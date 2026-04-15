@@ -1,6 +1,7 @@
 export type IndicatorType = 'NDVI' | 'NDMI';
 export type Granularity = 'day' | 'week' | 'month';
 export type CriticityLevel = 'HIGH' | 'MEDIUM' | 'LOW' | 'CRITICAL' | 'UNKNOWN';
+export type FreshnessStatus = 'FRESH' | 'STALE' | 'EMPTY';
 
 export interface ApiResponse<T> {
   success: boolean;
@@ -39,15 +40,15 @@ export interface AlertsSummaryDto {
 
 export interface LatestIndicatorDto {
   regionId: string;
-  regionName: string;
   indicator: IndicatorType;
   value: number | null;
-  measuredAt: string;
-  quality: 'GOOD' | 'WARN' | 'STALE' | 'UNKNOWN';
+  observedAt: string;
+  source: string;
+  cached: boolean;
 }
 
 export interface IndicatorSeriesPointDto {
-  date: string;
+  ts: string;
   value: number | null;
 }
 
@@ -61,10 +62,9 @@ export interface IndicatorMapPointDto {
 
 export interface DataFreshnessDto {
   regionId: string;
-  regionName: string;
-  lastSyncAt: string;
-  isFresh: boolean;
-  lagHours: number;
+  lastUpdate: string;
+  ageSeconds: number;
+  status: FreshnessStatus;
 }
 
 export interface SyncRunResultDto {
@@ -81,4 +81,12 @@ export interface DashboardFilters {
   to: string;
   granularity: Granularity;
   mapLimit: number;
+}
+
+export interface RegionDto {
+  id: string;
+  nombre: string;
+  codigo: string;
+  zona: string;
+  hectareasBosqueReferencia: number | null;
 }

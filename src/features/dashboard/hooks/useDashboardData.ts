@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import {
   fetchAlertsSummary,
   fetchCriticalRegions,
@@ -8,6 +8,7 @@ import {
   fetchIndicatorSeries,
   fetchLatestIndicator,
   fetchLossTrend,
+  fetchRegions,
   triggerDashboardSync
 } from '../services/dashboardApiService';
 import type { DashboardFilters } from '../types';
@@ -16,6 +17,12 @@ import { useDashboardResource } from './useDashboardResource';
 export function useDashboardData(filters: DashboardFilters) {
   const hasRegion = Boolean(filters.regionId);
   const hasDateRange = Boolean(filters.from && filters.to);
+
+  const regions = useDashboardResource({
+    cacheKey: 'dashboard:regions',
+    fetcher: fetchRegions,
+    ttlMs: 120_000
+  });
 
   const summary = useDashboardResource({
     cacheKey: 'dashboard:summary',
@@ -45,7 +52,7 @@ export function useDashboardData(filters: DashboardFilters) {
     cacheKey: `dashboard:indicator-latest:${filters.regionId}:${filters.indicator}`,
     enabled: hasRegion,
     fetcher: () => fetchLatestIndicator(filters.regionId, filters.indicator),
-    ttlMs: 30_000
+    ttlMs: 60_000
   });
 
   const indicatorSeries = useDashboardResource({
@@ -59,7 +66,7 @@ export function useDashboardData(filters: DashboardFilters) {
         to: filters.to,
         granularity: filters.granularity
       }),
-    ttlMs: 30_000
+    ttlMs: 120_000
   });
 
   const indicatorMap = useDashboardResource({
@@ -79,29 +86,43 @@ export function useDashboardData(filters: DashboardFilters) {
     cacheKey: `dashboard:data-freshness:${filters.regionId}`,
     enabled: hasRegion,
     fetcher: () => fetchDataFreshness(filters.regionId),
-    ttlMs: 20_000
+    ttlMs: 60_000
   });
 
-  const syncNow = async () => {
+  const syncNow = useCallback(async () => {
     return triggerDashboardSync(filters.regionId || undefined);
-  };
+  }, [filters.regionId]);
 
-  const reloadAll = async () => {
+  const reloadAll = useCallback(async () => {
     await Promise.all([
       summary.reload(),
       criticalRegions.reload(),
       lossTrend.reload(),
       alertsSummary.reload(),
+      regions.reload(),
       hasRegion ? latestIndicator.reload() : Promise.resolve(),
       hasRegion && hasDateRange ? indicatorSeries.reload() : Promise.resolve(),
       hasDateRange ? indicatorMap.reload() : Promise.resolve(),
       hasRegion ? dataFreshness.reload() : Promise.resolve()
     ]);
-  };
+  }, [
+    alertsSummary,
+    criticalRegions,
+    dataFreshness,
+    hasDateRange,
+    hasRegion,
+    indicatorMap,
+    indicatorSeries,
+    latestIndicator,
+    lossTrend,
+    regions,
+    summary
+  ]);
 
   return useMemo(
     () => ({
       summary,
+      regions,
       criticalRegions,
       lossTrend,
       alertsSummary,
@@ -124,7 +145,10 @@ export function useDashboardData(filters: DashboardFilters) {
       indicatorSeries,
       latestIndicator,
       lossTrend,
-      summary
+      regions,
+      reloadAll,
+      summary,
+      syncNow
     ]
   );
 }

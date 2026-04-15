@@ -12,6 +12,7 @@ import type {
   IndicatorType,
   LatestIndicatorDto,
   LossTrendPointDto,
+  RegionDto,
   SyncRunResultDto
 } from '../types';
 
@@ -20,6 +21,7 @@ interface RequestParams {
 }
 
 const DASHBOARD_ENDPOINTS = {
+  regions: '/api/regions',
   summary: '/api/dashboard/summary',
   criticalRegions: '/api/dashboard/critical-regions',
   lossTrend: '/api/dashboard/loss-trend',
@@ -80,14 +82,19 @@ function toNullableNumber(value: unknown): number | null {
 }
 
 function ensureApiResponse<T>(payload: unknown): ApiResponse<T> {
-  if (!isObject(payload) || !('success' in payload) || !('data' in payload)) {
-    throw new Error('Formato inesperado de respuesta del backend');
+  if (isObject(payload) && 'success' in payload && 'data' in payload) {
+    return payload as ApiResponse<T>;
   }
 
-  return payload as ApiResponse<T>;
+  return {
+    success: true,
+    message: '',
+    data: payload as T,
+    timestamp: new Date().toISOString()
+  };
 }
 
-function handleRequestError(error: unknown, endpoint: string, params?: RequestParams): never {
+function handleRequestError(error: unknown, endpoint: string, userMessage: string, params?: RequestParams): never {
   const normalizedError = toApiError(error);
   console.error('[dashboard-api] Error tecnico', {
     endpoint,
@@ -96,12 +103,12 @@ function handleRequestError(error: unknown, endpoint: string, params?: RequestPa
     path: normalizedError.path,
     raw: normalizedError.raw
   });
-  throw new Error(normalizedError.message || 'No fue posible cargar datos del dashboard.');
+  throw new Error(normalizedError.message || userMessage);
 }
 
-async function getApiData<T>(endpoint: string, params?: RequestParams): Promise<T> {
+async function getApiData<T>(endpoint: string, userMessage: string, params?: RequestParams): Promise<T> {
   try {
-    const response = await axiosClient.get<ApiResponse<T>>(endpoint, { params });
+    const response = await axiosClient.get<ApiResponse<T> | T>(endpoint, { params });
     const payload = ensureApiResponse<T>(response.data);
 
     if (!payload.success) {
@@ -110,13 +117,13 @@ async function getApiData<T>(endpoint: string, params?: RequestParams): Promise<
 
     return payload.data;
   } catch (error) {
-    return handleRequestError(error, endpoint, params);
+    return handleRequestError(error, endpoint, userMessage, params);
   }
 }
 
-async function postApiData<T>(endpoint: string, params?: RequestParams): Promise<T> {
+async function postApiData<T>(endpoint: string, userMessage: string, params?: RequestParams): Promise<T> {
   try {
-    const response = await axiosClient.post<ApiResponse<T>>(endpoint, null, { params });
+    const response = await axiosClient.post<ApiResponse<T> | T>(endpoint, null, { params });
     const payload = ensureApiResponse<T>(response.data);
 
     if (!payload.success) {
@@ -125,8 +132,19 @@ async function postApiData<T>(endpoint: string, params?: RequestParams): Promise
 
     return payload.data;
   } catch (error) {
-    return handleRequestError(error, endpoint, params);
+    return handleRequestError(error, endpoint, userMessage, params);
   }
+}
+
+function normalizeRegion(payload: unknown, index: number): RegionDto {
+  const source = isObject(payload) ? payload : {};
+  return {
+    id: toString(source.id, `region-${index + 1}`),
+    nombre: toString(source.nombre ?? source.regionName, `Region ${index + 1}`),
+    codigo: toString(source.codigo ?? source.code, '-'),
+    zona: toString(source.zona ?? source.zone, ''),
+    hectareasBosqueReferencia: toNullableNumber(source.hectareasBosqueReferencia ?? source.referenceHectares)
+  };
 }
 
 function normalizeSummary(payload: unknown): DashboardSummaryDto {
@@ -136,22 +154,25 @@ function normalizeSummary(payload: unknown): DashboardSummaryDto {
     totalAlerts: toNumber(source.totalAlerts ?? source.totalAlertas),
     worstPeriodLabel: toString(source.worstPeriodLabel ?? source.anioMayorPerdida, '-'),
     trendLabel: toString(source.trendLabel ?? source.tendenciaGeneral, '-'),
-    monitoredRegions: toNumber(source.monitoredRegions ?? source.totalRegiones)
+    monitoredRegions: toNumber(source.monitoredRegions ?? source.totalRegiones ?? source.regionesCriticas)
   };
 }
 
 function normalizeCriticalRegion(payload: unknown, index: number): CriticalRegionDto {
   const source = isObject(payload) ? payload : {};
   const regionId = toString(source.regionId ?? source.id, `region-${index + 1}`);
-  const regionName = toString(source.regionName ?? source.nombre ?? source.region, `Region ${index + 1}`);
+  const regionName = toString(
+    source.regionName ?? source.nombreRegion ?? source.nombre ?? source.region,
+    `Region ${index + 1}`
+  );
 
   return {
     id: toString(source.id, regionId),
     regionId,
     regionName,
-    criticity: toCriticity(source.criticity ?? source.nivelCriticidad ?? source.level),
-    hectaresLost: toNumber(source.hectaresLost ?? source.hectareasPerdidas),
-    totalAlerts: toNumber(source.totalAlerts ?? source.totalAlertas)
+    criticity: toCriticity(source.criticity ?? source.nivelCriticidad ?? source.estadoCriticidad ?? source.level),
+    hectaresLost: toNumber(source.hectaresLost ?? source.hectareasPerdidas ?? source.porcentajePerdidaActual),
+    totalAlerts: toNumber(source.totalAlerts ?? source.totalAlertas ?? source.eventosCalorRecientes)
   };
 }
 
@@ -172,22 +193,39 @@ function normalizeAlertsSummary(payload: unknown, index: number): AlertsSummaryD
   };
 }
 
+function normalizeAlertsSummaryCollection(payload: unknown): AlertsSummaryDto[] {
+  if (Array.isArray(payload)) {
+    return payload.map(normalizeAlertsSummary);
+  }
+
+  if (!isObject(payload)) {
+    return [];
+  }
+
+  return [
+    { category: 'LOW', total: toNumber(payload.bajo), level: 'LOW' },
+    { category: 'MEDIUM', total: toNumber(payload.medio), level: 'MEDIUM' },
+    { category: 'HIGH', total: toNumber(payload.alto), level: 'HIGH' },
+    { category: 'CRITICAL', total: toNumber(payload.critico), level: 'CRITICAL' }
+  ];
+}
+
 function normalizeLatestIndicator(payload: unknown, indicator: IndicatorType, regionId: string): LatestIndicatorDto {
   const source = isObject(payload) ? payload : {};
   return {
     regionId: toString(source.regionId, regionId),
-    regionName: toString(source.regionName ?? source.nombreRegion, regionId || 'Region'),
-    indicator,
+    indicator: toString(source.indicator, indicator).toUpperCase() as IndicatorType,
     value: toNullableNumber(source.value ?? source.valor),
-    measuredAt: toString(source.measuredAt ?? source.timestamp ?? source.fecha, ''),
-    quality: toString(source.quality ?? source.calidad, 'UNKNOWN').toUpperCase() as LatestIndicatorDto['quality']
+    observedAt: toString(source.observedAt ?? source.measuredAt ?? source.timestamp ?? source.fecha, ''),
+    source: toString(source.source, 'Copernicus/openEO'),
+    cached: Boolean(source.cached ?? false)
   };
 }
 
 function normalizeSeriesPoint(payload: unknown, index: number): IndicatorSeriesPointDto {
   const source = isObject(payload) ? payload : {};
   return {
-    date: toString(source.date ?? source.fecha ?? source.label, `P-${index + 1}`),
+    ts: toString(source.ts ?? source.date ?? source.fecha ?? source.label, `P-${index + 1}`),
     value: toNullableNumber(source.value ?? source.valor)
   };
 }
@@ -195,23 +233,37 @@ function normalizeSeriesPoint(payload: unknown, index: number): IndicatorSeriesP
 function normalizeMapPoint(payload: unknown, indicator: IndicatorType, index: number): IndicatorMapPointDto {
   const source = isObject(payload) ? payload : {};
   const regionId = toString(source.regionId ?? source.id, `region-${index + 1}`);
+  const value = toNullableNumber(source.value ?? source.valor);
+  const explicitCriticity = toCriticity(source.criticity ?? source.level);
+  const inferredCriticity =
+    value === null ? 'UNKNOWN' : value >= 0.5 ? 'LOW' : value >= 0.2 ? 'MEDIUM' : 'HIGH';
+
   return {
     regionId,
-    regionName: toString(source.regionName ?? source.nombreRegion ?? source.region, `Region ${index + 1}`),
+    regionName: toString(source.regionName ?? source.nombreRegion ?? source.region ?? source.aoi, `Region ${index + 1}`),
     indicator,
-    value: toNullableNumber(source.value ?? source.valor),
-    criticity: toCriticity(source.criticity ?? source.level)
+    value,
+    criticity: explicitCriticity === 'UNKNOWN' ? inferredCriticity : explicitCriticity
   };
 }
 
 function normalizeDataFreshness(payload: unknown, regionId: string): DataFreshnessDto {
   const source = isObject(payload) ? payload : {};
+  const rawStatus = toString(source.status, '').toUpperCase();
+  const ageSecondsFromLegacyHours =
+    source.lagHours !== undefined && source.ageSeconds === undefined ? toNumber(source.lagHours, 0) * 3600 : null;
+  const status: DataFreshnessDto['status'] =
+    rawStatus === 'FRESH' || rawStatus === 'STALE' || rawStatus === 'EMPTY'
+      ? rawStatus
+      : Boolean(source.isFresh ?? source.fresco)
+        ? 'FRESH'
+        : 'STALE';
+
   return {
     regionId: toString(source.regionId, regionId),
-    regionName: toString(source.regionName ?? source.nombreRegion, regionId || 'Region'),
-    lastSyncAt: toString(source.lastSyncAt ?? source.ultimaSincronizacion, ''),
-    isFresh: Boolean(source.isFresh ?? source.fresco),
-    lagHours: toNumber(source.lagHours ?? source.horasDeAtraso)
+    lastUpdate: toString(source.lastUpdate ?? source.lastSyncAt ?? source.ultimaSincronizacion, ''),
+    ageSeconds: toNumber(source.ageSeconds ?? source.age ?? ageSecondsFromLegacyHours, 0),
+    status
   };
 }
 
@@ -226,27 +278,43 @@ function normalizeSyncRun(payload: unknown, regionId?: string): SyncRunResultDto
 }
 
 export async function fetchDashboardSummary(): Promise<DashboardSummaryDto> {
-  const payload = await getApiData<unknown>(DASHBOARD_ENDPOINTS.summary);
+  const payload = await getApiData<unknown>(
+    DASHBOARD_ENDPOINTS.summary,
+    'No fue posible cargar el resumen del dashboard.'
+  );
   return normalizeSummary(payload);
 }
 
 export async function fetchCriticalRegions(): Promise<CriticalRegionDto[]> {
-  const payload = await getApiData<unknown[]>(DASHBOARD_ENDPOINTS.criticalRegions);
+  const payload = await getApiData<unknown[]>(
+    DASHBOARD_ENDPOINTS.criticalRegions,
+    'No fue posible cargar las regiones criticas.'
+  );
   return Array.isArray(payload) ? payload.map(normalizeCriticalRegion) : [];
 }
 
 export async function fetchLossTrend(): Promise<LossTrendPointDto[]> {
-  const payload = await getApiData<unknown[]>(DASHBOARD_ENDPOINTS.lossTrend);
+  const payload = await getApiData<unknown[]>(
+    DASHBOARD_ENDPOINTS.lossTrend,
+    'No fue posible cargar la tendencia de perdida.'
+  );
   return Array.isArray(payload) ? payload.map(normalizeLossTrend) : [];
 }
 
 export async function fetchAlertsSummary(): Promise<AlertsSummaryDto[]> {
-  const payload = await getApiData<unknown[]>(DASHBOARD_ENDPOINTS.alertsSummary);
-  return Array.isArray(payload) ? payload.map(normalizeAlertsSummary) : [];
+  const payload = await getApiData<unknown>(
+    DASHBOARD_ENDPOINTS.alertsSummary,
+    'No fue posible cargar el resumen de alertas.'
+  );
+  return normalizeAlertsSummaryCollection(payload);
 }
 
 export async function fetchLatestIndicator(regionId: string, indicator: IndicatorType): Promise<LatestIndicatorDto> {
-  const payload = await getApiData<unknown>(DASHBOARD_ENDPOINTS.latestIndicators, { regionId, indicator });
+  const payload = await getApiData<unknown>(
+    DASHBOARD_ENDPOINTS.latestIndicators,
+    'No fue posible cargar el ultimo indicador de la region.',
+    { regionId, indicator }
+  );
   return normalizeLatestIndicator(payload, indicator, regionId);
 }
 
@@ -257,8 +325,18 @@ export async function fetchIndicatorSeries(params: {
   to: string;
   granularity: Granularity;
 }): Promise<IndicatorSeriesPointDto[]> {
-  const payload = await getApiData<unknown[]>(DASHBOARD_ENDPOINTS.indicatorSeries, params);
-  return Array.isArray(payload) ? payload.map(normalizeSeriesPoint) : [];
+  const payload = await getApiData<unknown>(
+    DASHBOARD_ENDPOINTS.indicatorSeries,
+    'No fue posible cargar la serie temporal.',
+    params
+  );
+  const points = Array.isArray(payload)
+    ? payload
+    : isObject(payload) && Array.isArray(payload.points)
+      ? payload.points
+      : [];
+
+  return points.map(normalizeSeriesPoint);
 }
 
 export async function fetchIndicatorMap(params: {
@@ -267,16 +345,42 @@ export async function fetchIndicatorMap(params: {
   to: string;
   limit: number;
 }): Promise<IndicatorMapPointDto[]> {
-  const payload = await getApiData<unknown[]>(DASHBOARD_ENDPOINTS.indicatorMap, params);
-  return Array.isArray(payload) ? payload.map((item, index) => normalizeMapPoint(item, params.indicator, index)) : [];
+  const payload = await getApiData<unknown>(
+    DASHBOARD_ENDPOINTS.indicatorMap,
+    'No fue posible cargar la capa de mapa.',
+    params
+  );
+  const items = Array.isArray(payload)
+    ? payload
+    : isObject(payload) && Array.isArray(payload.items)
+      ? payload.items
+      : [];
+
+  return items.map((item, index) => normalizeMapPoint(item, params.indicator, index));
 }
 
 export async function fetchDataFreshness(regionId: string): Promise<DataFreshnessDto> {
-  const payload = await getApiData<unknown>(DASHBOARD_ENDPOINTS.dataFreshness, { regionId });
+  const payload = await getApiData<unknown>(
+    DASHBOARD_ENDPOINTS.dataFreshness,
+    'No fue posible consultar la frescura de datos.',
+    { regionId }
+  );
   return normalizeDataFreshness(payload, regionId);
 }
 
 export async function triggerDashboardSync(regionId?: string): Promise<SyncRunResultDto> {
-  const payload = await postApiData<unknown>(DASHBOARD_ENDPOINTS.syncRun, regionId ? { regionId } : undefined);
+  const payload = await postApiData<unknown>(
+    DASHBOARD_ENDPOINTS.syncRun,
+    'No fue posible iniciar la sincronizacion.',
+    regionId ? { regionId } : undefined
+  );
   return normalizeSyncRun(payload, regionId);
+}
+
+export async function fetchRegions(): Promise<RegionDto[]> {
+  const payload = await getApiData<unknown[]>(
+    DASHBOARD_ENDPOINTS.regions,
+    'No fue posible cargar regiones desde backend.'
+  );
+  return Array.isArray(payload) ? payload.map(normalizeRegion) : [];
 }

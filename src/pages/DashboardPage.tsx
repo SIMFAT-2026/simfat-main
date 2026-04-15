@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import SectionTitle from '../components/SectionTitle';
 import AlertsBar from '../features/dashboard/components/AlertsBar';
 import AlertsDonut from '../features/dashboard/components/AlertsDonut';
@@ -27,6 +28,14 @@ function DashboardPage() {
   } = useDashboardFilters();
 
   const dashboard = useDashboardData(filters);
+  const regions = dashboard.regions.data || [];
+  const selectedRegion = regions.find((region) => region.id === filters.regionId) || null;
+
+  useEffect(() => {
+    if (!filters.regionId && regions.length > 0 && !dashboard.regions.loading) {
+      setRegionId(regions[0].id);
+    }
+  }, [dashboard.regions.loading, filters.regionId, regions, setRegionId]);
 
   return (
     <section className="page-container">
@@ -34,12 +43,16 @@ function DashboardPage() {
 
       <DashboardFiltersPanel
         filters={filters}
+        regions={regions}
+        regionsLoading={dashboard.regions.loading}
+        regionsError={dashboard.regions.error}
         onRegionChange={setRegionId}
         onIndicatorChange={setIndicator}
         onFromChange={setFrom}
         onToChange={setTo}
         onGranularityChange={setGranularity}
         onMapLimitChange={setMapLimit}
+        onReloadRegions={dashboard.regions.reload}
         onReset={resetFilters}
       />
 
@@ -53,6 +66,16 @@ function DashboardPage() {
         />
         <SyncNowButton onSync={dashboard.syncNow} onSyncSuccess={dashboard.reloadAll} />
       </div>
+
+      <LatestIndicatorsPanel
+        data={dashboard.latestIndicator.data}
+        loading={dashboard.latestIndicator.loading}
+        error={dashboard.latestIndicator.error}
+        hasRegion={dashboard.hasRegion}
+        selectedRegionName={selectedRegion?.nombre || '-'}
+        selectedRegionCode={selectedRegion?.codigo || '-'}
+        onRetry={dashboard.latestIndicator.reload}
+      />
 
       <DashboardKpiCards
         summary={dashboard.summary.data}
@@ -83,13 +106,6 @@ function DashboardPage() {
       </div>
 
       <div className="dashboard-grid">
-        <LatestIndicatorsPanel
-          data={dashboard.latestIndicator.data}
-          loading={dashboard.latestIndicator.loading}
-          error={dashboard.latestIndicator.error}
-          hasRegion={dashboard.hasRegion}
-          onRetry={dashboard.latestIndicator.reload}
-        />
         <IndicatorSeriesChart
           data={dashboard.indicatorSeries.data}
           loading={dashboard.indicatorSeries.loading}

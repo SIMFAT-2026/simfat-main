@@ -1,36 +1,51 @@
-import type { DashboardFilters, Granularity, IndicatorType } from '../types';
+import type { DashboardFilters, Granularity, IndicatorType, RegionDto } from '../types';
 
 interface DashboardFiltersProps {
   filters: DashboardFilters;
+  regions: RegionDto[];
+  regionsLoading: boolean;
+  regionsError: string;
   onRegionChange: (value: string) => void;
   onIndicatorChange: (value: IndicatorType) => void;
   onFromChange: (value: string) => void;
   onToChange: (value: string) => void;
   onGranularityChange: (value: Granularity) => void;
   onMapLimitChange: (value: number) => void;
+  onReloadRegions: () => Promise<void> | void;
   onReset: () => void;
 }
 
 function DashboardFiltersPanel({
   filters,
+  regions,
+  regionsLoading,
+  regionsError,
   onRegionChange,
   onIndicatorChange,
   onFromChange,
   onToChange,
   onGranularityChange,
   onMapLimitChange,
+  onReloadRegions,
   onReset
 }: DashboardFiltersProps) {
   return (
     <div className="filter-bar dashboard-filters">
       <label>
-        Region ID
-        <input
-          type="text"
-          value={filters.regionId}
-          onChange={(event) => onRegionChange(event.target.value.trim())}
-          placeholder="Ej: region-001"
-        />
+        Region
+        <select value={filters.regionId} onChange={(event) => onRegionChange(event.target.value)}>
+          <option value="">{regionsLoading ? 'Cargando regiones...' : 'Selecciona una region'}</option>
+          {regions.map((region) => (
+            <option key={region.id} value={region.id}>
+              {region.nombre} ({region.codigo || 'SIN-COD'})
+            </option>
+          ))}
+        </select>
+        {regionsError ? (
+          <button type="button" className="btn btn-secondary dashboard-inline-action" onClick={onReloadRegions}>
+            Reintentar regiones
+          </button>
+        ) : null}
       </label>
 
       <label>

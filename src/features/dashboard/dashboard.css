@@ -29,6 +29,12 @@
   align-items: flex-end;
 }
 
+.dashboard-inline-action {
+  margin-top: 6px;
+  padding: 4px 8px;
+  font-size: 0.75rem;
+}
+
 .dashboard-hint {
   color: #64748b;
   margin: 8px 0 0;
@@ -74,6 +80,12 @@
   margin: 0 0 4px;
 }
 
+.latest-indicator-sub {
+  margin: 4px 0 0;
+  font-size: 0.78rem;
+  color: #64748b;
+}
+
 .freshness-chip {
   border-radius: 999px;
   padding: 6px 10px;
@@ -90,9 +102,15 @@
 }
 
 .freshness-chip-stale {
-  border-color: #fca5a5;
-  background: #fef2f2;
-  color: #991b1b;
+  border-color: #fcd34d;
+  background: #fffbeb;
+  color: #92400e;
+}
+
+.freshness-chip-empty {
+  border-color: #cbd5e1;
+  background: #f8fafc;
+  color: #475569;
 }
 
 .freshness-chip-unknown {

@@ -12,7 +12,13 @@ function getChipClass(data: DataFreshnessDto | null): string {
   if (!data) {
     return 'freshness-chip freshness-chip-unknown';
   }
-  return data.isFresh ? 'freshness-chip freshness-chip-fresh' : 'freshness-chip freshness-chip-stale';
+  if (data.status === 'FRESH') {
+    return 'freshness-chip freshness-chip-fresh';
+  }
+  if (data.status === 'STALE') {
+    return 'freshness-chip freshness-chip-stale';
+  }
+  return 'freshness-chip freshness-chip-empty';
 }
 
 function formatDate(value: string): string {
@@ -21,6 +27,17 @@ function formatDate(value: string): string {
   }
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? value : date.toLocaleString('es-CL');
+}
+
+function formatAge(ageSeconds: number): string {
+  if (!Number.isFinite(ageSeconds) || ageSeconds <= 0) {
+    return '-';
+  }
+  const hours = ageSeconds / 3600;
+  if (hours >= 24) {
+    return `${(hours / 24).toFixed(1)} d`;
+  }
+  return `${hours.toFixed(1)} h`;
 }
 
 function DataFreshnessChip({ data, loading, error, hasRegion, onRetry }: DataFreshnessChipProps) {
@@ -42,7 +59,8 @@ function DataFreshnessChip({ data, loading, error, hasRegion, onRetry }: DataFre
 
   return (
     <span className={getChipClass(data)}>
-      Frescura: {data?.isFresh ? 'actualizada' : 'desfasada'} | Ult sync: {formatDate(data?.lastSyncAt || '')}
+      Frescura: {data?.status || 'EMPTY'} | Ult update: {formatDate(data?.lastUpdate || '')} | Edad:{' '}
+      {formatAge(data?.ageSeconds || 0)}
     </span>
   );
 }

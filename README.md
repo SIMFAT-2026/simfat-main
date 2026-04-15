@@ -48,8 +48,13 @@ Frontend del proyecto **SIMFAT** (Sistema Integrado de Monitoreo y Alerta Tempra
 Crear archivo `.env` (puedes copiar `.env.example`) con:
 
 ```env
+NEXT_PUBLIC_API_BASE_URL=http://localhost:8080
 VITE_API_URL=http://localhost:8080
 ```
+
+Notas:
+- `NEXT_PUBLIC_API_BASE_URL` es la variable principal usada por el dashboard satelital MVP.
+- `VITE_API_URL` se mantiene como fallback de compatibilidad.
 
 ## Ejecutar en modo desarrollo
 

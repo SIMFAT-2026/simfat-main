@@ -34,6 +34,7 @@ function IndicatorSeriesChart({ data, loading, error, indicator, hasRegion, onRe
     ...point,
     value: point.value ?? null
   }));
+  const hasSomeValue = rows.some((point) => point.value !== null);
 
   return (
     <article className="dashboard-card">
@@ -41,15 +42,15 @@ function IndicatorSeriesChart({ data, loading, error, indicator, hasRegion, onRe
       <DashboardPanelState
         loading={loading}
         error={error}
-        isEmpty={rows.length === 0}
+        isEmpty={rows.length === 0 || !hasSomeValue}
         emptyTitle="Sin serie temporal"
-        emptyDescription="No hay valores para la combinacion de filtros seleccionada."
+        emptyDescription="No hay valores numericos para la combinacion de filtros seleccionada."
         onRetry={onRetry}
       >
         <ResponsiveContainer width="100%" height={300}>
           <AreaChart data={rows}>
             <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="date" />
+            <XAxis dataKey="ts" />
             <YAxis domain={[-1, 1]} />
             <Tooltip />
             <Legend />

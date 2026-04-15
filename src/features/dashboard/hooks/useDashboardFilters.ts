@@ -15,7 +15,7 @@ function createInitialFilters(): DashboardFilters {
     indicator: 'NDVI',
     from: formatDate(start),
     to: formatDate(now),
-    granularity: 'week',
+    granularity: 'day',
     mapLimit: 200
   };
 }

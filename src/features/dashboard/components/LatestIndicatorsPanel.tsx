@@ -6,6 +6,8 @@ interface LatestIndicatorsPanelProps {
   loading: boolean;
   error: string;
   hasRegion: boolean;
+  selectedRegionName: string;
+  selectedRegionCode: string;
   onRetry: () => Promise<void> | void;
 }
 
@@ -24,20 +26,41 @@ function formatTimestamp(value: string): string {
   return Number.isNaN(date.getTime()) ? value : date.toLocaleString('es-CL');
 }
 
-function getQualityClass(quality: LatestIndicatorDto['quality']): string {
-  if (quality === 'GOOD') {
+function getValueStatus(value: number | null): 'SALUDABLE' | 'INTERMEDIO' | 'CRITICO' | 'SIN_DATO' {
+  if (value === null) {
+    return 'SIN_DATO';
+  }
+  if (value >= 0.5) {
+    return 'SALUDABLE';
+  }
+  if (value >= 0.2) {
+    return 'INTERMEDIO';
+  }
+  return 'CRITICO';
+}
+
+function getValueBadgeClass(status: ReturnType<typeof getValueStatus>): string {
+  if (status === 'SALUDABLE') {
     return 'badge badge-low';
   }
-  if (quality === 'WARN') {
+  if (status === 'INTERMEDIO') {
     return 'badge badge-medium';
   }
-  if (quality === 'STALE') {
-    return 'badge badge-high';
+  if (status === 'CRITICO') {
+    return 'badge badge-critical';
   }
   return 'badge';
 }
 
-function LatestIndicatorsPanel({ data, loading, error, hasRegion, onRetry }: LatestIndicatorsPanelProps) {
+function LatestIndicatorsPanel({
+  data,
+  loading,
+  error,
+  hasRegion,
+  selectedRegionName,
+  selectedRegionCode,
+  onRetry
+}: LatestIndicatorsPanelProps) {
   if (!hasRegion) {
     return (
       <article className="dashboard-card">
@@ -47,9 +70,11 @@ function LatestIndicatorsPanel({ data, loading, error, hasRegion, onRetry }: Lat
     );
   }
 
+  const valueStatus = getValueStatus(data?.value ?? null);
+
   return (
     <article className="dashboard-card">
-      <h3>Ultimo indicador</h3>
+      <h3>KPI satelital actual</h3>
       <DashboardPanelState
         loading={loading}
         error={error}
@@ -61,7 +86,8 @@ function LatestIndicatorsPanel({ data, loading, error, hasRegion, onRetry }: Lat
         <div className="latest-indicator-grid">
           <div>
             <p className="latest-indicator-label">Region</p>
-            <strong>{data?.regionName || '-'}</strong>
+            <strong>{selectedRegionName}</strong>
+            <p className="latest-indicator-sub">Codigo: {selectedRegionCode}</p>
           </div>
           <div>
             <p className="latest-indicator-label">Indicador</p>
@@ -73,11 +99,19 @@ function LatestIndicatorsPanel({ data, loading, error, hasRegion, onRetry }: Lat
           </div>
           <div>
             <p className="latest-indicator-label">Ultima lectura</p>
-            <strong>{formatTimestamp(data?.measuredAt || '')}</strong>
+            <strong>{formatTimestamp(data?.observedAt || '')}</strong>
           </div>
           <div>
-            <p className="latest-indicator-label">Calidad</p>
-            <span className={getQualityClass(data?.quality || 'UNKNOWN')}>{data?.quality || 'UNKNOWN'}</span>
+            <p className="latest-indicator-label">Estado indice</p>
+            <span className={getValueBadgeClass(valueStatus)}>{valueStatus}</span>
+          </div>
+          <div>
+            <p className="latest-indicator-label">Fuente</p>
+            <strong>{data?.source || '-'}</strong>
+          </div>
+          <div>
+            <p className="latest-indicator-label">Cache</p>
+            <span className="badge">{data?.cached ? 'CACHEADA' : 'EN VIVO'}</span>
           </div>
         </div>
       </DashboardPanelState>
