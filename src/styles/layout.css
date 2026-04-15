@@ -34,6 +34,27 @@
   justify-content: flex-end;
 }
 
+.navbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.navbar-user {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.navbar-user-name {
+  font-size: 0.85rem;
+  color: #475569;
+}
+
+.navbar-logout-btn {
+  padding: 6px 10px;
+}
+
 .nav-link {
   border: 1px solid transparent;
   border-radius: 8px;
@@ -116,6 +137,18 @@
 }
 
 @media (max-width: 992px) {
+  .navbar {
+    align-items: flex-start;
+    gap: 10px;
+    flex-direction: column;
+  }
+
+  .navbar-actions {
+    width: 100%;
+    justify-content: space-between;
+    flex-wrap: wrap;
+  }
+
   .app-content-wrapper {
     grid-template-columns: 1fr;
   }

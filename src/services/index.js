@@ -3,3 +3,4 @@ export * from './forestLossService';
 export * from './alertsService';
 export * from './rulesService';
 export * from './dashboardService';
+export * from './authService';

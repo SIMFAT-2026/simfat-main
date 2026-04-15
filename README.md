@@ -1,4 +1,4 @@
-# SIMFAT Frontend
+﻿# SIMFAT Frontend
 
 Frontend del proyecto **SIMFAT** (Sistema Integrado de Monitoreo y Alerta Temprana Forestal).
 
@@ -8,53 +8,60 @@ Frontend del proyecto **SIMFAT** (Sistema Integrado de Monitoreo y Alerta Tempra
 
 ## Estado Actual del Desarrollo
 
-**Fecha de actualizacion:** 05-04-2026  
-**Estado general:** Base MVP funcional y conectada a backend real.
+**Fecha de actualizacion:** 15-04-2026  
+**Estado general:** MVP funcional con autenticacion JWT integrada a backend.
 
 ### Avance implementado
 
 - Estructura profesional del proyecto (`api`, `services`, `pages`, `components`, `layouts`, `hooks`, `utils`, `styles`).
-- Navegacion completa con React Router.
+- Navegacion con React Router y proteccion de rutas por autenticacion.
 - Layout principal con Navbar, Sidebar y Footer.
-- CRUD funcional para:
-  - Regiones
-  - Perdida forestal
-  - Alertas
-  - Reglas
 - Dashboard conectado a endpoints reales:
   - Summary
   - Critical regions
   - Loss trend
   - Alerts summary
-- Manejo de errores robusto con normalizacion de contrato backend.
-- Soporte para `validationErrors` por campo en formularios.
-- Adaptador de compatibilidad para respuestas envueltas y payload plano.
-- Build y lint verificados.
-
-### Estado de ramas remotas
-
-- `main` publicada
-- `develop` publicada
-- Commit base actual: `be09cbb`
+- Manejo de errores robusto con normalizacion de contrato backend (`ApiResponse<T>` y `validationErrors`).
+- Flujo auth completo en frontend:
+  - Login
+  - Registro
+  - Recuperacion de contraseña
+  - Reset de contraseña
+  - Logout
+- Soporte JWT:
+  - `Authorization: Bearer <accessToken>` en Axios
+  - Refresh automatico de token con `POST /api/auth/refresh` cuando expira access token
+  - Limpieza de sesion si refresh falla
+- UX de autenticacion mejorada:
+  - Requisitos visibles de password
+  - Indicador de seguridad de contraseña
+  - Mostrar/ocultar contraseña en login y registro
+  - Recordar usuario (persistencia de correo local)
+- Turnstile de Cloudflare habilitable por variable de entorno.
 
 ## Requisitos
 
 - Node.js 18+ (recomendado Node.js 20 LTS)
 - npm 9+
-- Backend `simfat-backend` ejecutandose en `http://localhost:8080`
+- Backend `simfat-backend` ejecutandose en `http://localhost:8081`
 
 ## Variables de entorno
 
 Crear archivo `.env` (puedes copiar `.env.example`) con:
 
 ```env
-NEXT_PUBLIC_API_BASE_URL=http://localhost:8080
-VITE_API_URL=http://localhost:8080
+NEXT_PUBLIC_API_BASE_URL=http://localhost:8081
+VITE_API_URL=http://localhost:8081
+VITE_AUTH_TURNSTILE_ENABLED=true
+VITE_TURNSTILE_SITE_KEY=1x00000000000000000000AA
+VITE_AUTH_DEV_TOOLS_ENABLED=true
 ```
 
 Notas:
-- `NEXT_PUBLIC_API_BASE_URL` es la variable principal usada por el dashboard satelital MVP.
-- `VITE_API_URL` se mantiene como fallback de compatibilidad.
+- `NEXT_PUBLIC_API_BASE_URL` / `VITE_API_URL`: base URL backend.
+- `VITE_AUTH_TURNSTILE_ENABLED`: activa/desactiva captcha en formularios auth.
+- `VITE_TURNSTILE_SITE_KEY`: clave publica de Turnstile (usar la del ambiente).
+- `VITE_AUTH_DEV_TOOLS_ENABLED`: habilita utilidades de desarrollo (seed users).
 
 ## Ejecutar en modo desarrollo
 
@@ -76,7 +83,7 @@ npm run dev
 http://localhost:5173
 ```
 
-## Ejecutar en modo produccion (local)
+## Ejecutar en modo preview (build local)
 
 1. Generar build optimizado:
 
@@ -90,7 +97,7 @@ npm run build
 npm run preview
 ```
 
-3. Abrir URL que muestra Vite Preview (normalmente):
+3. Abrir URL de preview (normalmente):
 
 ```text
 http://localhost:4173
@@ -110,7 +117,7 @@ npm run lint     # revision de codigo
 Base URL:
 
 ```text
-http://localhost:8080
+http://localhost:8081
 ```
 
 Formato exito:
@@ -133,21 +140,33 @@ Formato error:
 }
 ```
 
+## Endpoints de autenticacion usados por frontend
+
+- `POST /api/auth/register`
+- `POST /api/auth/login`
+- `POST /api/auth/refresh`
+- `POST /api/auth/forgot-password`
+- `POST /api/auth/reset-password`
+- `GET /api/auth/me`
+- `POST /api/auth/logout`
+- `POST /api/auth/dev/seed-users` (solo dev)
+
 ## Despliegue en Vercel
 
-El proyecto ya incluye configuracion SPA para rutas de React Router en `vercel.json`.
+El proyecto incluye configuracion SPA para rutas de React Router en `vercel.json`.
 
 Pasos recomendados:
 
 1. Importar repo en Vercel.
-2. Configurar variable de entorno `VITE_API_URL` con la URL real del backend.
-3. Deploy de `main` (produccion) o `develop` (entorno dev/preview segun flujo).
+2. Configurar variables de entorno del frontend.
+3. Deploy de `main` (produccion) o `develop` (preview/dev).
 
 ## Estructura resumida
 
 ```text
 src/
   api/
+  auth/
   components/
   hooks/
   layouts/
@@ -163,7 +182,3 @@ src/
 - Features nuevas en ramas `feature/*` desde `develop`.
 - Merge de feature -> `develop` para pruebas integradas.
 - Merge de `develop` -> `main` para releases.
-
----
-
-Si necesitas, en la siguiente iteracion dejamos tambien una guia de contribucion (`CONTRIBUTING.md`) y convenciones de commits para el equipo.
