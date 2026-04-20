@@ -8,7 +8,7 @@ function formatDate(date: Date): string {
 function createInitialFilters(): DashboardFilters {
   const now = new Date();
   const start = new Date(now);
-  start.setDate(now.getDate() - 30);
+  start.setDate(now.getDate() - 3);
 
   return {
     regionId: '',

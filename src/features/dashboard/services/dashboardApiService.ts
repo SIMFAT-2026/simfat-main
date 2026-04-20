@@ -136,6 +136,29 @@ async function postApiData<T>(endpoint: string, userMessage: string, params?: Re
   }
 }
 
+async function postApiDataWithTimeout<T>(
+  endpoint: string,
+  userMessage: string,
+  timeoutMs: number,
+  params?: RequestParams
+): Promise<T> {
+  try {
+    const response = await axiosClient.post<ApiResponse<T> | T>(endpoint, null, {
+      params,
+      timeout: timeoutMs
+    });
+    const payload = ensureApiResponse<T>(response.data);
+
+    if (!payload.success) {
+      throw new Error(payload.message || 'La API respondio con success=false');
+    }
+
+    return payload.data;
+  } catch (error) {
+    return handleRequestError(error, endpoint, userMessage, params);
+  }
+}
+
 function normalizeRegion(payload: unknown, index: number): RegionDto {
   const source = isObject(payload) ? payload : {};
   return {
@@ -368,11 +391,23 @@ export async function fetchDataFreshness(regionId: string): Promise<DataFreshnes
   return normalizeDataFreshness(payload, regionId);
 }
 
-export async function triggerDashboardSync(regionId?: string): Promise<SyncRunResultDto> {
-  const payload = await postApiData<unknown>(
+export async function triggerDashboardSync(regionId?: string, from?: string, to?: string): Promise<SyncRunResultDto> {
+  const params: RequestParams = {};
+  if (regionId) {
+    params.regionId = regionId;
+  }
+  if (from) {
+    params.from = from;
+  }
+  if (to) {
+    params.to = to;
+  }
+
+  const payload = await postApiDataWithTimeout<unknown>(
     DASHBOARD_ENDPOINTS.syncRun,
     'No fue posible iniciar la sincronizacion.',
-    regionId ? { regionId } : undefined
+    120000,
+    Object.keys(params).length > 0 ? params : undefined
   );
   return normalizeSyncRun(payload, regionId);
 }

@@ -90,8 +90,8 @@ export function useDashboardData(filters: DashboardFilters) {
   });
 
   const syncNow = useCallback(async () => {
-    return triggerDashboardSync(filters.regionId || undefined);
-  }, [filters.regionId]);
+    return triggerDashboardSync(filters.regionId || undefined, filters.from || undefined, filters.to || undefined);
+  }, [filters.from, filters.regionId, filters.to]);
 
   const reloadAll = useCallback(async () => {
     await Promise.all([
