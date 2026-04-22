@@ -51,3 +51,14 @@ npm run build
 ```
 
 Resultado: ambos comandos exitosos.
+
+## Actualizacion adicional de cierre (misma iteracion)
+
+- Se mejoro experiencia de `Reportes ciudadanos`:
+  - se reemplazo visualizador embebido por galeria modal con miniaturas;
+  - al hacer click en miniatura se muestra imagen en tamano completo.
+- Se fortalecio continuidad de persistencia:
+  - frontend reintenta creacion de reporte sin adjuntos si falla envio con archivos;
+  - backend agrega tolerancia a fallo de upload para no perder registro principal.
+- Pendiente operacional declarado:
+  - completar configuracion correcta de variables Supabase Storage en entorno local/evaluacion.

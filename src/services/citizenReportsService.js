@@ -1,6 +1,7 @@
 import axiosClient from '../api/axiosClient';
 import { API_ENDPOINTS } from '../api/endpoints';
 import { extractData } from '../api/responseAdapter';
+import { resizeImagesBatch } from '../utils/imageResize';
 
 export async function getCitizenReports(filters = {}) {
   const response = await axiosClient.get(API_ENDPOINTS.citizenReports, {
@@ -14,9 +15,15 @@ export async function getCitizenReports(filters = {}) {
 }
 
 export async function createCitizenReport({ payload, files = [] }) {
+  const optimizedFiles = await resizeImagesBatch(files, {
+    maxSide: 1024,
+    quality: 0.76,
+    mimeType: 'image/webp'
+  });
+
   const formData = new window.FormData();
   formData.append('payload', JSON.stringify(payload));
-  files.forEach((file) => formData.append('files', file));
+  optimizedFiles.forEach((file) => formData.append('files', file));
 
   const response = await axiosClient.post(API_ENDPOINTS.citizenReports, formData, {
     headers: {

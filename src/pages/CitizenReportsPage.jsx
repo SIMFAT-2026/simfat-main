@@ -47,7 +47,8 @@ function CitizenReportsPage() {
   const [locating, setLocating] = useState(false);
   const [filters, setFilters] = useState({ regionId: '', status: '', category: '' });
   const [pendingDeleteId, setPendingDeleteId] = useState('');
-  const [previewReport, setPreviewReport] = useState(null);
+  const [galleryReport, setGalleryReport] = useState(null);
+  const [activePhotoIndex, setActivePhotoIndex] = useState(0);
 
   const regionMap = useMemo(
     () =>
@@ -84,7 +85,14 @@ function CitizenReportsPage() {
         header: 'Fotos',
         render: (row) =>
           row.photoCount > 0 ? (
-            <button type="button" className="btn btn-secondary" onClick={() => setPreviewReport(row)}>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => {
+                setGalleryReport(row);
+                setActivePhotoIndex(0);
+              }}
+            >
               Ver ({row.photoCount})
             </button>
           ) : (
@@ -371,31 +379,48 @@ function CitizenReportsPage() {
         onCancel={() => setPendingDeleteId('')}
       />
 
-      {previewReport ? (
-        <article className="dashboard-card">
-          <div className="reports-photo-preview-header">
-            <h3>Fotos del reporte</h3>
-            <button type="button" className="btn btn-secondary" onClick={() => setPreviewReport(null)}>
-              Cerrar vista
-            </button>
-          </div>
-          {previewReport.photos?.length ? (
-            <div className="reports-photo-preview-grid">
-              {previewReport.photos.map((photo, index) => (
-                <figure key={`${photo.name}-${index}`} className="reports-photo-preview-item">
-                  {photo.previewUrl ? (
-                    <img src={photo.previewUrl} alt={photo.name} />
+      {galleryReport ? (
+        <div className="modal-backdrop" onClick={() => setGalleryReport(null)}>
+          <article className="reports-gallery-dialog" onClick={(event) => event.stopPropagation()}>
+            <div className="reports-photo-dialog-header">
+              <strong>Galeria del reporte</strong>
+              <button type="button" className="btn btn-secondary" onClick={() => setGalleryReport(null)}>
+                Cerrar
+              </button>
+            </div>
+
+            {galleryReport.photos?.length ? (
+              <>
+                <div className="reports-gallery-main">
+                  {galleryReport.photos[activePhotoIndex]?.previewUrl ? (
+                    <img
+                      src={galleryReport.photos[activePhotoIndex].previewUrl}
+                      alt={galleryReport.photos[activePhotoIndex].name}
+                      className="reports-photo-dialog-image"
+                    />
                   ) : (
                     <div className="reports-photo-no-preview">Vista previa no disponible</div>
                   )}
-                  <figcaption>{photo.name}</figcaption>
-                </figure>
-              ))}
-            </div>
-          ) : (
-            <EmptyState title="Sin fotos" description="Este reporte no registra imagenes asociadas." />
-          )}
-        </article>
+                </div>
+
+                <div className="reports-gallery-thumbs">
+                  {galleryReport.photos.map((photo, index) => (
+                    <button
+                      key={`${photo.name}-${index}`}
+                      type="button"
+                      className={`reports-gallery-thumb ${index === activePhotoIndex ? 'is-active' : ''}`}
+                      onClick={() => setActivePhotoIndex(index)}
+                    >
+                      {photo.previewUrl ? <img src={photo.previewUrl} alt={photo.name} /> : <span>Sin vista previa</span>}
+                    </button>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <EmptyState title="Sin fotos" description="Este reporte no registra imagenes asociadas." />
+            )}
+          </article>
+        </div>
       ) : null}
     </section>
   );

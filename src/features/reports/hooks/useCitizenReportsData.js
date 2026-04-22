@@ -68,7 +68,12 @@ function normalizePhotos(item = {}) {
 
   rawPhotos.forEach((photo, index) => {
     if (typeof photo === 'string') {
-      photoList.push({ name: photo, previewUrl: rawUrls[index] || '' });
+      const isUrl = /^https?:\/\//i.test(photo);
+      const fromUrl = isUrl ? photo.split('/').pop() || `foto-${index + 1}` : photo;
+      photoList.push({
+        name: fromUrl,
+        previewUrl: isUrl ? photo : rawUrls[index] || ''
+      });
       return;
     }
 
@@ -160,7 +165,19 @@ export function useCitizenReportsData() {
           setReports((prev) => [normalized, ...prev]);
           return normalized;
         } catch {
-          // fallback local controlado
+          // segundo intento: persistir reporte sin adjuntos para no perder el registro operativo
+          try {
+            const createdWithoutFiles = await createCitizenReport({ payload, files: [] });
+            const normalized = normalizeReports([createdWithoutFiles])[0];
+            if (previewPhotos.length > 0) {
+              normalized.photos = previewPhotos;
+              normalized.photoCount = previewPhotos.length;
+            }
+            setReports((prev) => [normalized, ...prev]);
+            return normalized;
+          } catch {
+            // fallback local controlado
+          }
         }
       }
 
