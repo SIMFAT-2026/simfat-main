@@ -98,6 +98,20 @@
   color: #0f172a;
 }
 
+.sidebar-section + .sidebar-section {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.sidebar-section-title {
+  margin: 0 0 8px;
+  font-size: 0.85rem;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
 .sidebar ul {
   list-style: none;
   margin: 0;

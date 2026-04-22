@@ -1,0 +1,107 @@
+.territory-page {
+  display: grid;
+  gap: 14px;
+}
+
+.territory-page-note {
+  margin: 0;
+  color: #64748b;
+}
+
+.territory-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.territory-header h3 {
+  margin: 0;
+}
+
+.territory-controls {
+  margin-top: 12px;
+}
+
+.territory-layer-toggles {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.territory-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border-radius: 8px;
+  border: 1px solid #d7e0ea;
+  background: #fff;
+  color: #334155;
+}
+
+.territory-map-wrapper {
+  margin-top: 12px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 240px;
+  gap: 12px;
+}
+
+.territory-map {
+  height: 460px;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  overflow: hidden;
+}
+
+.territory-legend {
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #f8fafc;
+  padding: 12px;
+}
+
+.territory-legend h4 {
+  margin: 0 0 8px;
+  color: #0f172a;
+}
+
+.territory-legend ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 7px;
+}
+
+.territory-legend li {
+  display: grid;
+  grid-template-columns: 12px 1fr auto;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9rem;
+}
+
+.territory-color-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+}
+
+.territory-meta {
+  margin: 12px 0 0;
+  color: #64748b;
+  font-size: 0.8rem;
+}
+
+.territory-dashboard-block {
+  margin-top: 2px;
+}
+
+@media (max-width: 1080px) {
+  .territory-map-wrapper {
+    grid-template-columns: 1fr;
+  }
+}

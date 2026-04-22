@@ -21,7 +21,7 @@ function LoginPage() {
   const [submitting, setSubmitting] = useState(false);
   const [creatingSeedUsers, setCreatingSeedUsers] = useState(false);
 
-  const fromPath = location.state?.from?.pathname || '/dashboard';
+  const fromPath = location.state?.from?.pathname || '/territorio';
   const authDevToolsEnabled = import.meta.env.VITE_AUTH_DEV_TOOLS_ENABLED === 'true';
 
   useEffect(() => {

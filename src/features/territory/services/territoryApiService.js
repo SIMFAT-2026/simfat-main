@@ -1,0 +1,112 @@
+import axiosClient from '../../../api/axiosClient';
+
+const TERRITORY_ENDPOINTS = {
+  layers: '/api/territory/layers',
+  bounds: '/api/territory/bounds'
+};
+
+function isFeatureCollection(value) {
+  return Boolean(value) && typeof value === 'object' && value.type === 'FeatureCollection';
+}
+
+function toFeatureCollection(value) {
+  if (isFeatureCollection(value)) {
+    return value;
+  }
+
+  return {
+    type: 'FeatureCollection',
+    features: []
+  };
+}
+
+function toBounds(value) {
+  if (!Array.isArray(value) || value.length !== 2) {
+    return null;
+  }
+
+  const first = value[0];
+  const second = value[1];
+
+  if (!Array.isArray(first) || !Array.isArray(second) || first.length !== 2 || second.length !== 2) {
+    return null;
+  }
+
+  const parsed = [
+    [Number(first[0]), Number(first[1])],
+    [Number(second[0]), Number(second[1])]
+  ];
+
+  if (!parsed.every((point) => Number.isFinite(point[0]) && Number.isFinite(point[1]))) {
+    return null;
+  }
+
+  return parsed;
+}
+
+function toCenter(value, fallbackCenter) {
+  if (!Array.isArray(value) || value.length !== 2) {
+    return fallbackCenter;
+  }
+
+  const parsed = [Number(value[0]), Number(value[1])];
+  if (Number.isFinite(parsed[0]) && Number.isFinite(parsed[1])) {
+    return parsed;
+  }
+  return fallbackCenter;
+}
+
+function extractResponseData(payload) {
+  if (payload && typeof payload === 'object' && 'data' in payload) {
+    return payload.data;
+  }
+  return payload;
+}
+
+function normalizeLayerPayload(payload, regionId) {
+  const source = extractResponseData(payload) || {};
+  const layers = source.layers || {};
+
+  return {
+    regionId: source.regionId || regionId,
+    generatedAt: source.generatedAt || new Date().toISOString(),
+    layers: {
+      NDVI: toFeatureCollection(layers.NDVI),
+      NDMI: toFeatureCollection(layers.NDMI),
+      LOSS: toFeatureCollection(layers.LOSS),
+      ALERTS: toFeatureCollection(layers.ALERTS),
+      REPORTS: toFeatureCollection(layers.REPORTS)
+    }
+  };
+}
+
+function normalizeBoundsPayload(payload, fallback) {
+  const source = extractResponseData(payload) || {};
+  const bounds = toBounds(source.bounds) || fallback.bounds;
+
+  return {
+    bounds,
+    center: toCenter(source.center, fallback.center),
+    zoom: Number.isFinite(Number(source.zoom)) ? Number(source.zoom) : fallback.zoom
+  };
+}
+
+export async function fetchTerritoryLayers({ regionId, indicators, from, to }) {
+  const response = await axiosClient.get(TERRITORY_ENDPOINTS.layers, {
+    params: {
+      regionId,
+      indicators: indicators.join(','),
+      from,
+      to
+    }
+  });
+
+  return normalizeLayerPayload(response.data, regionId);
+}
+
+export async function fetchTerritoryBounds(regionId, fallback) {
+  const response = await axiosClient.get(TERRITORY_ENDPOINTS.bounds, {
+    params: { regionId }
+  });
+  return normalizeBoundsPayload(response.data, fallback);
+}

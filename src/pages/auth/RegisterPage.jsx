@@ -72,7 +72,7 @@ function RegisterPage() {
         password: form.password,
         captchaToken
       });
-      navigate('/dashboard', { replace: true });
+      navigate('/territorio', { replace: true });
     } catch (error) {
       showError(error.message || 'No fue posible crear la cuenta.');
     } finally {

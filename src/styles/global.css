@@ -312,6 +312,11 @@ textarea {
   font-weight: 600;
 }
 
+.community-source-note {
+  margin: 8px 0 14px;
+  color: #64748b;
+}
+
 .modal-backdrop {
   position: fixed;
   inset: 0;

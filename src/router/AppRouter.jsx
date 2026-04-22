@@ -1,71 +1,74 @@
+import { lazy, Suspense } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
-import MainLayout from '../layouts/MainLayout';
 import ProtectedRoute from '../auth/ProtectedRoute';
 import PublicOnlyRoute from '../auth/PublicOnlyRoute';
-import HomePage from '../pages/HomePage';
-import DashboardPage from '../pages/DashboardPage';
-import RegionsPage from '../pages/RegionsPage';
-import ForestLossPage from '../pages/ForestLossPage';
-import AlertsPage from '../pages/AlertsPage';
-import RulesPage from '../pages/RulesPage';
-import NotFoundPage from '../pages/NotFoundPage';
-import LoginPage from '../pages/auth/LoginPage';
-import RegisterPage from '../pages/auth/RegisterPage';
-import ForgotPasswordPage from '../pages/auth/ForgotPasswordPage';
-import ResetPasswordPage from '../pages/auth/ResetPasswordPage';
+
+const MainLayout = lazy(() => import('../layouts/MainLayout'));
+const HomePage = lazy(() => import('../pages/HomePage'));
+const TerritoryPage = lazy(() => import('../pages/TerritoryPage'));
+const CommunityPage = lazy(() => import('../pages/CommunityPage'));
+const CitizenReportsPage = lazy(() => import('../pages/CitizenReportsPage'));
+const RegionsPage = lazy(() => import('../pages/RegionsPage'));
+const ForestLossPage = lazy(() => import('../pages/ForestLossPage'));
+const AlertsPage = lazy(() => import('../pages/AlertsPage'));
+const RulesPage = lazy(() => import('../pages/RulesPage'));
+const NotFoundPage = lazy(() => import('../pages/NotFoundPage'));
+const LoginPage = lazy(() => import('../pages/auth/LoginPage'));
+const RegisterPage = lazy(() => import('../pages/auth/RegisterPage'));
+const ForgotPasswordPage = lazy(() => import('../pages/auth/ForgotPasswordPage'));
+const ResetPasswordPage = lazy(() => import('../pages/auth/ResetPasswordPage'));
+
+function RouteLoader() {
+  return <div className="loading-state">Cargando vista...</div>;
+}
+
+function withSuspense(element) {
+  return <Suspense fallback={<RouteLoader />}>{element}</Suspense>;
+}
 
 function AppRouter() {
   return (
     <Routes>
       <Route
         path="/login"
-        element={
-          <PublicOnlyRoute>
-            <LoginPage />
-          </PublicOnlyRoute>
-        }
+        element={<PublicOnlyRoute>{withSuspense(<LoginPage />)}</PublicOnlyRoute>}
       />
       <Route
         path="/register"
-        element={
-          <PublicOnlyRoute>
-            <RegisterPage />
-          </PublicOnlyRoute>
-        }
+        element={<PublicOnlyRoute>{withSuspense(<RegisterPage />)}</PublicOnlyRoute>}
       />
       <Route
         path="/forgot-password"
-        element={
-          <PublicOnlyRoute>
-            <ForgotPasswordPage />
-          </PublicOnlyRoute>
-        }
+        element={<PublicOnlyRoute>{withSuspense(<ForgotPasswordPage />)}</PublicOnlyRoute>}
       />
       <Route
         path="/reset-password"
-        element={
-          <PublicOnlyRoute>
-            <ResetPasswordPage />
-          </PublicOnlyRoute>
-        }
+        element={<PublicOnlyRoute>{withSuspense(<ResetPasswordPage />)}</PublicOnlyRoute>}
       />
 
       <Route
-        element={
-          <ProtectedRoute>
-            <MainLayout />
-          </ProtectedRoute>
-        }
+        element={<ProtectedRoute>{withSuspense(<MainLayout />)}</ProtectedRoute>}
       >
-        <Route path="/" element={<HomePage />} />
-        <Route path="/dashboard" element={<DashboardPage />} />
-        <Route path="/regions" element={<RegionsPage />} />
-        <Route path="/forest-loss" element={<ForestLossPage />} />
-        <Route path="/alerts" element={<AlertsPage />} />
-        <Route path="/rules" element={<RulesPage />} />
+        <Route path="/" element={<Navigate to="/territorio" replace />} />
+        <Route path="/home" element={withSuspense(<HomePage />)} />
+
+        <Route path="/territorio" element={withSuspense(<TerritoryPage />)} />
+        <Route path="/comunidad" element={withSuspense(<CommunityPage />)} />
+        <Route path="/reportes" element={withSuspense(<CitizenReportsPage />)} />
+        <Route path="/alertas" element={withSuspense(<AlertsPage />)} />
+
+        <Route path="/admin/regions" element={withSuspense(<RegionsPage />)} />
+        <Route path="/admin/forest-loss" element={withSuspense(<ForestLossPage />)} />
+        <Route path="/admin/rules" element={withSuspense(<RulesPage />)} />
+
+        <Route path="/dashboard" element={<Navigate to="/territorio" replace />} />
+        <Route path="/alerts" element={<Navigate to="/alertas" replace />} />
+        <Route path="/regions" element={<Navigate to="/admin/regions" replace />} />
+        <Route path="/forest-loss" element={<Navigate to="/admin/forest-loss" replace />} />
+        <Route path="/rules" element={<Navigate to="/admin/rules" replace />} />
       </Route>
-      <Route path="/home" element={<Navigate to="/" replace />} />
-      <Route path="*" element={<NotFoundPage />} />
+
+      <Route path="*" element={withSuspense(<NotFoundPage />)} />
     </Routes>
   );
 }

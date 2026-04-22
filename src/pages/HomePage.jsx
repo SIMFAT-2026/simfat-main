@@ -1,25 +1,23 @@
 import { Link } from 'react-router-dom';
 import SectionTitle from '../components/SectionTitle';
+import { homeQuickLinks } from '../router/navigationConfig';
 
 function HomePage() {
   return (
     <section className="page-container">
-      <SectionTitle
-        title="SIMFAT"
-        subtitle="Sistema Integrado de Monitoreo y Alerta Temprana Forestal"
-      />
+      <SectionTitle title="SIMFAT" subtitle="Plataforma territorial para prevencion y alerta temprana de incendios" />
 
       <p>
-        Plataforma para registrar perdida de cobertura forestal, eventos de alerta, reglas de monitoreo y visualizaciones
-        para apoyo a la toma de decisiones ambientales.
+        Esta iteracion prioriza la monitorizacion territorial, coordinacion comunitaria, reportes ciudadanos y alertas
+        operativas para Biobio y La Araucania.
       </p>
 
       <div className="quick-links">
-        <Link to="/dashboard" className="quick-link">Dashboard</Link>
-        <Link to="/regions" className="quick-link">Regiones</Link>
-        <Link to="/forest-loss" className="quick-link">Perdida Forestal</Link>
-        <Link to="/alerts" className="quick-link">Alertas</Link>
-        <Link to="/rules" className="quick-link">Reglas</Link>
+        {homeQuickLinks.map((link) => (
+          <Link key={link.to} to={link.to} className="quick-link">
+            {link.label}
+          </Link>
+        ))}
       </div>
     </section>
   );

@@ -1,14 +1,6 @@
-﻿import { NavLink, useNavigate } from 'react-router-dom';
+import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../auth/AuthContext';
-
-const topLinks = [
-  { label: 'Inicio', to: '/' },
-  { label: 'Dashboard', to: '/dashboard' },
-  { label: 'Regiones', to: '/regions' },
-  { label: 'Perdida Forestal', to: '/forest-loss' },
-  { label: 'Alertas', to: '/alerts' },
-  { label: 'Reglas', to: '/rules' }
-];
+import { primaryNavigationLinks } from '../../router/navigationConfig';
 
 function Navbar() {
   const navigate = useNavigate();
@@ -28,13 +20,11 @@ function Navbar() {
 
       <div className="navbar-actions">
         <nav className="navbar-nav" aria-label="Navegacion principal">
-          {topLinks.map((link) => (
+          {primaryNavigationLinks.map((link) => (
             <NavLink
               key={link.to}
               to={link.to}
-              className={({ isActive }) =>
-                isActive ? 'nav-link nav-link-active' : 'nav-link'
-              }
+              className={({ isActive }) => (isActive ? 'nav-link nav-link-active' : 'nav-link')}
             >
               {link.label}
             </NavLink>
@@ -43,11 +33,7 @@ function Navbar() {
 
         <div className="navbar-user">
           <span className="navbar-user-name">{user?.name || 'Usuario'}</span>
-          <button
-            type="button"
-            className="btn btn-secondary navbar-logout-btn"
-            onClick={handleLogout}
-          >
+          <button type="button" className="btn btn-secondary navbar-logout-btn" onClick={handleLogout}>
             Cerrar sesion
           </button>
         </div>

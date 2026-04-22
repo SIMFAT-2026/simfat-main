@@ -4,3 +4,5 @@ export * from './alertsService';
 export * from './rulesService';
 export * from './dashboardService';
 export * from './authService';
+export * from './communityService';
+export * from './citizenReportsService';
