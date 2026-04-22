@@ -1,13 +1,26 @@
 import { Suspense, lazy } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import SectionTitle from '../components/SectionTitle';
 import TerritoryMapPanel from '../features/territory/components/TerritoryMapPanel';
 import { useTerritoryLayers } from '../features/territory/hooks/useTerritoryLayers';
 import '../features/territory/territory.css';
 
 const DashboardPage = lazy(() => import('./DashboardPage'));
+const FOCUS_MAP = {
+  alerts: ['ALERTS', 'REPORTS'],
+  vegetation: ['NDVI', 'NDMI'],
+  loss: ['LOSS', 'ALERTS']
+};
 
 function TerritoryPage() {
-  const territory = useTerritoryLayers();
+  const [searchParams] = useSearchParams();
+  const regionId = searchParams.get('regionId') || undefined;
+  const focus = searchParams.get('focus') || '';
+
+  const territory = useTerritoryLayers({
+    initialRegionId: regionId,
+    initialVisibleIndicators: FOCUS_MAP[focus] || undefined
+  });
 
   return (
     <>

@@ -13,6 +13,7 @@ export const API_ENDPOINTS = {
   regions: '/api/regions',
   forestLoss: '/api/forest-loss',
   alerts: '/api/alerts',
+  alertsMap: '/api/alerts/map',
   rules: '/api/rules',
   citizenReports: '/api/citizen-reports',
   communityBoard: '/api/community/board',

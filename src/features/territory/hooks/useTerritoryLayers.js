@@ -31,6 +31,7 @@ const REGION_CONFIG = {
 const REGION_OPTIONS = Object.values(REGION_CONFIG);
 const DEFAULT_INDICATORS = ['NDVI', 'NDMI', 'LOSS', 'ALERTS', 'REPORTS'];
 const DEFAULT_VISIBLE_INDICATORS = ['NDVI', 'ALERTS', 'REPORTS'];
+const REGION_IDS = new Set(REGION_OPTIONS.map((region) => region.id));
 
 function createPointFeature(id, lng, lat, properties) {
   return {
@@ -207,9 +208,14 @@ function defaultDateRange() {
   };
 }
 
-export function useTerritoryLayers() {
-  const [selectedRegionId, setSelectedRegionId] = useState('biobio');
-  const [visibleIndicators, setVisibleIndicators] = useState(DEFAULT_VISIBLE_INDICATORS);
+export function useTerritoryLayers(options = {}) {
+  const initialRegionId = REGION_IDS.has(options.initialRegionId) ? options.initialRegionId : 'biobio';
+  const initialVisibleIndicators = Array.isArray(options.initialVisibleIndicators) && options.initialVisibleIndicators.length > 0
+    ? options.initialVisibleIndicators.filter((indicator) => DEFAULT_INDICATORS.includes(indicator))
+    : DEFAULT_VISIBLE_INDICATORS;
+
+  const [selectedRegionId, setSelectedRegionId] = useState(initialRegionId);
+  const [visibleIndicators, setVisibleIndicators] = useState(initialVisibleIndicators);
   const [dateRange] = useState(defaultDateRange);
   const [dataByRegion, setDataByRegion] = useState({});
   const [loadingRegionId, setLoadingRegionId] = useState('');
@@ -245,6 +251,21 @@ export function useTerritoryLayers() {
     },
     [dateRange.from, dateRange.to]
   );
+
+  useEffect(() => {
+    if (REGION_IDS.has(options.initialRegionId)) {
+      setSelectedRegionId(options.initialRegionId);
+    }
+  }, [options.initialRegionId]);
+
+  useEffect(() => {
+    if (Array.isArray(options.initialVisibleIndicators) && options.initialVisibleIndicators.length > 0) {
+      const normalized = options.initialVisibleIndicators.filter((indicator) => DEFAULT_INDICATORS.includes(indicator));
+      if (normalized.length > 0) {
+        setVisibleIndicators(normalized);
+      }
+    }
+  }, [options.initialVisibleIndicators]);
 
   useEffect(() => {
     let mounted = true;
