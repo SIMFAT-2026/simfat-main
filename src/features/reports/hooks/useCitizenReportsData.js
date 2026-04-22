@@ -16,7 +16,10 @@ const MOCK_REPORTS = [
     latitude: -36.81,
     longitude: -73.04,
     status: 'RECIBIDO',
-    photoCount: 2,
+    photos: [
+      { name: 'humo-1.jpg', previewUrl: '' },
+      { name: 'humo-2.jpg', previewUrl: '' }
+    ],
     createdAt: '2026-04-21T14:30:00Z'
   },
   {
@@ -27,7 +30,7 @@ const MOCK_REPORTS = [
     latitude: -38.74,
     longitude: -72.6,
     status: 'VALIDADO',
-    photoCount: 1,
+    photos: [{ name: 'foco-1.jpg', previewUrl: '' }],
     createdAt: '2026-04-21T16:45:00Z'
   }
 ];
@@ -58,18 +61,58 @@ function normalizeStatus(value) {
   return allowed.includes(normalized) ? normalized : 'RECIBIDO';
 }
 
-function normalizeReports(items = []) {
-  return items.map((item, index) => ({
-    id: String(item.id || createId(`report-${index}`)),
-    regionId: String(item.regionId || item.region_id || ''),
-    category: String(item.category || item.categoria || 'OTRO').toUpperCase(),
-    description: item.description || item.descripcion || '',
-    latitude: Number(item.latitude ?? item.latitud ?? item.lat ?? 0),
-    longitude: Number(item.longitude ?? item.longitud ?? item.lng ?? 0),
-    status: normalizeStatus(item.status || item.estado),
-    photoCount: Number(item.photoCount ?? item.photosCount ?? item.fotos ?? 0) || 0,
-    createdAt: item.createdAt || item.created_at || item.fechaCreacion || new Date().toISOString()
+function normalizePhotos(item = {}) {
+  const photoList = [];
+  const rawPhotos = Array.isArray(item.photos) ? item.photos : [];
+  const rawUrls = Array.isArray(item.photoUrls) ? item.photoUrls : [];
+
+  rawPhotos.forEach((photo, index) => {
+    if (typeof photo === 'string') {
+      photoList.push({ name: photo, previewUrl: rawUrls[index] || '' });
+      return;
+    }
+
+    if (photo && typeof photo === 'object') {
+      photoList.push({
+        name: photo.name || `foto-${index + 1}`,
+        previewUrl: photo.previewUrl || photo.url || ''
+      });
+    }
+  });
+
+  if (photoList.length === 0 && Number(item.photoCount ?? item.photosCount ?? item.fotos ?? 0) > 0) {
+    return Array.from({ length: Number(item.photoCount ?? item.photosCount ?? item.fotos ?? 0) }, (_, index) => ({
+      name: `foto-${index + 1}`,
+      previewUrl: ''
+    }));
+  }
+
+  return photoList;
+}
+
+function toPreviewPhotos(files = []) {
+  return files.map((file) => ({
+    name: file.name,
+    previewUrl: window.URL.createObjectURL(file)
   }));
+}
+
+function normalizeReports(items = []) {
+  return items.map((item, index) => {
+    const photos = normalizePhotos(item);
+    return {
+      id: String(item.id || createId(`report-${index}`)),
+      regionId: String(item.regionId || item.region_id || ''),
+      category: String(item.category || item.categoria || 'OTRO').toUpperCase(),
+      description: item.description || item.descripcion || '',
+      latitude: Number(item.latitude ?? item.latitud ?? item.lat ?? 0),
+      longitude: Number(item.longitude ?? item.longitud ?? item.lng ?? 0),
+      status: normalizeStatus(item.status || item.estado),
+      photos,
+      photoCount: photos.length,
+      createdAt: item.createdAt || item.created_at || item.fechaCreacion || new Date().toISOString()
+    };
+  });
 }
 
 export function useCitizenReportsData() {
@@ -104,10 +147,16 @@ export function useCitizenReportsData() {
 
   const createReport = useCallback(
     async ({ payload, files }) => {
+      const previewPhotos = toPreviewPhotos(files);
+
       if (source === 'backend') {
         try {
           const created = await createCitizenReport({ payload, files });
           const normalized = normalizeReports([created])[0];
+          if (!normalized.photos.length && previewPhotos.length > 0) {
+            normalized.photos = previewPhotos;
+            normalized.photoCount = previewPhotos.length;
+          }
           setReports((prev) => [normalized, ...prev]);
           return normalized;
         } catch {
@@ -123,7 +172,8 @@ export function useCitizenReportsData() {
         latitude: Number(payload.latitude),
         longitude: Number(payload.longitude),
         status: 'RECIBIDO',
-        photoCount: files.length,
+        photos: previewPhotos,
+        photoCount: previewPhotos.length,
         createdAt: new Date().toISOString()
       };
       setReports((prev) => [local, ...prev]);
@@ -135,6 +185,7 @@ export function useCitizenReportsData() {
   const setReportStatus = useCallback(
     async (id, status) => {
       const normalizedStatus = normalizeStatus(status);
+      setReports((prev) => prev.map((item) => (item.id === id ? { ...item, status: normalizedStatus } : item)));
 
       if (source === 'backend') {
         try {
@@ -143,11 +194,9 @@ export function useCitizenReportsData() {
           setReports((prev) => prev.map((item) => (item.id === id ? normalized : item)));
           return;
         } catch {
-          // fallback local controlado
+          // si falla backend se mantiene actualizacion local para continuidad
         }
       }
-
-      setReports((prev) => prev.map((item) => (item.id === id ? { ...item, status: normalizedStatus } : item)));
     },
     [source]
   );

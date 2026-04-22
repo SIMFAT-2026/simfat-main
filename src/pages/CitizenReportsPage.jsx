@@ -47,6 +47,7 @@ function CitizenReportsPage() {
   const [locating, setLocating] = useState(false);
   const [filters, setFilters] = useState({ regionId: '', status: '', category: '' });
   const [pendingDeleteId, setPendingDeleteId] = useState('');
+  const [previewReport, setPreviewReport] = useState(null);
 
   const regionMap = useMemo(
     () =>
@@ -78,7 +79,18 @@ function CitizenReportsPage() {
       },
       { key: 'latitude', header: 'Latitud', render: (row) => Number(row.latitude).toFixed(5) },
       { key: 'longitude', header: 'Longitud', render: (row) => Number(row.longitude).toFixed(5) },
-      { key: 'photoCount', header: 'Fotos' },
+      {
+        key: 'photoCount',
+        header: 'Fotos',
+        render: (row) =>
+          row.photoCount > 0 ? (
+            <button type="button" className="btn btn-secondary" onClick={() => setPreviewReport(row)}>
+              Ver ({row.photoCount})
+            </button>
+          ) : (
+            '0'
+          )
+      },
       { key: 'description', header: 'Descripcion' }
     ],
     [regionMap]
@@ -177,7 +189,11 @@ function CitizenReportsPage() {
     feedback.clear();
     try {
       await setReportStatus(reportId, status);
-      feedback.showSuccess(`Estado actualizado a ${status}.`);
+      if (filters.status && filters.status !== status) {
+        feedback.showSuccess(`Estado actualizado a ${status}. El reporte puede ocultarse por filtro actual.`);
+      } else {
+        feedback.showSuccess(`Estado actualizado a ${status}.`);
+      }
     } catch (err) {
       feedback.showError(err.message || 'No se pudo actualizar el estado.');
     }
@@ -299,9 +315,7 @@ function CitizenReportsPage() {
           <label className="full-width">
             Fotos (max {MAX_FILES}, 5 MB c/u)
             <input type="file" accept="image/*" multiple onChange={onFilesChange} />
-            {selectedFiles.length > 0 ? (
-              <small>{selectedFiles.map((file) => file.name).join(' | ')}</small>
-            ) : null}
+            {selectedFiles.length > 0 ? <small>{selectedFiles.map((file) => file.name).join(' | ')}</small> : null}
           </label>
 
           <div className="form-actions">
@@ -356,6 +370,33 @@ function CitizenReportsPage() {
         onConfirm={confirmDelete}
         onCancel={() => setPendingDeleteId('')}
       />
+
+      {previewReport ? (
+        <article className="dashboard-card">
+          <div className="reports-photo-preview-header">
+            <h3>Fotos del reporte</h3>
+            <button type="button" className="btn btn-secondary" onClick={() => setPreviewReport(null)}>
+              Cerrar vista
+            </button>
+          </div>
+          {previewReport.photos?.length ? (
+            <div className="reports-photo-preview-grid">
+              {previewReport.photos.map((photo, index) => (
+                <figure key={`${photo.name}-${index}`} className="reports-photo-preview-item">
+                  {photo.previewUrl ? (
+                    <img src={photo.previewUrl} alt={photo.name} />
+                  ) : (
+                    <div className="reports-photo-no-preview">Vista previa no disponible</div>
+                  )}
+                  <figcaption>{photo.name}</figcaption>
+                </figure>
+              ))}
+            </div>
+          ) : (
+            <EmptyState title="Sin fotos" description="Este reporte no registra imagenes asociadas." />
+          )}
+        </article>
+      ) : null}
     </section>
   );
 }

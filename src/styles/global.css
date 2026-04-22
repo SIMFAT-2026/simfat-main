@@ -360,6 +360,57 @@ textarea {
   color: #64748b;
 }
 
+.reports-photo-preview-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.reports-photo-preview-header h3 {
+  margin: 0;
+}
+
+.reports-photo-preview-grid {
+  margin-top: 12px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 10px;
+}
+
+.reports-photo-preview-item {
+  margin: 0;
+  border: 1px solid #dbe2ea;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #f8fafc;
+}
+
+.reports-photo-preview-item img {
+  width: 100%;
+  height: 140px;
+  object-fit: cover;
+  display: block;
+}
+
+.reports-photo-preview-item figcaption {
+  padding: 8px;
+  font-size: 0.84rem;
+  color: #334155;
+}
+
+.reports-photo-no-preview {
+  height: 140px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.82rem;
+  color: #64748b;
+  text-align: center;
+  padding: 8px;
+}
+
 @media (max-width: 992px) {
   .alerts-layout {
     grid-template-columns: 1fr;
