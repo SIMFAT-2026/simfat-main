@@ -1,0 +1,12 @@
+﻿{
+    "periodEnd":  "2026-04-12",
+    "source":  "openeo-service-test",
+    "regionId":  "69dffed608503e565b962d8e",
+    "quality":  "measured",
+    "measuredAt":  "2026-04-16T00:00:00Z",
+    "indicatorType":  "NDVI",
+    "periodStart":  "2026-04-01",
+    "fetchedAt":  "2026-04-16T00:00:00Z",
+    "cached":  false,
+    "unit":  "ratio"
+}

@@ -1,0 +1,14 @@
+﻿{
+    "periodEnd":  "2026-04-12",
+    "regionId":  "69dffed608503e565b962d8e",
+    "aoi":  {
+                "coordinates":  [
+                                    -70.8,
+                                    -19.2,
+                                    -69.2,
+                                    -18.1
+                                ],
+                "type":  "bbox"
+            },
+    "periodStart":  "2026-04-01"
+}

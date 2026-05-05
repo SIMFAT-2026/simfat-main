@@ -1,0 +1,13 @@
+zone,indicator,period_start,period_end,status_code,result,value,error_message
+Valparaiso,NDVI,2026-03-01,2026-03-03,400,no_data,,openEO indicator request failed with status 400: There is no data available for the given extents.
+Valparaiso,NDVI,2026-03-08,2026-03-10,502,timeout,,openEO connectivity error while loading indicator value: The read operation timed out
+Valparaiso,NDMI,2026-03-01,2026-03-03,400,no_data,,openEO indicator request failed with status 400: There is no data available for the given extents.
+Valparaiso,NDMI,2026-03-08,2026-03-10,200,ok,-0.0435245302326118,
+Santiago,NDVI,2026-03-01,2026-03-03,400,no_data,,openEO indicator request failed with status 400: There is no data available for the given extents.
+Santiago,NDVI,2026-03-08,2026-03-10,502,timeout,,openEO connectivity error while loading indicator value: The read operation timed out
+Santiago,NDMI,2026-03-01,2026-03-03,400,no_data,,openEO indicator request failed with status 400: There is no data available for the given extents.
+Santiago,NDMI,2026-03-08,2026-03-10,200,ok,-0.028255000202858,
+Temuco,NDVI,2026-03-01,2026-03-03,400,no_data,,openEO indicator request failed with status 400: There is no data available for the given extents.
+Temuco,NDVI,2026-03-08,2026-03-10,502,timeout,,openEO connectivity error while loading indicator value: The read operation timed out
+Temuco,NDMI,2026-03-01,2026-03-03,400,no_data,,openEO indicator request failed with status 400: There is no data available for the given extents.
+Temuco,NDMI,2026-03-08,2026-03-10,200,ok,0.0672907870859637,

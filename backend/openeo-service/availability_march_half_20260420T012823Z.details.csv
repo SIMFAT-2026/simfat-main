@@ -1,0 +1,41 @@
+zone,indicator,period_start,period_end,status_code,result,value,error_message
+Arica,NDVI,2026-03-01,2026-03-03,200,ok,-0.0440999249663749,
+Arica,NDVI,2026-03-08,2026-03-10,200,ok,-0.0122043116206508,
+Arica,NDMI,2026-03-01,2026-03-03,200,ok,0.0162385049051872,
+Arica,NDMI,2026-03-08,2026-03-10,502,timeout,,openEO connectivity error while loading indicator value: The read operation timed out
+Antofagasta,NDVI,2026-03-01,2026-03-03,502,timeout,,openEO connectivity error while loading indicator value: The read operation timed out
+Antofagasta,NDVI,2026-03-08,2026-03-10,502,timeout,,openEO connectivity error while loading indicator value: The read operation timed out
+Antofagasta,NDMI,2026-03-01,2026-03-03,200,ok,-0.0269823423003444,
+Antofagasta,NDMI,2026-03-08,2026-03-10,200,ok,-0.0322179710302979,
+LaSerena,NDVI,2026-03-01,2026-03-03,502,timeout,,openEO connectivity error while loading indicator value: The read operation timed out
+LaSerena,NDVI,2026-03-08,2026-03-10,200,ok,0.1242470675507882,
+LaSerena,NDMI,2026-03-01,2026-03-03,502,timeout,,openEO connectivity error while loading indicator value: The read operation timed out
+LaSerena,NDMI,2026-03-08,2026-03-10,502,timeout,,openEO connectivity error while loading indicator value: The read operation timed out
+Valparaiso,NDVI,2026-03-01,2026-03-03,400,no_data,,openEO indicator request failed with status 400: There is no data available for the given extents.
+Valparaiso,NDVI,2026-03-08,2026-03-10,502,timeout,,openEO connectivity error while loading indicator value: The read operation timed out
+Valparaiso,NDMI,2026-03-01,2026-03-03,400,no_data,,openEO indicator request failed with status 400: There is no data available for the given extents.
+Valparaiso,NDMI,2026-03-08,2026-03-10,200,ok,-0.0435245302326118,
+Santiago,NDVI,2026-03-01,2026-03-03,400,no_data,,openEO indicator request failed with status 400: There is no data available for the given extents.
+Santiago,NDVI,2026-03-08,2026-03-10,502,timeout,,openEO connectivity error while loading indicator value: The read operation timed out
+Santiago,NDMI,2026-03-01,2026-03-03,400,no_data,,openEO indicator request failed with status 400: There is no data available for the given extents.
+Santiago,NDMI,2026-03-08,2026-03-10,502,timeout,,openEO connectivity error while loading indicator value: The read operation timed out
+Concepcion,NDVI,2026-03-01,2026-03-03,200,ok,-0.0049338524031079,
+Concepcion,NDVI,2026-03-08,2026-03-10,502,timeout,,openEO connectivity error while loading indicator value: The read operation timed out
+Concepcion,NDMI,2026-03-01,2026-03-03,200,ok,0.2660363193873784,
+Concepcion,NDMI,2026-03-08,2026-03-10,200,ok,0.1140805135430454,
+Temuco,NDVI,2026-03-01,2026-03-03,400,no_data,,openEO indicator request failed with status 400: There is no data available for the given extents.
+Temuco,NDVI,2026-03-08,2026-03-10,200,ok,0.5541208346327847,
+Temuco,NDMI,2026-03-01,2026-03-03,400,no_data,,openEO indicator request failed with status 400: There is no data available for the given extents.
+Temuco,NDMI,2026-03-08,2026-03-10,200,ok,0.0672907870859637,
+Valdivia,NDVI,2026-03-01,2026-03-03,400,no_data,,openEO indicator request failed with status 400: There is no data available for the given extents.
+Valdivia,NDVI,2026-03-08,2026-03-10,502,timeout,,openEO connectivity error while loading indicator value: The read operation timed out
+Valdivia,NDMI,2026-03-01,2026-03-03,400,no_data,,openEO indicator request failed with status 400: There is no data available for the given extents.
+Valdivia,NDMI,2026-03-08,2026-03-10,200,ok,0.2816779644920097,
+PuertoMontt,NDVI,2026-03-01,2026-03-03,400,no_data,,openEO indicator request failed with status 400: There is no data available for the given extents.
+PuertoMontt,NDVI,2026-03-08,2026-03-10,502,timeout,,openEO connectivity error while loading indicator value: The read operation timed out
+PuertoMontt,NDMI,2026-03-01,2026-03-03,400,no_data,,openEO indicator request failed with status 400: There is no data available for the given extents.
+PuertoMontt,NDMI,2026-03-08,2026-03-10,200,ok,0.2683634520740515,
+PuntaArenas,NDVI,2026-03-01,2026-03-03,200,ok,0.1338069439623455,
+PuntaArenas,NDVI,2026-03-08,2026-03-10,200,ok,-0.0047627756334476,
+PuntaArenas,NDMI,2026-03-01,2026-03-03,502,timeout,,openEO connectivity error while loading indicator value: The read operation timed out
+PuntaArenas,NDMI,2026-03-08,2026-03-10,200,ok,0.4318482455064232,

@@ -1,0 +1,7 @@
+zone,indicator,total,ok,no_data,rate_limited,timeout,other_error,availability_ratio
+Valparaiso,NDVI,2,0,1,0,1,0,0.0
+Valparaiso,NDMI,2,1,1,0,0,0,0.5
+Santiago,NDVI,2,0,1,0,1,0,0.0
+Santiago,NDMI,2,1,1,0,0,0,0.5
+Temuco,NDVI,2,0,1,0,1,0,0.0
+Temuco,NDMI,2,1,1,0,0,0,0.5

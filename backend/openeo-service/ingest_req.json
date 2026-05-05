@@ -1,0 +1,14 @@
+﻿{
+    "periodEnd":  "2026-04-12",
+    "source":  "openeo-service-test",
+    "collectionId":  "SENTINEL2_L2A",
+    "regionId":  "69dffed608503e565b962d8e",
+    "quality":  "measured",
+    "measuredAt":  "2026-04-16T00:00:00Z",
+    "value":  0.61,
+    "indicatorType":  "NDVI",
+    "periodStart":  "2026-04-01",
+    "fetchedAt":  "2026-04-16T00:00:00Z",
+    "cached":  false,
+    "unit":  "ratio"
+}

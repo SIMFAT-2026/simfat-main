@@ -1,0 +1,122 @@
+[
+  {
+    "zone": "Valparaiso",
+    "indicator": "NDVI",
+    "period_start": "2026-03-01",
+    "period_end": "2026-03-03",
+    "status_code": 400,
+    "result": "no_data",
+    "value": null,
+    "error_message": "openEO indicator request failed with status 400: There is no data available for the given extents."
+  },
+  {
+    "zone": "Valparaiso",
+    "indicator": "NDVI",
+    "period_start": "2026-03-08",
+    "period_end": "2026-03-10",
+    "status_code": 502,
+    "result": "timeout",
+    "value": null,
+    "error_message": "openEO connectivity error while loading indicator value: The read operation timed out"
+  },
+  {
+    "zone": "Valparaiso",
+    "indicator": "NDMI",
+    "period_start": "2026-03-01",
+    "period_end": "2026-03-03",
+    "status_code": 400,
+    "result": "no_data",
+    "value": null,
+    "error_message": "openEO indicator request failed with status 400: There is no data available for the given extents."
+  },
+  {
+    "zone": "Valparaiso",
+    "indicator": "NDMI",
+    "period_start": "2026-03-08",
+    "period_end": "2026-03-10",
+    "status_code": 200,
+    "result": "ok",
+    "value": -0.0435245302326118,
+    "error_message": ""
+  },
+  {
+    "zone": "Santiago",
+    "indicator": "NDVI",
+    "period_start": "2026-03-01",
+    "period_end": "2026-03-03",
+    "status_code": 400,
+    "result": "no_data",
+    "value": null,
+    "error_message": "openEO indicator request failed with status 400: There is no data available for the given extents."
+  },
+  {
+    "zone": "Santiago",
+    "indicator": "NDVI",
+    "period_start": "2026-03-08",
+    "period_end": "2026-03-10",
+    "status_code": 502,
+    "result": "timeout",
+    "value": null,
+    "error_message": "openEO connectivity error while loading indicator value: The read operation timed out"
+  },
+  {
+    "zone": "Santiago",
+    "indicator": "NDMI",
+    "period_start": "2026-03-01",
+    "period_end": "2026-03-03",
+    "status_code": 400,
+    "result": "no_data",
+    "value": null,
+    "error_message": "openEO indicator request failed with status 400: There is no data available for the given extents."
+  },
+  {
+    "zone": "Santiago",
+    "indicator": "NDMI",
+    "period_start": "2026-03-08",
+    "period_end": "2026-03-10",
+    "status_code": 200,
+    "result": "ok",
+    "value": -0.028255000202858,
+    "error_message": ""
+  },
+  {
+    "zone": "Temuco",
+    "indicator": "NDVI",
+    "period_start": "2026-03-01",
+    "period_end": "2026-03-03",
+    "status_code": 400,
+    "result": "no_data",
+    "value": null,
+    "error_message": "openEO indicator request failed with status 400: There is no data available for the given extents."
+  },
+  {
+    "zone": "Temuco",
+    "indicator": "NDVI",
+    "period_start": "2026-03-08",
+    "period_end": "2026-03-10",
+    "status_code": 502,
+    "result": "timeout",
+    "value": null,
+    "error_message": "openEO connectivity error while loading indicator value: The read operation timed out"
+  },
+  {
+    "zone": "Temuco",
+    "indicator": "NDMI",
+    "period_start": "2026-03-01",
+    "period_end": "2026-03-03",
+    "status_code": 400,
+    "result": "no_data",
+    "value": null,
+    "error_message": "openEO indicator request failed with status 400: There is no data available for the given extents."
+  },
+  {
+    "zone": "Temuco",
+    "indicator": "NDMI",
+    "period_start": "2026-03-08",
+    "period_end": "2026-03-10",
+    "status_code": 200,
+    "result": "ok",
+    "value": 0.0672907870859637,
+    "error_message": ""
+  }
+]

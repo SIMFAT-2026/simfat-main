@@ -1,0 +1,222 @@
+[
+  {
+    "zone": "Arica",
+    "indicator": "NDVI",
+    "total": 5,
+    "ok": 3,
+    "no_data": 2,
+    "rate_limited": 0,
+    "timeout": 0,
+    "other_error": 0,
+    "availability_ratio": 0.6
+  },
+  {
+    "zone": "Arica",
+    "indicator": "NDMI",
+    "total": 5,
+    "ok": 2,
+    "no_data": 2,
+    "rate_limited": 0,
+    "timeout": 1,
+    "other_error": 0,
+    "availability_ratio": 0.4
+  },
+  {
+    "zone": "Antofagasta",
+    "indicator": "NDVI",
+    "total": 5,
+    "ok": 0,
+    "no_data": 2,
+    "rate_limited": 0,
+    "timeout": 2,
+    "other_error": 1,
+    "availability_ratio": 0.0
+  },
+  {
+    "zone": "Antofagasta",
+    "indicator": "NDMI",
+    "total": 5,
+    "ok": 2,
+    "no_data": 2,
+    "rate_limited": 0,
+    "timeout": 1,
+    "other_error": 0,
+    "availability_ratio": 0.4
+  },
+  {
+    "zone": "LaSerena",
+    "indicator": "NDVI",
+    "total": 5,
+    "ok": 1,
+    "no_data": 2,
+    "rate_limited": 0,
+    "timeout": 2,
+    "other_error": 0,
+    "availability_ratio": 0.2
+  },
+  {
+    "zone": "LaSerena",
+    "indicator": "NDMI",
+    "total": 5,
+    "ok": 1,
+    "no_data": 2,
+    "rate_limited": 0,
+    "timeout": 2,
+    "other_error": 0,
+    "availability_ratio": 0.2
+  },
+  {
+    "zone": "Valparaiso",
+    "indicator": "NDVI",
+    "total": 5,
+    "ok": 1,
+    "no_data": 4,
+    "rate_limited": 0,
+    "timeout": 0,
+    "other_error": 0,
+    "availability_ratio": 0.2
+  },
+  {
+    "zone": "Valparaiso",
+    "indicator": "NDMI",
+    "total": 5,
+    "ok": 1,
+    "no_data": 4,
+    "rate_limited": 0,
+    "timeout": 0,
+    "other_error": 0,
+    "availability_ratio": 0.2
+  },
+  {
+    "zone": "Santiago",
+    "indicator": "NDVI",
+    "total": 5,
+    "ok": 3,
+    "no_data": 1,
+    "rate_limited": 0,
+    "timeout": 1,
+    "other_error": 0,
+    "availability_ratio": 0.6
+  },
+  {
+    "zone": "Santiago",
+    "indicator": "NDMI",
+    "total": 5,
+    "ok": 4,
+    "no_data": 1,
+    "rate_limited": 0,
+    "timeout": 0,
+    "other_error": 0,
+    "availability_ratio": 0.8
+  },
+  {
+    "zone": "Concepcion",
+    "indicator": "NDVI",
+    "total": 5,
+    "ok": 2,
+    "no_data": 2,
+    "rate_limited": 0,
+    "timeout": 1,
+    "other_error": 0,
+    "availability_ratio": 0.4
+  },
+  {
+    "zone": "Concepcion",
+    "indicator": "NDMI",
+    "total": 5,
+    "ok": 3,
+    "no_data": 2,
+    "rate_limited": 0,
+    "timeout": 0,
+    "other_error": 0,
+    "availability_ratio": 0.6
+  },
+  {
+    "zone": "Temuco",
+    "indicator": "NDVI",
+    "total": 5,
+    "ok": 1,
+    "no_data": 4,
+    "rate_limited": 0,
+    "timeout": 0,
+    "other_error": 0,
+    "availability_ratio": 0.2
+  },
+  {
+    "zone": "Temuco",
+    "indicator": "NDMI",
+    "total": 5,
+    "ok": 1,
+    "no_data": 4,
+    "rate_limited": 0,
+    "timeout": 0,
+    "other_error": 0,
+    "availability_ratio": 0.2
+  },
+  {
+    "zone": "Valdivia",
+    "indicator": "NDVI",
+    "total": 5,
+    "ok": 0,
+    "no_data": 4,
+    "rate_limited": 0,
+    "timeout": 1,
+    "other_error": 0,
+    "availability_ratio": 0.0
+  },
+  {
+    "zone": "Valdivia",
+    "indicator": "NDMI",
+    "total": 5,
+    "ok": 1,
+    "no_data": 4,
+    "rate_limited": 0,
+    "timeout": 0,
+    "other_error": 0,
+    "availability_ratio": 0.2
+  },
+  {
+    "zone": "PuertoMontt",
+    "indicator": "NDVI",
+    "total": 5,
+    "ok": 2,
+    "no_data": 1,
+    "rate_limited": 0,
+    "timeout": 2,
+    "other_error": 0,
+    "availability_ratio": 0.4
+  },
+  {
+    "zone": "PuertoMontt",
+    "indicator": "NDMI",
+    "total": 5,
+    "ok": 3,
+    "no_data": 1,
+    "rate_limited": 0,
+    "timeout": 1,
+    "other_error": 0,
+    "availability_ratio": 0.6
+  },
+  {
+    "zone": "PuntaArenas",
+    "indicator": "NDVI",
+    "total": 5,
+    "ok": 2,
+    "no_data": 0,
+    "rate_limited": 0,
+    "timeout": 3,
+    "other_error": 0,
+    "availability_ratio": 0.4
+  },
+  {
+    "zone": "PuntaArenas",
+    "indicator": "NDMI",
+    "total": 5,
+    "ok": 2,
+    "no_data": 0,
+    "rate_limited": 0,
+    "timeout": 3,
+    "other_error": 0,
+    "availability_ratio": 0.4
+  }
+]
