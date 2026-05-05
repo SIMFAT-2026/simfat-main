@@ -1,0 +1,8 @@
+target/
+.idea/
+.vscode/
+*.iml
+backups/
+.env
+.env.local
+.env.remote

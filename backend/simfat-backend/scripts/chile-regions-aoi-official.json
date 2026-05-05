@@ -1,0 +1,201 @@
+{
+  "source": {
+    "name": "DPA 2023 - SUBDERE/IDE Chile (capa COMUNAS_v1, SIRGAS-Chile)",
+    "download_url": "https://www.geoportal.cl/geoportal/catalog/download/912598ad-ac92-35f6-8045-098f214bd9c2",
+    "method": "bbox por region derivada agregando los poligonos comunales oficiales (CUT_REG)"
+  },
+  "regions": [
+    {
+      "codigo": "CL-1",
+      "nombre": "Region de Tarapaca",
+      "zona": "Tarapaca",
+      "aoiBbox": [
+        -70.28665,
+        -21.62774,
+        -68.404871,
+        -18.936775
+      ],
+      "cutReg": "01"
+    },
+    {
+      "codigo": "CL-2",
+      "nombre": "Region de Antofagasta",
+      "zona": "Antofagasta",
+      "aoiBbox": [
+        -70.74304,
+        -26.062273,
+        -66.990503,
+        -20.934545
+      ],
+      "cutReg": "02"
+    },
+    {
+      "codigo": "CL-3",
+      "nombre": "Region de Atacama",
+      "zona": "Atacama",
+      "aoiBbox": [
+        -71.59191,
+        -29.535,
+        -68.263084,
+        -25.28584
+      ],
+      "cutReg": "03"
+    },
+    {
+      "codigo": "CL-4",
+      "nombre": "Region de Coquimbo",
+      "zona": "Coquimbo",
+      "aoiBbox": [
+        -71.71782,
+        -32.28247,
+        -69.809082,
+        -29.0366
+      ],
+      "cutReg": "04"
+    },
+    {
+      "codigo": "CL-5",
+      "nombre": "Region de Valparaiso",
+      "zona": "Valparaiso",
+      "aoiBbox": [
+        -109.454916,
+        -33.9742,
+        -69.989233,
+        -26.27314
+      ],
+      "cutReg": "05"
+    },
+    {
+      "codigo": "CL-6",
+      "nombre": "Region de Libertador General Bernardo OHiggins",
+      "zona": "OHiggins",
+      "aoiBbox": [
+        -72.057541,
+        -35.005199,
+        -70.009245,
+        -33.850686
+      ],
+      "cutReg": "06"
+    },
+    {
+      "codigo": "CL-7",
+      "nombre": "Region de Maule",
+      "zona": "Maule",
+      "aoiBbox": [
+        -72.78573,
+        -36.543818,
+        -70.311747,
+        -34.684374
+      ],
+      "cutReg": "07"
+    },
+    {
+      "codigo": "CL-8",
+      "nombre": "Region de Biobio",
+      "zona": "Biobio",
+      "aoiBbox": [
+        -73.97359,
+        -38.492447,
+        -70.98298,
+        -36.44324
+      ],
+      "cutReg": "08"
+    },
+    {
+      "codigo": "CL-9",
+      "nombre": "Region de La Araucania",
+      "zona": "Araucania",
+      "aoiBbox": [
+        -73.52026,
+        -39.63724,
+        -70.826457,
+        -37.581726
+      ],
+      "cutReg": "09"
+    },
+    {
+      "codigo": "CL-10",
+      "nombre": "Region de Los Lagos",
+      "zona": "Los Lagos",
+      "aoiBbox": [
+        -74.84848,
+        -44.067119,
+        -71.581008,
+        -40.23607
+      ],
+      "cutReg": "10"
+    },
+    {
+      "codigo": "CL-11",
+      "nombre": "Region de Aysen del General Carlos Ibanez del Campo",
+      "zona": "Aysen",
+      "aoiBbox": [
+        -75.677921,
+        -49.158776,
+        -71.091309,
+        -43.637991
+      ],
+      "cutReg": "11"
+    },
+    {
+      "codigo": "CL-12",
+      "nombre": "Region de Magallanes y de la Antartica Chilena",
+      "zona": "Magallanes y Antartica Chilena",
+      "aoiBbox": [
+        -75.723163,
+        -56.537766,
+        -66.415594,
+        -48.594091
+      ],
+      "cutReg": "12"
+    },
+    {
+      "codigo": "CL-13",
+      "nombre": "Region de Metropolitana de Santiago",
+      "zona": "Metropolitana",
+      "aoiBbox": [
+        -71.71548,
+        -34.291023,
+        -69.76975,
+        -32.921925
+      ],
+      "cutReg": "13"
+    },
+    {
+      "codigo": "CL-14",
+      "nombre": "Region de Los Rios",
+      "zona": "Los Rios",
+      "aoiBbox": [
+        -73.72528,
+        -40.68094,
+        -71.592287,
+        -39.287472
+      ],
+      "cutReg": "14"
+    },
+    {
+      "codigo": "CL-15",
+      "nombre": "Region de Arica y Parinacota",
+      "zona": "Arica y Parinacota",
+      "aoiBbox": [
+        -70.377618,
+        -19.22905,
+        -68.911313,
+        -17.498399
+      ],
+      "cutReg": "15"
+    },
+    {
+      "codigo": "CL-16",
+      "nombre": "Region de Nuble",
+      "zona": "Nuble",
+      "aoiBbox": [
+        -72.884703,
+        -37.19847,
+        -71.007007,
+        -36.005384
+      ],
+      "cutReg": "16"
+    }
+  ]
+}
