@@ -110,6 +110,6 @@ Respuesta recomendada:
 
 1. Guardar originales de imagen en almacenamiento objeto; no en base documental principal.
 2. Exponer `photoCount` en listados y evitar devolver blobs/urls pesadas en consulta masiva.
-3. Validar peso/tipo de imagen en backend (frontend ya hace validacion basica).
+3. Validar peso/tipo de imagen en backend (frontend ya hace validaci?n basica).
 4. Indexar por `regionId`, `status`, `category`, `createdAt`.
 5. Mantener paginacion en listados cuando el volumen crezca.

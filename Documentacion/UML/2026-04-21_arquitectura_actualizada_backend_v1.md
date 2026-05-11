@@ -2,7 +2,7 @@
 
 - Fecha: 2026-04-21
 - Version: 1.0
-- Alcance: estado actualizado para iteracion territorial/comunitaria.
+- Alcance: estado actualizado para iteraci?n territorial/comunitaria.
 
 ## Vista de alto nivel
 
@@ -30,16 +30,16 @@ flowchart LR
 
 - Frontend mantiene arquitectura modular y consume backend real.
 - Backend separa persistencia por responsabilidad:
-  - PostgreSQL: autenticacion, sesiones y seguridad.
+  - PostgreSQL: autenticaci?n, sesiones y seguridad.
   - MongoDB: datos territoriales, alertas, snapshots y trazabilidad openEO.
-- `openeo-service` queda desacoplado como integracion especializada, evitando sobrecargar el frontend.
+- `openeo-service` queda desacoplado como integraci?n especializada, evitando sobrecargar el frontend.
 - Flyway controla cambios relacionales y habilita trazabilidad de esquema.
 
 ## Riesgos y mitigaciones
 
 - Dependencia de `openeo-service` para indicadores avanzados.
-  - Mitigacion: fallback con snapshots/documentos historicos en MongoDB.
+  - Mitigacion: fallback con snapshots/documentos hist?ricos en MongoDB.
 - Costo por llamadas externas.
   - Mitigacion: cache/TTL por region y actualizacion programada en backend.
 - Datos heterogeneos por fuente territorial.
-  - Mitigacion: contratos backend con validacion y normalizacion centralizada.
+  - Mitigacion: contratos backend con validaci?n y normalizacion centralizada.

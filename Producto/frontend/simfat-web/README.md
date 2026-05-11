@@ -2,19 +2,19 @@
 
 Frontend del proyecto **SIMFAT** (Sistema Integrado de Monitoreo y Alerta Temprana Forestal).
 
-- Nombre tecnico: `simfat-frontend`
+- Nombre t?cnico: `simfat-frontend`
 - Stack: React + Vite + JavaScript + Axios + React Router DOM + Recharts
-- Objetivo: visualizacion, gestion de datos y alertas tempranas conectadas a `simfat-backend`
+- Objetivo: visualizaci?n, gesti?n de datos y alertas tempranas conectadas a `simfat-backend`
 
 ## Estado Actual del Desarrollo
 
 **Fecha de actualizacion:** 15-04-2026  
-**Estado general:** MVP funcional con autenticacion JWT integrada a backend.
+**Estado general:** MVP funcional con autenticaci?n JWT integrada a backend.
 
 ### Avance implementado
 
 - Estructura profesional del proyecto (`api`, `services`, `pages`, `components`, `layouts`, `hooks`, `utils`, `styles`).
-- Navegacion con React Router y proteccion de rutas por autenticacion.
+- Navegacion con React Router y proteccion de rutas por autenticaci?n.
 - Layout principal con Navbar, Sidebar y Footer.
 - Dashboard conectado a endpoints reales:
   - Summary
@@ -31,8 +31,8 @@ Frontend del proyecto **SIMFAT** (Sistema Integrado de Monitoreo y Alerta Tempra
 - Soporte JWT:
   - `Authorization: Bearer <accessToken>` en Axios
   - Refresh automatico de token con `POST /api/auth/refresh` cuando expira access token
-  - Limpieza de sesion si refresh falla
-- UX de autenticacion mejorada:
+  - Limpieza de sesi?n s? refresh falla
+- UX de autenticaci?n mejorada:
   - Requisitos visibles de password
   - Indicador de seguridad de contraseña
   - Mostrar/ocultar contraseña en login y registro
@@ -140,7 +140,7 @@ Formato error:
 }
 ```
 
-## Endpoints de autenticacion usados por frontend
+## Endpoints de autenticaci?n usados por frontend
 
 - `POST /api/auth/register`
 - `POST /api/auth/login`

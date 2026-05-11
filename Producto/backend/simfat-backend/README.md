@@ -16,7 +16,7 @@ Flujo principal:
 
 Persistencia actual:
 
-- PostgreSQL: autenticacion (`app_users`, `refresh_tokens`, `password_reset_tokens`) con migraciones Flyway.
+- PostgreSQL: autenticaci?n (`app_users`, `refresh_tokens`, `password_reset_tokens`) con migraciones Flyway.
 - MongoDB: dashboard y observaciones openEO.
 
 Colecciones nuevas:
@@ -47,7 +47,7 @@ Base:
 - `DEFAULT_LOSS_THRESHOLD`
 - `DEFAULT_HEAT_EVENTS_THRESHOLD`
 
-Integracion openEO:
+Integraci?n openEO:
 
 - `OPENEO_SERVICE_BASE_URL`
 - `OPENEO_SERVICE_TIMEOUT_MS` (default `8000`)
@@ -58,14 +58,14 @@ Integracion openEO:
 - `OPENEO_SYNC_MIN_REQUEST_INTERVAL_MINUTES` (default `0`; evita llamadas repetidas a openEO dentro de una ventana)
 - `OPENEO_INGEST_AUTH_TOKEN` (opcional; protege `POST /api/indicators/measurements` para ingesta interna desde `openeo-service`)
 
-Autenticacion y seguridad:
+Autenticaci?n y seguridad:
 
 - `AUTH_JWT_SECRET` (obligatoria, minimo 32 bytes)
 - `AUTH_JWT_ACCESS_TTL_MINUTES` (10-15 recomendado, default `15`)
 - `AUTH_JWT_REFRESH_TTL_DAYS` (default `14`)
 - `AUTH_JWT_ISSUER` (default `simfat-backend`)
 - `AUTH_TURNSTILE_ENABLED` (default `false`)
-- `AUTH_TURNSTILE_SECRET_KEY` (obligatoria si `AUTH_TURNSTILE_ENABLED=true`)
+- `AUTH_TURNSTILE_SECRET_KEY` (obligatoria s? `AUTH_TURNSTILE_ENABLED=true`)
 - `AUTH_TURNSTILE_VERIFY_URL` (default Cloudflare Turnstile)
 - `AUTH_RATE_LIMIT_LOGIN_MAX_ATTEMPTS` (default `5`)
 - `AUTH_RATE_LIMIT_LOGIN_WINDOW_SECONDS` (default `300`)
@@ -109,7 +109,7 @@ Nuevos MVP:
 - `GET /api/dashboard/indicators/series?regionId={id}&indicator=NDVI|NDMI&from=YYYY-MM-DD&to=YYYY-MM-DD&granularity=day|week|month` (`from/to` opcionales, default ultimos 30 dias)
 - `GET /api/dashboard/indicators/map?indicator=NDVI|NDMI&from=YYYY-MM-DD&to=YYYY-MM-DD&limit=500`
 - `GET /api/dashboard/data-freshness?regionId={id}`
-- `POST /api/indicators/measurements` (ingesta interna para `openeo-service`; usa `Authorization: Bearer <OPENEO_INGEST_AUTH_TOKEN>` o `X-OpenEO-Ingest-Token` si el token esta configurado)
+- `POST /api/indicators/measurements` (ingesta interna para `openeo-service`; usa `Authorization: Bearer <OPENEO_INGEST_AUTH_TOKEN>` o `X-OpenEO-Ingest-Token` s? el token esta configurado)
 
 Endpoints AOI de regiones:
 
@@ -146,7 +146,7 @@ Politicas aplicadas:
 - Password hashing: `BCrypt`
 - Access token JWT corto: `10-15` min (default `15`)
 - Refresh token rotatorio con revocacion server-side
-- `forgot-password` no revela si el correo existe
+- `forgot-password` no revela s? el correo existe
 - Rate limiting para login y recuperacion
 - Turnstile opcional por feature flag
 - Indices SQL en `app_users`, `refresh_tokens`, `password_reset_tokens` (Flyway `V1__create_auth_tables.sql`)
@@ -165,7 +165,7 @@ Trigger manual de sync:
 curl -X POST "http://localhost:8080/api/dashboard/sync/run?regionId=REGION_ID"
 ```
 
-Trigger manual con ventana explicita:
+Trigger manual con ventana expl?cita:
 
 ```bash
 curl -X POST "http://localhost:8080/api/dashboard/sync/run?regionId=REGION_ID&from=2026-04-01&to=2026-04-05"
@@ -356,7 +356,7 @@ Incluye:
 | Amenaza | Riesgo | Mitigacion aplicada |
 |---|---|---|
 | Robo de password en DB | Compromiso de cuentas | Hash `BCrypt` (no password en claro) |
-| Access token robado | Suplantacion temporal | TTL corto (10-15 min) + validacion JWT firmada |
+| Access token robado | Suplantacion temporal | TTL corto (10-15 min) + validaci?n JWT firmada |
 | Reuso de refresh token | Sesion persistente indebida | Rotacion por uso + revocacion server-side |
 | Fuerza bruta en login | Toma de cuentas | Rate limiting por IP+email |
 | Enumeracion de correos | Filtrado de usuarios validos | `forgot-password` con respuesta neutra |
@@ -370,10 +370,10 @@ Incluye:
 - [ ] Configurar rotacion periodica de `AUTH_JWT_SECRET`.
 - [ ] Implementar envio real de email para reset (proveedor transaccional + plantillas).
 - [ ] Agregar auditoria de eventos auth (login ok/fail, refresh, reset).
-- [ ] Activar bloqueo progresivo de cuenta ante multiples intentos fallidos.
-- [ ] Configurar HTTPS obligatorio y cookies `Secure`/`HttpOnly` si se migra a cookie auth.
+- [ ] Activar bloqueo progresivo de cuenta ante m?ltiples intentos fallidos.
+- [ ] Configurar HTTPS obligatorio y cookies `Secure`/`HttpOnly` s? se migra a cookie auth.
 - [ ] Agregar deteccion de reuse sospechoso de refresh token y respuesta de incidente.
-- [ ] Integrar observabilidad (metricas de 401/429, alertas, trazabilidad).
+- [ ] Integrar observabilidad (m?tricas de 401/429, alertas, trazabilidad).
 
 ## Documento de avance
 

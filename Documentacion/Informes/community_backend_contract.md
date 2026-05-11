@@ -137,4 +137,4 @@ Body:
 1. Filtrar por `regionId` desde base de datos (no en frontend).
 2. Limitar campos de salida para listados (evitar payload excesivo).
 3. Mantener TTL corto (30-120s) para lectura frecuente de mural.
-4. Auditoria minima de creacion/eliminacion (usuario, fecha, modulo).
+4. Auditoria minima de creacion/eliminacion (usuario, fecha, m?dulo).

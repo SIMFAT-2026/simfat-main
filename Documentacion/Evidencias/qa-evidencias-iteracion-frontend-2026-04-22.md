@@ -1,4 +1,4 @@
-# QA y Evidencias - Iteracion 2026-04-22
+# QA y Evidencias - Iteraci?n 2026-04-22
 
 Fecha: 2026-04-22  
 Version: 1.0  
@@ -6,7 +6,7 @@ Objetivo: registrar pruebas de QA ejecutadas y evidencia para entrega DUOC.
 
 ## 1) Pruebas ejecutadas en frontend (simfat-web)
 
-### 1.1 Calidad de codigo
+### 1.1 Calidad de c?digo
 
 - Comando: `npm run lint`
 - Resultado: OK
@@ -44,7 +44,7 @@ Se identifican suites de prueba en:
 - [x] Diagrama de arquitectura actualizado
 - [x] MER actualizado
 - [x] Diccionario de datos actualizado
-- [x] Modelo logico actualizado
+- [x] Modelo l?gico actualizado
 - [x] Documento de scripts para creacion e insercion de prueba
 - [x] Documento QA con comandos y resultados
 

@@ -6,7 +6,7 @@
 
 ## Alcance implementado
 
-1. Integracion de Alertas con contexto territorial:
+1. Integraci?n de Alertas con contexto territorial:
    - Mapa operativo dentro de `AlertsPage` con capas de alertas y reportes ciudadanos.
    - Priorizacion territorial por score (riesgo + reportes cercanos + recencia).
 
@@ -18,7 +18,7 @@
    - `AlertsPage` guarda filtros en query params (`regionId`, `level`, `from`, `to`).
    - Permite compartir una vista exacta para coordinacion operativa.
 
-4. Insights QA/operacion:
+4. Insights QA/operaci?n:
    - Chips metricos en alertas:
      - alertas filtradas
      - criticas/altas
@@ -52,13 +52,13 @@ npm run build
 
 Resultado: ambos comandos exitosos.
 
-## Actualizacion adicional de cierre (misma iteracion)
+## Actualizacion adicional de cierre (misma iteraci?n)
 
 - Se mejoro experiencia de `Reportes ciudadanos`:
   - se reemplazo visualizador embebido por galeria modal con miniaturas;
   - al hacer click en miniatura se muestra imagen en tamano completo.
 - Se fortalecio continuidad de persistencia:
-  - frontend reintenta creacion de reporte sin adjuntos si falla envio con archivos;
+  - frontend reintenta creacion de reporte sin adjuntos s? falla envio con archivos;
   - backend agrega tolerancia a fallo de upload para no perder registro principal.
 - Pendiente operacional declarado:
   - completar configuracion correcta de variables Supabase Storage en entorno local/evaluacion.

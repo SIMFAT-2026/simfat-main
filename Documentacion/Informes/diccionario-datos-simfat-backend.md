@@ -4,28 +4,28 @@
 - Fecha: 2026-04-21
 - Version: 1.0
 - Alcance: estructuras persistentes activas del backend (PostgreSQL + MongoDB)
-- Fuente tecnica: entidades en `src/main/java/com/simfat/backend/model` y migracion `V1__create_auth_tables.sql`
+- Fuente t?cnica: entidades en `src/main/java/com/simfat/backend/model` y migracion `V1__create_auth_tables.sql`
 
 ## 1) Convenciones
 
 - PK: llave primaria.
 - UK: llave unica.
 - NN: no nulo.
-- FK logica: relacion usada por la aplicacion, pero no forzada con `FOREIGN KEY` en la BD.
+- FK l?gica: relacion usada por la aplicacion, pero no forzada con `FOREIGN KEY` en la BD.
 - En MongoDB, los campos se listan con su nombre real (camelCase) tal como se persisten por Spring Data.
 
 ## 2) Modelo Relacional (PostgreSQL)
 
 ### 2.1 Tabla `app_users`
 
-Descripcion: usuarios del sistema para autenticacion y autorizacion.
+Descripcion: usuarios del sistema para autenticaci?n y autorizaci?n.
 
 | Campo | Tipo SQL | Nulo | Restricciones | Descripcion |
 |---|---|---|---|---|
 | id | VARCHAR(36) | No | PK | Identificador UUID en texto. |
 | email | VARCHAR(180) | No | UK | Correo de acceso del usuario. |
 | full_name | VARCHAR(120) | No |  | Nombre completo. |
-| password_hash | VARCHAR(100) | No |  | Hash BCrypt de la contrasena. |
+| password_hash | VARCHAR(100) | No |  | Hash BCrypt de la contrase?a. |
 | enabled | BOOLEAN | No | Default `TRUE` | Estado habilitado del usuario. |
 | roles | VARCHAR(255) | No |  | Roles serializados en CSV (`ADMIN,USER`). |
 | created_at | TIMESTAMPTZ | No |  | Fecha de creacion (UTC). |
@@ -43,11 +43,11 @@ Descripcion: tokens de refresco para sesiones JWT con rotacion y revocacion.
 |---|---|---|---|---|
 | id | VARCHAR(36) | No | PK | Identificador UUID en texto. |
 | token_id | VARCHAR(64) | No | UK | Identificador publico del refresh token. |
-| user_id | VARCHAR(36) | No | FK logica -> `app_users.id` | Usuario propietario del token. |
+| user_id | VARCHAR(36) | No | FK l?gica -> `app_users.id` | Usuario propietario del token. |
 | token_hash | VARCHAR(128) | No | UK | Hash del refresh token (no se guarda token plano). |
 | issued_at | TIMESTAMPTZ | No |  | Fecha de emision (UTC). |
 | expires_at | TIMESTAMPTZ | No |  | Fecha de expiracion (UTC). |
-| revoked_at | TIMESTAMPTZ | Si |  | Fecha de revocacion (si aplica). |
+| revoked_at | TIMESTAMPTZ | Si |  | Fecha de revocacion (s? aplica). |
 | replaced_by_token_id | VARCHAR(64) | Si |  | Token que reemplaza al actual en rotacion. |
 | created_by_ip | VARCHAR(64) | Si |  | IP origen de emision. |
 | user_agent | VARCHAR(512) | Si |  | User-Agent reportado por cliente. |
@@ -59,13 +59,13 @@ Indices:
 
 ### 2.3 Tabla `password_reset_tokens`
 
-Descripcion: tokens para flujo de recuperacion y cambio de contrasena.
+Descripcion: tokens para flujo de recuperacion y cambio de contrase?a.
 
 | Campo | Tipo SQL | Nulo | Restricciones | Descripcion |
 |---|---|---|---|---|
 | id | VARCHAR(36) | No | PK | Identificador UUID en texto. |
 | token_hash | VARCHAR(128) | No | UK | Hash del token de recuperacion. |
-| user_id | VARCHAR(36) | No | FK logica -> `app_users.id` | Usuario al que pertenece el token. |
+| user_id | VARCHAR(36) | No | FK l?gica -> `app_users.id` | Usuario al que pertenece el token. |
 | created_at | TIMESTAMPTZ | No |  | Fecha de creacion del token (UTC). |
 | expires_at | TIMESTAMPTZ | No |  | Fecha de expiracion del token (UTC). |
 | consumed_at | TIMESTAMPTZ | Si |  | Fecha de consumo exitoso del token. |
@@ -84,7 +84,7 @@ Descripcion: catalogo de regiones monitoreadas.
 |---|---|---|---|---|
 | id | ObjectId/String | Si (Mongo) | PK natural Mongo (`_id`) | Identificador de region. |
 | nombre | String | Si | max 120, no vacio | Nombre de region. |
-| codigo | String | Si | max 20, no vacio | Codigo funcional (`CL-15`, etc.). |
+| c?digo | String | Si | max 20, no vacio | C?digo funcional (`CL-15`, etc.). |
 | zona | String | Si | max 50, no vacio | Macro zona (`NORTE`, `CENTRO`, etc.). |
 | hectareasBosqueReferencia | Double | No | > 0 cuando se informa | Superficie de referencia de bosque. |
 | aoiBbox | Array<Double> | No | idealmente 4 coords | Bounding box AOI `[west,south,east,north]`. |
@@ -94,12 +94,12 @@ Indices definidos:
 
 ### 3.2 Coleccion `forest_loss_records`
 
-Descripcion: historico de perdida anual de bosque por region.
+Descripcion: hist?rico de perdida anual de bosque por region.
 
 | Campo | Tipo (BSON esperado) | Requerido en app | Restricciones de dominio | Descripcion |
 |---|---|---|---|---|
 | id | ObjectId/String | Si (Mongo) | PK natural Mongo (`_id`) | Identificador del registro. |
-| regionId | String | Si | no vacio | Referencia logica a `regions.id`. |
+| regionId | String | Si | no vacio | Referencia l?gica a `regions.id`. |
 | anio | Int32 | Si | >= 1900 | Ano del dato. |
 | hectareasPerdidas | Double | Si | >= 0 | Hectareas perdidas en el ano. |
 | porcentajePerdida | Double | No | >= 0 | Porcentaje de perdida respecto de referencia. |
@@ -116,7 +116,7 @@ Descripcion: eventos de alerta de calor asociados a regiones.
 | Campo | Tipo (BSON esperado) | Requerido en app | Restricciones de dominio | Descripcion |
 |---|---|---|---|---|
 | id | ObjectId/String | Si (Mongo) | PK natural Mongo (`_id`) | Identificador del evento. |
-| regionId | String | Si | no vacio | Referencia logica a `regions.id`. |
+| regionId | String | Si | no vacio | Referencia l?gica a `regions.id`. |
 | fechaEvento | Date | Si |  | Fecha/hora del evento. |
 | nivelRiesgo | String (enum) | Si | `BAJO`, `MEDIO`, `ALTO`, `CRITICO` | Nivel de severidad. |
 | latitud | Double | Si | -90 a 90 | Coordenada geografica. |
@@ -159,9 +159,9 @@ Descripcion: trazabilidad de ejecuciones/sincronizaciones de jobs hacia openEO.
 | requestedAt | Date | No |  | Fecha/hora de solicitud. |
 | updatedAt | Date | No |  | Ultima actualizacion de estado. |
 | finishedAt | Date | No |  | Fecha/hora de finalizacion. |
-| errorCode | String | No |  | Codigo de error si falla. |
-| errorMessage | String | No |  | Mensaje de error si falla. |
-| source | String | No |  | Origen de la ejecucion. |
+| errorCode | String | No |  | C?digo de error s? falla. |
+| errorMessage | String | No |  | Mensaje de error s? falla. |
+| source | String | No |  | Origen de la ejecuci?n. |
 
 
 * No posee anotacion `@NotNull`, pero en la practica se usa como dato operativo clave.
@@ -216,7 +216,7 @@ Descripcion: snapshot agregado por region para responder dashboard rapido.
 | dataFreshnessSeconds | Int64 | No |  | Antiguedad de datos en segundos. |
 
 
-* No posee anotacion `@NotNull`, pero en operacion normal se usa siempre.
+* No posee anotacion `@NotNull`, pero en operaci?n normal se usa siempre.
 
 Indices definidos:
 - `regionId` unico.
@@ -248,14 +248,14 @@ Persistencia:
 
 | Origen | Campo | Destino | Cardinalidad | Tipo |
 |---|---|---|---|---|
-| refresh_tokens | user_id | app_users.id | N:1 | FK logica |
-| password_reset_tokens | user_id | app_users.id | N:1 | FK logica |
-| forest_loss_records | regionId | regions.id | N:1 | FK logica |
-| heat_alert_events | regionId | regions.id | N:1 | FK logica |
-| alert_rules | regionId | regions.id | N:1 (opcional) | FK logica |
-| openeo_job_runs | regionId | regions.id | N:1 | FK logica |
-| openeo_indicator_observations | regionId | regions.id | N:1 | FK logica |
-| dashboard_region_snapshots | regionId | regions.id | 1:1 efectivo (por indice unico) | FK logica |
+| refresh_tokens | user_id | app_users.id | N:1 | FK l?gica |
+| password_reset_tokens | user_id | app_users.id | N:1 | FK l?gica |
+| forest_loss_records | regionId | regions.id | N:1 | FK l?gica |
+| heat_alert_events | regionId | regions.id | N:1 | FK l?gica |
+| alert_rules | regionId | regions.id | N:1 (opcional) | FK l?gica |
+| openeo_job_runs | regionId | regions.id | N:1 | FK l?gica |
+| openeo_indicator_observations | regionId | regions.id | N:1 | FK l?gica |
+| dashboard_region_snapshots | regionId | regions.id | 1:1 efectivo (por indice unico) | FK l?gica |
 
 ## 6) Observaciones Tecnicas para Defensa
 

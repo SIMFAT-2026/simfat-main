@@ -10,7 +10,7 @@ Documentar la arquitectura actualizada de la solucion SIMFAT considerando:
 
 - `simfat-web` como cliente principal
 - `simfat-backend` como API y orquestador de negocio
-- `openeo-service` como integracion satelital
+- `openeo-service` como integraci?n satelital
 - persistencia hibrida PostgreSQL + MongoDB
 
 ## Diagrama (Mermaid)
@@ -48,5 +48,5 @@ flowchart TB
 1. El frontend no se conecta directo a `openeo-service`; todo pasa por backend.
 2. El backend concentra normalizacion y cache de consultas para reducir costo de API externa.
 3. El modelo de datos se divide en:
-   - Relacional (auth y seguridad de sesion)
+   - Relacional (auth y seguridad de sesi?n)
    - Documental (dominio territorial y analitica)

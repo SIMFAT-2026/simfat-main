@@ -4,7 +4,7 @@
 - Version: 1.0
 - Nota: modelo hibrido (relacional + documental).
 
-## MER (vista logica)
+## MER (vista l?gica)
 
 ```mermaid
 erDiagram

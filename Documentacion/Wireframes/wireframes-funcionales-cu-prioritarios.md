@@ -1,4 +1,4 @@
-# Wireframes Funcionales (Baja Fidelidad) - SIMFAT
+﻿# Wireframes Funcionales (Baja Fidelidad) - SIMFAT
 
 Fecha: 2026-05-11  
 Objetivo: dejar wireframes/documento visual funcional alineado a CU prioritarios del sistema.
@@ -7,26 +7,26 @@ Objetivo: dejar wireframes/documento visual funcional alineado a CU prioritarios
 
 - CU01: Login
 - CU04: Registro
-- CU05: Recuperar contrasena / reset
-- CU02 + CU06: Dashboard y metricas historicas
+- CU05: Recuperar contraseña / reset
+- CU02 + CU06: Dashboard y métricas históricas
 - CU03 + CU07: Territorio (mapa, capas, zonas de riesgo)
 - CU08 + CU10: Alertas (reglas e historial)
 - CU11: Ingesta externa (vista operativa admin)
-- CU15 (base): Gestion de usuarios/roles (wireframe conceptual)
+- CU15 (base): Gestión de usuarios/roles (wireframe conceptual)
 
 ## 2. Wireframe CU01 - Login
 
 ```text
 +------------------------------------------------------+
 | SIMFAT                                               |
-| Prevencion y alerta temprana                         |
+| prevención y alerta temprana                         |
 |------------------------------------------------------|
 | [ Correo electronico                         ]       |
-| [ Contrasena                                 ]       |
+| [ contraseña                                 ]       |
 | [ ] Recordarme                                         |
-| [ Iniciar sesion ]                                    |
+| [ Iniciar sesión ]                                    |
 |------------------------------------------------------|
-| Olvide mi contrasena   |   Registrarme               |
+| Olvide mi contraseña   |   Registrarme               |
 +------------------------------------------------------+
 ```
 
@@ -38,16 +38,16 @@ Objetivo: dejar wireframes/documento visual funcional alineado a CU prioritarios
 |------------------------------------------------------|
 | [ Nombre completo                            ]       |
 | [ Correo electronico                         ]       |
-| [ Contrasena                                 ]       |
-| [ Confirmar contrasena                       ]       |
+| [ contraseña                                 ]       |
+| [ Confirmar contraseña                       ]       |
 | [ Captcha / Turnstile ]                               |
 | [ Registrarme ]                                       |
 |------------------------------------------------------|
-| Ya tienes cuenta? [Iniciar sesion]                   |
+| Ya tienes cuenta? [Iniciar sesión]                   |
 +------------------------------------------------------+
 ```
 
-## 4. Wireframe CU05 - Recuperar contrasena
+## 4. Wireframe CU05 - Recuperar contraseña
 
 ```text
 +------------------------------------------------------+
@@ -60,11 +60,11 @@ Objetivo: dejar wireframes/documento visual funcional alineado a CU prioritarios
 +------------------------------------------------------+
 
 +------------------------------------------------------+
-| Restablecer contrasena                               |
+| Restablecer contraseña                               |
 |------------------------------------------------------|
 | [ Token ]                                            |
-| [ Nueva contrasena ]                                 |
-| [ Confirmar nueva contrasena ]                       |
+| [ Nueva contraseña ]                                 |
+| [ Confirmar nueva contraseña ]                       |
 | [ Guardar ]                                          |
 +------------------------------------------------------+
 ```
@@ -93,8 +93,8 @@ Objetivo: dejar wireframes/documento visual funcional alineado a CU prioritarios
 |----------------------------------------------------------------------------------|
 |                                  MAPA                                            |
 |   - Pins de alertas                                                               |
-|   - Capa de criticidad por region                                                 |
-|   - Tooltip: region, score, ultima actualizacion                                  |
+|   - Capa de criticidad por región                                                 |
+|   - Tooltip: región, score, ultima actualización                                  |
 |----------------------------------------------------------------------------------|
 | Panel lateral:                                                                    |
 |  - Prioridad operativa                                                            |
@@ -103,7 +103,7 @@ Objetivo: dejar wireframes/documento visual funcional alineado a CU prioritarios
 +----------------------------------------------------------------------------------+
 ```
 
-## 7. Wireframe CU08/CU10 - Modulo alertas (reglas + historial)
+## 7. Wireframe CU08/CU10 - módulo alertas (reglas + historial)
 
 ```text
 +----------------------------------------------------------------------------------+
@@ -111,47 +111,49 @@ Objetivo: dejar wireframes/documento visual funcional alineado a CU prioritarios
 |----------------------------------------------------------------------------------|
 | Filtros: [Region] [Nivel] [Desde] [Hasta] [Actualizar] [Limpiar]                 |
 |----------------------------------------------------------------------------------|
-| Tabla historial: Fecha | Region | Nivel | Fuente | Descripcion | Acciones        |
+| Tabla historial: Fecha | Region | Nivel | Fuente | Descripcion | acciónes        |
 |----------------------------------------------------------------------------------|
 | Formulario regla/alerta:                                                          |
 | [Region] [Umbral perdida %] [Umbral eventos calor] [Activa SI/NO] [Guardar]      |
 +----------------------------------------------------------------------------------+
 ```
 
-## 8. Wireframe CU11 - Ingesta API externa (admin tecnico)
+## 8. Wireframe CU11 - Ingesta API externa (admin técnico)
 
 ```text
 +----------------------------------------------------------------------------------+
 | Ingesta Externa (OpenEO/NASA/GFW)                                                |
 |----------------------------------------------------------------------------------|
-| Parametros: [Fuente] [Region/AOI] [Fecha inicio] [Fecha fin] [Indicador]         |
-| [ Ejecutar ingesta ] [ Validar normalizacion ]                                   |
+| parámetros: [Fuente] [Region/AOI] [Fecha inicio] [Fecha fin] [Indicador]         |
+| [ Ejecutar ingesta ] [ válidar normalizacion ]                                   |
 |----------------------------------------------------------------------------------|
 | Estado ultima corrida:                                                            |
-| - jobId | estado | registros recibidos | registros validos | errores             |
+| - jobId | estado | registros recibidos | registros válidos | errores             |
 |----------------------------------------------------------------------------------|
-| Log resumido y acciones de reintento                                              |
+| Log resumido y acciónes de reintento                                              |
 +----------------------------------------------------------------------------------+
 ```
 
-## 9. Wireframe CU15 - Gestion de usuarios (conceptual)
+## 9. Wireframe CU15 - Gestión de usuarios (conceptual)
 
 ```text
 +----------------------------------------------------------------------------------+
-| Administracion de usuarios                                                       |
+| administración de usuarios                                                       |
 |----------------------------------------------------------------------------------|
 | Filtros: [Nombre/Correo] [Rol] [Estado]                                          |
 |----------------------------------------------------------------------------------|
-| Tabla: Nombre | Correo | Rol | Estado | Ultimo acceso | Acciones                |
+| Tabla: Nombre | Correo | Rol | Estado | Ultimo acceso | acciónes                |
 |----------------------------------------------------------------------------------|
-| Acciones: [Crear usuario] [Editar] [Deshabilitar] [Reset password]               |
+| acciónes: [Crear usuario] [Editar] [Deshabilitar] [Reset password]               |
 |----------------------------------------------------------------------------------|
 | Modal roles/permisos:                                                             |
 | [Usuario General] [Administrador] + matriz de permisos                           |
 +----------------------------------------------------------------------------------+
 ```
 
-## 10. Nota de uso academico
+## 10. Nota de uso académico
 
-Estos wireframes son de baja fidelidad y sirven como respaldo formal de diseno funcional.
-Se recomienda exportarlos a formato PDF/DOCX para la entrega final si la pauta lo exige.
+Estos wireframes son de baja fidelidad y sirven como respaldo formal de diseño funcional.
+Se recomienda exportarlos a formato PDF/DOCX para la entrega final s? la pauta lo exige.
+
+

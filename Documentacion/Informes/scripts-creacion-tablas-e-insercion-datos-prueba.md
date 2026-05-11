@@ -4,13 +4,13 @@
 - Version: 1.0
 - Alcance: estado actual del backend en este repositorio.
 
-## 1) Creacion de tablas SQL (autenticacion)
+## 1) Creacion de tablas SQL (autenticaci?n)
 
 ### Script oficial
 
 - Archivo: `src/main/resources/db/migration/V1__create_auth_tables.sql`
 - Motor objetivo: PostgreSQL
-- Gestion: Flyway (arranca automaticamente con Spring Boot)
+- Gesti?n: Flyway (arranca automaticamente con Spring Boot)
 
 ### Tablas creadas
 
@@ -18,7 +18,7 @@
 - `refresh_tokens`
 - `password_reset_tokens`
 
-### Ejecucion
+### Ejecuci?n
 
 Con backend levantado y `spring.flyway.enabled=true`, la migracion se ejecuta automaticamente al iniciar la app.
 
@@ -35,7 +35,7 @@ mvn spring-boot:run
 - Archivo: `src/main/java/com/simfat/backend/config/DataSeederConfig.java`
 - Activacion: `app.seed.enabled=true` (default actual)
 - Comportamiento:
-  - Inserta regiones base si la base esta vacia.
+  - Inserta regiones base s? la base esta vacia.
   - Inserta perdida forestal de ejemplo.
   - Inserta alertas de calor de ejemplo.
   - Inserta regla global de alertas.

@@ -2,7 +2,7 @@
 
 ## Resumen ejecutivo
 
-Se implemento autenticacion completa y segura en `simfat-backend`, con persistencia de auth en PostgreSQL y manteniendo MongoDB para dashboard/OpenEO.
+Se implemento autenticaci?n completa y segura en `simfat-backend`, con persistencia de auth en PostgreSQL y manteniendo MongoDB para dashboard/OpenEO.
 
 ## Entregables implementados
 
@@ -40,7 +40,7 @@ Se implemento autenticacion completa y segura en `simfat-backend`, con persisten
   - backend Spring Boot + MongoDB
 - Ahora:
   - arquitectura hibrida:
-    - PostgreSQL para autenticacion (requisito SQL evaluativo)
+    - PostgreSQL para autenticaci?n (requisito SQL evaluativo)
     - MongoDB para datos operacionales de dashboard/OpenEO
 
 ## Configuracion requerida
@@ -64,7 +64,7 @@ Se implemento autenticacion completa y segura en `simfat-backend`, con persisten
 ## Riesgos / notas operativas
 
 - Si `AUTH_JWT_SECRET` no esta en entorno, el backend falla al iniciar.
-- `.env` no siempre se carga automaticamente al ejecutar `mvn spring-boot:run`; asegurar export en la sesion o script de arranque.
+- `.env` no siempre se carga automaticamente al ejecutar `mvn spring-boot:run`; asegurar export en la sesi?n o script de arranque.
 - Para PostgreSQL 17.x se requiere dependencia `flyway-database-postgresql`.
 
 ## Proximos pasos sugeridos

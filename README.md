@@ -1,43 +1,43 @@
 ﻿# SIMFAT
 
-## Sistema Inteligente de Monitorizacion Forestal y Alerta Temprana
+## Sistema Inteligente de Monitorización Forestal y Alerta Temprana
 
-SIMFAT es un proyecto academico-profesional orientado al monitoreo territorial, analisis de indicadores ambientales y soporte a la toma de decisiones para prevencion y alerta temprana en contexto forestal.
+SIMFAT es un proyecto académico-profesional orientado al monitoreo territorial, análisis de indicadores ambientales y soporte a la toma de decisiones para prevención y alerta temprana en contexto forestal.
 
-Este repositorio está organizado como **monorepo**, alineado con las exigencias de la pauta academica.
+El repositorio está organizado como **monorepo**, alineado con la pauta académica de TPY1101.
 
 ## Estructura General
 
-- `Gestion/`: antecedentes de identificacion del proyecto y del equipo.
-- `Producto/`: codigo fuente, scripts de base de datos y dependencias tecnicas.
-- `Documentacion/`: diseno tecnico/visual, planificacion, informes y evidencias QA.
+- `Gestion/`: antecedentes de identificación del proyecto y del equipo.
+- `Producto/`: código fuente, scripts de base de datos y dependencias técnicas.
+- `Documentacion/`: diseño técnico/visual, planificación, informes y evidencias QA.
 
-## Arquitectura Tecnica
+## Arquitectura técnica
 
 ### Backend principal
 - Ruta: `Producto/backend/simfat-backend`
-- Tecnologia: Spring Boot
-- Proposito: autenticacion, reglas de negocio y APIs principales.
+- Tecnología: Spring Boot
+- Propósito: autenticación, reglas de negocio y APIs principales.
 
 ### Microservicio OpenEO
 - Ruta: `Producto/backend/openeo-service`
-- Tecnologia: FastAPI
-- Proposito: integracion OpenEO/Copernicus para consulta e ingesta de indicadores.
+- Tecnología: FastAPI
+- Propósito: integración OpenEO/Copernicus para consulta e ingesta de indicadores.
 
 ### Frontend web
 - Ruta: `Producto/frontend/simfat-web`
-- Tecnologia: React + Vite
-- Proposito: interfaz de usuario y visualizacion de datos.
+- Tecnología: React + Vite
+- Propósito: interfaz de usuario y visualización de datos.
 
-## Documentacion (con accesos directos)
+## Documentación (con accesos directos)
 
-### Gestion
-- [Documento 1.1.2 de definicion e identificacion](Gestion/1.1.2%20Documento%20de%20registro%20de%20definicion%20e%20identificacion%20del%20proyecto.docx)
+### Gestión
+- [Documento 1.1.2 de definición e identificación](Gestion/1.1.2%20Documento%20de%20registro%20de%20definicion%20e%20identificacion%20del%20proyecto.docx)
 - [Integrantes](Gestion/Integrantes.txt)
 
 ### Informes de avance y control
 - [Matriz de casos de uso - Semana 10](Documentacion/Informes/matriz-casos-uso-semana10-2026-05-11.md)
-- [Auditoria de entrega - Semana 10](Documentacion/Informes/auditoria-entrega-semana10.md)
+- [Auditoría de entrega - Semana 10](Documentacion/Informes/auditoria-entrega-semana10.md)
 - [Estado de avance integrado](Documentacion/Informes/estado-avance-integrado-simfat-2026-04-14.md)
 
 ### QA y pruebas
@@ -46,18 +46,18 @@ Este repositorio está organizado como **monorepo**, alineado con las exigencias
 - [Evidencias QA backend](Documentacion/Evidencias/qa-evidencias-iteracion-backend-2026-04-21.md)
 - [Evidencias QA frontend](Documentacion/Evidencias/qa-evidencias-iteracion-frontend-2026-04-22.md)
 
-### Diseno tecnico y visual
+### Diseño técnico y visual
 - [UML / Arquitectura](Documentacion/UML/)
-- [MER / Modelo logico](Documentacion/MER/)
+- [MER / Modelo lógico](Documentacion/MER/)
 - [Wireframes funcionales](Documentacion/Wireframes/wireframes-funcionales-cu-prioritarios.md)
-- [Analisis de problemas / roadmap](Documentacion/Analisis-Problemas/roadmap_frontend_backend_simfat.md)
+- [Análisis de problemas / roadmap](Documentacion/Analisis-Problemas/roadmap_frontend_backend_simfat.md)
 
-### Planificacion
-- [Planificacion semana 10 a 12 (alineada a CU)](Documentacion/Gantt/planificacion-semana10-a-semana12-cu.md)
+### Planificación
+- [Planificación semana 10 a 12 (alineada a CU)](Documentacion/Gantt/planificacion-semana10-a-semana12-cu.md)
 
-## Producto Tecnico
+## Producto técnico
 
-### Codigo fuente
+### Código fuente
 - [Backend principal](Producto/backend/simfat-backend/)
 - [Microservicio OpenEO](Producto/backend/openeo-service/)
 - [Frontend web](Producto/frontend/simfat-web/)
@@ -71,12 +71,12 @@ Este repositorio está organizado como **monorepo**, alineado con las exigencias
 ### Dependencias
 - [Registro consolidado de dependencias](Producto/dependencias/registro-dependencias-consolidado.md)
 - [Registro dependencias backend](Producto/dependencias/registro-dependencias-backend.md)
-- Manifiestos por modulo:
+- Manifiestos por módulo:
   - `Producto/backend/simfat-backend/pom.xml`
   - `Producto/backend/openeo-service/requirements.txt`
   - `Producto/frontend/simfat-web/package.json`
 
-## Ejecucion Local (rapida)
+## Ejecución local (rápida)
 
 ### Backend principal
 ```bash

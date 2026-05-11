@@ -3,7 +3,7 @@
 Subir aqui:
 - Diagrama de arquitectura
 - Diagrama ER / modelo de datos
-- Diagrama de casos de uso (si aplica)
+- Diagrama de casos de uso (s? aplica)
 
 Formato recomendado de nombre:
 `AAAA-MM-DD_tipo_diagrama_vN.ext`

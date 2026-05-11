@@ -1,4 +1,4 @@
-# Registro Consolidado de Dependencias - SIMFAT
+﻿# Registro Consolidado de Dependencias - SIMFAT
 
 Fecha: 2026-05-11
 
@@ -25,7 +25,9 @@ Fecha: 2026-05-11
 - Gestor: npm
 - Tipo de stack: React + Vite
 
-## 4. Nota de control academico
+## 4. Nota de control académico
 
-Este registro consolidado apunta a los archivos canonicos de dependencias por modulo.
-Para auditoria docente, se recomienda no incluir `node_modules` en el reporte manual y referenciar siempre los archivos de manifiesto indicados arriba.
+Este registro consolidado apunta a los archivos canonicos de dependencias por módulo.
+Para Auditoría docente, se recomienda no incluir `node_modules` en el reporte manual y referenciar siempre los archivos de manifiesto indicados arriba.
+
+

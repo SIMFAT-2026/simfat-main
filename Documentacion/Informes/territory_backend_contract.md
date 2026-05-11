@@ -1,12 +1,12 @@
 # Contrato Backend Minimo - Monitorizacion Territorial
 
 Fecha: 2026-04-21  
-Frontend consumidor: `simfat-web` (modulo `TerritoryPage`)  
+Frontend consumidor: `simfat-web` (m?dulo `TerritoryPage`)  
 Objetivo: soportar mapa principal con bajo costo y carga progresiva por region.
 
-## Principios de diseno
+## Principios de dise?o
 
-- Entregar datos listos para visualizacion (sin geoprocesamiento pesado en frontend).
+- Entregar datos listos para visualizaci?n (sin geoprocesamiento pesado en frontend).
 - Soportar datos imperfectos y degradacion controlada (`source`, `generatedAt`, `qualityFlag`).
 - Reducir costo de API: respuestas agregadas, por region y rango acotado.
 
@@ -123,7 +123,7 @@ Recomendaciones backend para costo bajo:
 
 ## 4) Evolucion futura del contrato
 
-Estado actual (cerrado para esta iteracion):
+Estado actual (cerrado para esta iteraci?n):
 
 - geometria puntual + GeoJSON simplificado
 

@@ -1,8 +1,8 @@
-﻿# Evidencias QA - Iteracion SIMFAT
+﻿# Evidencias QA - Iteraci?n SIMFAT
 
 - Fecha: 2026-04-21
 - Version: 1.0
-- Objetivo: dejar trazabilidad de verificaciones tecnicas para cierre de avance.
+- Objetivo: dejar trazabilidad de verificaciones t?cnicas para cierre de avance.
 
 ## 1) Frontend (`simfat-web`)
 
@@ -18,7 +18,7 @@ Resultado:
 - `lint`: OK, sin warnings permitidos (`--max-warnings 0`).
 - `build`: OK, bundle de produccion generado.
 - Observacion relevante de performance:
-  - chunk `map-vendor` separado, permitiendo carga diferida del modulo territorial.
+  - chunk `map-vendor` separado, permitiendo carga diferida del m?dulo territorial.
 
 ## 2) Backend (`simfat-backend`)
 
@@ -31,7 +31,7 @@ mvn -q -DskipTests compile
 Resultado:
 
 - Compilacion exitosa sin errores.
-- Validacion de integridad basica de codigo posterior a actualizaciones de documentacion y configuracion de datos.
+- Validacion de integridad basica de c?digo posterior a actualizaciones de documentaci?n y configuracion de datos.
 
 ## 3) Evidencias sugeridas para carpeta DUOC
 
@@ -45,4 +45,4 @@ Resultado:
 
 - Pruebas E2E con backend/openeo caidos para validar degradacion controlada.
 - Pruebas funcionales de contratos nuevos de capas territoriales y reportes ciudadanos.
-- Pruebas de autorizacion por rol en flujos comunitarios y de reportes.
+- Pruebas de autorizaci?n por rol en flujos comunitarios y de reportes.

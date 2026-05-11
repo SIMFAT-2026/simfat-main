@@ -2,7 +2,7 @@
 
 Microservicio especializado para obtencion de datos satelitales desde openEO/Copernicus dentro del ecosistema SIMFAT.
 
-Este servicio no implementa logica de negocio principal de SIMFAT. Su rol en este sprint es entregar una base tecnica limpia para futuras ejecuciones de jobs satelitales.
+Este servicio no implementa l?gica de negocio principal de SIMFAT. Su rol en este sprint es entregar una base t?cnica limpia para futuras ejecuciones de jobs satelitales.
 
 ## Alcance de este sprint
 
@@ -89,7 +89,7 @@ Variables relevantes para flujo end-to-end:
 - `SIMFAT_BACKEND_SYNC_ENABLED` (default: `true`; usar `false` para validar openEO sin depender del backend)
 - `APP_CORS_ALLOW_ORIGINS` (default: `*`; lista separada por coma)
 
-## Ejecucion local
+## Ejecuci?n local
 
 1. Crear y activar entorno virtual.
 2. Instalar dependencias:
@@ -121,7 +121,7 @@ uvicorn app.main:app --reload --port ${APP_PORT}
 
 Nota: los endpoints de indicadores requieren `aoi` tipo `bbox` con 4 coordenadas (`west,south,east,north`).
 
-## Verificacion liviana de conexion openEO
+## Verificacion liviana de conexi?n openEO
 
 Los endpoints `GET /openeo/capabilities` y `GET /openeo/collections` estan orientados a pruebas de conectividad de bajo costo.
 
@@ -133,7 +133,7 @@ Para computo satelital de indicadores (endpoint `POST /openeo/indicators/latest/
 Opciones soportadas:
 
 - `OPENEO_ACCESS_TOKEN`: token corto (manual).
-- `OPENEO_REFRESH_TOKEN`: renovacion automatica de access token (recomendado para operacion continua).
+- `OPENEO_REFRESH_TOKEN`: renovacion automatica de access token (recomendado para operaci?n continua).
 
 En CDSE, el flujo `client_credentials` no habilita endpoints de procesamiento, solo metadatos/probes.
 
@@ -194,7 +194,7 @@ Ademas, despues de calcular el indicador, el microservicio publica automaticamen
 
 ## Notas de arquitectura
 
-- Este microservicio encapsula la integracion futura con openEO mediante `clients` + `adapters`.
-- Las rutas HTTP solo orquestan validacion y delegan a `services`.
+- Este microservicio encapsula la integraci?n futura con openEO mediante `clients` + `adapters`.
+- Las rutas HTTP solo orquestan validaci?n y delegan a `services`.
 - La persistencia y reglas de negocio del dominio SIMFAT permanecen en `simfat-backend`.
 - El frontend no debe consumir este servicio directamente.

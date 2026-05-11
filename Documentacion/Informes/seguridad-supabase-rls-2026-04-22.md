@@ -50,4 +50,4 @@ commit;
 
 1. Revisar Security Advisor de Supabase semanalmente.
 2. Aplicar regla preventiva: toda tabla nueva en `public` debe nacer con RLS habilitado.
-3. Mantener acceso a tablas de autenticacion solo via backend confiable.
+3. Mantener acceso a tablas de autenticaci?n solo via backend confiable.

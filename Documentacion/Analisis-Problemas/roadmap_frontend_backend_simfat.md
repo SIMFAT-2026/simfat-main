@@ -6,11 +6,11 @@ Alcance de este documento: adaptacion incremental de arquitectura, no reconstruc
 
 ## a) Proposito del documento
 
-Definir una ruta tecnica realista para evolucionar `simfat-web` desde su estado actual (dashboard tecnico + CRUD operativos) hacia una plataforma web funcional de inteligencia territorial y articulacion comunitaria para prevencion, monitoreo y alerta temprana de incendios forestales.
+Definir una ruta t?cnica realista para evolucionar `simfat-web` desde su estado actual (dashboard t?cnico + CRUD operativos) hacia una plataforma web funcional de inteligencia territorial y articulacion comunitaria para prevencion, monitoreo y alerta temprana de incendios forestales.
 
 Este documento prioriza:
 
-- Reutilizacion maxima del codigo existente.
+- Reutilizacion maxima del c?digo existente.
 - Bajo costo operacional (API, tokens, procesamiento).
 - Escalabilidad progresiva sin sobredisenio.
 - Claridad de dependencias con `simfat-backend` y `openeo-service`.
@@ -24,7 +24,7 @@ SIMFAT debe operar como plataforma integral con foco inicial en Biobio y La Arau
 3. Monitorizacion territorial (mapa interactivo + analitica integrada).
 4. Alertas operativas (eventos y reglas conectadas al contexto espacial).
 
-La analitica deja de estar aislada como "tablero tecnico" y pasa a estar integrada al flujo de monitorizacion territorial.
+La analitica deja de estar aislada como "tablero t?cnico" y pasa a estar integrada al flujo de monitorizacion territorial.
 
 ## c) Modulos priorizados
 
@@ -39,7 +39,7 @@ La analitica deja de estar aislada como "tablero tecnico" y pasa a estar integra
 
 - Formulario de reporte con geolocalizacion, categoria, descripcion y fotos.
 - Historial de reportes con estado (recibido, validado, descartado, derivado).
-- Conexion gradual con alertas y monitorizacion (sin acoplar logica compleja en frontend).
+- Conexion gradual con alertas y monitorizacion (sin acoplar l?gica compleja en frontend).
 
 ## C. Monitorizacion territorial (nucleo principal)
 
@@ -54,15 +54,15 @@ La analitica deja de estar aislada como "tablero tecnico" y pasa a estar integra
 
 ## d) Diagnostico del frontend existente
 
-## Stack y capacidades actuales (confirmado en codigo)
+## Stack y capacidades actuales (confirmado en c?digo)
 
 - React 18 + Vite + React Router + Axios + Recharts.
 - Arquitectura por capas base ya presente:
   - `src/api` (cliente HTTP, errores, endpoints)
   - `src/services` (servicios CRUD)
-  - `src/features/dashboard` (modulo analitico moderno con hooks TS)
+  - `src/features/dashboard` (m?dulo analitico moderno con hooks TS)
   - `src/pages`, `src/components`, `src/layouts`, `src/auth`, `src/router`.
-- Autenticacion JWT robusta con refresh y guards de ruta.
+- Autenticaci?n JWT robusta con refresh y guards de ruta.
 
 ## Rutas actuales
 
@@ -81,10 +81,10 @@ La analitica deja de estar aislada como "tablero tecnico" y pasa a estar integra
 
 ## Fricciones con la nueva vision
 
-1. Navegacion actual orientada a CRUD tecnico, no a flujos de producto (comunidad/reportes/territorio).
+1. Navegacion actual orientada a CRUD t?cnico, no a flujos de producto (comunidad/reportes/territorio).
 2. No existe libreria cartografica; "mapa" actual es una lista con barras (no mapa geoespacial real).
-3. No existe modulo de coordinacion comunitaria.
-4. No existe modulo de reportes ciudadanos con fotos y geolocalizacion asistida.
+3. No existe m?dulo de coordinacion comunitaria.
+4. No existe m?dulo de reportes ciudadanos con fotos y geolocalizacion asistida.
 5. No hay lazy loading de rutas/pantallas.
 6. Coexisten capas antiguas y nuevas de dashboard:
    - `src/services/dashboardService.js` ya no se usa en pantallas activas.
@@ -92,14 +92,14 @@ La analitica deja de estar aislada como "tablero tecnico" y pasa a estar integra
 8. Doble configuracion de menu (Navbar y Sidebar) con riesgo de divergencia de rutas.
 9. README y `.env.example` presentan diferencias de puerto backend (deuda operativa menor).
 
-## Ausencias clave para siguiente iteracion
+## Ausencias clave para siguiente iteraci?n
 
 - Motor de mapa interactivo + capas GeoJSON.
 - Contratos API para reportes ciudadanos y recursos comunitarios.
 - Contrato API de capas territoriales filtrables por region/rango/indicador.
 - Mecanismo de adjuntar imagenes de reporte (upload directo o URL prefirmada).
 
-## e) Estrategia de reutilizacion de codigo existente
+## e) Estrategia de reutilizacion de c?digo existente
 
 ## Reutilizar sin cambios grandes
 
@@ -113,14 +113,14 @@ La analitica deja de estar aislada como "tablero tecnico" y pasa a estar integra
 
 - `DashboardPage.tsx` y componentes `features/dashboard/*` pasan a subvista de `Monitorizacion Territorial`.
 - `AlertsPage.jsx` se mantiene como base de "Alertas operativas" y se integra al contexto de mapa.
-- `RegionsPage.jsx`, `ForestLossPage.jsx`, `RulesPage.jsx` migran a seccion de administracion (no ruta principal de navegacion).
+- `RegionsPage.jsx`, `ForestLossPage.jsx`, `RulesPage.jsx` migran a seccion de administraci?n (no ruta principal de navegacion).
 - `IndicatorsMapLayer.tsx` evoluciona desde lista-resumen a panel de leyenda/inspeccion conectado al mapa real.
 
-## Reducir deuda tecnica incremental
+## Reducir deuda t?cnica incremental
 
 - Unificar navegacion en una sola fuente de verdad (config central de menu/rutas).
 - Remover o deprecar `src/services/dashboardService.js` cuando se confirme no uso.
-- Introducir `React.lazy` + `Suspense` por modulo principal.
+- Introducir `React.lazy` + `Suspense` por m?dulo principal.
 
 ## f) Hoja de ruta frontend
 
@@ -144,11 +144,11 @@ La analitica deja de estar aislada como "tablero tecnico" y pasa a estar integra
    - `components/TerritoryLegend.jsx`
    - `hooks/useTerritoryLayers.js`
 2. Integrar mapa principal en nueva pagina `TerritoryPage`.
-3. Reusar dashboard actual como bloque analitico inferior (opcion recomendada):
+3. Reusar dashboard actual como bloque analitico inferior (opci?n recomendada):
    - Mapa arriba (foco operativo inmediato).
    - Dashboard debajo con scroll (reuso maximo y menor complejidad).
 
-Justificacion de opcion:
+Justificacion de opci?n:
 
 - Mas eficiente que tabs para el caso operativo (evita cambio constante de contexto).
 - Menor costo de implementacion al reutilizar `DashboardPage` como seccion embebida.
@@ -212,7 +212,7 @@ Justificacion de opcion:
 - `GET /api/community/resources`
 - `GET /api/community/contacts`
 - `GET /api/community/board`
-- CRUD administrativo protegido para gestion de contenido.
+- CRUD administrativo protegido para gesti?n de contenido.
 
 ## 4) Alertas integradas al mapa
 
@@ -220,9 +220,9 @@ Justificacion de opcion:
 - Agregar endpoint agregado para capa de alertas georreferenciadas:
   - `GET /api/alerts/map?regionId=&from=&to=&level=`.
 
-## Principio tecnico backend
+## Principio t?cnico backend
 
-El backend debe entregar datos listos para visualizacion (agregados/simplificados), evitando que el frontend haga:
+El backend debe entregar datos listos para visualizaci?n (agregados/simplificados), evitando que el frontend haga:
 
 - geoprocesamiento pesado
 - joins complejos sobre grandes colecciones
@@ -230,12 +230,12 @@ El backend debe entregar datos listos para visualizacion (agregados/simplificado
 
 ## h) Dependencias eventuales con openeo-service
 
-`openeo-service` no es foco de esta iteracion, pero hay dependencias indirectas que deben quedar claras:
+`openeo-service` no es foco de esta iteraci?n, pero hay dependencias indirectas que deben quedar claras:
 
 1. Disponibilidad y frescura de NDVI/NDMI para `territory/layers`.
 2. Necesidad de snapshots cacheados por region y ventana temporal para no disparar consultas openEO por cada vista.
-3. Definicion de politicas de degradacion:
-   - si openEO falla, backend responde ultimo snapshot + bandera `STALE`.
+3. Definici?n de politicas de degradacion:
+   - s? openEO falla, backend responde ultimo snapshot + bandera `STALE`.
 4. Estandarizacion de metadatos minimos por capa:
    - `source`, `observedAt`, `pipelineRunId`, `qualityFlag`.
 5. Programacion de sync por ventana regional (Biobio/Araucania primero) para controlar costo.
@@ -245,17 +245,17 @@ El backend debe entregar datos listos para visualizacion (agregados/simplificado
 1. Estrategia de imagenes de reportes:
    - storage backend directo vs URL prefirmada a objeto.
 2. Modelo geoespacial base:
-   - CERRADO en esta iteracion: geometria puntual + GeoJSON simplificado.
+   - CERRADO en esta iteraci?n: geometria puntual + GeoJSON simplificado.
    - Evolucion prevista: extender contrato a poligonos cuando se valide necesidad operativa.
 3. Politica de proveedor cartografico base (tiles):
    - OSM publico con limites vs proveedor dedicado/caché propio.
 4. Gobernanza de catalogo comunitario:
    - quien publica/valida recursos y protocolos.
-5. Definicion de SLA de frescura para indicadores satelitales por region.
+5. Definici?n de SLA de frescura para indicadores satelitales por region.
 
 ## j) Recomendaciones de performance, costo y optimizacion
 
-1. Aplicar lazy loading por modulo principal para bajar costo de carga inicial.
+1. Aplicar lazy loading por m?dulo principal para bajar costo de carga inicial.
 2. Mantener y extender cache por TTL ya existente en dashboard para nuevas capas.
 3. Evitar polling agresivo; preferir refresco manual + eventos de estado cuando sea necesario.
 4. Limitar payload geoespacial por nivel de zoom y region.
@@ -264,9 +264,9 @@ El backend debe entregar datos listos para visualizacion (agregados/simplificado
 7. Mover agregaciones y joins de capas al backend.
 8. Mantener frontend como consumidor de contratos limpios y estables, no como motor ETL.
 
-## Recomendacion cartografica (decision tecnica inicial)
+## Recomendacion cartografica (decision t?cnica inicial)
 
-Decision cerrada para esta iteracion: iniciar con **Leaflet + react-leaflet** y alcance geoespacial de
+Decision cerrada para esta iteraci?n: iniciar con **Leaflet + react-leaflet** y alcance geoespacial de
 **puntos + GeoJSON simplificado**.
 
 Se recomienda esta base por:
@@ -280,6 +280,6 @@ No se recomienda partir con soluciones mas pesadas (MapLibre GL + vector tiles a
 
 Estrategia de escalado:
 
-1. Iteracion actual: Leaflet + GeoJSON agregado desde backend.
-2. Iteracion futura: ampliar contrato de capas (incluyendo poligonos) cuando el producto lo requiera.
-3. Iteracion futura avanzada: evaluar MapLibre si crecen capas, detalle espacial y volumen concurrente.
+1. Iteraci?n actual: Leaflet + GeoJSON agregado desde backend.
+2. Iteraci?n futura: ampliar contrato de capas (incluyendo poligonos) cuando el producto lo requiera.
+3. Iteraci?n futura avanzada: evaluar MapLibre s? crecen capas, detalle espacial y volumen concurrente.

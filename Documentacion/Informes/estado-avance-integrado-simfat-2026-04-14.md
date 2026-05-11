@@ -1,13 +1,13 @@
 ﻿# Estado de Avance Integrado - SIMFAT
 
 Fecha de corte: 2026-04-14  
-Fuente: analisis de ramas `develop`, estado de trabajo y ultimos commits en `simfat-web`, `Simfat-backend` y `openeo-service`.
+Fuente: an?lisis de ramas `develop`, estado de trabajo y ultimos commits en `simfat-web`, `Simfat-backend` y `openeo-service`.
 
 ## Resumen Ejecutivo
 
 - Los tres repositorios se encuentran en rama `develop`.
 - Los tres repositorios estan sincronizados con `origin/develop` (`ahead=0`, `behind=0`).
-- Estado global del sprint: integracion MVP operativa entre frontend dashboard, backend y microservicio openEO.
+- Estado global del sprint: integraci?n MVP operativa entre frontend dashboard, backend y microservicio openEO.
 - Riesgo principal actual: falta de hardening para entorno productivo (observabilidad avanzada, pruebas e2e integradas y gobierno de secretos).
 
 ## 1) simfat-web
@@ -20,7 +20,7 @@ Working tree: limpio
 ### Avance confirmado
 
 - Dashboard MVP conectado al backend real.
-- Mejoras recientes en filtros, series e indicadores para visualizacion.
+- Mejoras recientes en filtros, series e indicadores para visualizaci?n.
 - Estructura frontend consolidada (pages/components/hooks/services) y contrato de errores robusto.
 
 ### Commits recientes relevantes
@@ -38,7 +38,7 @@ Working tree: limpio
 
 ### Avance confirmado
 
-- Integracion con `openeo-service` por flujo interno (sin consumo directo desde frontend).
+- Integraci?n con `openeo-service` por flujo interno (sin consumo directo desde frontend).
 - Pipeline de sync implementado (job run, upsert de observaciones, snapshot para dashboard).
 - Endpoints MVP de indicadores (latest, series, map, data freshness) disponibles.
 
@@ -59,19 +59,19 @@ Working tree: sin cambios rastreados (se observaron warnings de permisos al list
 
 - Microservicio FastAPI en funcionamiento con arquitectura por capas.
 - Endpoints de salud, config, jobs y probes de conectividad openEO.
-- Endpoint de indicador latest orientado a integracion con backend.
+- Endpoint de indicador latest orientado a integraci?n con backend.
 
 ### Commits recientes relevantes
 
-1. `9a116ba` (2026-04-14): feat: mejorar integracion OpenEO y endpoint de diagnostico  
+1. `9a116ba` (2026-04-14): feat: mejorar integraci?n OpenEO y endpoint de diagnostico  
 2. `6bb7b38` (2026-04-12): feat: add openeo connectivity probe endpoints  
 3. `be58d35` (2026-04-10): feat: scaffold openeo microservice base with fastapi placeholders
 
-## Integracion entre repos (estado)
+## Integraci?n entre repos (estado)
 
 - `simfat-web` consume `Simfat-backend`.
 - `Simfat-backend` orquesta sync y consume `openeo-service`.
-- `openeo-service` encapsula acceso tecnico a openEO/CDSE.
+- `openeo-service` encapsula acceso t?cnico a openEO/CDSE.
 
 Conclusion: flujo integrado funcionando a nivel MVP para soporte de tablero satelital y frescura de datos.
 
@@ -87,9 +87,9 @@ Conclusion: flujo integrado funcionando a nivel MVP para soporte de tablero sate
 1. Definir SLA/SLO del pipeline de sync (latencia y frescura) y medirlo semanalmente.  
 2. Incorporar pruebas de contrato API entre frontend y backend (schemas versionados).  
 3. Agregar smoke test programado diario para `data-freshness` y endpoint `latest` por region critica.  
-4. Establecer checklist de release para `develop -> main` con validaciones tecnicas minimas.
+4. Establecer checklist de release para `develop -> main` con validaciones t?cnicas minimas.
 
-## Evidencia tecnica usada para este documento
+## Evidencia t?cnica usada para este documento
 
 - `git branch --show-current`
 - `git status --short`

@@ -5,7 +5,7 @@ Version: 1.0
 
 ## Objetivo
 
-Representar el modelo entidad-relacion/logico actualizado considerando estructuras activas en:
+Representar el modelo entidad-relacion/l?gico actualizado considerando estructuras activas en:
 
 - PostgreSQL (auth)
 - MongoDB (dominio territorial y analitica)
@@ -126,4 +126,4 @@ erDiagram
 
 ## Nota DUOC
 
-Las relaciones marcadas como "logica" son gestionadas por aplicacion (sin FK fisica en Mongo ni FK SQL explicita en auth).
+Las relaciones marcadas como "l?gica" son gestionadas por aplicacion (sin FK fisica en Mongo ni FK SQL expl?cita en auth).

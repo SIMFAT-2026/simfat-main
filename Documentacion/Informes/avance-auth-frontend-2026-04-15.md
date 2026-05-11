@@ -6,23 +6,23 @@ Rama: `develop`
 
 ## Resumen
 
-Se completo la migracion del frontend desde auth local de prueba hacia integracion real con backend JWT, incluyendo mejoras de UX para un flujo mas intuitivo de inicio de sesion y registro.
+Se completo la migracion del frontend desde auth local de prueba hacia integraci?n real con backend JWT, incluyendo mejoras de UX para un flujo mas intuitivo de inicio de sesi?n y registro.
 
 ## Implementado
 
-1. Integracion JWT con backend
+1. Integraci?n JWT con backend
 - Login, register, forgot, reset, me y logout conectados a `simfat-backend`.
 - Inyeccion automatica de `Authorization: Bearer <accessToken>` en requests autenticados.
 - Soporte de refresh automatico con `POST /api/auth/refresh` al detectar `401` por access token expirado.
 - Cola de reintentos para requests concurrentes durante refresh.
-- Cierre de sesion local cuando refresh falla.
+- Cierre de sesi?n local cuando refresh falla.
 
-2. Proteccion de rutas y sesion
+2. Proteccion de rutas y sesi?n
 - Rutas privadas y publicas con guards.
-- Bootstrap de sesion al cargar la app (`/api/auth/me`).
-- Persistencia de sesion centralizada en `tokenStorage`.
+- Bootstrap de sesi?n al cargar la app (`/api/auth/me`).
+- Persistencia de sesi?n centralizada en `tokenStorage`.
 
-3. UX de autenticacion
+3. UX de autenticaci?n
 - Mensajeria de instrucciones para contraseñas en registro.
 - Checklist de requisitos de password.
 - Barra indicadora de seguridad de contraseña (debil/media/fuerte).
@@ -63,4 +63,4 @@ VITE_AUTH_DEV_TOOLS_ENABLED=true
 
 ## Resultado
 
-Frontend de SIMFAT quedo listo para operar con autenticacion backend segura (JWT + refresh) y con una experiencia de usuario de auth significativamente mas clara y guiada para pruebas y uso diario.
+Frontend de SIMFAT quedo listo para operar con autenticaci?n backend segura (JWT + refresh) y con una experiencia de usuario de auth significativamente mas clara y guiada para pruebas y uso diario.
