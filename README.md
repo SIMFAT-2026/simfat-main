@@ -4,7 +4,7 @@
 
 SIMFAT es un proyecto academico-profesional orientado al monitoreo territorial, analisis de indicadores ambientales y soporte a la toma de decisiones para prevencion y alerta temprana en contexto forestal.
 
-El repositorio esta organizado como **monorepo**, alineado con la pauta academica de TPY1101.
+Este repositorio está organizado como **monorepo**, alineado con las exigencias de la pauta academica.
 
 ## Estructura General
 
