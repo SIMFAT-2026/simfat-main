@@ -1,91 +1,98 @@
-# SIMFAT
+﻿# SIMFAT
 
-## Sistema Inteligente de Monitorización Forestal y Alerta Temprana
+## Sistema Inteligente de Monitorizacion Forestal y Alerta Temprana
 
-SIMFAT es un proyecto académico-profesional orientado al monitoreo territorial, análisis de indicadores ambientales y soporte a la toma de decisiones para prevención y alerta temprana en contexto forestal.
+SIMFAT es un proyecto academico-profesional orientado al monitoreo territorial, analisis de indicadores ambientales y soporte a la toma de decisiones para prevencion y alerta temprana en contexto forestal.
 
-Este repositorio está organizado como **monorepo**, con una estructura técnica modular y, al mismo tiempo, alineada con la pauta académica de Taller de Programación.
+El repositorio esta organizado como **monorepo**, alineado con la pauta academica de TPY1101.
 
-## Estructura General del Repositorio
+## Estructura General
 
-- `Gestion/`: antecedentes de identificación del proyecto y del equipo.
-- `Producto/`: código fuente, servicios, frontend, scripts de base de datos y dependencias técnicas.
-- `Documentacion/`: documentación de ingeniería, diseño, evidencias y control de avance.
+- `Gestion/`: antecedentes de identificacion del proyecto y del equipo.
+- `Producto/`: codigo fuente, scripts de base de datos y dependencias tecnicas.
+- `Documentacion/`: diseno tecnico/visual, planificacion, informes y evidencias QA.
 
-## Arquitectura Técnica (Monorepo)
+## Arquitectura Tecnica
 
 ### Backend principal
 - Ruta: `Producto/backend/simfat-backend`
-- Tecnología: Spring Boot
-- Responsabilidad: reglas de negocio, autenticación, APIs principales y orquestación de integración.
+- Tecnologia: Spring Boot
+- Proposito: autenticacion, reglas de negocio y APIs principales.
 
 ### Microservicio OpenEO
 - Ruta: `Producto/backend/openeo-service`
-- Tecnología: FastAPI
-- Responsabilidad: integración especializada con OpenEO/Copernicus para procesamiento y consulta de indicadores.
+- Tecnologia: FastAPI
+- Proposito: integracion OpenEO/Copernicus para consulta e ingesta de indicadores.
 
 ### Frontend web
 - Ruta: `Producto/frontend/simfat-web`
-- Tecnología: React + Vite
-- Responsabilidad: interfaz de usuario, visualización de datos y consumo de APIs del backend.
+- Tecnologia: React + Vite
+- Proposito: interfaz de usuario y visualizacion de datos.
 
-### Scripts y recursos de base de datos
-- Ruta base: `Producto/database/`
-- Subcarpetas:
-  - `sql/`
-  - `nosql/`
-  - `plsql/`
+## Documentacion (con accesos directos)
 
-## Estructura Académica de Documentación
+### Gestion
+- [Documento 1.1.2 de definicion e identificacion](Gestion/1.1.2%20Documento%20de%20registro%20de%20definicion%20e%20identificacion%20del%20proyecto.docx)
+- [Integrantes](Gestion/Integrantes.txt)
 
-La carpeta `Documentacion/` centraliza los entregables de ingeniería y evidencia del proyecto, incluyendo:
+### Informes de avance y control
+- [Matriz de casos de uso - Semana 10](Documentacion/Informes/matriz-casos-uso-semana10-2026-05-11.md)
+- [Auditoria de entrega - Semana 10](Documentacion/Informes/auditoria-entrega-semana10.md)
+- [Estado de avance integrado](Documentacion/Informes/estado-avance-integrado-simfat-2026-04-14.md)
 
-- `UML/`: arquitectura y diagramas de diseño.
-- `MER/`: modelo entidad-relación y modelo lógico.
-- `Wireframes/`: diseño de interfaces.
-- `Analisis-Problemas/`: análisis técnico y funcional.
-- `Gantt/`: planificación y control temporal.
-- `Informes/`: reportes técnicos y de avance.
-- `Evidencias/`: evidencia de pruebas y validaciones.
-- `Presentaciones/`: material para revisión y defensa.
+### QA y pruebas
+- [Plan de pruebas alineado a CU01-CU15](Documentacion/Evidencias/plan-pruebas-cu01-cu15.md)
+- [Checklist QA alineado a CU01-CU15](Documentacion/Evidencias/checklist-qa-cu01-cu15.md)
+- [Evidencias QA backend](Documentacion/Evidencias/qa-evidencias-iteracion-backend-2026-04-21.md)
+- [Evidencias QA frontend](Documentacion/Evidencias/qa-evidencias-iteracion-frontend-2026-04-22.md)
 
-## Ejecución Local (Referencia Rápida)
+### Diseno tecnico y visual
+- [UML / Arquitectura](Documentacion/UML/)
+- [MER / Modelo logico](Documentacion/MER/)
+- [Wireframes funcionales](Documentacion/Wireframes/wireframes-funcionales-cu-prioritarios.md)
+- [Analisis de problemas / roadmap](Documentacion/Analisis-Problemas/roadmap_frontend_backend_simfat.md)
+
+### Planificacion
+- [Planificacion semana 10 a 12 (alineada a CU)](Documentacion/Gantt/planificacion-semana10-a-semana12-cu.md)
+
+## Producto Tecnico
+
+### Codigo fuente
+- [Backend principal](Producto/backend/simfat-backend/)
+- [Microservicio OpenEO](Producto/backend/openeo-service/)
+- [Frontend web](Producto/frontend/simfat-web/)
+
+### Base de datos
+- [Esquema PostgreSQL](Producto/database/sql/init-postgres-schema.sql)
+- [Datos de prueba PostgreSQL](Producto/database/sql/seed-postgres-test-data.sql)
+- [Funciones/procedimientos PostgreSQL](Producto/database/plsql/postgresql_auth_helpers.sql)
+- [Esquema MongoDB](Producto/database/nosql/init-mongodb-schema.js)
+
+### Dependencias
+- [Registro consolidado de dependencias](Producto/dependencias/registro-dependencias-consolidado.md)
+- [Registro dependencias backend](Producto/dependencias/registro-dependencias-backend.md)
+- Manifiestos por modulo:
+  - `Producto/backend/simfat-backend/pom.xml`
+  - `Producto/backend/openeo-service/requirements.txt`
+  - `Producto/frontend/simfat-web/package.json`
+
+## Ejecucion Local (rapida)
 
 ### Backend principal
-1. Ir a `Producto/backend/simfat-backend`
-2. Configurar variables de entorno del servicio
-3. Ejecutar:
 ```bash
+cd Producto/backend/simfat-backend
 mvn spring-boot:run
 ```
 
-### OpenEO service
-1. Ir a `Producto/backend/openeo-service`
-2. Configurar variables de entorno del servicio
-3. Ejecutar:
+### Microservicio OpenEO
 ```bash
+cd Producto/backend/openeo-service
 uvicorn app.main:app --reload --port 8000
 ```
 
 ### Frontend
-1. Ir a `Producto/frontend/simfat-web`
-2. Instalar dependencias:
 ```bash
+cd Producto/frontend/simfat-web
 npm install
-```
-3. Ejecutar:
-```bash
 npm run dev
 ```
-
-## Despliegue por Servicio (Railway)
-
-Para despliegues por subdirectorio, configurar el **Root Directory** de cada servicio:
-
-- Backend: `Producto/backend/simfat-backend`
-- OpenEO service: `Producto/backend/openeo-service`
-- Frontend: `Producto/frontend/simfat-web`
-
-## Observación de Trazabilidad
-
-La reorganización del monorepo se realizó preservando historial Git y trazabilidad de cambios, manteniendo la modularidad técnica de los servicios y la compatibilidad con la estructura académica solicitada.
