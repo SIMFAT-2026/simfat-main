@@ -7,6 +7,7 @@ import com.simfat.backend.service.ForestLossService;
 import jakarta.validation.Valid;
 import java.util.List;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -53,11 +54,13 @@ public class ForestLossController {
     }
 
     @PostMapping
+    @PreAuthorize("hasAnyAuthority('PERM_REGION_MANAGE','ROLE_ADMIN','ROLE_SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<ForestLossResponseDTO>> create(@Valid @RequestBody ForestLossRequestDTO record) {
         return ResponseEntity.ok(ApiResponse.ok("Registro forestal creado correctamente", forestLossService.create(record)));
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasAnyAuthority('PERM_REGION_MANAGE','ROLE_ADMIN','ROLE_SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<ForestLossResponseDTO>> update(
         @PathVariable String id,
         @Valid @RequestBody ForestLossRequestDTO record
@@ -69,6 +72,7 @@ public class ForestLossController {
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasAnyAuthority('PERM_REGION_MANAGE','ROLE_ADMIN','ROLE_SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<String>> delete(@PathVariable String id) {
         forestLossService.delete(id);
         return ResponseEntity.ok(ApiResponse.ok("Registro forestal eliminado correctamente", id));

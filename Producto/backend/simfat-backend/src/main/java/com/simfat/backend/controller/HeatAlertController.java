@@ -10,6 +10,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -65,11 +66,13 @@ public class HeatAlertController {
     }
 
     @PostMapping
+    @PreAuthorize("hasAnyAuthority('PERM_REGION_MANAGE','ROLE_ADMIN','ROLE_SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<HeatAlertResponseDTO>> create(@Valid @RequestBody HeatAlertRequestDTO event) {
         return ResponseEntity.ok(ApiResponse.ok("Alerta creada correctamente", heatAlertService.create(event)));
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasAnyAuthority('PERM_REGION_MANAGE','ROLE_ADMIN','ROLE_SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<HeatAlertResponseDTO>> update(
         @PathVariable String id,
         @Valid @RequestBody HeatAlertRequestDTO event
@@ -78,6 +81,7 @@ public class HeatAlertController {
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasAnyAuthority('PERM_REGION_MANAGE','ROLE_ADMIN','ROLE_SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<String>> delete(@PathVariable String id) {
         heatAlertService.delete(id);
         return ResponseEntity.ok(ApiResponse.ok("Alerta eliminada correctamente", id));
