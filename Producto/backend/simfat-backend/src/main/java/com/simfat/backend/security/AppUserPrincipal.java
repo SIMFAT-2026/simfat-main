@@ -1,6 +1,5 @@
 package com.simfat.backend.security;
 
-import com.simfat.backend.model.UserRole;
 import java.util.Set;
 
 public class AppUserPrincipal {
@@ -8,13 +7,13 @@ public class AppUserPrincipal {
     private final String userId;
     private final String email;
     private final String fullName;
-    private final Set<UserRole> roles;
+    private final Set<String> roleCodes;
 
-    public AppUserPrincipal(String userId, String email, String fullName, Set<UserRole> roles) {
+    public AppUserPrincipal(String userId, String email, String fullName, Set<String> roleCodes) {
         this.userId = userId;
         this.email = email;
         this.fullName = fullName;
-        this.roles = roles;
+        this.roleCodes = roleCodes;
     }
 
     public String getUserId() {
@@ -29,8 +28,8 @@ public class AppUserPrincipal {
         return fullName;
     }
 
-    public Set<UserRole> getRoles() {
-        return roles;
+    public Set<String> getRoleCodes() {
+        return roleCodes;
     }
 }
 

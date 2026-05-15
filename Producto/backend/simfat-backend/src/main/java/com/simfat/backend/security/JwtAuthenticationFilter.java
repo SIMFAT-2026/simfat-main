@@ -10,11 +10,9 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
-import java.util.stream.Collectors;
 import org.springframework.http.HttpHeaders;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.stereotype.Component;
@@ -25,15 +23,18 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtService jwtService;
     private final AppUserRepository appUserRepository;
+    private final AuthorizationResolverService authorizationResolverService;
     private final AuthenticationEntryPoint authenticationEntryPoint;
 
     public JwtAuthenticationFilter(
         JwtService jwtService,
         AppUserRepository appUserRepository,
+        AuthorizationResolverService authorizationResolverService,
         AuthenticationEntryPoint authenticationEntryPoint
     ) {
         this.jwtService = jwtService;
         this.appUserRepository = appUserRepository;
+        this.authorizationResolverService = authorizationResolverService;
         this.authenticationEntryPoint = authenticationEntryPoint;
     }
 
@@ -56,20 +57,18 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             if (user == null || !user.isEnabled()) {
                 throw new BadCredentialsException("Token invalido");
             }
+            AuthorizationSnapshot snapshot = authorizationResolverService.resolveForUser(user);
             AppUserPrincipal principal = new AppUserPrincipal(
                 user.getId(),
                 user.getEmail(),
                 user.getFullName(),
-                user.getRoles()
+                snapshot.getRoleCodes()
             );
 
             UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
                 principal,
                 null,
-                user.getRoles()
-                    .stream()
-                    .map(role -> new SimpleGrantedAuthority("ROLE_" + role.name()))
-                    .collect(Collectors.toSet())
+                snapshot.getAuthorities()
             );
             SecurityContextHolder.getContext().setAuthentication(authentication);
             filterChain.doFilter(request, response);
