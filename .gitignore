@@ -1,0 +1,15 @@
+# Logs de ejecucion local
+*.log
+
+# Logs especificos de servicios
+Producto/backend/simfat-backend/*.log
+Producto/backend/openeo-service/*.log
+Producto/frontend/simfat-web/*.log
+
+# Python venv/cache local
+**/.venv/
+**/__pycache__/
+*.pyc
+
+# Node local
+**/node_modules/
