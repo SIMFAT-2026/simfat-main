@@ -16,10 +16,11 @@ import com.simfat.backend.service.DashboardService;
 import com.simfat.backend.service.OpenEoSyncService;
 import java.util.List;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -67,6 +68,7 @@ public class DashboardController {
     }
 
     @PostMapping("/sync/run")
+    @PreAuthorize("hasAuthority('PERM_DASHBOARD_SYNC_RUN')")
     public ResponseEntity<ApiResponse<SyncRunResponseDTO>> runSync(
         @RequestParam(required = false) String regionId,
         @RequestParam(required = false) String from,

@@ -18,6 +18,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Objects;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -75,6 +76,7 @@ public class CitizenReportController {
     }
 
     @PostMapping(consumes = { "multipart/form-data" })
+    @PreAuthorize("hasAnyAuthority('PERM_REPORT_CREATE','ROLE_VERIFIED_USER','ROLE_ADMIN','ROLE_SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<CitizenReportResponseDTO>> create(
         @RequestPart("payload") String payload,
         @RequestPart(value = "files", required = false) List<MultipartFile> files
@@ -100,6 +102,7 @@ public class CitizenReportController {
     }
 
     @PatchMapping("/{id}/status")
+    @PreAuthorize("hasAnyAuthority('PERM_REPORT_MODERATE','ROLE_MODERATOR','ROLE_ADMIN','ROLE_SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<CitizenReportResponseDTO>> patchStatus(
         @PathVariable String id,
         @Valid @RequestBody CitizenReportStatusPatchDTO patch
@@ -115,6 +118,7 @@ public class CitizenReportController {
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasAnyAuthority('PERM_REPORT_MODERATE','ROLE_MODERATOR','ROLE_ADMIN','ROLE_SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<String>> delete(@PathVariable String id) {
         CitizenReport existing = citizenReportRepository.findById(id)
             .orElseThrow(() -> new ResourceNotFoundException("Reporte ciudadano no encontrado con id: " + id));

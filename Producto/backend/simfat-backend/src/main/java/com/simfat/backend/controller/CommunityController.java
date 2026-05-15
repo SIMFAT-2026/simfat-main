@@ -18,6 +18,7 @@ import jakarta.validation.Valid;
 import java.time.LocalDateTime;
 import java.util.List;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -55,6 +56,7 @@ public class CommunityController {
     }
 
     @PostMapping("/board")
+    @PreAuthorize("hasAnyAuthority('PERM_COMMUNITY_BOARD_MANAGE','ROLE_ADMIN','ROLE_SUPER_ADMIN','ROLE_MODERATOR')")
     public ResponseEntity<ApiResponse<CommunityBoardResponseDTO>> createBoard(@Valid @RequestBody CommunityBoardRequestDTO request) {
         CommunityBoardPost item = new CommunityBoardPost();
         item.setTitle(request.getTitle());
@@ -69,6 +71,7 @@ public class CommunityController {
     }
 
     @DeleteMapping("/board/{id}")
+    @PreAuthorize("hasAnyAuthority('PERM_COMMUNITY_BOARD_MANAGE','ROLE_ADMIN','ROLE_SUPER_ADMIN','ROLE_MODERATOR')")
     public ResponseEntity<ApiResponse<String>> deleteBoard(@PathVariable String id) {
         CommunityBoardPost existing = boardRepository.findById(id)
             .orElseThrow(() -> new ResourceNotFoundException("Aviso comunitario no encontrado con id: " + id));
@@ -89,6 +92,7 @@ public class CommunityController {
     }
 
     @PostMapping("/resources")
+    @PreAuthorize("hasAnyAuthority('PERM_COMMUNITY_RESOURCE_MANAGE','ROLE_ADMIN','ROLE_SUPER_ADMIN','ROLE_MODERATOR')")
     public ResponseEntity<ApiResponse<CommunityResourceResponseDTO>> createResource(
         @Valid @RequestBody CommunityResourceRequestDTO request
     ) {
@@ -105,6 +109,7 @@ public class CommunityController {
     }
 
     @DeleteMapping("/resources/{id}")
+    @PreAuthorize("hasAnyAuthority('PERM_COMMUNITY_RESOURCE_MANAGE','ROLE_ADMIN','ROLE_SUPER_ADMIN','ROLE_MODERATOR')")
     public ResponseEntity<ApiResponse<String>> deleteResource(@PathVariable String id) {
         CommunityResource existing = resourceRepository.findById(id)
             .orElseThrow(() -> new ResourceNotFoundException("Recurso comunitario no encontrado con id: " + id));
@@ -125,6 +130,7 @@ public class CommunityController {
     }
 
     @PostMapping("/contacts")
+    @PreAuthorize("hasAnyAuthority('PERM_COMMUNITY_RESOURCE_MANAGE','ROLE_ADMIN','ROLE_SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<CommunityContactResponseDTO>> createContact(
         @Valid @RequestBody CommunityContactRequestDTO request
     ) {
@@ -142,6 +148,7 @@ public class CommunityController {
     }
 
     @DeleteMapping("/contacts/{id}")
+    @PreAuthorize("hasAnyAuthority('PERM_COMMUNITY_RESOURCE_MANAGE','ROLE_ADMIN','ROLE_SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<String>> deleteContact(@PathVariable String id) {
         CommunityContact existing = contactRepository.findById(id)
             .orElseThrow(() -> new ResourceNotFoundException("Contacto comunitario no encontrado con id: " + id));

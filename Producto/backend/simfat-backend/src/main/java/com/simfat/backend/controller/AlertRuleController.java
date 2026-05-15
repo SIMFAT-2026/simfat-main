@@ -7,6 +7,7 @@ import com.simfat.backend.service.AlertRuleService;
 import jakarta.validation.Valid;
 import java.util.List;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -37,11 +38,13 @@ public class AlertRuleController {
     }
 
     @PostMapping
+    @PreAuthorize("hasAuthority('PERM_ALERT_RULE_MANAGE')")
     public ResponseEntity<ApiResponse<AlertRuleResponseDTO>> create(@Valid @RequestBody AlertRuleRequestDTO rule) {
         return ResponseEntity.ok(ApiResponse.ok("Regla creada correctamente", alertRuleService.create(rule)));
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasAuthority('PERM_ALERT_RULE_MANAGE')")
     public ResponseEntity<ApiResponse<AlertRuleResponseDTO>> update(
         @PathVariable String id,
         @Valid @RequestBody AlertRuleRequestDTO rule
@@ -50,6 +53,7 @@ public class AlertRuleController {
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasAuthority('PERM_ALERT_RULE_MANAGE')")
     public ResponseEntity<ApiResponse<String>> delete(@PathVariable String id) {
         alertRuleService.delete(id);
         return ResponseEntity.ok(ApiResponse.ok("Regla eliminada correctamente", id));

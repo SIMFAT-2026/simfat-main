@@ -9,11 +9,12 @@ import com.simfat.backend.service.RegionService;
 import jakarta.validation.Valid;
 import java.util.List;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -40,11 +41,13 @@ public class RegionController {
     }
 
     @PostMapping
+    @PreAuthorize("hasAuthority('PERM_REGION_MANAGE')")
     public ResponseEntity<ApiResponse<RegionResponseDTO>> create(@Valid @RequestBody RegionRequestDTO region) {
         return ResponseEntity.ok(ApiResponse.ok("Region creada correctamente", regionService.create(region)));
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasAuthority('PERM_REGION_MANAGE')")
     public ResponseEntity<ApiResponse<RegionResponseDTO>> update(
         @PathVariable String id,
         @Valid @RequestBody RegionRequestDTO region
@@ -53,6 +56,7 @@ public class RegionController {
     }
 
     @PatchMapping("/{id}/aoi")
+    @PreAuthorize("hasAuthority('PERM_REGION_MANAGE')")
     public ResponseEntity<ApiResponse<RegionResponseDTO>> updateAoi(
         @PathVariable String id,
         @RequestBody RegionAoiUpdateRequestDTO request
@@ -66,6 +70,7 @@ public class RegionController {
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasAuthority('PERM_REGION_MANAGE')")
     public ResponseEntity<ApiResponse<String>> delete(@PathVariable String id) {
         regionService.delete(id);
         return ResponseEntity.ok(ApiResponse.ok("Region eliminada correctamente", id));
