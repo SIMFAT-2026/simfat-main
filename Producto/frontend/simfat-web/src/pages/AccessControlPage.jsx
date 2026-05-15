@@ -8,6 +8,18 @@ import { useAuth } from '../auth/AuthContext';
 import { useFeedback } from '../hooks';
 import { getAccessPermissions, getAccessRoles, getAccessUsers, updateAccessUserRoles } from '../services';
 
+const PROFILE_OPTIONS = [
+  { value: 'COMMUNITY', label: 'Comunidad', roles: ['ROLE_COMMUNITY_USER'] },
+  { value: 'VERIFIED', label: 'Verificado', roles: ['ROLE_VERIFIED_USER', 'ROLE_COMMUNITY_USER'] },
+  { value: 'MODERATOR', label: 'Moderador', roles: ['ROLE_MODERATOR', 'ROLE_VERIFIED_USER', 'ROLE_COMMUNITY_USER'] },
+  { value: 'ADMIN', label: 'Administrador', roles: ['ROLE_ADMIN', 'ROLE_MODERATOR', 'ROLE_VERIFIED_USER', 'ROLE_COMMUNITY_USER'] },
+  {
+    value: 'SUPER_ADMIN',
+    label: 'Super Admin',
+    roles: ['ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_MODERATOR', 'ROLE_VERIFIED_USER', 'ROLE_COMMUNITY_USER']
+  }
+];
+
 function AccessControlPage() {
   const { user } = useAuth();
   const feedback = useFeedback();
@@ -61,6 +73,22 @@ function AccessControlPage() {
     loadAccessData();
   }, [canManageAccess]);
 
+  function normalizeRoleSet(roleCodes) {
+    return new Set((roleCodes || []).filter((role) => role?.startsWith('ROLE_')));
+  }
+
+  function detectProfile(roleCodes) {
+    const roleSet = normalizeRoleSet(roleCodes);
+    const matched = [...PROFILE_OPTIONS]
+      .reverse()
+      .find((profile) => profile.roles.every((role) => roleSet.has(role)));
+    return matched?.value || 'COMMUNITY';
+  }
+
+  function getProfileRoles(profileValue) {
+    return PROFILE_OPTIONS.find((profile) => profile.value === profileValue)?.roles || PROFILE_OPTIONS[0].roles;
+  }
+
   function toggleRole(userId, roleCode) {
     setDraftRolesByUser((prev) => {
       const current = new Set(prev[userId] || []);
@@ -68,6 +96,28 @@ function AccessControlPage() {
         current.delete(roleCode);
       } else {
         current.add(roleCode);
+      }
+      return { ...prev, [userId]: [...current] };
+    });
+  }
+
+  function applyProfile(userId, profileValue) {
+    setDraftRolesByUser((prev) => {
+      const current = new Set(prev[userId] || []);
+      const nonRoleCodes = [...current].filter((code) => !code?.startsWith('ROLE_'));
+      const next = [...new Set([...getProfileRoles(profileValue), ...nonRoleCodes])];
+      return { ...prev, [userId]: next };
+    });
+  }
+
+  function toggleVerifiedSwitch(userId, enabled) {
+    setDraftRolesByUser((prev) => {
+      const current = new Set(prev[userId] || []);
+      if (enabled) {
+        current.add('ROLE_VERIFIED_USER');
+        current.add('ROLE_COMMUNITY_USER');
+      } else {
+        current.delete('ROLE_VERIFIED_USER');
       }
       return { ...prev, [userId]: [...current] };
     });
@@ -124,24 +174,56 @@ function AccessControlPage() {
         <>
           <DataTable columns={columns} rows={users} rowKey="id" />
 
-          <div className="form-grid" style={{ marginTop: '1rem' }}>
+          <div className="access-grid">
             {users.map((target) => (
-              <div key={target.id} className="card">
-                <h3>{target.email}</h3>
-                <p style={{ marginBottom: '0.5rem' }}>Selecciona roles asignados:</p>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem' }}>
-                  {roles.map((role) => (
-                    <label key={`${target.id}-${role.code}`} style={{ display: 'inline-flex', gap: '0.35rem' }}>
-                      <input
-                        type="checkbox"
-                        checked={(draftRolesByUser[target.id] || []).includes(role.code)}
-                        onChange={() => toggleRole(target.id, role.code)}
-                      />
-                      <span>{role.code}</span>
-                    </label>
-                  ))}
+              <article key={target.id} className="access-user-card">
+                <div className="access-user-header">
+                  <h3>{target.fullName || target.email}</h3>
+                  <p>{target.email}</p>
                 </div>
-                <div className="form-actions" style={{ marginTop: '0.75rem' }}>
+
+                <div className="access-controls-row">
+                  <label>
+                    <span>Perfil</span>
+                    <select
+                      value={detectProfile(draftRolesByUser[target.id] || [])}
+                      onChange={(event) => applyProfile(target.id, event.target.value)}
+                    >
+                      {PROFILE_OPTIONS.map((profile) => (
+                        <option key={profile.value} value={profile.value}>
+                          {profile.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label className="access-toggle">
+                    <span>Usuario verificado</span>
+                    <input
+                      type="checkbox"
+                      checked={(draftRolesByUser[target.id] || []).includes('ROLE_VERIFIED_USER')}
+                      onChange={(event) => toggleVerifiedSwitch(target.id, event.target.checked)}
+                    />
+                  </label>
+                </div>
+
+                <details className="access-advanced">
+                  <summary>Ajustes avanzados</summary>
+                  <div className="access-role-list">
+                    {roles.map((role) => (
+                      <label key={`${target.id}-${role.code}`} className="access-role-item">
+                        <input
+                          type="checkbox"
+                          checked={(draftRolesByUser[target.id] || []).includes(role.code)}
+                          onChange={() => toggleRole(target.id, role.code)}
+                        />
+                        <span>{role.code}</span>
+                      </label>
+                    ))}
+                  </div>
+                </details>
+
+                <div className="form-actions">
                   <button
                     type="button"
                     className="btn"
@@ -151,7 +233,7 @@ function AccessControlPage() {
                     {savingUserId === target.id ? 'Guardando...' : 'Guardar roles'}
                   </button>
                 </div>
-              </div>
+              </article>
             ))}
           </div>
 
