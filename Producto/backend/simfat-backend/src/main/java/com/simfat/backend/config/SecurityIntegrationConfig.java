@@ -2,6 +2,7 @@ package com.simfat.backend.config;
 
 import com.simfat.backend.security.AuthProperties;
 import com.simfat.backend.security.JwtAuthenticationFilter;
+import com.simfat.backend.security.PrivilegedActionAuditFilter;
 import com.simfat.backend.security.RestAccessDeniedHandler;
 import com.simfat.backend.security.RestAuthenticationEntryPoint;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -28,6 +29,7 @@ public class SecurityIntegrationConfig {
     SecurityFilterChain securityFilterChain(
         HttpSecurity http,
         JwtAuthenticationFilter jwtAuthenticationFilter,
+        PrivilegedActionAuditFilter privilegedActionAuditFilter,
         RestAuthenticationEntryPoint authenticationEntryPoint,
         RestAccessDeniedHandler accessDeniedHandler
     ) throws Exception {
@@ -54,7 +56,8 @@ public class SecurityIntegrationConfig {
                 .requestMatchers(HttpMethod.POST, "/api/auth/logout").authenticated()
                 .anyRequest().permitAll()
             )
-            .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+            .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
+            .addFilterAfter(privilegedActionAuditFilter, JwtAuthenticationFilter.class);
 
         return http.build();
     }
