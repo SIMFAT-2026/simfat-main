@@ -6,3 +6,4 @@ export * from './dashboardService';
 export * from './authService';
 export * from './communityService';
 export * from './citizenReportsService';
+export * from './accessAdminService';

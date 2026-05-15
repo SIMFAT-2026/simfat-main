@@ -153,7 +153,7 @@ WHERE NOT EXISTS (
 );
 
 INSERT INTO role_permissions (role_id, permission_id, created_at)
-SELECT '00000000-0000-0000-0000-000000000001', permission_id, NOW()
+SELECT '00000000-0000-0000-0000-000000000001', p.id, NOW()
 FROM permissions p
 WHERE NOT EXISTS (
     SELECT 1 FROM role_permissions rp
