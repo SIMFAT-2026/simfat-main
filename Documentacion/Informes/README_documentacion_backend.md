@@ -20,3 +20,10 @@ Repositorio de evidencias t?cnico-funcionales para SIMFAT Backend.
 
 - Toda evidencia debe incluir fecha y version.
 - Formato sugerido: `AAAA-MM-DD_nombre_vN.ext`.
+
+## Seguridad RBAC - Fase 0 (2026-05-14)
+
+- `2026-05-14_fase0_rbac_jwt_contrato_arquitectura_v1.md`
+- `2026-05-14_fase0_rbac_estimacion_esfuerzo_v1.md`
+- `2026-05-14_fase0_rbac_definition_of_done_v1.md`
+- `2026-05-14_fase0_rbac_plan_incremental_v1.md`
