@@ -25,8 +25,9 @@ Este directorio centraliza la documentaci?n acad?mica del proyecto.
 ## Entrega DUOC - Semana 10 (Control)
 
 - Indice de cumplimiento:
-  - `Informes/2026-05-15_entrega_semana10_duoc_cumplimiento.md`
+  - `Informes/Entrega-Semana10-Cumplimiento-Rubrica-DUOC.md`
 - Casos de uso actualizados con roles:
-  - `Informes/2026-05-15_matriz_casos_uso_semana10_actualizada_roles.md`
+  - `Informes/Matriz-Casos-de-Uso-Semana10-Roles-Actualizados.md`
 - Resultado de desarrollo por casos de uso:
-  - `Informes/2026-05-15_resultado_desarrollo_semana10_por_casos_uso.md`
+  - `Informes/Resultado-Desarrollo-Semana10-Por-Casos-de-Uso.md`
+
