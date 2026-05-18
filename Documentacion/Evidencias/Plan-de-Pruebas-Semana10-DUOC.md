@@ -12,6 +12,43 @@ Validar estabilidad funcional, seguridad RBAC/JWT y disponibilidad de contratos 
 - Frontend panel de accesos (flujo principal).
 - Integraciones base de datos e infraestructura local.
 
+## Ambiente de pruebas (detalle operativo)
+
+### Equipo de ejecucion
+
+- Host de pruebas: notebook personal de desarrollo (Windows 11).
+- Runtime principal:
+  - Java 23
+  - Maven 3.9.x
+  - Node.js 22.x + npm 10.x
+  - Python 3.13.x
+- Navegador de validacion funcional: Chrome/Edge (canal estable).
+
+### Ambientes utilizados
+
+1. Local (integracion tecnica)
+- Frontend: `http://localhost:4173`
+- Backend: `http://localhost:8081`
+- OpenEO service: `http://localhost:8000`
+- DB remotas usadas en pruebas locales:
+  - PostgreSQL Supabase (`POSTGRES_URI`)
+  - MongoDB Atlas (`MONGODB_URI`)
+
+2. Staging (demo estable)
+- Backend: `https://simfat-backend-staging.up.railway.app`
+- Swagger: `https://simfat-backend-staging.up.railway.app/swagger-ui/index.html`
+- OpenAPI: `https://simfat-backend-staging.up.railway.app/v3/api-docs`
+
+3. Produccion (validacion de despliegue)
+- Backend: `https://simfat-backend-production.up.railway.app`
+- OpenEO service: `https://openeo-service-production-production.up.railway.app`
+- Frontend Vercel (dominio productivo del proyecto): validado en linea.
+
+### Criterio de uso por riesgo
+
+- Para demostraciones y pruebas de continuidad operativa se prioriza staging cuando produccion presenta inestabilidad transitoria (ej. reinicios/OOM).
+- Produccion se considera valida al pasar smoke test de login, `auth/me`, regiones, comunidad y panel de accesos.
+
 ## Tipos de prueba
 
 1. Operativas

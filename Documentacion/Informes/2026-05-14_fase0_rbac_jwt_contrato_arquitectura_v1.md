@@ -87,3 +87,22 @@ Nota: la jerarquia se define para gobernanza, pero autorizacion real se basara e
 ## 9. Aprobacion
 
 Aprobado como contrato base para iniciar Fase 1 (modelo de datos y seguridad declarativa).
+
+## 10. Matriz resumida de roles y capacidades (base de presentacion)
+
+| Capacidad | COMMUNITY_USER | VERIFIED_USER | MODERATOR | ADMIN | SUPER_ADMIN |
+|---|---|---|---|---|---|
+| Ver recursos comunitarios | Si | Si | Si | Si | Si |
+| Crear reporte ciudadano | No | Si | Parcial (si hereda permiso explicito) | Si | Si |
+| Moderar reportes ciudadanos | No | No | Si | Si | Si |
+| Gestionar mural comunitario | No | No | Si | Si | Si |
+| Gestionar recursos comunitarios | No | No | Si | Si | Si |
+| Gestionar contactos comunitarios | No | No | No | Si | Si |
+| Gestionar reglas de alerta | No | No | No | Si | Si |
+| Gestionar regiones (CRUD/AOI) | No | No | No | Si | Si |
+| Ejecutar sync dashboard manual | No | No | No | Si | Si |
+| Gestionar usuarios/roles | No | No | No | Si | Si |
+
+Notas:
+- El principio aplicado es minimo privilegio con permisos declarativos `PERM_*`.
+- La fuente de verdad de autorizacion es RBAC persistido en BD (`roles`, `permissions`, `role_permissions`, `user_roles`).

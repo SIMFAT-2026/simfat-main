@@ -31,3 +31,4 @@ Fecha: 2026-05-15
 - [x] Arquitectura tecnica actualizada.
 - [x] Plan de pruebas y evidencias QA registradas.
 - [x] Carta Gantt actualizada semana 10.
+- [x] Evidencia de inyeccion de usuarios demo AIFBN (roles admin) documentada.
