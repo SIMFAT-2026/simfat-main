@@ -4,6 +4,7 @@ import com.simfat.backend.dto.ApiResponse;
 import com.simfat.backend.dto.admin.AccessPermissionDTO;
 import com.simfat.backend.dto.admin.AccessRoleDTO;
 import com.simfat.backend.dto.admin.AccessUserDTO;
+import com.simfat.backend.dto.admin.UpdateCommunityChatAccessRequestDTO;
 import com.simfat.backend.dto.admin.UpdateUserRolesRequestDTO;
 import com.simfat.backend.security.SecurityUtils;
 import com.simfat.backend.service.AccessAdminService;
@@ -51,5 +52,14 @@ public class AccessAdminController {
     ) {
         AccessUserDTO updated = accessAdminService.updateUserRoles(userId, request.roleCodes(), SecurityUtils.currentUserIdOrThrow());
         return ResponseEntity.ok(ApiResponse.ok("Roles de usuario actualizados correctamente", updated));
+    }
+
+    @PutMapping("/users/{userId}/community-chat-access")
+    public ResponseEntity<ApiResponse<AccessUserDTO>> updateCommunityChatAccess(
+        @PathVariable String userId,
+        @RequestBody UpdateCommunityChatAccessRequestDTO request
+    ) {
+        AccessUserDTO updated = accessAdminService.updateCommunityChatAccess(userId, request, SecurityUtils.currentUserIdOrThrow());
+        return ResponseEntity.ok(ApiResponse.ok("Acceso regional de chat actualizado correctamente", updated));
     }
 }

@@ -21,3 +21,8 @@ export async function updateAccessUserRoles(userId, roleCodes) {
   const response = await axiosClient.put(`${API_ENDPOINTS.adminAccessUsers}/${userId}/roles`, { roleCodes });
   return extractData(response.data);
 }
+
+export async function updateCommunityChatAccess(userId, payload) {
+  const response = await axiosClient.put(`${API_ENDPOINTS.adminAccessUsers}/${userId}/community-chat-access`, payload);
+  return extractData(response.data);
+}
