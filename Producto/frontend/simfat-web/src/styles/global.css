@@ -259,6 +259,144 @@ textarea {
   font-size: 0.85rem;
 }
 
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.community-chat {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 30;
+  width: min(420px, calc(100vw - 32px));
+}
+
+.community-chat-toggle {
+  width: 100%;
+  border: 1px solid #0b5cab;
+  border-radius: 999px;
+  padding: 10px 14px;
+  background: #0b5cab;
+  color: #fff;
+  display: flex;
+  justify-content: space-between;
+  cursor: pointer;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.18);
+}
+
+.community-chat-panel {
+  margin-top: 10px;
+  border: 1px solid #dbe2ea;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.18);
+  overflow: hidden;
+}
+
+.community-chat-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px;
+  border-bottom: 1px solid #e5e7eb;
+  background: #f8fafc;
+}
+
+.community-chat-header h3,
+.community-chat-header p {
+  margin: 0;
+}
+
+.community-chat-header p {
+  color: #64748b;
+  font-size: 0.85rem;
+}
+
+.community-chat-header label,
+.community-chat-moderation-reason {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.82rem;
+  color: #334155;
+}
+
+.community-chat-rooms {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 10px 14px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.community-chat-rooms button {
+  border: 1px solid #cbd5e1;
+  border-radius: 999px;
+  padding: 6px 10px;
+  background: #fff;
+  color: #334155;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.community-chat-rooms button.active {
+  border-color: #0b5cab;
+  background: #dbeafe;
+  color: #0b5cab;
+}
+
+.community-chat-messages {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.community-chat-message {
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 10px;
+  background: #fff;
+}
+
+.community-chat-message.moderated {
+  background: #f8fafc;
+  color: #64748b;
+}
+
+.community-chat-message header {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  color: #334155;
+  font-size: 0.85rem;
+}
+
+.community-chat-message p {
+  margin: 8px 0;
+}
+
+.community-chat-moderation-reason {
+  padding: 0 14px 12px;
+}
+
+.community-chat-form {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border-top: 1px solid #e5e7eb;
+}
+
 .metric-card strong {
   display: block;
   margin-top: 6px;

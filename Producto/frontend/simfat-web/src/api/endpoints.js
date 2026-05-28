@@ -22,6 +22,7 @@ export const API_ENDPOINTS = {
   communityBoard: '/api/community/board',
   communityResources: '/api/community/resources',
   communityContacts: '/api/community/contacts',
+  communityChat: '/api/community/chat',
   dashboardSummary: '/api/dashboard/summary',
   dashboardCriticalRegions: '/api/dashboard/critical-regions',
   dashboardLossTrend: '/api/dashboard/loss-trend',
