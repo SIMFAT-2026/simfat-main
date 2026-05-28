@@ -3,6 +3,7 @@ package com.simfat.backend.service.impl;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -69,6 +70,8 @@ class AccessAdminServiceImplTest {
         when(userRoleAssignmentRepository.findAll()).thenReturn(List.of());
         when(userVerificationRepository.findById("user-1")).thenReturn(Optional.empty());
         when(communityChatRoomAccessRepository.findByUserIdAndRevokedAtIsNull("user-1")).thenReturn(List.of(
+            access("user-1", "old-region")
+        )).thenReturn(List.of(
             access("user-1", "araucania"),
             access("user-1", "los-rios")
         ));
@@ -81,7 +84,7 @@ class AccessAdminServiceImplTest {
 
         assertEquals("biobio", result.communityChatAccess().primaryRegionId());
         assertEquals(Set.of("araucania", "los-rios"), result.communityChatAccess().additionalRegionIds());
-        verify(communityChatRoomAccessRepository).revokeActiveByUserId("user-1");
+        verify(communityChatRoomAccessRepository, times(2)).findByUserIdAndRevokedAtIsNull("user-1");
         verify(userCommunityProfileRepository).save(any(UserCommunityProfile.class));
     }
 

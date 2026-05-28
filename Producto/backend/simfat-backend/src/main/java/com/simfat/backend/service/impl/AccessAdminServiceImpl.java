@@ -174,7 +174,13 @@ public class AccessAdminServiceImpl implements AccessAdminService {
         profile.setPrimaryRegionId(normalizeRegionId(request == null ? null : request.primaryRegionId()));
         UserCommunityProfile savedProfile = userCommunityProfileRepository.save(profile);
 
-        communityChatRoomAccessRepository.revokeActiveByUserId(user.getId());
+        List<CommunityChatRoomAccess> activeGrants = communityChatRoomAccessRepository.findByUserIdAndRevokedAtIsNull(user.getId());
+        if (!activeGrants.isEmpty()) {
+            Instant revokedAt = Instant.now();
+            activeGrants.forEach(access -> access.setRevokedAt(revokedAt));
+            communityChatRoomAccessRepository.saveAll(activeGrants);
+        }
+
         Set<String> additionalRegions = sanitizeRegionIds(request == null ? Set.of() : request.additionalRegionIds());
         if (!additionalRegions.isEmpty()) {
             List<CommunityChatRoomAccess> grants = additionalRegions.stream().map(regionId -> {
