@@ -1,7 +1,7 @@
 function Footer() {
   return (
     <footer className="footer">
-      <p>SIMFAT MVP · Monitoreo de perdida de cobertura forestal · 2026</p>
+      <p>SIMFAT MVP Â· Monitoreo de perdida de cobertura forestal Â· 2026</p>
     </footer>
   );
 }
