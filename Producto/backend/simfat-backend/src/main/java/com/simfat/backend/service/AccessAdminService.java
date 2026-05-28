@@ -3,6 +3,7 @@ package com.simfat.backend.service;
 import com.simfat.backend.dto.admin.AccessPermissionDTO;
 import com.simfat.backend.dto.admin.AccessRoleDTO;
 import com.simfat.backend.dto.admin.AccessUserDTO;
+import com.simfat.backend.dto.admin.UpdateCommunityChatAccessRequestDTO;
 import java.util.List;
 import java.util.Set;
 
@@ -15,4 +16,6 @@ public interface AccessAdminService {
     List<AccessPermissionDTO> getPermissions();
 
     AccessUserDTO updateUserRoles(String targetUserId, Set<String> requestedRoleCodes, String actorUserId);
+
+    AccessUserDTO updateCommunityChatAccess(String targetUserId, UpdateCommunityChatAccessRequestDTO request, String actorUserId);
 }
