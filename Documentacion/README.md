@@ -31,3 +31,26 @@ Este directorio centraliza la documentaci?n acad?mica del proyecto.
 - Resultado de desarrollo por casos de uso:
   - `Informes/Resultado-Desarrollo-Semana10-Por-Casos-de-Uso.md`
 
+## Continuidad Semana 11 - Spec-Driven Development
+
+- Transicion metodologica y brechas por casos de uso:
+  - `Informes/2026-05-27_transicion_metodologica_semana11_spec_driven.md`
+- Spec inicial de riesgo geografico y comunidad:
+  - `Informes/2026-05-25_spec_iteracion_riesgo_geo_y_comunidad_v1.md`
+- Spec inicial de gestion de cuenta y perfil:
+  - `Informes/2026-05-27_spec_gestion_cuenta_perfil_v1.md`
+
+## Chat comunitario territorial - SDD 2026-05-28
+
+- Informe de implementacion:
+  - `Informes/2026-05-28_chat_comunitario_sdd_implementacion_v1.md`
+- Evidencia de pruebas:
+  - `Evidencias/2026-05-28_evidencia_chat_comunitario_sdd_v1.md`
+- Cambios de base de datos:
+  - `Informes/database_changes_chat_comunitario_sdd_2026-05-28.md`
+- MER especifico:
+  - `MER/2026-05-28_mer_chat_comunitario_sdd_v1.md`
+- Arquitectura / UML especifico:
+  - `UML/2026-05-28_arquitectura_chat_comunitario_sdd_v1.md`
+- Contrato backend actualizado:
+  - `Informes/community_backend_contract.md`

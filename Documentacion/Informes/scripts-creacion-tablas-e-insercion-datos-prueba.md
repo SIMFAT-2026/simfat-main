@@ -75,3 +75,74 @@ mvn spring-boot:run
 ```bash
 mvn -q -DskipTests compile
 ```
+
+---
+
+# Actualizacion 2026-05-28 - Scripts y datos chat comunitario
+
+## 5) Migracion Flyway V3 - Chat comunitario
+
+### Script oficial
+
+- Archivo: `Producto/backend/simfat-backend/src/main/resources/db/migration/V3__community_chat_access_foundation.sql`
+- Motor objetivo: PostgreSQL/Supabase
+- Gestion: Flyway
+
+### Objetos creados
+
+- Tabla `user_community_profiles`
+- Tabla `community_chat_room_access`
+- Indices de busqueda por usuario, region y grant activo
+- Permisos `PERM_COMMUNITY_CHAT_READ`, `PERM_COMMUNITY_CHAT_SEND`, `PERM_COMMUNITY_CHAT_MODERATE`, `PERM_COMMUNITY_CHAT_ACCESS_MANAGE`
+- Asignacion de permisos a roles RBAC existentes
+
+### Ejecucion
+
+Con backend levantado y `spring.flyway.enabled=true`, la migracion se ejecuta automaticamente.
+
+```bash
+mvn spring-boot:run
+```
+
+## 6) Colecciones MongoDB agregadas por el backend
+
+El backend crea/usa estas colecciones logicas al operar el chat:
+
+- `community_chat_rooms`
+- `community_chat_messages`
+- `community_chat_presence`
+- `community_chat_moderation_events`
+
+## 7) Entorno local usado para QA
+
+MongoDB local:
+
+```bash
+docker run -d --name simfat-mongo-test -p 27017:27017 -v simfat-mongo-test-data:/data/db mongo:7
+```
+
+Backend local con H2 en memoria para QA rapida:
+
+```powershell
+$env:AUTH_JWT_SECRET='local-dev-secret-that-has-at-least-32-bytes'
+$env:SPRING_PROFILES_ACTIVE='local'
+$env:SPRING_DATASOURCE_URL='jdbc:h2:mem:simfat_local;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE'
+$env:SPRING_DATASOURCE_DRIVER_CLASS_NAME='org.h2.Driver'
+$env:SPRING_DATASOURCE_USERNAME='sa'
+$env:SPRING_DATASOURCE_PASSWORD=''
+$env:SPRING_JPA_HIBERNATE_DDL_AUTO='create-drop'
+$env:SPRING_FLYWAY_ENABLED='false'
+$env:MONGODB_URI='mongodb://localhost:27017/simfat-local'
+$env:APP_SEED_ENABLED='true'
+$env:FRONTEND_URL='http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000,http://localhost:4173'
+mvn '-Dspring-boot.run.useTestClasspath=true' spring-boot:run
+```
+
+Generacion de usuarios dev:
+
+```powershell
+Invoke-RestMethod -Method Post `
+  -Uri 'http://localhost:8080/api/auth/dev/seed-users' `
+  -ContentType 'application/json' `
+  -Body '{"count":2}'
+```
