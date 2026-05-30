@@ -6,6 +6,7 @@ import ErrorMessage from '../components/ErrorMessage';
 import FilterBar from '../components/FilterBar';
 import LoadingSpinner from '../components/LoadingSpinner';
 import SectionTitle from '../components/SectionTitle';
+import CommunityChatPanel from '../features/community/chat/CommunityChatPanel';
 import { useFeedback } from '../hooks';
 import { useCommunityData } from '../features/community/hooks/useCommunityData';
 
@@ -498,6 +499,8 @@ function CommunityPage() {
         onConfirm={confirmDelete}
         onCancel={() => setPendingDelete({ type: '', id: '' })}
       />
+
+      <CommunityChatPanel />
     </section>
   );
 }
