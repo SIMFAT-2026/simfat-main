@@ -2,8 +2,8 @@ package com.simfat.backend.model;
 
 import jakarta.persistence.AttributeConverter;
 import jakarta.persistence.Converter;
-import java.util.Arrays;
 import java.util.Collections;
+import java.util.LinkedHashSet;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -23,11 +23,25 @@ public class UserRoleSetConverter implements AttributeConverter<Set<UserRole>, S
         if (dbData == null || dbData.isBlank()) {
             return Collections.emptySet();
         }
-        return Arrays.stream(dbData.split(","))
-            .map(String::trim)
-            .filter(value -> !value.isBlank())
-            .map(UserRole::valueOf)
-            .collect(Collectors.toSet());
+        Set<UserRole> roles = new LinkedHashSet<>();
+        for (String rawValue : dbData.split(",")) {
+            UserRole role = toLegacyRole(rawValue);
+            if (role != null) {
+                roles.add(role);
+            }
+        }
+        return roles;
+    }
+
+    private UserRole toLegacyRole(String rawValue) {
+        if (rawValue == null || rawValue.isBlank()) {
+            return null;
+        }
+        return switch (rawValue.trim()) {
+            case "ADMIN", "ROLE_ADMIN", "ROLE_SUPER_ADMIN" -> UserRole.ADMIN;
+            case "USER", "ROLE_USER", "ROLE_COMMUNITY_USER", "ROLE_VERIFIED_USER", "ROLE_MODERATOR" -> UserRole.USER;
+            default -> null;
+        };
     }
 }
 
