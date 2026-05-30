@@ -6,7 +6,14 @@ import LoadingSpinner from '../components/LoadingSpinner';
 import SectionTitle from '../components/SectionTitle';
 import { useAuth } from '../auth/AuthContext';
 import { useFeedback } from '../hooks';
-import { getAccessPermissions, getAccessRoles, getAccessUsers, updateAccessUserRoles } from '../services';
+import {
+  getAccessPermissions,
+  getAccessRoles,
+  getAccessUsers,
+  getRegions,
+  updateAccessUserRoles,
+  updateCommunityChatAccess
+} from '../services';
 
 const PROFILE_OPTIONS = [
   { value: 'COMMUNITY', label: 'Comunidad', roles: ['ROLE_COMMUNITY_USER'] },
@@ -29,7 +36,9 @@ function AccessControlPage() {
   const [users, setUsers] = useState([]);
   const [roles, setRoles] = useState([]);
   const [permissions, setPermissions] = useState([]);
+  const [regions, setRegions] = useState([]);
   const [draftRolesByUser, setDraftRolesByUser] = useState({});
+  const [draftChatAccessByUser, setDraftChatAccessByUser] = useState({});
 
   const canManageAccess = useMemo(() => {
     const roleSet = new Set(user?.roles || []);
@@ -46,23 +55,34 @@ function AccessControlPage() {
       setLoading(true);
       setError(null);
       try {
-        const [usersData, rolesData, permissionsData] = await Promise.all([
+        const [usersData, rolesData, permissionsData, regionsData] = await Promise.all([
           getAccessUsers(),
           getAccessRoles(),
-          getAccessPermissions()
+          getAccessPermissions(),
+          getRegions()
         ]);
 
         const normalizedUsers = Array.isArray(usersData) ? usersData : [];
         const normalizedRoles = Array.isArray(rolesData) ? rolesData : [];
+        const normalizedRegions = Array.isArray(regionsData) ? regionsData : [];
         setUsers(normalizedUsers);
         setRoles(normalizedRoles);
         setPermissions(Array.isArray(permissionsData) ? permissionsData : []);
+        setRegions(normalizedRegions);
 
         const draft = {};
+        const chatDraft = {};
         for (const row of normalizedUsers) {
           draft[row.id] = Array.isArray(row.assignedRoles) ? [...row.assignedRoles] : [];
+          chatDraft[row.id] = {
+            primaryRegionId: row.communityChatAccess?.primaryRegionId || '',
+            additionalRegionIds: Array.isArray(row.communityChatAccess?.additionalRegionIds)
+              ? [...row.communityChatAccess.additionalRegionIds]
+              : []
+          };
         }
         setDraftRolesByUser(draft);
+        setDraftChatAccessByUser(chatDraft);
       } catch (err) {
         setError(err);
       } finally {
@@ -131,6 +151,49 @@ function AccessControlPage() {
       const updatedUser = await updateAccessUserRoles(userId, nextRoles);
       setUsers((prev) => prev.map((row) => (row.id === userId ? updatedUser : row)));
       feedback.showSuccess(`Roles actualizados para ${updatedUser.email}`);
+    } catch (err) {
+      feedback.showError(err.message);
+    } finally {
+      setSavingUserId('');
+    }
+  }
+
+  function updatePrimaryChatRegion(userId, primaryRegionId) {
+    setDraftChatAccessByUser((prev) => ({
+      ...prev,
+      [userId]: {
+        primaryRegionId,
+        additionalRegionIds: prev[userId]?.additionalRegionIds || []
+      }
+    }));
+  }
+
+  function toggleAdditionalChatRegion(userId, regionId) {
+    setDraftChatAccessByUser((prev) => {
+      const current = new Set(prev[userId]?.additionalRegionIds || []);
+      if (current.has(regionId)) {
+        current.delete(regionId);
+      } else {
+        current.add(regionId);
+      }
+      return {
+        ...prev,
+        [userId]: {
+          primaryRegionId: prev[userId]?.primaryRegionId || '',
+          additionalRegionIds: [...current]
+        }
+      };
+    });
+  }
+
+  async function saveChatAccess(userId) {
+    const nextAccess = draftChatAccessByUser[userId] || { primaryRegionId: '', additionalRegionIds: [] };
+    setSavingUserId(userId);
+    feedback.clear();
+    try {
+      const updatedUser = await updateCommunityChatAccess(userId, nextAccess);
+      setUsers((prev) => prev.map((row) => (row.id === userId ? updatedUser : row)));
+      feedback.showSuccess(`Acceso regional de chat actualizado para ${updatedUser.email}`);
     } catch (err) {
       feedback.showError(err.message);
     } finally {
@@ -220,6 +283,53 @@ function AccessControlPage() {
                         <span>{role.code}</span>
                       </label>
                     ))}
+                  </div>
+                </details>
+
+                <details className="access-advanced">
+                  <summary>Acceso a chat comunitario</summary>
+                  <label>
+                    <span>Region principal</span>
+                    <select
+                      value={draftChatAccessByUser[target.id]?.primaryRegionId || ''}
+                      onChange={(event) => updatePrimaryChatRegion(target.id, event.target.value)}
+                    >
+                      <option value="">Sin region asignada</option>
+                      {regions.map((region) => (
+                        <option key={region.id} value={region.id}>
+                          {region.nombre || region.name || region.id}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <p className="community-source-note">
+                    Por defecto accede a la sala general y a su region principal. Marca regiones extra solo cuando
+                    necesite coordinar con otras subsalas.
+                  </p>
+
+                  <div className="access-role-list">
+                    {regions.map((region) => (
+                      <label key={`${target.id}-chat-${region.id}`} className="access-role-item">
+                        <input
+                          type="checkbox"
+                          checked={(draftChatAccessByUser[target.id]?.additionalRegionIds || []).includes(region.id)}
+                          onChange={() => toggleAdditionalChatRegion(target.id, region.id)}
+                        />
+                        <span>{region.nombre || region.name || region.id}</span>
+                      </label>
+                    ))}
+                  </div>
+
+                  <div className="form-actions">
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      disabled={savingUserId === target.id}
+                      onClick={() => saveChatAccess(target.id)}
+                    >
+                      {savingUserId === target.id ? 'Guardando...' : 'Guardar acceso chat'}
+                    </button>
                   </div>
                 </details>
 
