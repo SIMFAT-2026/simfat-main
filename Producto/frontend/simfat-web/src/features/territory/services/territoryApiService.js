@@ -117,7 +117,8 @@ export async function fetchTerritoryBounds(regionId, fallback) {
 }
 
 export async function fetchTerritoryGeoJson(regionId) {
-  const response = await axiosClient.get(TERRITORY_ENDPOINTS.geojson(regionId));
+  // Served as static asset by Spring Boot — no auth needed, cached 24h
+  const response = await axiosClient.get(`/geojson/comunas-${regionId.toLowerCase()}.geojson`);
   return response.data;
 }
 
