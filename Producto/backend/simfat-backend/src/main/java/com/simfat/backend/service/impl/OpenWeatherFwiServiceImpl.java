@@ -24,7 +24,7 @@ import org.springframework.stereotype.Service;
 public class OpenWeatherFwiServiceImpl implements OpenWeatherFwiService {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(OpenWeatherFwiServiceImpl.class);
-    private static final String SOURCE = "openweathermap";
+    private static final String SOURCE = "open-meteo";
     private static final HttpClient HTTP_CLIENT = HttpClient.newBuilder()
         .connectTimeout(Duration.ofSeconds(10))
         .build();
@@ -33,13 +33,10 @@ public class OpenWeatherFwiServiceImpl implements OpenWeatherFwiService {
     private final RegionRepository regionRepository;
     private final ObjectMapper objectMapper;
 
-    @Value("${openweather.api.key:}")
-    private String apiKey;
-
-    @Value("${openweather.api.base-url:https://api.openweathermap.org}")
+    @Value("${openmeteo.api.base-url:https://api.open-meteo.com}")
     private String baseUrl;
 
-    @Value("${openweather.sync.enabled:true}")
+    @Value("${openmeteo.sync.enabled:true}")
     private boolean syncEnabled;
 
     public OpenWeatherFwiServiceImpl(
@@ -52,11 +49,11 @@ public class OpenWeatherFwiServiceImpl implements OpenWeatherFwiService {
         this.objectMapper = objectMapper;
     }
 
-    @Scheduled(cron = "${openweather.sync.cron:0 30 */12 * * *}")
+    @Scheduled(cron = "${openmeteo.sync.cron:0 30 */12 * * *}")
     @Override
     public void syncFwiForAllRegions() {
-        if (!syncEnabled || apiKey == null || apiKey.isBlank()) {
-            LOGGER.info("fwi_sync status=skipped reason={}", apiKey == null || apiKey.isBlank() ? "no_api_key" : "disabled");
+        if (!syncEnabled) {
+            LOGGER.info("fwi_sync status=skipped reason=disabled");
             return;
         }
 
@@ -81,11 +78,13 @@ public class OpenWeatherFwiServiceImpl implements OpenWeatherFwiService {
 
     @Override
     public boolean syncFwiByRegion(String regionId, double lat, double lon) {
-        String url = baseUrl + "/data/3.0/onecall"
-            + "?lat=" + lat
-            + "&lon=" + lon
-            + "&exclude=minutely,hourly,daily,alerts"
-            + "&appid=" + apiKey;
+        // Open-Meteo: sin API key, completamente gratuito
+        String url = baseUrl + "/v1/forecast"
+            + "?latitude=" + lat
+            + "&longitude=" + lon
+            + "&daily=fire_danger_index"
+            + "&forecast_days=1"
+            + "&timezone=America%2FSantiago";
 
         try {
             HttpRequest request = HttpRequest.newBuilder()
@@ -102,13 +101,15 @@ public class OpenWeatherFwiServiceImpl implements OpenWeatherFwiService {
             }
 
             JsonNode root = objectMapper.readTree(response.body());
-            JsonNode current = root.path("current");
-            JsonNode fwiNode = current.path("fire_weather_index");
+            JsonNode daily = root.path("daily");
+            JsonNode fwiArray = daily.path("fire_danger_index");
 
-            if (fwiNode.isMissingNode() || fwiNode.isNull()) {
-                LOGGER.info("fwi_api status=no_fwi_data regionId={}", regionId);
+            if (fwiArray.isMissingNode() || fwiArray.isEmpty() || fwiArray.get(0).isNull()) {
+                LOGGER.info("fwi_api status=no_data regionId={}", regionId);
                 return false;
             }
+
+            double fwiValue = fwiArray.get(0).asDouble();
 
             TerritoryWeatherObservation obs = new TerritoryWeatherObservation();
             obs.setRegionId(regionId);
@@ -116,13 +117,7 @@ public class OpenWeatherFwiServiceImpl implements OpenWeatherFwiService {
             obs.setSource(SOURCE);
             obs.setLat(lat);
             obs.setLon(lon);
-            obs.setFwi(getDoubleOrNull(fwiNode, "fwi"));
-            obs.setFfmc(getDoubleOrNull(fwiNode, "ffmc"));
-            obs.setDmc(getDoubleOrNull(fwiNode, "dmc"));
-            obs.setDc(getDoubleOrNull(fwiNode, "dc"));
-            obs.setIsi(getDoubleOrNull(fwiNode, "isi"));
-            obs.setBui(getDoubleOrNull(fwiNode, "bui"));
-            obs.setDsr(getDoubleOrNull(fwiNode, "dsr"));
+            obs.setFwi(fwiValue);
             obs.setIngestedAt(LocalDateTime.now());
 
             weatherRepository.save(obs);
@@ -136,10 +131,5 @@ public class OpenWeatherFwiServiceImpl implements OpenWeatherFwiService {
             LOGGER.warn("fwi_api status=exception regionId={} error={}", regionId, ex.getMessage());
             return false;
         }
-    }
-
-    private Double getDoubleOrNull(JsonNode node, String field) {
-        JsonNode n = node.path(field);
-        return n.isMissingNode() || n.isNull() ? null : n.asDouble();
     }
 }
