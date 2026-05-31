@@ -210,6 +210,7 @@ function TerritoryMapPanel({
       {!loading && !error && regionData ? (
         <div className="territory-map-wrapper">
           <MapContainer
+            key={regionData.regionId}
             className="territory-map"
             center={regionData.center}
             zoom={regionData.zoom}

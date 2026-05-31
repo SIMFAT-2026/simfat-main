@@ -378,9 +378,9 @@ public class TerritoryController {
         static RegionGeometry fromRegion(String regionId) {
             String normalized = regionId == null ? "" : regionId.trim().toLowerCase(Locale.ROOT);
             if ("araucania".equals(normalized)) {
-                return new RegionGeometry("araucania", "La Araucania", -38.7, -72.4, -39.8, -73.9, -37.8, -71.2, 8);
+                return new RegionGeometry("araucania", "La Araucania", -38.7, -72.4, -39.8, -73.9, -37.8, -71.2, 9);
             }
-            return new RegionGeometry("biobio", "Biobio", -37.5, -72.5, -38.9, -74.1, -36.3, -71.0, 8);
+            return new RegionGeometry("biobio", "Biobio", -37.5, -72.5, -38.9, -74.1, -36.3, -71.0, 9);
         }
     }
 }

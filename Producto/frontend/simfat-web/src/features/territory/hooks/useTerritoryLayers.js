@@ -14,7 +14,7 @@ const REGION_CONFIG = {
       [-38.9, -74.1],
       [-36.3, -71.0]
     ],
-    zoom: 8
+    zoom: 9
   },
   araucania: {
     id: 'araucania',
@@ -24,7 +24,7 @@ const REGION_CONFIG = {
       [-39.8, -73.9],
       [-37.8, -71.2]
     ],
-    zoom: 8
+    zoom: 9
   }
 };
 
