@@ -51,8 +51,16 @@ function featureLabel(feature) {
 
 function featureMeta(feature) {
   const props = feature?.properties || {};
+
+  if (props.indicator === 'FIRMS') {
+    const frp = props.frp != null ? `FRP: ${Number(props.frp).toFixed(1)} MW` : '';
+    const conf = props.confidence === 'h' ? 'Alta confianza' : props.confidence === 'n' ? 'Confianza nominal' : '';
+    const time = props.acquiredAt ? `Detectado: ${new Date(props.acquiredAt).toLocaleString('es-CL')}` : '';
+    return [frp, conf, time].filter(Boolean).join(' | ');
+  }
+
   if (props.value !== undefined && props.value !== null) {
-    return `Valor: ${props.value}`;
+    return `Valor: ${Number(props.value).toFixed(3)}`;
   }
   if (props.hectares !== undefined && props.hectares !== null) {
     return `Hectareas: ${props.hectares}`;
@@ -87,20 +95,55 @@ function toPointStyle(indicator, feature) {
   };
 }
 
-function RiskScoreBadge({ regionData }) {
-  const riskFeature = regionData?.layers?.RISK_SCORE?.features?.[0];
-  if (!riskFeature) return null;
+const COMPONENT_LABELS = {
+  fwi: 'FWI meteorológico',
+  ndmi: 'Humedad vegetación',
+  firms: 'Focos activos',
+  loss: 'Cobertura forestal',
+  ndvi: 'Índice vegetación',
+  reports: 'Reportes'
+};
 
-  const { score, alertLevel } = riskFeature.properties || {};
+function RiskScoreBadge({ regionData }) {
+  const detail = regionData?.riskScore;
+  const layerFeature = regionData?.layers?.RISK_SCORE?.features?.[0];
+
+  const score = detail?.scoreComposite ?? layerFeature?.properties?.score ?? null;
+  const alertLevel = detail?.alertLevel || layerFeature?.properties?.alertLevel || 'NORMAL';
+  const components = detail?.components || null;
+
+  if (score === null && !alertLevel) return null;
+
   const level = alertLevel || 'NORMAL';
   const config = ALERT_LEVEL_CONFIG[level] || ALERT_LEVEL_CONFIG.NORMAL;
   const scoreDisplay = typeof score === 'number' ? (score * 100).toFixed(0) : '—';
 
   return (
     <div className="risk-score-badge" style={{ borderColor: config.color, backgroundColor: config.bg }}>
-      <span className="risk-score-label">Nivel de riesgo</span>
-      <span className="risk-score-level" style={{ color: config.color }}>{config.label}</span>
-      <span className="risk-score-value" style={{ color: config.color }}>{scoreDisplay}<small>/100</small></span>
+      <div className="risk-score-main">
+        <span className="risk-score-label">Nivel de riesgo</span>
+        <span className="risk-score-level" style={{ color: config.color }}>{config.label}</span>
+        <span className="risk-score-value" style={{ color: config.color }}>{scoreDisplay}<small>/100</small></span>
+      </div>
+      {components && (
+        <div className="risk-score-breakdown">
+          {Object.entries(components).map(([key, comp]) => {
+            const pct = typeof comp?.score === 'number' ? (comp.score * 100).toFixed(0) : '—';
+            return (
+              <div key={key} className="risk-score-component">
+                <span className="risk-component-label">{COMPONENT_LABELS[key] || key}</span>
+                <div className="risk-component-bar-wrap">
+                  <div
+                    className="risk-component-bar"
+                    style={{ width: `${Math.min(comp?.score * 100 || 0, 100)}%`, backgroundColor: config.color }}
+                  />
+                </div>
+                <span className="risk-component-value">{pct}</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
@@ -178,7 +221,7 @@ function TerritoryMapPanel({
             />
             <FitRegionBounds bounds={regionData.bounds} />
 
-            {visibleIndicators.map((indicator) => (
+            {visibleIndicators.filter((i) => i !== 'RISK_SCORE').map((indicator) => (
               <GeoJSON
                 key={`${regionData.regionId}-${indicator}`}
                 data={regionData.layers[indicator]}
@@ -195,13 +238,13 @@ function TerritoryMapPanel({
           <div className="territory-legend">
             <h4>Leyenda de capas</h4>
             <ul>
-              {['NDVI', 'NDMI', 'LOSS', 'ALERTS', 'REPORTS'].map((indicator) => (
+              {['FIRMS', 'NDVI', 'NDMI', 'LOSS', 'ALERTS', 'REPORTS'].map((indicator) => (
                 <li key={indicator}>
                   <span
                     className="territory-color-dot"
                     style={{ backgroundColor: INDICATOR_COLORS[indicator] || '#64748b' }}
                   />
-                  <span>{indicator}</span>
+                  <span>{indicator === 'FIRMS' ? 'Focos' : indicator}</span>
                   <strong>{indicatorCount(regionData, indicator)}</strong>
                 </li>
               ))}

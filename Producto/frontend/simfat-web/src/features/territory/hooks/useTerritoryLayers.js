@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { fetchTerritoryBounds, fetchTerritoryLayers } from '../services/territoryApiService';
+import { fetchTerritoryBounds, fetchTerritoryLayers, fetchTerritoryRiskScore } from '../services/territoryApiService';
 
 const CACHE_TTL_MS = 120_000;
 const pendingByKey = new Map();
@@ -177,9 +177,10 @@ async function loadRegionData({ regionId, indicators, from, to, force = false })
   const regionFallback = REGION_CONFIG[regionId] || REGION_CONFIG.biobio;
   const requestPromise = (async () => {
     try {
-      const [boundsData, layerData] = await Promise.all([
+      const [boundsData, layerData, riskScoreData] = await Promise.all([
         fetchTerritoryBounds(regionId, regionFallback),
-        fetchTerritoryLayers({ regionId, indicators, from, to })
+        fetchTerritoryLayers({ regionId, indicators, from, to }),
+        fetchTerritoryRiskScore(regionId).catch(() => null)
       ]);
 
       return {
@@ -190,7 +191,8 @@ async function loadRegionData({ regionId, indicators, from, to, force = false })
         generatedAt: layerData.generatedAt,
         source: 'backend',
         requestedRange: { from, to },
-        layers: layerData.layers
+        layers: layerData.layers,
+        riskScore: riskScoreData
       };
     } catch {
       return createMockRegionData(regionId, from, to);

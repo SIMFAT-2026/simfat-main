@@ -2,7 +2,8 @@ import axiosClient from '../../../api/axiosClient';
 
 const TERRITORY_ENDPOINTS = {
   layers: '/api/territory/layers',
-  bounds: '/api/territory/bounds'
+  bounds: '/api/territory/bounds',
+  riskScore: (regionId) => `/api/territory/risk-score/${regionId}`
 };
 
 function isFeatureCollection(value) {
@@ -75,7 +76,9 @@ function normalizeLayerPayload(payload, regionId) {
       NDMI: toFeatureCollection(layers.NDMI),
       LOSS: toFeatureCollection(layers.LOSS),
       ALERTS: toFeatureCollection(layers.ALERTS),
-      REPORTS: toFeatureCollection(layers.REPORTS)
+      FIRMS: toFeatureCollection(layers.FIRMS),
+      REPORTS: toFeatureCollection(layers.REPORTS),
+      RISK_SCORE: toFeatureCollection(layers.RISK_SCORE)
     }
   };
 }
@@ -109,4 +112,17 @@ export async function fetchTerritoryBounds(regionId, fallback) {
     params: { regionId }
   });
   return normalizeBoundsPayload(response.data, fallback);
+}
+
+export async function fetchTerritoryRiskScore(regionId) {
+  const response = await axiosClient.get(TERRITORY_ENDPOINTS.riskScore(regionId));
+  const source = (response.data && response.data.data) || response.data || {};
+  return {
+    regionId: source.regionId || regionId,
+    scoreComposite: source.scoreComposite ?? null,
+    alertLevel: source.alertLevel || 'NORMAL',
+    qualityFlag: source.qualityFlag || 'NO_DATA',
+    computedAt: source.computedAt || null,
+    components: source.components || null
+  };
 }
