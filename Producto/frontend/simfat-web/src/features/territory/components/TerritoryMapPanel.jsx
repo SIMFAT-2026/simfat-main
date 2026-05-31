@@ -20,7 +20,16 @@ const INDICATOR_COLORS = {
   NDMI: '#0ea5e9',
   LOSS: '#f97316',
   ALERTS: '#dc2626',
-  REPORTS: '#7c3aed'
+  FIRMS: '#ff4500',
+  REPORTS: '#7c3aed',
+  RISK_SCORE: '#b45309'
+};
+
+const ALERT_LEVEL_CONFIG = {
+  NORMAL:     { color: '#16a34a', bg: '#dcfce7', label: 'Normal' },
+  PREVENTIVO: { color: '#ca8a04', bg: '#fef9c3', label: 'Preventivo' },
+  ALTO:       { color: '#ea580c', bg: '#ffedd5', label: 'Alto' },
+  CRITICO:    { color: '#dc2626', bg: '#fee2e2', label: 'Critico' }
 };
 
 function FitRegionBounds({ bounds }) {
@@ -57,15 +66,43 @@ function featureMeta(feature) {
   return '';
 }
 
-function toPointStyle(indicator) {
+function toPointStyle(indicator, feature) {
+  const frp = feature?.properties?.frp;
+  const confidence = feature?.properties?.confidence;
+  let radius = indicator === 'ALERTS' ? 8 : 7;
+
+  if (indicator === 'FIRMS') {
+    radius = frp ? Math.min(6 + frp / 15, 16) : 8;
+    const fillColor = confidence === 'h' ? '#dc2626' : '#f97316';
+    return { radius, fillColor, color: '#7f1d1d', weight: 1.5, opacity: 0.9, fillOpacity: 0.85 };
+  }
+
   return {
-    radius: indicator === 'ALERTS' ? 8 : 7,
+    radius,
     fillColor: INDICATOR_COLORS[indicator] || '#64748b',
     color: '#0f172a',
     weight: 1,
     opacity: 0.85,
     fillOpacity: 0.8
   };
+}
+
+function RiskScoreBadge({ regionData }) {
+  const riskFeature = regionData?.layers?.RISK_SCORE?.features?.[0];
+  if (!riskFeature) return null;
+
+  const { score, alertLevel } = riskFeature.properties || {};
+  const level = alertLevel || 'NORMAL';
+  const config = ALERT_LEVEL_CONFIG[level] || ALERT_LEVEL_CONFIG.NORMAL;
+  const scoreDisplay = typeof score === 'number' ? (score * 100).toFixed(0) : '—';
+
+  return (
+    <div className="risk-score-badge" style={{ borderColor: config.color, backgroundColor: config.bg }}>
+      <span className="risk-score-label">Nivel de riesgo</span>
+      <span className="risk-score-level" style={{ color: config.color }}>{config.label}</span>
+      <span className="risk-score-value" style={{ color: config.color }}>{scoreDisplay}<small>/100</small></span>
+    </div>
+  );
 }
 
 function indicatorCount(regionData, indicator) {
@@ -93,6 +130,8 @@ function TerritoryMapPanel({
         </button>
       </div>
 
+      {regionData && visibleIndicators.includes('RISK_SCORE') && <RiskScoreBadge regionData={regionData} />}
+
       <div className="filter-bar territory-controls">
         <label>
           Region
@@ -106,7 +145,7 @@ function TerritoryMapPanel({
         </label>
 
         <div className="territory-layer-toggles">
-          {['NDVI', 'NDMI', 'LOSS', 'ALERTS', 'REPORTS'].map((indicator) => (
+          {['RISK_SCORE', 'FIRMS', 'NDVI', 'NDMI', 'LOSS', 'ALERTS', 'REPORTS'].map((indicator) => (
             <label key={indicator} className="territory-toggle">
               <input
                 type="checkbox"
@@ -143,7 +182,7 @@ function TerritoryMapPanel({
               <GeoJSON
                 key={`${regionData.regionId}-${indicator}`}
                 data={regionData.layers[indicator]}
-                pointToLayer={(feature, latlng) => L.circleMarker(latlng, toPointStyle(indicator))}
+                pointToLayer={(feature, latlng) => L.circleMarker(latlng, toPointStyle(indicator, feature))}
                 onEachFeature={(feature, layer) => {
                   const label = featureLabel(feature);
                   const meta = featureMeta(feature);

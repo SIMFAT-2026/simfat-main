@@ -29,8 +29,8 @@ const REGION_CONFIG = {
 };
 
 const REGION_OPTIONS = Object.values(REGION_CONFIG);
-const DEFAULT_INDICATORS = ['NDVI', 'NDMI', 'LOSS', 'ALERTS', 'REPORTS'];
-const DEFAULT_VISIBLE_INDICATORS = ['NDVI', 'ALERTS', 'REPORTS'];
+const DEFAULT_INDICATORS = ['NDVI', 'NDMI', 'LOSS', 'ALERTS', 'FIRMS', 'REPORTS', 'RISK_SCORE'];
+const DEFAULT_VISIBLE_INDICATORS = ['RISK_SCORE', 'FIRMS', 'ALERTS', 'REPORTS'];
 const REGION_IDS = new Set(REGION_OPTIONS.map((region) => region.id));
 
 function createPointFeature(id, lng, lat, properties) {
@@ -86,6 +86,13 @@ function createMockLayers(regionId) {
             category: 'QUEMA'
           })
         ]
+      },
+      FIRMS: { type: 'FeatureCollection', features: [] },
+      RISK_SCORE: {
+        type: 'FeatureCollection',
+        features: [
+          createPointFeature('ar-risk', -72.4, -38.7, { label: 'La Araucania', indicator: 'RISK_SCORE', score: 0.0, alertLevel: 'NORMAL' })
+        ]
       }
     };
   }
@@ -124,6 +131,13 @@ function createMockLayers(regionId) {
       features: [
         createPointFeature('bb-report-1', -73.01, -36.79, { label: 'Foco de humo', indicator: 'REPORTS', category: 'HUMO' }),
         createPointFeature('bb-report-2', -72.66, -37.42, { label: 'Fuego en ladera', indicator: 'REPORTS', category: 'FOCO' })
+      ]
+    },
+    FIRMS: { type: 'FeatureCollection', features: [] },
+    RISK_SCORE: {
+      type: 'FeatureCollection',
+      features: [
+        createPointFeature('bb-risk', -72.5, -37.5, { label: 'Biobio', indicator: 'RISK_SCORE', score: 0.0, alertLevel: 'NORMAL' })
       ]
     }
   };

@@ -1,0 +1,77 @@
+package com.simfat.backend.model;
+
+import java.time.LocalDateTime;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.index.CompoundIndex;
+import org.springframework.data.mongodb.core.index.CompoundIndexes;
+import org.springframework.data.mongodb.core.mapping.Document;
+
+@Document(collection = "territory_weather_observations")
+@CompoundIndexes({
+    @CompoundIndex(name = "idx_weather_region_observed_desc", def = "{'regionId': 1, 'observedAt': -1}"),
+    @CompoundIndex(name = "uk_weather_region_observed", def = "{'regionId': 1, 'observedAt': 1}", unique = true)
+})
+public class TerritoryWeatherObservation {
+
+    @Id
+    private String id;
+
+    private String regionId;
+    private LocalDateTime observedAt;
+    private String source;
+
+    private Double fwi;
+    private Double ffmc;
+    private Double dmc;
+    private Double dc;
+    private Double isi;
+    private Double bui;
+    private Double dsr;
+
+    private Double lat;
+    private Double lon;
+
+    private LocalDateTime ingestedAt;
+
+    public String getId() { return id; }
+    public void setId(String id) { this.id = id; }
+
+    public String getRegionId() { return regionId; }
+    public void setRegionId(String regionId) { this.regionId = regionId; }
+
+    public LocalDateTime getObservedAt() { return observedAt; }
+    public void setObservedAt(LocalDateTime observedAt) { this.observedAt = observedAt; }
+
+    public String getSource() { return source; }
+    public void setSource(String source) { this.source = source; }
+
+    public Double getFwi() { return fwi; }
+    public void setFwi(Double fwi) { this.fwi = fwi; }
+
+    public Double getFfmc() { return ffmc; }
+    public void setFfmc(Double ffmc) { this.ffmc = ffmc; }
+
+    public Double getDmc() { return dmc; }
+    public void setDmc(Double dmc) { this.dmc = dmc; }
+
+    public Double getDc() { return dc; }
+    public void setDc(Double dc) { this.dc = dc; }
+
+    public Double getIsi() { return isi; }
+    public void setIsi(Double isi) { this.isi = isi; }
+
+    public Double getBui() { return bui; }
+    public void setBui(Double bui) { this.bui = bui; }
+
+    public Double getDsr() { return dsr; }
+    public void setDsr(Double dsr) { this.dsr = dsr; }
+
+    public Double getLat() { return lat; }
+    public void setLat(Double lat) { this.lat = lat; }
+
+    public Double getLon() { return lon; }
+    public void setLon(Double lon) { this.lon = lon; }
+
+    public LocalDateTime getIngestedAt() { return ingestedAt; }
+    public void setIngestedAt(LocalDateTime ingestedAt) { this.ingestedAt = ingestedAt; }
+}

@@ -100,6 +100,43 @@
   margin-top: 2px;
 }
 
+.risk-score-badge {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  border-radius: 10px;
+  border: 2px solid;
+  margin-top: 8px;
+  margin-bottom: 4px;
+}
+
+.risk-score-label {
+  font-size: 0.85rem;
+  color: #475569;
+  font-weight: 500;
+}
+
+.risk-score-level {
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+}
+
+.risk-score-value {
+  margin-left: auto;
+  font-size: 1.5rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.risk-score-value small {
+  font-size: 0.75rem;
+  font-weight: 500;
+  opacity: 0.7;
+  margin-left: 1px;
+}
+
 @media (max-width: 1080px) {
   .territory-map-wrapper {
     grid-template-columns: 1fr;

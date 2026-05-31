@@ -8,10 +8,12 @@ import com.simfat.backend.model.ForestLossRecord;
 import com.simfat.backend.model.HeatAlertEvent;
 import com.simfat.backend.model.IndicatorType;
 import com.simfat.backend.model.OpenEoIndicatorObservation;
+import com.simfat.backend.model.TerritoryRiskSnapshot;
 import com.simfat.backend.repository.CitizenReportRepository;
 import com.simfat.backend.repository.ForestLossRecordRepository;
 import com.simfat.backend.repository.HeatAlertEventRepository;
 import com.simfat.backend.repository.OpenEoIndicatorObservationRepository;
+import com.simfat.backend.service.TerritoryRiskService;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -22,7 +24,10 @@ import java.util.Map;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -31,21 +36,27 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/territory")
 public class TerritoryController {
 
+    private static final List<String> VALID_INDICATORS =
+        List.of("NDVI", "NDMI", "LOSS", "ALERTS", "REPORTS", "FIRMS", "RISK_SCORE");
+
     private final HeatAlertEventRepository heatAlertRepository;
     private final CitizenReportRepository citizenReportRepository;
     private final ForestLossRecordRepository forestLossRepository;
     private final OpenEoIndicatorObservationRepository observationRepository;
+    private final TerritoryRiskService territoryRiskService;
 
     public TerritoryController(
         HeatAlertEventRepository heatAlertRepository,
         CitizenReportRepository citizenReportRepository,
         ForestLossRecordRepository forestLossRepository,
-        OpenEoIndicatorObservationRepository observationRepository
+        OpenEoIndicatorObservationRepository observationRepository,
+        TerritoryRiskService territoryRiskService
     ) {
         this.heatAlertRepository = heatAlertRepository;
         this.citizenReportRepository = citizenReportRepository;
         this.forestLossRepository = forestLossRepository;
         this.observationRepository = observationRepository;
+        this.territoryRiskService = territoryRiskService;
     }
 
     @GetMapping("/bounds")
@@ -90,8 +101,14 @@ public class TerritoryController {
         if (requestedIndicators.contains("ALERTS")) {
             layers.put("ALERTS", alertsLayer(fromDate, toDate));
         }
+        if (requestedIndicators.contains("FIRMS")) {
+            layers.put("FIRMS", firmsLayer(regionId, fromDate, toDate));
+        }
         if (requestedIndicators.contains("REPORTS")) {
             layers.put("REPORTS", reportsLayer(fromDate, toDate));
+        }
+        if (requestedIndicators.contains("RISK_SCORE")) {
+            layers.put("RISK_SCORE", riskScoreLayer(regionId, geometry));
         }
 
         TerritoryLayersResponseDTO dto = new TerritoryLayersResponseDTO();
@@ -220,17 +237,98 @@ public class TerritoryController {
         ));
     }
 
+    @GetMapping("/risk-score/{regionId}")
+    @PreAuthorize("hasAnyAuthority('ROLE_VERIFIED_USER','ROLE_MODERATOR','ROLE_ADMIN','ROLE_SUPER_ADMIN')")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> getRiskScore(@PathVariable String regionId) {
+        TerritoryRiskSnapshot snapshot = territoryRiskService.getLatestSnapshot(regionId);
+        if (snapshot == null) {
+            return ResponseEntity.ok(ApiResponse.ok("Sin snapshot disponible para " + regionId, Map.of(
+                "regionId", regionId,
+                "alertLevel", "NORMAL",
+                "scoreComposite", 0.0,
+                "qualityFlag", "NO_DATA"
+            )));
+        }
+
+        Map<String, Object> components = new LinkedHashMap<>();
+        components.put("fwi", Map.of("score", nullSafe(snapshot.getComponentFwi()), "rawValue", nullSafe(snapshot.getFwiRaw()), "weight", 0.38));
+        components.put("ndmi", Map.of("score", nullSafe(snapshot.getComponentNdmi()), "rawValue", nullSafe(snapshot.getNdmiRaw()), "weight", 0.22));
+        components.put("firms", Map.of("score", nullSafe(snapshot.getComponentFirms()), "focosCount", nullSafe(snapshot.getFirmsCount()), "frpMean", nullSafe(snapshot.getFirmsFrpMean()), "weight", 0.18));
+        components.put("loss", Map.of("score", nullSafe(snapshot.getComponentLoss()), "lossRate", nullSafe(snapshot.getLossRateRaw()), "weight", 0.10));
+        components.put("ndvi", Map.of("score", nullSafe(snapshot.getComponentNdvi()), "rawValue", nullSafe(snapshot.getNdviRaw()), "weight", 0.08));
+        components.put("reports", Map.of("score", nullSafe(snapshot.getComponentReports()), "count", nullSafe(snapshot.getReportsCount()), "weight", 0.04));
+
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("regionId", snapshot.getRegionId());
+        data.put("computedAt", snapshot.getComputedAt());
+        data.put("scoreComposite", snapshot.getScoreComposite());
+        data.put("alertLevel", snapshot.getAlertLevel());
+        data.put("qualityFlag", snapshot.getQualityFlag());
+        data.put("components", components);
+
+        return ResponseEntity.ok(ApiResponse.ok("Score de riesgo territorial obtenido correctamente", data));
+    }
+
+    @PostMapping("/sync")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_SUPER_ADMIN')")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> triggerSync(@RequestParam String regionId) {
+        TerritoryRiskSnapshot snapshot = territoryRiskService.recomputeRiskByRegion(regionId);
+        return ResponseEntity.ok(ApiResponse.ok("Score de riesgo recalculado para " + regionId,
+            Map.of("regionId", regionId, "alertLevel", snapshot.getAlertLevel(), "scoreComposite", snapshot.getScoreComposite())));
+    }
+
+    private Map<String, Object> firmsLayer(String regionId, LocalDateTime from, LocalDateTime to) {
+        List<Map<String, Object>> features = heatAlertRepository.findByRegionId(regionId)
+            .stream()
+            .filter(e -> "NASA_FIRMS".equals(e.getFuente()))
+            .filter(e -> e.getFechaEvento() != null && !e.getFechaEvento().isBefore(from) && !e.getFechaEvento().isAfter(to))
+            .filter(e -> e.getFirmsConfidence() != null && !"l".equals(e.getFirmsConfidence()))
+            .map(e -> {
+                Map<String, Object> props = new LinkedHashMap<>();
+                props.put("label", "Foco activo VIIRS");
+                props.put("indicator", "FIRMS");
+                props.put("confidence", e.getFirmsConfidence());
+                props.put("frp", e.getFirmsFrp() == null ? 0.0 : e.getFirmsFrp());
+                props.put("satellite", e.getFirmsSatellite());
+                props.put("acquiredAt", e.getFechaEvento());
+                return pointFeature(e.getId(), e.getLongitud(), e.getLatitud(), props);
+            })
+            .toList();
+
+        return featureCollection(features);
+    }
+
+    private Map<String, Object> riskScoreLayer(String regionId, RegionGeometry geometry) {
+        TerritoryRiskSnapshot snapshot = territoryRiskService.getLatestSnapshot(regionId);
+        double score = snapshot != null && snapshot.getScoreComposite() != null ? snapshot.getScoreComposite() : 0.0;
+        String alertLevel = snapshot != null && snapshot.getAlertLevel() != null ? snapshot.getAlertLevel() : "NORMAL";
+        String computedAt = snapshot != null && snapshot.getComputedAt() != null ? snapshot.getComputedAt().toString() : null;
+
+        Map<String, Object> props = new LinkedHashMap<>();
+        props.put("label", geometry.label);
+        props.put("indicator", "RISK_SCORE");
+        props.put("score", score);
+        props.put("alertLevel", alertLevel);
+        props.put("computedAt", computedAt);
+
+        return featureCollection(List.of(pointFeature("risk-" + regionId, geometry.centerLng, geometry.centerLat, props)));
+    }
+
     private List<String> parseIndicators(String rawIndicators) {
         if (rawIndicators == null || rawIndicators.isBlank()) {
-            return List.of("NDVI", "NDMI", "LOSS", "ALERTS", "REPORTS");
+            return List.of("NDVI", "NDMI", "LOSS", "ALERTS", "FIRMS", "REPORTS", "RISK_SCORE");
         }
 
         return List.of(rawIndicators.split(","))
             .stream()
             .map(item -> item == null ? "" : item.trim().toUpperCase(Locale.ROOT))
-            .filter(item -> List.of("NDVI", "NDMI", "LOSS", "ALERTS", "REPORTS").contains(item))
+            .filter(VALID_INDICATORS::contains)
             .distinct()
             .toList();
+    }
+
+    private Object nullSafe(Object value) {
+        return value == null ? 0 : value;
     }
 
     private Map<String, Object> featureCollection(List<Map<String, Object>> features) {
