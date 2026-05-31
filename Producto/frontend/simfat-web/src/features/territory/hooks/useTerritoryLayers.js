@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { fetchTerritoryBounds, fetchTerritoryLayers, fetchTerritoryRiskScore } from '../services/territoryApiService';
+import { fetchTerritoryBounds, fetchTerritoryGeoJson, fetchTerritoryLayers, fetchTerritoryRiskScore, fetchComunalRiskScores } from '../services/territoryApiService';
 
 const CACHE_TTL_MS = 120_000;
 const pendingByKey = new Map();
@@ -177,10 +177,12 @@ async function loadRegionData({ regionId, indicators, from, to, force = false })
   const regionFallback = REGION_CONFIG[regionId] || REGION_CONFIG.biobio;
   const requestPromise = (async () => {
     try {
-      const [boundsData, layerData, riskScoreData] = await Promise.all([
+      const [boundsData, layerData, riskScoreData, comunalGeoJson, comunalScores] = await Promise.all([
         fetchTerritoryBounds(regionId, regionFallback),
         fetchTerritoryLayers({ regionId, indicators, from, to }),
-        fetchTerritoryRiskScore(regionId).catch(() => null)
+        fetchTerritoryRiskScore(regionId).catch(() => null),
+        fetchTerritoryGeoJson(regionId).catch(() => null),
+        fetchComunalRiskScores(regionId).catch(() => null)
       ]);
 
       return {
@@ -192,7 +194,9 @@ async function loadRegionData({ regionId, indicators, from, to, force = false })
         source: 'backend',
         requestedRange: { from, to },
         layers: layerData.layers,
-        riskScore: riskScoreData
+        riskScore: riskScoreData,
+        comunalGeoJson,
+        comunalScores
       };
     } catch {
       return createMockRegionData(regionId, from, to);

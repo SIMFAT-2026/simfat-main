@@ -3,7 +3,9 @@ import axiosClient from '../../../api/axiosClient';
 const TERRITORY_ENDPOINTS = {
   layers: '/api/territory/layers',
   bounds: '/api/territory/bounds',
-  riskScore: (regionId) => `/api/territory/risk-score/${regionId}`
+  riskScore: (regionId) => `/api/territory/risk-score/${regionId}`,
+  geojson: (regionId) => `/api/territory/geojson/${regionId}`,
+  comunalScores: (regionId) => `/api/territory/risk-score/comunas/${regionId}`
 };
 
 function isFeatureCollection(value) {
@@ -112,6 +114,17 @@ export async function fetchTerritoryBounds(regionId, fallback) {
     params: { regionId }
   });
   return normalizeBoundsPayload(response.data, fallback);
+}
+
+export async function fetchTerritoryGeoJson(regionId) {
+  const response = await axiosClient.get(TERRITORY_ENDPOINTS.geojson(regionId));
+  return response.data;
+}
+
+export async function fetchComunalRiskScores(regionId) {
+  const response = await axiosClient.get(TERRITORY_ENDPOINTS.comunalScores(regionId));
+  const source = (response.data && response.data.data) || response.data || {};
+  return source;
 }
 
 export async function fetchTerritoryRiskScore(regionId) {

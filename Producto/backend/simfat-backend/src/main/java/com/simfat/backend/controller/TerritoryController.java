@@ -3,6 +3,8 @@ package com.simfat.backend.controller;
 import com.simfat.backend.dto.ApiResponse;
 import com.simfat.backend.dto.TerritoryBoundsResponseDTO;
 import com.simfat.backend.dto.TerritoryLayersResponseDTO;
+import com.simfat.backend.model.ComunaRiskSnapshot;
+import com.simfat.backend.service.ComunaRiskService;
 import com.simfat.backend.model.CitizenReport;
 import com.simfat.backend.model.ForestLossRecord;
 import com.simfat.backend.model.HeatAlertEvent;
@@ -18,11 +20,17 @@ import com.simfat.backend.service.NasaFirmsService;
 import com.simfat.backend.service.OpenWeatherFwiService;
 import com.simfat.backend.service.TerritoryRiskService;
 import java.time.LocalDate;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.stream.Collectors;
+import org.springframework.core.io.ClassPathResource;
+import org.springframework.http.MediaType;
 import java.util.Map;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -50,6 +58,7 @@ public class TerritoryController {
     private final TerritoryRiskService territoryRiskService;
     private final NasaFirmsService nasaFirmsService;
     private final OpenWeatherFwiService openWeatherFwiService;
+    private final ComunaRiskService comunaRiskService;
 
     public TerritoryController(
         HeatAlertEventRepository heatAlertRepository,
@@ -59,7 +68,8 @@ public class TerritoryController {
         RegionRepository regionRepository,
         TerritoryRiskService territoryRiskService,
         NasaFirmsService nasaFirmsService,
-        OpenWeatherFwiService openWeatherFwiService
+        OpenWeatherFwiService openWeatherFwiService,
+        ComunaRiskService comunaRiskService
     ) {
         this.heatAlertRepository = heatAlertRepository;
         this.citizenReportRepository = citizenReportRepository;
@@ -69,6 +79,7 @@ public class TerritoryController {
         this.territoryRiskService = territoryRiskService;
         this.nasaFirmsService = nasaFirmsService;
         this.openWeatherFwiService = openWeatherFwiService;
+        this.comunaRiskService = comunaRiskService;
     }
 
     @GetMapping("/bounds")
@@ -281,6 +292,44 @@ public class TerritoryController {
         return ResponseEntity.ok(ApiResponse.ok("Score de riesgo territorial obtenido correctamente", data));
     }
 
+    @GetMapping(value = "/geojson/{regionId}", produces = MediaType.APPLICATION_JSON_VALUE)
+    public org.springframework.http.ResponseEntity<String> getComunasGeoJson(@PathVariable String regionId) {
+        String path = "geojson/comunas-" + regionId.toLowerCase(Locale.ROOT) + ".geojson";
+        try {
+            ClassPathResource resource = new ClassPathResource(path);
+            if (!resource.exists()) {
+                return org.springframework.http.ResponseEntity.notFound().build();
+            }
+            try (InputStream is = resource.getInputStream()) {
+                String json = new String(is.readAllBytes(), StandardCharsets.UTF_8);
+                return org.springframework.http.ResponseEntity.ok()
+                    .header("Cache-Control", "max-age=86400")
+                    .body(json);
+            }
+        } catch (Exception ex) {
+            return org.springframework.http.ResponseEntity.internalServerError().build();
+        }
+    }
+
+    @GetMapping("/risk-score/comunas/{regionId}")
+    @PreAuthorize("hasAnyAuthority('ROLE_VERIFIED_USER','ROLE_MODERATOR','ROLE_ADMIN','ROLE_SUPER_ADMIN')")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> getComunalRiskScores(@PathVariable String regionId) {
+        Map<String, ComunaRiskSnapshot> snapshots = comunaRiskService.getLatestSnapshotsByRegion(regionId);
+        Map<String, Object> result = new LinkedHashMap<>();
+        snapshots.forEach((comunaId, s) -> {
+            Map<String, Object> data = new LinkedHashMap<>();
+            data.put("alertLevel", s.getAlertLevel());
+            data.put("scoreComposite", s.getScoreComposite());
+            data.put("qualityFlag", s.getQualityFlag());
+            data.put("nombreComuna", s.getNombreComuna());
+            data.put("fwiRaw", s.getFwiRaw());
+            data.put("firmsCount", s.getFirmsCount());
+            data.put("computedAt", s.getComputedAt());
+            result.put(comunaId, data);
+        });
+        return ResponseEntity.ok(ApiResponse.ok("Scores comunales para " + regionId, result));
+    }
+
     @PostMapping("/sync")
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<Map<String, Object>>> triggerSync(@RequestParam String regionId) {
@@ -296,9 +345,14 @@ public class TerritoryController {
         });
 
         TerritoryRiskSnapshot snapshot = territoryRiskService.recomputeRiskByRegion(regionId);
+
+        // Recalcula scores comunales en background (no bloquea la respuesta)
+        new Thread(comunaRiskService::recomputeAllComunas).start();
+
         return ResponseEntity.ok(ApiResponse.ok("Sync completo para " + regionId,
             Map.of("regionId", regionId, "alertLevel", snapshot.getAlertLevel(),
-                   "scoreComposite", snapshot.getScoreComposite(), "qualityFlag", snapshot.getQualityFlag())));
+                   "scoreComposite", snapshot.getScoreComposite(), "qualityFlag", snapshot.getQualityFlag(),
+                   "comunalSyncTriggered", true)));
     }
 
     private Map<String, Object> firmsLayer(String regionId, LocalDateTime from, LocalDateTime to) {

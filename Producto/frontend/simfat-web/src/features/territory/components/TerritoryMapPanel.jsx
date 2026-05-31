@@ -26,11 +26,53 @@ const INDICATOR_COLORS = {
 };
 
 const ALERT_LEVEL_CONFIG = {
-  NORMAL:     { color: '#16a34a', bg: '#dcfce7', label: 'Normal' },
-  PREVENTIVO: { color: '#ca8a04', bg: '#fef9c3', label: 'Preventivo' },
-  ALTO:       { color: '#ea580c', bg: '#ffedd5', label: 'Alto' },
-  CRITICO:    { color: '#dc2626', bg: '#fee2e2', label: 'Critico' }
+  NORMAL:     { color: '#16a34a', bg: '#dcfce7', label: 'Normal',     fill: '#22c55e' },
+  PREVENTIVO: { color: '#ca8a04', bg: '#fef9c3', label: 'Preventivo', fill: '#eab308' },
+  ALTO:       { color: '#ea580c', bg: '#ffedd5', label: 'Alto',       fill: '#f97316' },
+  CRITICO:    { color: '#dc2626', bg: '#fee2e2', label: 'Critico',    fill: '#ef4444' }
 };
+
+function ComunaChoropleth({ geoJson, comunalScores }) {
+  if (!geoJson || !geoJson.features) return null;
+
+  return (
+    <GeoJSON
+      key="choropleth"
+      data={geoJson}
+      style={(feature) => {
+        const comunaId = feature?.properties?.comunaId;
+        const score = comunalScores?.[comunaId];
+        const level = score?.alertLevel || 'NORMAL';
+        const cfg = ALERT_LEVEL_CONFIG[level] || ALERT_LEVEL_CONFIG.NORMAL;
+        return {
+          fillColor: cfg.fill,
+          fillOpacity: score ? 0.55 : 0.15,
+          color: '#1e293b',
+          weight: 0.6,
+          opacity: 0.8
+        };
+      }}
+      onEachFeature={(feature, layer) => {
+        const comunaId = feature?.properties?.comunaId;
+        const nombre = feature?.properties?.nombre || comunaId;
+        const score = comunalScores?.[comunaId];
+        if (score) {
+          const pct = typeof score.scoreComposite === 'number' ? (score.scoreComposite * 100).toFixed(0) : '—';
+          const fwi = score.fwiRaw != null ? Number(score.fwiRaw).toFixed(1) : '—';
+          const fires = score.firmsCount ?? 0;
+          const level = ALERT_LEVEL_CONFIG[score.alertLevel] || ALERT_LEVEL_CONFIG.NORMAL;
+          layer.bindPopup(
+            `<b>${nombre}</b><br/>` +
+            `<span style="color:${level.color};font-weight:700">${level.label}</span> · ${pct}/100<br/>` +
+            `FWI: ${fwi} · Focos: ${fires}`
+          );
+        } else {
+          layer.bindPopup(`<b>${nombre}</b><br/><i>Sin datos aún</i>`);
+        }
+      }}
+    />
+  );
+}
 
 function FitRegionBounds({ bounds }) {
   const map = useMap();
@@ -164,6 +206,8 @@ function TerritoryMapPanel({
   error,
   onRetry
 }) {
+  const comunalGeoJson = regionData?.comunalGeoJson || null;
+  const comunalScores = regionData?.comunalScores || null;
   return (
     <article className="dashboard-card territory-map-card">
       <div className="territory-header">
@@ -221,6 +265,10 @@ function TerritoryMapPanel({
               url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
             />
             <FitRegionBounds bounds={regionData.bounds} />
+
+            {comunalGeoJson && (
+              <ComunaChoropleth geoJson={comunalGeoJson} comunalScores={comunalScores} />
+            )}
 
             {visibleIndicators.filter((i) => i !== 'RISK_SCORE').map((indicator) => (
               <GeoJSON
