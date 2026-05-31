@@ -13,6 +13,9 @@ import com.simfat.backend.repository.CitizenReportRepository;
 import com.simfat.backend.repository.ForestLossRecordRepository;
 import com.simfat.backend.repository.HeatAlertEventRepository;
 import com.simfat.backend.repository.OpenEoIndicatorObservationRepository;
+import com.simfat.backend.repository.RegionRepository;
+import com.simfat.backend.service.NasaFirmsService;
+import com.simfat.backend.service.OpenWeatherFwiService;
 import com.simfat.backend.service.TerritoryRiskService;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -43,20 +46,29 @@ public class TerritoryController {
     private final CitizenReportRepository citizenReportRepository;
     private final ForestLossRecordRepository forestLossRepository;
     private final OpenEoIndicatorObservationRepository observationRepository;
+    private final RegionRepository regionRepository;
     private final TerritoryRiskService territoryRiskService;
+    private final NasaFirmsService nasaFirmsService;
+    private final OpenWeatherFwiService openWeatherFwiService;
 
     public TerritoryController(
         HeatAlertEventRepository heatAlertRepository,
         CitizenReportRepository citizenReportRepository,
         ForestLossRecordRepository forestLossRepository,
         OpenEoIndicatorObservationRepository observationRepository,
-        TerritoryRiskService territoryRiskService
+        RegionRepository regionRepository,
+        TerritoryRiskService territoryRiskService,
+        NasaFirmsService nasaFirmsService,
+        OpenWeatherFwiService openWeatherFwiService
     ) {
         this.heatAlertRepository = heatAlertRepository;
         this.citizenReportRepository = citizenReportRepository;
         this.forestLossRepository = forestLossRepository;
         this.observationRepository = observationRepository;
+        this.regionRepository = regionRepository;
         this.territoryRiskService = territoryRiskService;
+        this.nasaFirmsService = nasaFirmsService;
+        this.openWeatherFwiService = openWeatherFwiService;
     }
 
     @GetMapping("/bounds")
@@ -272,9 +284,21 @@ public class TerritoryController {
     @PostMapping("/sync")
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<Map<String, Object>>> triggerSync(@RequestParam String regionId) {
+        // Buscar bbox de la región para FIRMS y FWI
+        regionRepository.findById(regionId).ifPresent(region -> {
+            java.util.List<Double> bbox = region.getAoiBbox();
+            if (bbox != null && bbox.size() == 4) {
+                nasaFirmsService.syncActiveFiresByRegion(regionId, bbox.get(0), bbox.get(1), bbox.get(2), bbox.get(3));
+                double centerLat = (bbox.get(1) + bbox.get(3)) / 2.0;
+                double centerLon = (bbox.get(0) + bbox.get(2)) / 2.0;
+                openWeatherFwiService.syncFwiByRegion(regionId, centerLat, centerLon);
+            }
+        });
+
         TerritoryRiskSnapshot snapshot = territoryRiskService.recomputeRiskByRegion(regionId);
-        return ResponseEntity.ok(ApiResponse.ok("Score de riesgo recalculado para " + regionId,
-            Map.of("regionId", regionId, "alertLevel", snapshot.getAlertLevel(), "scoreComposite", snapshot.getScoreComposite())));
+        return ResponseEntity.ok(ApiResponse.ok("Sync completo para " + regionId,
+            Map.of("regionId", regionId, "alertLevel", snapshot.getAlertLevel(),
+                   "scoreComposite", snapshot.getScoreComposite(), "qualityFlag", snapshot.getQualityFlag())));
     }
 
     private Map<String, Object> firmsLayer(String regionId, LocalDateTime from, LocalDateTime to) {
