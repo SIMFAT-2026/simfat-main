@@ -78,11 +78,12 @@ public class OpenWeatherFwiServiceImpl implements OpenWeatherFwiService {
 
     @Override
     public boolean syncFwiByRegion(String regionId, double lat, double lon) {
-        // Open-Meteo: sin API key, completamente gratuito
+        // Open-Meteo: variables meteorológicas para proxy FWI
+        // (fire_danger_index no existe en Open-Meteo free tier)
         String url = baseUrl + "/v1/forecast"
             + "?latitude=" + lat
             + "&longitude=" + lon
-            + "&daily=fire_danger_index"
+            + "&daily=temperature_2m_max,relative_humidity_2m_min,windspeed_10m_max,precipitation_sum"
             + "&forecast_days=1"
             + "&timezone=America%2FSantiago";
 
@@ -102,14 +103,18 @@ public class OpenWeatherFwiServiceImpl implements OpenWeatherFwiService {
 
             JsonNode root = objectMapper.readTree(response.body());
             JsonNode daily = root.path("daily");
-            JsonNode fwiArray = daily.path("fire_danger_index");
 
-            if (fwiArray.isMissingNode() || fwiArray.isEmpty() || fwiArray.get(0).isNull()) {
-                LOGGER.info("fwi_api status=no_data regionId={}", regionId);
+            Double tempMax = getFirstDouble(daily, "temperature_2m_max");
+            Double rhMin = getFirstDouble(daily, "relative_humidity_2m_min");
+            Double windMax = getFirstDouble(daily, "windspeed_10m_max");
+            Double precip = getFirstDouble(daily, "precipitation_sum");
+
+            if (tempMax == null || rhMin == null || windMax == null || precip == null) {
+                LOGGER.warn("fwi_api status=missing_fields regionId={}", regionId);
                 return false;
             }
 
-            double fwiValue = fwiArray.get(0).asDouble();
+            double proxyFwi = computeProxyFwi(tempMax, rhMin, windMax, precip);
 
             TerritoryWeatherObservation obs = new TerritoryWeatherObservation();
             obs.setRegionId(regionId);
@@ -117,10 +122,12 @@ public class OpenWeatherFwiServiceImpl implements OpenWeatherFwiService {
             obs.setSource(SOURCE);
             obs.setLat(lat);
             obs.setLon(lon);
-            obs.setFwi(fwiValue);
+            obs.setFwi(round2(proxyFwi));
             obs.setIngestedAt(LocalDateTime.now());
-
             weatherRepository.save(obs);
+
+            LOGGER.info("fwi_api status=ok regionId={} temp={} rh={} wind={} precip={} proxyFwi={}",
+                regionId, tempMax, rhMin, windMax, precip, round2(proxyFwi));
             return true;
 
         } catch (InterruptedException ex) {
@@ -131,5 +138,40 @@ public class OpenWeatherFwiServiceImpl implements OpenWeatherFwiService {
             LOGGER.warn("fwi_api status=exception regionId={} error={}", regionId, ex.getMessage());
             return false;
         }
+    }
+
+    /**
+     * Proxy FWI en escala 0-60 (similar a CFWI: <15 bajo, 15-30 moderado, 30-45 alto, >45 extremo).
+     * Aproximación documentada para MVP basada en variables Open-Meteo disponibles.
+     * Fuentes: relaciones meteorológicas del CFWI (temperatura-FFMC, humedad-FFMC, viento-ISI).
+     */
+    private double computeProxyFwi(double tempMax, double rhMin, double windMaxKmh, double precipMm) {
+        // Factor de secado: temperatura alta eleva peligro
+        double tempFactor = Math.max(0, Math.min(1.0, tempMax / 40.0));
+
+        // Factor de sequedad: humedad mínima del día (peor caso)
+        double drynessFactor = Math.max(0, (100.0 - rhMin) / 100.0);
+
+        // Factor de viento: velocidad máxima del día
+        double windFactor = Math.max(0, Math.min(1.0, windMaxKmh / 60.0));
+
+        // Amortiguación por precipitación: 3mm+ reduce significativamente el riesgo
+        double rainFactor = Math.max(0.0, 1.0 - precipMm / 3.0);
+
+        // Compuesto: dryness domina (40%), temperatura (30%), viento (30%)
+        double raw = 60.0 * (0.40 * drynessFactor + 0.30 * tempFactor + 0.30 * windFactor) * rainFactor;
+        return Math.max(0, Math.min(60.0, raw));
+    }
+
+    private Double getFirstDouble(JsonNode daily, String field) {
+        JsonNode arr = daily.path(field);
+        if (arr.isMissingNode() || arr.isEmpty() || arr.get(0).isNull()) {
+            return null;
+        }
+        return arr.get(0).asDouble();
+    }
+
+    private double round2(double value) {
+        return Math.round(value * 100.0) / 100.0;
     }
 }
