@@ -1,4 +1,3 @@
-from uuid import UUID
 from typing import Any
 
 from app.clients.openeo_client import OpenEOClient
@@ -19,9 +18,6 @@ class OpenEOAdapter:
             refresh_client_id=settings.openeo_refresh_client_id,
             refresh_client_secret=settings.openeo_refresh_client_secret,
         )
-
-    def create_job(self, indicator_type: IndicatorType, payload: IndicatorJobRequest) -> UUID:
-        return self.client.submit_indicator_job(indicator_type=indicator_type, payload=payload)
 
     def get_capabilities(self) -> dict[str, Any]:
         return self.client.fetch_capabilities()
