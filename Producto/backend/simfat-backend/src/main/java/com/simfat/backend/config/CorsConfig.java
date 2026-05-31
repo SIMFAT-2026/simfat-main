@@ -27,7 +27,8 @@ public class CorsConfig implements WebMvcConfigurer {
         registry.addMapping("/geojson/**")
             .allowedOrigins(allowedOrigins)
             .allowedMethods("GET", "OPTIONS")
-            .allowedHeaders("*");
+            .allowedHeaders("*")
+            .allowCredentials(true);
 
         registry.addMapping("/uploads/**")
             .allowedOrigins(allowedOrigins)
