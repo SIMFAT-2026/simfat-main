@@ -26,8 +26,8 @@ public class MonitoredComunasConfig {
     private static final Logger LOGGER = LoggerFactory.getLogger(MonitoredComunasConfig.class);
 
     private static final Map<String, String> GEOJSON_BY_REGION = Map.of(
-        "biobio", "geojson/comunas-biobio.geojson",
-        "araucania", "geojson/comunas-araucania.geojson"
+        "biobio", "static/geojson/comunas-biobio.geojson",
+        "araucania", "static/geojson/comunas-araucania.geojson"
     );
 
     private final ComunaInfoRepository comunaRepository;
