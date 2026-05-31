@@ -79,7 +79,7 @@ function FitRegionBounds({ bounds }) {
 
   useEffect(() => {
     if (Array.isArray(bounds) && bounds.length === 2) {
-      map.fitBounds(bounds, { padding: [20, 20] });
+      map.fitBounds(bounds, { padding: [20, 20], maxZoom: 10 });
     }
   }, [bounds, map]);
 
