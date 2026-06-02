@@ -58,12 +58,13 @@ const ComunaChoropleth = memo(function ComunaChoropleth({ geoJson, comunalScores
       }}
       onEachFeature={(feature, layer) => {
         const comunaId = feature?.properties?.comunaId;
+        const nombre = feature?.properties?.nombre || comunaId;
         const score = comunalScores?.[comunaId];
 
         layer.on('mouseover', (e) => {
-          layer.setStyle({ fillOpacity: 0.72, weight: 2, color: '#0f172a' });
+          layer.setStyle({ fillOpacity: 0.68, weight: 1.4, color: '#475569' });
           layer.bringToFront();
-          onComunaHover?.(comunaId, score, e.containerPoint);
+          onComunaHover?.(comunaId, nombre, score, e.containerPoint);
         });
 
         layer.on('mouseout', () => {
@@ -72,7 +73,7 @@ const ComunaChoropleth = memo(function ComunaChoropleth({ geoJson, comunalScores
         });
 
         layer.on('click', () => {
-          onComunaClick?.(comunaId, score);
+          onComunaClick?.(comunaId, nombre, score);
         });
       }}
     />
@@ -102,7 +103,7 @@ function featureMeta(feature) {
   if (props.indicator === 'FIRMS') {
     const frp = props.frp != null ? `FRP: ${Number(props.frp).toFixed(1)} MW` : '';
     const conf = props.confidence === 'h' ? 'Alta confianza' : props.confidence === 'n' ? 'Confianza nominal' : '';
-    const time = props.acquiredAt ? `Detectado: ${new Date(props.acquiredAt).toLocaleString('es-CL')}` : '';
+    const time = props.acquiredAt ? `Detectado: ${new Date(props.acquiredAt).toLocaleString('es-CL', { timeZone: 'America/Santiago' })}` : '';
     return [frp, conf, time].filter(Boolean).join(' | ');
   }
 
@@ -199,11 +200,11 @@ function indicatorCount(regionData, indicator) {
   return regionData?.layers?.[indicator]?.features?.length || 0;
 }
 
-function ComunaTooltip({ comunaId, score, pos }) {
+function ComunaTooltip({ comunaId, nombre, score, pos }) {
   if (!comunaId || !pos) return null;
   const level = ALERT_LEVEL_CONFIG[score?.alertLevel] || ALERT_LEVEL_CONFIG.NORMAL;
-  const pct = typeof score?.scoreComposite === 'number' ? (score.scoreComposite * 100).toFixed(0) : '—';
-  const nombre = score?.nombreComuna || comunaId;
+  const pct = typeof score?.scoreComposite === 'number' ? (score.scoreComposite * 100).toFixed(0) : null;
+  const displayNombre = nombre || score?.nombreComuna || comunaId;
   const mode = score?.mode;
 
   const components = score?.components || {};
@@ -218,25 +219,31 @@ function ComunaTooltip({ comunaId, score, pos }) {
       style={{ left: pos.x + 12, top: pos.y - 8 }}
     >
       <div className="comuna-tooltip-header">
-        <span className="comuna-tooltip-nombre">{nombre}</span>
+        <span className="comuna-tooltip-nombre">{displayNombre}</span>
         {mode && (
           <span className={`comuna-mode-badge ${mode === 'ENHANCED' ? 'enhanced' : 'standard'}`}>
             {mode}
           </span>
         )}
       </div>
-      <div className="comuna-tooltip-level" style={{ color: level.color }}>
-        {level.label}
-      </div>
-      <div className="comuna-tooltip-score-row">
-        <div className="comuna-tooltip-bar-wrap">
-          <div
-            className="comuna-tooltip-bar"
-            style={{ width: `${pct}%`, backgroundColor: level.color }}
-          />
-        </div>
-        <span className="comuna-tooltip-pct" style={{ color: level.color }}>{pct}<small>/100</small></span>
-      </div>
+      {score ? (
+        <>
+          <div className="comuna-tooltip-level" style={{ color: level.color }}>
+            {level.label}
+          </div>
+          <div className="comuna-tooltip-score-row">
+            <div className="comuna-tooltip-bar-wrap">
+              <div
+                className="comuna-tooltip-bar"
+                style={{ width: `${pct}%`, backgroundColor: level.color }}
+              />
+            </div>
+            <span className="comuna-tooltip-pct" style={{ color: level.color }}>{pct}<small>/100</small></span>
+          </div>
+        </>
+      ) : (
+        <div className="comuna-tooltip-level" style={{ color: '#64748b' }}>Sin datos de riesgo aún</div>
+      )}
       {componentEntries.length > 0 && (
         <div className="comuna-tooltip-components">
           {componentEntries.map(([key, val]) => (
@@ -269,8 +276,8 @@ function TerritoryMapPanel({
   const [tooltipPos, setTooltipPos] = useState(null);
   const [selectedComuna, setSelectedComuna] = useState(null);
 
-  const handleComunaHover = useCallback((comunaId, score, containerPoint) => {
-    setHoveredComuna({ comunaId, score });
+  const handleComunaHover = useCallback((comunaId, nombre, score, containerPoint) => {
+    setHoveredComuna({ comunaId, nombre, score });
     setTooltipPos({ x: containerPoint.x, y: containerPoint.y });
   }, []);
 
@@ -279,8 +286,8 @@ function TerritoryMapPanel({
     setTooltipPos(null);
   }, []);
 
-  const handleComunaClick = useCallback((comunaId, score) => {
-    setSelectedComuna((prev) => prev?.comunaId === comunaId ? null : { comunaId, score });
+  const handleComunaClick = useCallback((comunaId, nombre, score) => {
+    setSelectedComuna((prev) => prev?.comunaId === comunaId ? null : { comunaId, nombre, score });
   }, []);
 
   return (
@@ -368,6 +375,7 @@ function TerritoryMapPanel({
           {hoveredComuna && (
             <ComunaTooltip
               comunaId={hoveredComuna.comunaId}
+              nombre={hoveredComuna.nombre}
               score={hoveredComuna.score}
               pos={tooltipPos}
             />
@@ -397,7 +405,7 @@ function TerritoryMapPanel({
               </ul>
               <p className="territory-meta">
                 Fuente: {regionData.source === 'backend' ? 'Backend' : 'Mock local'} | Ultima actualizacion:{' '}
-                {new Date(regionData.generatedAt).toLocaleString('es-CL')}
+                {new Date(regionData.generatedAt).toLocaleString('es-CL', { timeZone: 'America/Santiago' })}
               </p>
             </div>
           )}

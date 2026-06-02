@@ -99,7 +99,7 @@ export default function ComunaRiskPanel({ comunaId, score, onClose, canSync, onS
   const meta = COMPONENT_META[mode] || COMPONENT_META.STANDARD;
 
   const computedAt = score.computedAt
-    ? new Date(score.computedAt).toLocaleString('es-CL', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
+    ? new Date(score.computedAt).toLocaleString('es-CL', { timeZone: 'America/Santiago', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
     : null;
 
   return (
