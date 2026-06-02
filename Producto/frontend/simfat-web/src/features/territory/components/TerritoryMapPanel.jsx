@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, memo } from 'react';
 import L from 'leaflet';
 import ComunaRiskPanel from './ComunaRiskPanel';
 import { GeoJSON, MapContainer, TileLayer, useMap } from 'react-leaflet';
@@ -45,7 +45,7 @@ function comunaBaseStyle(score) {
   };
 }
 
-function ComunaChoropleth({ geoJson, comunalScores, onComunaHover, onComunaHoverEnd, onComunaClick }) {
+const ComunaChoropleth = memo(function ComunaChoropleth({ geoJson, comunalScores, onComunaHover, onComunaHoverEnd, onComunaClick }) {
   if (!geoJson || !geoJson.features) return null;
 
   return (
@@ -77,7 +77,7 @@ function ComunaChoropleth({ geoJson, comunalScores, onComunaHover, onComunaHover
       }}
     />
   );
-}
+});
 
 function FitRegionBounds({ bounds }) {
   const map = useMap();
