@@ -3,7 +3,9 @@ package com.simfat.backend.config;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.simfat.backend.model.ComunaInfo;
+import com.simfat.backend.model.Region;
 import com.simfat.backend.repository.ComunaInfoRepository;
+import com.simfat.backend.repository.RegionRepository;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
@@ -30,16 +32,27 @@ public class MonitoredComunasConfig {
         "araucania", "static/geojson/comunas-araucania.geojson"
     );
 
+    // [west, south, east, north] EPSG:4326 — bboxes piloto derivados de GADM 4.1
+    private static final Map<String, Object[]> REGION_SEED = Map.of(
+        "biobio",    new Object[]{"Región del Biobío",    "BIOBIO",    "SUR", 1500000.0, List.of(-73.6, -38.5, -71.0, -36.7)},
+        "araucania", new Object[]{"Región de La Araucanía", "ARAUCANIA", "SUR", 1750000.0, List.of(-73.6, -40.0, -70.8, -37.6)}
+    );
+
     private final ComunaInfoRepository comunaRepository;
+    private final RegionRepository regionRepository;
     private final ObjectMapper objectMapper;
 
-    public MonitoredComunasConfig(ComunaInfoRepository comunaRepository, ObjectMapper objectMapper) {
+    public MonitoredComunasConfig(ComunaInfoRepository comunaRepository,
+                                   RegionRepository regionRepository,
+                                   ObjectMapper objectMapper) {
         this.comunaRepository = comunaRepository;
+        this.regionRepository = regionRepository;
         this.objectMapper = objectMapper;
     }
 
     @EventListener(ApplicationReadyEvent.class)
     public void ensureMonitoredComunas() {
+        ensureRegions();
         for (Map.Entry<String, String> entry : GEOJSON_BY_REGION.entrySet()) {
             String regionId = entry.getKey();
             String path = entry.getValue();
@@ -48,6 +61,32 @@ public class MonitoredComunasConfig {
                 LOGGER.info("monitored_comunas status=ok regionId={} upserted={}", regionId, upserted);
             } catch (Exception ex) {
                 LOGGER.warn("monitored_comunas status=error regionId={} error={}", regionId, ex.getMessage());
+            }
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private void ensureRegions() {
+        for (Map.Entry<String, Object[]> entry : REGION_SEED.entrySet()) {
+            String id = entry.getKey();
+            Object[] data = entry.getValue();
+            try {
+                Region region = regionRepository.findById(id).orElseGet(() -> {
+                    Region r = new Region();
+                    r.setId(id);
+                    return r;
+                });
+                region.setNombre((String) data[0]);
+                region.setCodigo((String) data[1]);
+                region.setZona((String) data[2]);
+                region.setHectareasBosqueReferencia((Double) data[3]);
+                if (region.getAoiBbox() == null) {
+                    region.setAoiBbox((List<Double>) data[4]);
+                }
+                regionRepository.save(region);
+                LOGGER.info("monitored_regions status=ok regionId={}", id);
+            } catch (Exception ex) {
+                LOGGER.warn("monitored_regions status=error regionId={} error={}", id, ex.getMessage());
             }
         }
     }

@@ -1,5 +1,6 @@
-import { useEffect } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import L from 'leaflet';
+import ComunaRiskPanel from './ComunaRiskPanel';
 import { GeoJSON, MapContainer, TileLayer, useMap } from 'react-leaflet';
 import marker2x from 'leaflet/dist/images/marker-icon-2x.png';
 import markerIcon from 'leaflet/dist/images/marker-icon.png';
@@ -32,7 +33,19 @@ const ALERT_LEVEL_CONFIG = {
   CRITICO:    { color: '#dc2626', bg: '#fee2e2', label: 'Critico',    fill: '#ef4444' }
 };
 
-function ComunaChoropleth({ geoJson, comunalScores }) {
+function comunaBaseStyle(score) {
+  const level = score?.alertLevel || 'NORMAL';
+  const cfg = ALERT_LEVEL_CONFIG[level] || ALERT_LEVEL_CONFIG.NORMAL;
+  return {
+    fillColor: cfg.fill,
+    fillOpacity: score ? 0.30 : 0.10,
+    color: '#334155',
+    weight: 0.8,
+    opacity: 0.7
+  };
+}
+
+function ComunaChoropleth({ geoJson, comunalScores, onComunaHover, onComunaHoverEnd, onComunaClick }) {
   if (!geoJson || !geoJson.features) return null;
 
   return (
@@ -40,35 +53,27 @@ function ComunaChoropleth({ geoJson, comunalScores }) {
       key="choropleth"
       data={geoJson}
       style={(feature) => {
-        const comunaId = feature?.properties?.comunaId;
-        const score = comunalScores?.[comunaId];
-        const level = score?.alertLevel || 'NORMAL';
-        const cfg = ALERT_LEVEL_CONFIG[level] || ALERT_LEVEL_CONFIG.NORMAL;
-        return {
-          fillColor: cfg.fill,
-          fillOpacity: score ? 0.55 : 0.15,
-          color: '#1e293b',
-          weight: 0.6,
-          opacity: 0.8
-        };
+        const score = comunalScores?.[feature?.properties?.comunaId];
+        return comunaBaseStyle(score);
       }}
       onEachFeature={(feature, layer) => {
         const comunaId = feature?.properties?.comunaId;
-        const nombre = feature?.properties?.nombre || comunaId;
         const score = comunalScores?.[comunaId];
-        if (score) {
-          const pct = typeof score.scoreComposite === 'number' ? (score.scoreComposite * 100).toFixed(0) : '—';
-          const fwi = score.fwiRaw != null ? Number(score.fwiRaw).toFixed(1) : '—';
-          const fires = score.firmsCount ?? 0;
-          const level = ALERT_LEVEL_CONFIG[score.alertLevel] || ALERT_LEVEL_CONFIG.NORMAL;
-          layer.bindPopup(
-            `<b>${nombre}</b><br/>` +
-            `<span style="color:${level.color};font-weight:700">${level.label}</span> · ${pct}/100<br/>` +
-            `FWI: ${fwi} · Focos: ${fires}`
-          );
-        } else {
-          layer.bindPopup(`<b>${nombre}</b><br/><i>Sin datos aún</i>`);
-        }
+
+        layer.on('mouseover', (e) => {
+          layer.setStyle({ fillOpacity: 0.72, weight: 2, color: '#0f172a' });
+          layer.bringToFront();
+          onComunaHover?.(comunaId, score, e.containerPoint);
+        });
+
+        layer.on('mouseout', () => {
+          layer.setStyle(comunaBaseStyle(score));
+          onComunaHoverEnd?.();
+        });
+
+        layer.on('click', () => {
+          onComunaClick?.(comunaId, score);
+        });
       }}
     />
   );
@@ -194,6 +199,57 @@ function indicatorCount(regionData, indicator) {
   return regionData?.layers?.[indicator]?.features?.length || 0;
 }
 
+function ComunaTooltip({ comunaId, score, pos }) {
+  if (!comunaId || !pos) return null;
+  const level = ALERT_LEVEL_CONFIG[score?.alertLevel] || ALERT_LEVEL_CONFIG.NORMAL;
+  const pct = typeof score?.scoreComposite === 'number' ? (score.scoreComposite * 100).toFixed(0) : '—';
+  const nombre = score?.nombreComuna || comunaId;
+  const mode = score?.mode;
+
+  const components = score?.components || {};
+  const componentEntries = Object.entries(components)
+    .filter(([, v]) => v != null && v > 0)
+    .sort(([, a], [, b]) => b - a)
+    .slice(0, 2);
+
+  return (
+    <div
+      className="comuna-tooltip"
+      style={{ left: pos.x + 12, top: pos.y - 8 }}
+    >
+      <div className="comuna-tooltip-header">
+        <span className="comuna-tooltip-nombre">{nombre}</span>
+        {mode && (
+          <span className={`comuna-mode-badge ${mode === 'ENHANCED' ? 'enhanced' : 'standard'}`}>
+            {mode}
+          </span>
+        )}
+      </div>
+      <div className="comuna-tooltip-level" style={{ color: level.color }}>
+        {level.label}
+      </div>
+      <div className="comuna-tooltip-score-row">
+        <div className="comuna-tooltip-bar-wrap">
+          <div
+            className="comuna-tooltip-bar"
+            style={{ width: `${pct}%`, backgroundColor: level.color }}
+          />
+        </div>
+        <span className="comuna-tooltip-pct" style={{ color: level.color }}>{pct}<small>/100</small></span>
+      </div>
+      {componentEntries.length > 0 && (
+        <div className="comuna-tooltip-components">
+          {componentEntries.map(([key, val]) => (
+            <span key={key} className="comuna-tooltip-comp-chip">
+              {COMPONENT_LABELS[key] || key}: {(val * 100).toFixed(0)}
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function TerritoryMapPanel({
   regionOptions,
   selectedRegionId,
@@ -208,6 +264,25 @@ function TerritoryMapPanel({
 }) {
   const comunalGeoJson = regionData?.comunalGeoJson || null;
   const comunalScores = regionData?.comunalScores || null;
+
+  const [hoveredComuna, setHoveredComuna] = useState(null);
+  const [tooltipPos, setTooltipPos] = useState(null);
+  const [selectedComuna, setSelectedComuna] = useState(null);
+
+  const handleComunaHover = useCallback((comunaId, score, containerPoint) => {
+    setHoveredComuna({ comunaId, score });
+    setTooltipPos({ x: containerPoint.x, y: containerPoint.y });
+  }, []);
+
+  const handleComunaHoverEnd = useCallback(() => {
+    setHoveredComuna(null);
+    setTooltipPos(null);
+  }, []);
+
+  const handleComunaClick = useCallback((comunaId, score) => {
+    setSelectedComuna((prev) => prev?.comunaId === comunaId ? null : { comunaId, score });
+  }, []);
+
   return (
     <article className="dashboard-card territory-map-card">
       <div className="territory-header">
@@ -267,7 +342,13 @@ function TerritoryMapPanel({
             <FitRegionBounds bounds={regionData.bounds} />
 
             {comunalGeoJson && (
-              <ComunaChoropleth geoJson={comunalGeoJson} comunalScores={comunalScores} />
+              <ComunaChoropleth
+                geoJson={comunalGeoJson}
+                comunalScores={comunalScores}
+                onComunaHover={handleComunaHover}
+                onComunaHoverEnd={handleComunaHoverEnd}
+                onComunaClick={handleComunaClick}
+              />
             )}
 
             {visibleIndicators.filter((i) => i !== 'RISK_SCORE').map((indicator) => (
@@ -284,25 +365,42 @@ function TerritoryMapPanel({
             ))}
           </MapContainer>
 
-          <div className="territory-legend">
-            <h4>Leyenda de capas</h4>
-            <ul>
-              {['FIRMS', 'NDVI', 'NDMI', 'LOSS', 'ALERTS', 'REPORTS'].map((indicator) => (
-                <li key={indicator}>
-                  <span
-                    className="territory-color-dot"
-                    style={{ backgroundColor: INDICATOR_COLORS[indicator] || '#64748b' }}
-                  />
-                  <span>{indicator === 'FIRMS' ? 'Focos' : indicator}</span>
-                  <strong>{indicatorCount(regionData, indicator)}</strong>
-                </li>
-              ))}
-            </ul>
-            <p className="territory-meta">
-              Fuente: {regionData.source === 'backend' ? 'Backend' : 'Mock local'} | Ultima actualizacion:{' '}
-              {new Date(regionData.generatedAt).toLocaleString('es-CL')}
-            </p>
-          </div>
+          {hoveredComuna && (
+            <ComunaTooltip
+              comunaId={hoveredComuna.comunaId}
+              score={hoveredComuna.score}
+              pos={tooltipPos}
+            />
+          )}
+
+          {selectedComuna ? (
+            <ComunaRiskPanel
+              comunaId={selectedComuna.comunaId}
+              score={selectedComuna.score}
+              onClose={() => setSelectedComuna(null)}
+              canSync={false}
+            />
+          ) : (
+            <div className="territory-legend">
+              <h4>Leyenda de capas</h4>
+              <ul>
+                {['FIRMS', 'NDVI', 'NDMI', 'LOSS', 'ALERTS', 'REPORTS'].map((indicator) => (
+                  <li key={indicator}>
+                    <span
+                      className="territory-color-dot"
+                      style={{ backgroundColor: INDICATOR_COLORS[indicator] || '#64748b' }}
+                    />
+                    <span>{indicator === 'FIRMS' ? 'Focos' : indicator}</span>
+                    <strong>{indicatorCount(regionData, indicator)}</strong>
+                  </li>
+                ))}
+              </ul>
+              <p className="territory-meta">
+                Fuente: {regionData.source === 'backend' ? 'Backend' : 'Mock local'} | Ultima actualizacion:{' '}
+                {new Date(regionData.generatedAt).toLocaleString('es-CL')}
+              </p>
+            </div>
+          )}
         </div>
       ) : null}
     </article>

@@ -23,8 +23,8 @@ public class ComunaRiskSnapshot {
 
     private Double scoreComposite;
     private String alertLevel;
-    // STANDARD = sin Copernicus | ENHANCED = con NDVI/NDMI de Copernicus
-    private String qualityFlag;
+    private String mode;         // STANDARD | ENHANCED
+    private String qualityFlag;  // null | PARTIAL | COPERNICUS_UNAVAILABLE
 
     // Componentes modo STANDARD
     private Double componentFwi;
@@ -34,6 +34,9 @@ public class ComunaRiskSnapshot {
     // Componentes adicionales modo ENHANCED
     private Double componentNdmi;
     private Double componentNdvi;
+    private Double componentLoss;
+
+    private String openeoObservationId;
 
     // Valores raw
     private Double fwiRaw;
@@ -81,6 +84,15 @@ public class ComunaRiskSnapshot {
 
     public Double getComponentNdvi() { return componentNdvi; }
     public void setComponentNdvi(Double componentNdvi) { this.componentNdvi = componentNdvi; }
+
+    public Double getComponentLoss() { return componentLoss; }
+    public void setComponentLoss(Double componentLoss) { this.componentLoss = componentLoss; }
+
+    public String getMode() { return mode; }
+    public void setMode(String mode) { this.mode = mode; }
+
+    public String getOpeneoObservationId() { return openeoObservationId; }
+    public void setOpeneoObservationId(String openeoObservationId) { this.openeoObservationId = openeoObservationId; }
 
     public Double getFwiRaw() { return fwiRaw; }
     public void setFwiRaw(Double fwiRaw) { this.fwiRaw = fwiRaw; }

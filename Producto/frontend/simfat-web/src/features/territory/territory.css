@@ -47,6 +47,7 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr) 240px;
   gap: 12px;
+  position: relative;
 }
 
 .territory-map {
@@ -183,6 +184,323 @@
   text-align: right;
   font-weight: 600;
   color: #334155;
+}
+
+/* ── Tooltip comunal ── */
+.comuna-tooltip {
+  position: absolute;
+  z-index: 1000;
+  pointer-events: none;
+  background: rgba(15, 23, 42, 0.92);
+  color: #f1f5f9;
+  border-radius: 10px;
+  padding: 10px 13px;
+  min-width: 180px;
+  max-width: 240px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.25);
+  backdrop-filter: blur(4px);
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
+.comuna-tooltip-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.comuna-tooltip-nombre {
+  font-weight: 700;
+  font-size: 0.88rem;
+  color: #f8fafc;
+}
+
+.comuna-tooltip-level {
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  margin-bottom: 5px;
+}
+
+.comuna-tooltip-score-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.comuna-tooltip-bar-wrap {
+  flex: 1;
+  height: 6px;
+  background: rgba(255,255,255,0.15);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.comuna-tooltip-bar {
+  height: 100%;
+  border-radius: 3px;
+  opacity: 0.85;
+  transition: width 0.2s ease;
+}
+
+.comuna-tooltip-pct {
+  font-size: 0.9rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.comuna-tooltip-pct small {
+  font-size: 0.7rem;
+  opacity: 0.6;
+  margin-left: 1px;
+}
+
+.comuna-tooltip-components {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.comuna-tooltip-comp-chip {
+  font-size: 0.72rem;
+  background: rgba(255,255,255,0.1);
+  border-radius: 4px;
+  padding: 2px 6px;
+  color: #cbd5e1;
+}
+
+/* ── Badge modo STANDARD/ENHANCED ── */
+.comuna-mode-badge {
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  border-radius: 4px;
+  padding: 2px 5px;
+  white-space: nowrap;
+}
+
+.comuna-mode-badge.standard {
+  background: rgba(100, 116, 139, 0.3);
+  color: #94a3b8;
+}
+
+.comuna-mode-badge.enhanced {
+  background: rgba(14, 165, 233, 0.25);
+  color: #38bdf8;
+}
+
+/* ── Panel lateral comunal ── */
+.comuna-risk-panel {
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #f8fafc;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow-y: auto;
+  max-height: 460px;
+}
+
+.panel-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.panel-region {
+  margin: 0;
+  font-size: 0.72rem;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.panel-nombre {
+  margin: 2px 0 0;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #0f172a;
+  line-height: 1.2;
+}
+
+.panel-close {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1.3rem;
+  color: #94a3b8;
+  padding: 0 4px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.panel-close:hover { color: #0f172a; }
+
+.panel-score-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border-left: 4px solid;
+  background: rgba(0,0,0,0.03);
+}
+
+.panel-level {
+  display: block;
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.panel-pct {
+  font-size: 1.4rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.panel-pct small {
+  font-size: 0.7rem;
+  opacity: 0.6;
+  margin-left: 1px;
+}
+
+.panel-badges {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+.panel-mode-badge {
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  border-radius: 4px;
+  padding: 2px 6px;
+}
+
+.panel-mode-badge.standard {
+  background: #e2e8f0;
+  color: #475569;
+}
+
+.panel-mode-badge.enhanced {
+  background: #e0f2fe;
+  color: #0369a1;
+}
+
+.panel-quality-flag {
+  font-size: 0.68rem;
+  color: #b45309;
+  background: #fef9c3;
+  border-radius: 4px;
+  padding: 2px 5px;
+}
+
+.panel-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.panel-section-title {
+  margin: 0;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-bottom: 1px solid #e2e8f0;
+  padding-bottom: 4px;
+}
+
+.panel-components {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.panel-component-row {
+  display: grid;
+  grid-template-columns: 1fr 80px 22px 28px;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.75rem;
+}
+
+.panel-comp-label {
+  color: #334155;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.panel-comp-bar-wrap {
+  height: 5px;
+  background: rgba(0,0,0,0.08);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.panel-comp-bar {
+  height: 100%;
+  border-radius: 3px;
+  opacity: 0.65;
+  transition: width 0.3s ease;
+}
+
+.panel-comp-val {
+  text-align: right;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.panel-comp-weight {
+  text-align: right;
+  color: #94a3b8;
+  font-size: 0.7rem;
+}
+
+.panel-chart-empty {
+  margin: 4px 0;
+  font-size: 0.8rem;
+  color: #94a3b8;
+  text-align: center;
+}
+
+.panel-chart-legend {
+  margin: 2px 0 0;
+  font-size: 0.7rem;
+  color: #64748b;
+}
+
+.panel-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-top: 6px;
+  border-top: 1px solid #e2e8f0;
+}
+
+.panel-meta {
+  font-size: 0.72rem;
+  color: #94a3b8;
+}
+
+.panel-sync-btn {
+  font-size: 0.78rem;
+  padding: 4px 10px;
 }
 
 @media (max-width: 1080px) {

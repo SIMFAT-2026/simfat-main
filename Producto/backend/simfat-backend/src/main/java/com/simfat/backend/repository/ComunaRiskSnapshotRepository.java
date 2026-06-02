@@ -12,4 +12,6 @@ public interface ComunaRiskSnapshotRepository extends MongoRepository<ComunaRisk
     List<ComunaRiskSnapshot> findTopByRegionIdOrderByComputedAtDesc(String regionId);
 
     List<ComunaRiskSnapshot> findByRegionIdOrderByComputedAtDesc(String regionId);
+
+    List<ComunaRiskSnapshot> findByComunaIdAndComputedAtAfterOrderByComputedAtDesc(String comunaId, java.time.LocalDateTime after);
 }

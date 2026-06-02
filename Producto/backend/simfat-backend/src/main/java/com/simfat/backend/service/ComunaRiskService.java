@@ -13,4 +13,6 @@ public interface ComunaRiskService {
     Map<String, ComunaRiskSnapshot> getLatestSnapshotsByRegion(String regionId);
 
     List<ComunaRiskSnapshot> getLatestSnapshotsListByRegion(String regionId);
+
+    List<ComunaRiskSnapshot> getSnapshotHistory(String gadmGid, int days);
 }

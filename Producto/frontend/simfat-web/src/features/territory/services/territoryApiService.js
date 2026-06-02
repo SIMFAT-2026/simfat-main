@@ -5,7 +5,8 @@ const TERRITORY_ENDPOINTS = {
   bounds: '/api/territory/bounds',
   riskScore: (regionId) => `/api/territory/risk-score/${regionId}`,
   geojson: (regionId) => `/api/territory/geojson/${regionId}`,
-  comunalScores: (regionId) => `/api/territory/risk-score/comunas/${regionId}`
+  comunalScores: (regionId) => `/api/territory/risk-score/comunas/${regionId}`,
+  comunaHistory: (gadmGid, days) => `/api/territory/risk-score/comunas/${gadmGid}/history?days=${days}`
 };
 
 function isFeatureCollection(value) {
@@ -124,6 +125,12 @@ export async function fetchTerritoryGeoJson(regionId) {
 
 export async function fetchComunalRiskScores(regionId) {
   const response = await axiosClient.get(TERRITORY_ENDPOINTS.comunalScores(regionId));
+  const source = (response.data && response.data.data) || response.data || {};
+  return source;
+}
+
+export async function fetchComunaHistory(gadmGid, days = 7) {
+  const response = await axiosClient.get(TERRITORY_ENDPOINTS.comunaHistory(gadmGid, days));
   const source = (response.data && response.data.data) || response.data || {};
   return source;
 }

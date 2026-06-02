@@ -3,11 +3,14 @@ package com.simfat.backend.service.impl;
 import com.simfat.backend.model.ComunaInfo;
 import com.simfat.backend.model.ComunaRiskSnapshot;
 import com.simfat.backend.model.HeatAlertEvent;
+import com.simfat.backend.model.IndicatorType;
+import com.simfat.backend.model.OpenEoIndicatorObservation;
 import com.simfat.backend.model.TerritoryWeatherObservation;
 import com.simfat.backend.repository.CitizenReportRepository;
 import com.simfat.backend.repository.ComunaInfoRepository;
 import com.simfat.backend.repository.ComunaRiskSnapshotRepository;
 import com.simfat.backend.repository.HeatAlertEventRepository;
+import com.simfat.backend.repository.OpenEoIndicatorObservationRepository;
 import com.simfat.backend.repository.TerritoryWeatherObservationRepository;
 import com.simfat.backend.service.ComunaRiskService;
 import com.simfat.backend.service.OpenWeatherFwiService;
@@ -36,8 +39,12 @@ public class ComunaRiskServiceImpl implements ComunaRiskService {
     private static final double W_FWI_ENH = 0.38;
     private static final double W_NDMI_ENH = 0.22;
     private static final double W_FIRMS_ENH = 0.18;
+    private static final double W_LOSS_ENH = 0.10;
     private static final double W_NDVI_ENH = 0.08;
     private static final double W_REPORTS_ENH = 0.04;
+
+    // Ventana de validez de observaciones Copernicus (revisita Sentinel-2 ~5 días en Chile)
+    private static final long COPERNICUS_STALENESS_DAYS = 6;
 
     // Normalización
     private static final double FWI_MAX = 50.0;
@@ -65,6 +72,7 @@ public class ComunaRiskServiceImpl implements ComunaRiskService {
     private final HeatAlertEventRepository heatAlertRepository;
     private final CitizenReportRepository citizenReportRepository;
     private final OpenWeatherFwiService fwiService;
+    private final OpenEoIndicatorObservationRepository openEoObsRepository;
 
     public ComunaRiskServiceImpl(
         ComunaInfoRepository comunaRepository,
@@ -72,7 +80,8 @@ public class ComunaRiskServiceImpl implements ComunaRiskService {
         TerritoryWeatherObservationRepository weatherRepository,
         HeatAlertEventRepository heatAlertRepository,
         CitizenReportRepository citizenReportRepository,
-        OpenWeatherFwiService fwiService
+        OpenWeatherFwiService fwiService,
+        OpenEoIndicatorObservationRepository openEoObsRepository
     ) {
         this.comunaRepository = comunaRepository;
         this.snapshotRepository = snapshotRepository;
@@ -80,6 +89,7 @@ public class ComunaRiskServiceImpl implements ComunaRiskService {
         this.heatAlertRepository = heatAlertRepository;
         this.citizenReportRepository = citizenReportRepository;
         this.fwiService = fwiService;
+        this.openEoObsRepository = openEoObsRepository;
     }
 
     @Scheduled(cron = "${territory.riesgo.comunal.cron:0 30 1,13 * * *}")
@@ -153,9 +163,61 @@ public class ComunaRiskServiceImpl implements ComunaRiskService {
         double scoreStandard = fwiNorm * W_FWI_STD + firmsNorm * W_FIRMS_STD + reportsNorm * W_REPORTS_STD;
         scoreStandard = clamp(scoreStandard);
 
-        String alertLevel = resolveAlertLevel(scoreStandard, fwiRaw, firmsCount);
-        String qualityFlag = "STANDARD";
+        // --- Modo ENHANCED: activar si score >= umbral y hay observacion Copernicus fresca ---
+        String mode = "STANDARD";
+        String qualityFlag = null;
         double scoreComposite = scoreStandard;
+        double cFwi = fwiNorm * W_FWI_STD;
+        double cFirms = firmsNorm * W_FIRMS_STD;
+        double cReports = reportsNorm * W_REPORTS_STD;
+        Double cNdmi = null;
+        Double cNdvi = null;
+        Double ndmiRawVal = null;
+        Double ndviRawVal = null;
+        String openeoObsId = null;
+
+        if (scoreStandard >= COPERNICUS_TRIGGER_THRESHOLD) {
+            LocalDateTime cutoff = now.minusDays(COPERNICUS_STALENESS_DAYS);
+            Optional<OpenEoIndicatorObservation> ndmiObs = openEoObsRepository
+                .findTopByRegionIdAndIndicatorOrderByObservedAtDesc(comuna.getRegionId(), IndicatorType.NDMI);
+            Optional<OpenEoIndicatorObservation> ndviObs = openEoObsRepository
+                .findTopByRegionIdAndIndicatorOrderByObservedAtDesc(comuna.getRegionId(), IndicatorType.NDVI);
+
+            boolean ndmiOk = ndmiObs.isPresent() && ndmiObs.get().getValue() != null
+                && ndmiObs.get().getObservedAt() != null && ndmiObs.get().getObservedAt().isAfter(cutoff);
+            boolean ndviOk = ndviObs.isPresent() && ndviObs.get().getValue() != null
+                && ndviObs.get().getObservedAt() != null && ndviObs.get().getObservedAt().isAfter(cutoff);
+
+            if (ndmiOk && ndviOk) {
+                double ndmi = ndmiObs.get().getValue();
+                double ndvi = ndviObs.get().getValue();
+                // NDMI: cuanto mas seco (bajo) mayor riesgo — se invierte
+                double ndmiNorm = 1.0 - normalize(ndmi, NDMI_DRY, NDMI_WET);
+                // NDVI: mayor densidad = mayor combustible disponible
+                double ndviNorm = normalize(ndvi, NDVI_MIN, NDVI_MAX);
+                // Loss forestal comunal no disponible en fase piloto → contribución 0
+                double scoreEnhanced = fwiNorm * W_FWI_ENH
+                    + ndmiNorm * W_NDMI_ENH
+                    + firmsNorm * W_FIRMS_ENH
+                    + 0.0 * W_LOSS_ENH
+                    + ndviNorm * W_NDVI_ENH
+                    + reportsNorm * W_REPORTS_ENH;
+                mode = "ENHANCED";
+                scoreComposite = clamp(scoreEnhanced);
+                cFwi = fwiNorm * W_FWI_ENH;
+                cFirms = firmsNorm * W_FIRMS_ENH;
+                cReports = reportsNorm * W_REPORTS_ENH;
+                cNdmi = round4(ndmiNorm * W_NDMI_ENH);
+                cNdvi = round4(ndviNorm * W_NDVI_ENH);
+                ndmiRawVal = ndmi;
+                ndviRawVal = ndvi;
+                openeoObsId = ndmiObs.get().getId();
+            } else {
+                qualityFlag = "COPERNICUS_UNAVAILABLE";
+            }
+        }
+
+        String alertLevel = resolveAlertLevel(scoreComposite, fwiRaw, firmsCount);
 
         ComunaRiskSnapshot snapshot = new ComunaRiskSnapshot();
         snapshot.setComunaId(comunaId);
@@ -164,10 +226,17 @@ public class ComunaRiskServiceImpl implements ComunaRiskService {
         snapshot.setComputedAt(now);
         snapshot.setScoreComposite(round4(scoreComposite));
         snapshot.setAlertLevel(alertLevel);
+        snapshot.setMode(mode);
         snapshot.setQualityFlag(qualityFlag);
-        snapshot.setComponentFwi(round4(fwiNorm * W_FWI_STD));
-        snapshot.setComponentFirms(round4(firmsNorm * W_FIRMS_STD));
-        snapshot.setComponentReports(round4(reportsNorm * W_REPORTS_STD));
+        snapshot.setComponentFwi(round4(cFwi));
+        snapshot.setComponentFirms(round4(cFirms));
+        snapshot.setComponentReports(round4(cReports));
+        snapshot.setComponentNdmi(cNdmi);
+        snapshot.setComponentNdvi(cNdvi);
+        snapshot.setComponentLoss(mode.equals("ENHANCED") ? 0.0 : null);
+        snapshot.setNdmiRaw(ndmiRawVal);
+        snapshot.setNdviRaw(ndviRawVal);
+        snapshot.setOpeneoObservationId(openeoObsId);
         snapshot.setFwiRaw(fwiRaw);
         snapshot.setFirmsCount(firmsCount);
         snapshot.setFirmsFrpMean(round4(firmsFrpMean));
@@ -175,6 +244,12 @@ public class ComunaRiskServiceImpl implements ComunaRiskService {
 
         snapshotRepository.save(snapshot);
         return snapshot;
+    }
+
+    @Override
+    public List<ComunaRiskSnapshot> getSnapshotHistory(String gadmGid, int days) {
+        LocalDateTime after = LocalDateTime.now().minusDays(days);
+        return snapshotRepository.findByComunaIdAndComputedAtAfterOrderByComputedAtDesc(gadmGid, after);
     }
 
     @Override

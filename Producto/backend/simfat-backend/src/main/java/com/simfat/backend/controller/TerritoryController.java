@@ -320,14 +320,49 @@ public class TerritoryController {
             Map<String, Object> data = new LinkedHashMap<>();
             data.put("alertLevel", s.getAlertLevel());
             data.put("scoreComposite", s.getScoreComposite());
+            data.put("mode", s.getMode());
             data.put("qualityFlag", s.getQualityFlag());
             data.put("nombreComuna", s.getNombreComuna());
+            data.put("computedAt", s.getComputedAt());
             data.put("fwiRaw", s.getFwiRaw());
             data.put("firmsCount", s.getFirmsCount());
-            data.put("computedAt", s.getComputedAt());
+            data.put("firmsFrpMean", s.getFirmsFrpMean());
+            data.put("ndmiRaw", s.getNdmiRaw());
+            data.put("ndviRaw", s.getNdviRaw());
+            Map<String, Object> components = new LinkedHashMap<>();
+            components.put("fwi", s.getComponentFwi());
+            components.put("firms", s.getComponentFirms());
+            components.put("reports", s.getComponentReports());
+            components.put("ndmi", s.getComponentNdmi());
+            components.put("ndvi", s.getComponentNdvi());
+            components.put("loss", s.getComponentLoss());
+            data.put("components", components);
             result.put(comunaId, data);
         });
         return ResponseEntity.ok(ApiResponse.ok("Scores comunales para " + regionId, result));
+    }
+
+    @GetMapping("/risk-score/comunas/{gadmGid}/history")
+    @PreAuthorize("hasAnyAuthority('ROLE_VERIFIED_USER','ROLE_MODERATOR','ROLE_ADMIN','ROLE_SUPER_ADMIN')")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> getComunaHistory(
+        @PathVariable String gadmGid,
+        @RequestParam(defaultValue = "7") int days
+    ) {
+        List<ComunaRiskSnapshot> history = comunaRiskService.getSnapshotHistory(gadmGid, days);
+        List<Map<String, Object>> snapshots = history.stream().map(s -> {
+            Map<String, Object> entry = new LinkedHashMap<>();
+            entry.put("computedAt", s.getComputedAt());
+            entry.put("scoreComposite", s.getScoreComposite());
+            entry.put("alertLevel", s.getAlertLevel());
+            entry.put("mode", s.getMode());
+            return entry;
+        }).toList();
+        String nombre = history.isEmpty() ? gadmGid : history.get(0).getNombreComuna();
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("gadmGid", gadmGid);
+        result.put("comunaNombre", nombre);
+        result.put("snapshots", snapshots);
+        return ResponseEntity.ok(ApiResponse.ok("Historial de riesgo para " + gadmGid, result));
     }
 
     @PostMapping("/sync")
