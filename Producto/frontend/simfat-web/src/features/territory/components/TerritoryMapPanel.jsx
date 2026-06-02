@@ -9,6 +9,19 @@ import EmptyState from '../../../components/EmptyState';
 import ErrorMessage from '../../../components/ErrorMessage';
 import LoadingSpinner from '../../../components/LoadingSpinner';
 
+// LocalDateTime de Java llega sin 'Z' — JS lo interpreta como hora local del browser.
+// Esta utilidad fuerza UTC antes de convertir a Santiago para evitar doble conversión.
+function parseUtcDate(str, opts = {}) {
+  if (!str) return '—';
+  const utc = /Z|[+-]\d{2}:?\d{2}$/.test(str) ? str : str + 'Z';
+  return new Date(utc).toLocaleString('es-CL', {
+    timeZone: 'America/Santiago',
+    day: '2-digit', month: '2-digit', year: 'numeric',
+    hour: '2-digit', minute: '2-digit',
+    ...opts
+  });
+}
+
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: marker2x,
@@ -103,7 +116,7 @@ function featureMeta(feature) {
   if (props.indicator === 'FIRMS') {
     const frp = props.frp != null ? `FRP: ${Number(props.frp).toFixed(1)} MW` : '';
     const conf = props.confidence === 'h' ? 'Alta confianza' : props.confidence === 'n' ? 'Confianza nominal' : '';
-    const time = props.acquiredAt ? `Detectado: ${new Date(props.acquiredAt).toLocaleString('es-CL', { timeZone: 'America/Santiago' })}` : '';
+    const time = props.acquiredAt ? `Detectado: ${parseUtcDate(props.acquiredAt)}` : '';
     return [frp, conf, time].filter(Boolean).join(' | ');
   }
 
@@ -196,6 +209,49 @@ function RiskScoreBadge({ regionData }) {
   );
 }
 
+const REPORT_CATEGORY_LABELS = {
+  HUMO: 'Humo',
+  FOCO: 'Foco de incendio',
+  INCENDIO: 'Incendio activo',
+  OTRO: 'Otro'
+};
+const REPORT_CATEGORY_COLORS = {
+  HUMO: '#94a3b8',
+  FOCO: '#f97316',
+  INCENDIO: '#dc2626',
+  OTRO: '#64748b'
+};
+const REPORT_STATUS_LABELS = {
+  RECIBIDO: 'Recibido',
+  VALIDADO: 'Validado',
+  DERIVADO: 'Derivado',
+  DESCARTADO: 'Descartado'
+};
+
+function ReportCard({ report, pos, onClose }) {
+  if (!report || !pos) return null;
+  const props = report.properties || {};
+  const category = props.category || 'OTRO';
+  const color = REPORT_CATEGORY_COLORS[category] || '#64748b';
+  return (
+    <div className="report-card" style={{ left: pos.x + 14, top: pos.y - 10 }}>
+      <div className="report-card-header">
+        <span className="report-card-category" style={{ color }}>{REPORT_CATEGORY_LABELS[category] || category}</span>
+        <button type="button" className="panel-close" onClick={onClose} aria-label="Cerrar">×</button>
+      </div>
+      {props.description && <p className="report-card-desc">{props.description}</p>}
+      <div className="report-card-meta">
+        {props.status && (
+          <span className="report-card-status">{REPORT_STATUS_LABELS[props.status] || props.status}</span>
+        )}
+        {props.createdAt && (
+          <span className="report-card-time">{parseUtcDate(props.createdAt)}</span>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function indicatorCount(regionData, indicator) {
   return regionData?.layers?.[indicator]?.features?.length || 0;
 }
@@ -275,6 +331,8 @@ function TerritoryMapPanel({
   const [hoveredComuna, setHoveredComuna] = useState(null);
   const [tooltipPos, setTooltipPos] = useState(null);
   const [selectedComuna, setSelectedComuna] = useState(null);
+  const [selectedReport, setSelectedReport] = useState(null);
+  const [reportPos, setReportPos] = useState(null);
 
   const handleComunaHover = useCallback((comunaId, nombre, score, containerPoint) => {
     setHoveredComuna({ comunaId, nombre, score });
@@ -358,7 +416,7 @@ function TerritoryMapPanel({
               />
             )}
 
-            {visibleIndicators.filter((i) => i !== 'RISK_SCORE').map((indicator) => (
+            {visibleIndicators.filter((i) => i !== 'RISK_SCORE' && i !== 'REPORTS').map((indicator) => (
               <GeoJSON
                 key={`${regionData.regionId}-${indicator}`}
                 data={regionData.layers[indicator]}
@@ -370,7 +428,29 @@ function TerritoryMapPanel({
                 }}
               />
             ))}
+
+            {visibleIndicators.includes('REPORTS') && regionData.layers.REPORTS && (
+              <GeoJSON
+                key={`${regionData.regionId}-REPORTS`}
+                data={regionData.layers.REPORTS}
+                pointToLayer={(feature, latlng) => L.circleMarker(latlng, toPointStyle('REPORTS', feature))}
+                onEachFeature={(feature, layer) => {
+                  layer.on('click', (e) => {
+                    setSelectedReport(feature);
+                    setReportPos({ x: e.containerPoint.x, y: e.containerPoint.y });
+                  });
+                }}
+              />
+            )}
           </MapContainer>
+
+          {selectedReport && (
+            <ReportCard
+              report={selectedReport}
+              pos={reportPos}
+              onClose={() => { setSelectedReport(null); setReportPos(null); }}
+            />
+          )}
 
           {hoveredComuna && (
             <ComunaTooltip
@@ -405,7 +485,7 @@ function TerritoryMapPanel({
               </ul>
               <p className="territory-meta">
                 Fuente: {regionData.source === 'backend' ? 'Backend' : 'Mock local'} | Ultima actualizacion:{' '}
-                {new Date(regionData.generatedAt).toLocaleString('es-CL', { timeZone: 'America/Santiago' })}
+                {parseUtcDate(regionData.generatedAt)}
               </p>
             </div>
           )}
