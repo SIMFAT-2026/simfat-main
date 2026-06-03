@@ -896,3 +896,52 @@ textarea {
   gap: 6px;
   font-size: 0.82rem;
 }
+
+/* Account page */
+.account-page {
+  max-width: 680px;
+}
+
+.account-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 4px;
+}
+
+.account-header h2 {
+  margin: 0;
+}
+
+.account-meta {
+  margin: 0 0 20px;
+  color: #64748b;
+  font-size: 0.9rem;
+}
+
+.account-section {
+  margin-top: 16px;
+}
+
+.account-section h3 {
+  margin: 0 0 14px;
+  font-size: 1rem;
+  color: #0f172a;
+}
+
+.badge-info {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.field-optional {
+  font-weight: 400;
+  color: #94a3b8;
+  font-size: 0.82rem;
+}
+
+.field-hint {
+  margin: -6px 0 0;
+  font-size: 0.8rem;
+  color: #64748b;
+}

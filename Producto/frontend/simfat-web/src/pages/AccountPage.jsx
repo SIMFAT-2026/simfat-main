@@ -61,20 +61,18 @@ function AccountPage() {
     return () => { mounted = false; };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  function onProfileChange(event) {
-    const { name, value } = event.target;
+  function onProfileChange(e) {
+    const { name, value } = e.target;
     setProfileForm((prev) => ({ ...prev, [name]: value }));
   }
 
-  async function onProfileSubmit(event) {
-    event.preventDefault();
+  async function onProfileSubmit(e) {
+    e.preventDefault();
     profileFeedback.clear();
-
     if (!profileForm.fullName.trim()) {
       profileFeedback.showError('El nombre no puede estar en blanco.');
       return;
     }
-
     setSavingProfile(true);
     try {
       const updated = await updateAccountProfile({
@@ -90,14 +88,13 @@ function AccountPage() {
         regionCode: updated.regionCode || '',
         comunaCode: updated.comunaCode || ''
       });
-
       if (
         updated.verificationStatus === 'EMAIL_VERIFIED' &&
         profile?.verificationStatus &&
         ['IDENTITY_VERIFIED', 'FULLY_VERIFIED'].includes(profile.verificationStatus)
       ) {
         profileFeedback.showSuccess(
-          'Perfil actualizado. Tu estado de verificacion de identidad fue reiniciado por el cambio de nombre — un administrador puede restaurarlo.'
+          'Perfil actualizado. Tu verificacion de identidad fue reiniciada por el cambio de nombre — un admin puede restaurarla.'
         );
       } else {
         profileFeedback.showSuccess('Perfil actualizado correctamente.');
@@ -109,27 +106,22 @@ function AccountPage() {
     }
   }
 
-  function onPasswordChange(event) {
-    const { name, value } = event.target;
+  function onPasswordChange(e) {
+    const { name, value } = e.target;
     setPasswordForm((prev) => ({ ...prev, [name]: value }));
   }
 
-  async function onPasswordSubmit(event) {
-    event.preventDefault();
+  async function onPasswordSubmit(e) {
+    e.preventDefault();
     passwordFeedback.clear();
-
     if (!PASSWORD_POLICY.test(passwordForm.newPassword)) {
-      passwordFeedback.showError(
-        'La contrasena debe tener 12-72 caracteres, mayuscula, minuscula, numero y simbolo.'
-      );
+      passwordFeedback.showError('La contrasena debe tener 12-72 caracteres, mayuscula, minuscula, numero y simbolo.');
       return;
     }
-
     if (passwordForm.newPassword !== passwordForm.confirmPassword) {
       passwordFeedback.showError('La confirmacion de contrasena no coincide.');
       return;
     }
-
     setSavingPassword(true);
     try {
       await changePassword({
@@ -151,16 +143,17 @@ function AccountPage() {
 
   if (loading) {
     return (
-      <div className="page-container">
+      <div className="page-container account-page">
         <p className="loading-state">Cargando perfil...</p>
       </div>
     );
   }
 
   return (
-    <div className="page-container">
-      <div className="section-header">
-        <h2 className="section-title">Mi cuenta</h2>
+    <div className="page-container account-page">
+
+      <div className="account-header">
+        <h2>Mi cuenta</h2>
         {profile && (
           <span className="badge badge-info">
             {VERIFICATION_LABELS[profile.verificationStatus] || profile.verificationStatus || 'Sin verificar'}
@@ -169,80 +162,84 @@ function AccountPage() {
       </div>
 
       {profile && (
-        <p className="account-email-readonly">
-          <strong>Correo:</strong> {profile.email}
-          {profile.organizationName ? (
-            <> &nbsp;·&nbsp; <strong>Organizacion:</strong> {profile.organizationName}</>
-          ) : null}
+        <p className="account-meta">
+          {profile.email}
+          {profile.organizationName ? <> &nbsp;·&nbsp; {profile.organizationName}</> : null}
         </p>
       )}
 
-      {/* Formulario de datos personales */}
-      <section className="card account-section">
-        <h3 className="card-title">Datos personales</h3>
-        <form onSubmit={onProfileSubmit} className="account-form">
-          <label>
-            Nombre completo
-            <input
-              name="fullName"
-              type="text"
-              required
-              maxLength={120}
-              value={profileForm.fullName}
-              onChange={onProfileChange}
-            />
-          </label>
+      {/* Datos personales */}
+      <section className="dashboard-card account-section">
+        <h3>Datos personales</h3>
 
-          <label>
-            Telefono <span className="field-optional">(opcional)</span>
-            <input
-              name="phone"
-              type="tel"
-              maxLength={20}
-              value={profileForm.phone}
-              onChange={onProfileChange}
-              placeholder="+56912345678"
-            />
-          </label>
+        <form onSubmit={onProfileSubmit}>
+          <div className="form-grid">
+            <label>
+              Nombre completo
+              <input
+                name="fullName"
+                type="text"
+                required
+                maxLength={120}
+                value={profileForm.fullName}
+                onChange={onProfileChange}
+              />
+            </label>
 
-          <label>
-            Codigo de region <span className="field-optional">(opcional)</span>
-            <input
-              name="regionCode"
-              type="text"
-              maxLength={10}
-              value={profileForm.regionCode}
-              onChange={onProfileChange}
-              placeholder="08 (Biobio) · 09 (Araucania)"
-            />
-          </label>
+            <label>
+              Telefono <span className="field-optional">(opcional)</span>
+              <input
+                name="phone"
+                type="tel"
+                maxLength={20}
+                value={profileForm.phone}
+                onChange={onProfileChange}
+                placeholder="+56912345678"
+              />
+            </label>
 
-          <label>
-            Codigo de comuna <span className="field-optional">(opcional)</span>
-            <input
-              name="comunaCode"
-              type="text"
-              maxLength={10}
-              value={profileForm.comunaCode}
-              onChange={onProfileChange}
-              placeholder="08301"
-            />
-          </label>
+            <label>
+              Region <span className="field-optional">(opcional)</span>
+              <input
+                name="regionCode"
+                type="text"
+                maxLength={10}
+                value={profileForm.regionCode}
+                onChange={onProfileChange}
+                placeholder="08 · Biobio, 09 · Araucania"
+              />
+            </label>
 
-          {profileFeedback.message ? (
-            <p className={`feedback feedback-${profileFeedback.type}`}>{profileFeedback.message}</p>
-          ) : null}
+            <label>
+              Comuna <span className="field-optional">(opcional)</span>
+              <input
+                name="comunaCode"
+                type="text"
+                maxLength={10}
+                value={profileForm.comunaCode}
+                onChange={onProfileChange}
+                placeholder="08301"
+              />
+            </label>
+          </div>
 
-          <button type="submit" className="btn" disabled={savingProfile}>
-            {savingProfile ? 'Guardando...' : 'Guardar cambios'}
-          </button>
+          {profileFeedback.message
+            ? <p className={`feedback feedback-${profileFeedback.type}`}>{profileFeedback.message}</p>
+            : null}
+
+          <div className="form-actions">
+            <button type="submit" className="btn" disabled={savingProfile}>
+              {savingProfile ? 'Guardando...' : 'Guardar cambios'}
+            </button>
+          </div>
         </form>
       </section>
 
-      {/* Formulario de cambio de contraseña */}
-      <section className="card account-section">
-        <h3 className="card-title">Cambiar contrasena</h3>
-        <form onSubmit={onPasswordSubmit} className="account-form">
+      {/* Cambiar contraseña */}
+      <section className="dashboard-card account-section">
+        <h3>Cambiar contrasena</h3>
+
+        <form onSubmit={onPasswordSubmit} className="auth-form">
           <label>
             Contrasena actual
             <input
@@ -266,6 +263,7 @@ function AccountPage() {
               onChange={onPasswordChange}
             />
           </label>
+
           <p className="field-hint">12-72 caracteres, mayuscula, minuscula, numero y simbolo.</p>
 
           <label>
@@ -280,7 +278,7 @@ function AccountPage() {
             />
           </label>
 
-          <label className="checkbox-label">
+          <label className="auth-inline-option">
             <input
               type="checkbox"
               checked={showPasswords}
@@ -289,15 +287,18 @@ function AccountPage() {
             Mostrar contrasenas
           </label>
 
-          {passwordFeedback.message ? (
-            <p className={`feedback feedback-${passwordFeedback.type}`}>{passwordFeedback.message}</p>
-          ) : null}
+          {passwordFeedback.message
+            ? <p className={`feedback feedback-${passwordFeedback.type}`}>{passwordFeedback.message}</p>
+            : null}
 
-          <button type="submit" className="btn btn-danger" disabled={savingPassword}>
-            {savingPassword ? 'Actualizando...' : 'Cambiar contrasena'}
-          </button>
+          <div className="form-actions">
+            <button type="submit" className="btn btn-danger" disabled={savingPassword}>
+              {savingPassword ? 'Actualizando...' : 'Cambiar contrasena'}
+            </button>
+          </div>
         </form>
       </section>
+
     </div>
   );
 }
