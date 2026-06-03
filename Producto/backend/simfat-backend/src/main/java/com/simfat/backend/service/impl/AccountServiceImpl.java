@@ -6,10 +6,12 @@ import com.simfat.backend.dto.account.UpdateProfileRequestDTO;
 import com.simfat.backend.exception.BadRequestException;
 import com.simfat.backend.exception.ResourceNotFoundException;
 import com.simfat.backend.model.AppUser;
+import com.simfat.backend.model.UserCommunityProfile;
 import com.simfat.backend.model.UserVerification;
 import com.simfat.backend.model.VerificationEvent;
 import com.simfat.backend.model.VerificationStatus;
 import com.simfat.backend.repository.AppUserRepository;
+import com.simfat.backend.repository.UserCommunityProfileRepository;
 import com.simfat.backend.repository.UserVerificationRepository;
 import com.simfat.backend.repository.VerificationEventRepository;
 import com.simfat.backend.service.AccountService;
@@ -31,6 +33,7 @@ public class AccountServiceImpl implements AccountService {
     private final AppUserRepository appUserRepository;
     private final UserVerificationRepository userVerificationRepository;
     private final VerificationEventRepository verificationEventRepository;
+    private final UserCommunityProfileRepository userCommunityProfileRepository;
     private final PasswordEncoder passwordEncoder;
     private final AuthService authService;
 
@@ -38,12 +41,14 @@ public class AccountServiceImpl implements AccountService {
         AppUserRepository appUserRepository,
         UserVerificationRepository userVerificationRepository,
         VerificationEventRepository verificationEventRepository,
+        UserCommunityProfileRepository userCommunityProfileRepository,
         PasswordEncoder passwordEncoder,
         AuthService authService
     ) {
         this.appUserRepository = appUserRepository;
         this.userVerificationRepository = userVerificationRepository;
         this.verificationEventRepository = verificationEventRepository;
+        this.userCommunityProfileRepository = userCommunityProfileRepository;
         this.passwordEncoder = passwordEncoder;
         this.authService = authService;
     }
@@ -91,6 +96,19 @@ public class AccountServiceImpl implements AccountService {
         }
 
         appUserRepository.save(user);
+
+        if (request.regionCode() != null) {
+            UserCommunityProfile communityProfile = userCommunityProfileRepository.findById(userId)
+                .orElseGet(() -> {
+                    UserCommunityProfile p = new UserCommunityProfile();
+                    p.setUserId(userId);
+                    return p;
+                });
+            communityProfile.setPrimaryRegionId(
+                request.regionCode().isBlank() ? null : request.regionCode()
+            );
+            userCommunityProfileRepository.save(communityProfile);
+        }
 
         UserVerification updatedVerification = userVerificationRepository.findById(userId).orElse(null);
         return toProfileDTO(user, updatedVerification);
