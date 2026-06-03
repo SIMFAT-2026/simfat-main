@@ -32,10 +32,10 @@ public class AppUser {
     @Column(name = "phone", length = 20)
     private String phone;
 
-    @Column(name = "region_code", length = 10)
+    @Column(name = "region_code", length = 20)
     private String regionCode;
 
-    @Column(name = "comuna_code", length = 10)
+    @Column(name = "comuna_code", length = 20)
     private String comunaCode;
 
     @Column(name = "enabled", nullable = false)

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useFeedback } from '../hooks/useFeedback';
 import { getAccountProfile, updateAccountProfile, changePassword } from '../services/accountService';
+import { REGIONES, getComunasByRegion } from '../data/territorioChile';
 
 const PASSWORD_POLICY = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d]).{12,72}$/;
 
@@ -12,7 +13,7 @@ const VERIFICATION_LABELS = {
   IDENTITY_VERIFIED: 'Identidad verificada',
   FULLY_VERIFIED: 'Completamente verificado',
   REJECTED: 'Rechazado',
-  SUSPENDED: 'Suspendido'
+  SUSPENDED: 'Suspendido',
 };
 
 function AccountPage() {
@@ -27,14 +28,14 @@ function AccountPage() {
     fullName: '',
     phone: '',
     regionCode: '',
-    comunaCode: ''
+    comunaCode: '',
   });
   const [savingProfile, setSavingProfile] = useState(false);
 
   const [passwordForm, setPasswordForm] = useState({
     currentPassword: '',
     newPassword: '',
-    confirmPassword: ''
+    confirmPassword: '',
   });
   const [savingPassword, setSavingPassword] = useState(false);
   const [showPasswords, setShowPasswords] = useState(false);
@@ -49,7 +50,7 @@ function AccountPage() {
           fullName: data.fullName || '',
           phone: data.phone || '',
           regionCode: data.regionCode || '',
-          comunaCode: data.comunaCode || ''
+          comunaCode: data.comunaCode || '',
         });
       })
       .catch(() => {
@@ -63,7 +64,12 @@ function AccountPage() {
 
   function onProfileChange(e) {
     const { name, value } = e.target;
-    setProfileForm((prev) => ({ ...prev, [name]: value }));
+    // Al cambiar región, limpiar comuna si ya no pertenece a ella
+    if (name === 'regionCode') {
+      setProfileForm((prev) => ({ ...prev, regionCode: value, comunaCode: '' }));
+    } else {
+      setProfileForm((prev) => ({ ...prev, [name]: value }));
+    }
   }
 
   async function onProfileSubmit(e) {
@@ -79,14 +85,14 @@ function AccountPage() {
         fullName: profileForm.fullName.trim() || undefined,
         phone: profileForm.phone || undefined,
         regionCode: profileForm.regionCode || undefined,
-        comunaCode: profileForm.comunaCode || undefined
+        comunaCode: profileForm.comunaCode || undefined,
       });
       setProfile(updated);
       setProfileForm({
         fullName: updated.fullName || '',
         phone: updated.phone || '',
         regionCode: updated.regionCode || '',
-        comunaCode: updated.comunaCode || ''
+        comunaCode: updated.comunaCode || '',
       });
       if (
         updated.verificationStatus === 'EMAIL_VERIFIED' &&
@@ -127,7 +133,7 @@ function AccountPage() {
       await changePassword({
         currentPassword: passwordForm.currentPassword,
         newPassword: passwordForm.newPassword,
-        confirmPassword: passwordForm.confirmPassword
+        confirmPassword: passwordForm.confirmPassword,
       });
       passwordFeedback.showSuccess(
         'Contrasena actualizada. Se cerraron todas las sesiones activas. Volveras al login en unos segundos.'
@@ -148,6 +154,8 @@ function AccountPage() {
       </div>
     );
   }
+
+  const comunasDisponibles = getComunasByRegion(profileForm.regionCode);
 
   return (
     <div className="page-container account-page">
@@ -175,7 +183,7 @@ function AccountPage() {
         <form onSubmit={onProfileSubmit}>
           <div className="form-grid">
             <label>
-              Nombre completo
+              <span>Nombre completo</span>
               <input
                 name="fullName"
                 type="text"
@@ -187,7 +195,7 @@ function AccountPage() {
             </label>
 
             <label>
-              Telefono <span className="field-optional">(opcional)</span>
+              <span>Telefono <span className="field-optional">(opcional)</span></span>
               <input
                 name="phone"
                 type="tel"
@@ -199,27 +207,30 @@ function AccountPage() {
             </label>
 
             <label>
-              Region <span className="field-optional">(opcional)</span>
-              <input
-                name="regionCode"
-                type="text"
-                maxLength={10}
-                value={profileForm.regionCode}
-                onChange={onProfileChange}
-                placeholder="08 · Biobio, 09 · Araucania"
-              />
+              <span>Region <span className="field-optional">(opcional)</span></span>
+              <select name="regionCode" value={profileForm.regionCode} onChange={onProfileChange}>
+                <option value="">— Selecciona una region —</option>
+                {REGIONES.map((r) => (
+                  <option key={r.value} value={r.value}>{r.label}</option>
+                ))}
+              </select>
             </label>
 
             <label>
-              Comuna <span className="field-optional">(opcional)</span>
-              <input
+              <span>Comuna <span className="field-optional">(opcional)</span></span>
+              <select
                 name="comunaCode"
-                type="text"
-                maxLength={10}
                 value={profileForm.comunaCode}
                 onChange={onProfileChange}
-                placeholder="08301"
-              />
+                disabled={!profileForm.regionCode}
+              >
+                <option value="">
+                  {profileForm.regionCode ? '— Selecciona una comuna —' : '— Primero elige region —'}
+                </option>
+                {comunasDisponibles.map((c) => (
+                  <option key={c.value} value={c.value}>{c.label}</option>
+                ))}
+              </select>
             </label>
           </div>
 
