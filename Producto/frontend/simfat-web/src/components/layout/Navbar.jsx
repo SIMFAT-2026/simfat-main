@@ -1,4 +1,4 @@
-import { NavLink, useNavigate } from 'react-router-dom';
+import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../auth/AuthContext';
 import { primaryNavigationLinks } from '../../router/navigationConfig';
 
@@ -32,7 +32,9 @@ function Navbar() {
         </nav>
 
         <div className="navbar-user">
-          <span className="navbar-user-name">{user?.name || 'Usuario'}</span>
+          <Link to="/account" className="navbar-user-name navbar-account-link">
+            {user?.name || user?.fullName || 'Usuario'}
+          </Link>
           <button type="button" className="btn btn-secondary navbar-logout-btn" onClick={handleLogout}>
             Cerrar sesion
           </button>

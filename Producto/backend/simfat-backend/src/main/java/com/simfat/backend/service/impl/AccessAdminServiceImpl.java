@@ -281,6 +281,8 @@ public class AccessAdminServiceImpl implements AccessAdminService {
             ? "UNVERIFIED"
             : verification.getStatus().name();
 
+        String organizationName = verification != null ? verification.getOrganizationName() : null;
+
         return new AccessUserDTO(
             user.getId(),
             user.getEmail(),
@@ -293,7 +295,11 @@ public class AccessAdminServiceImpl implements AccessAdminService {
             new CommunityChatAccessDTO(
                 profile == null ? "" : profile.getPrimaryRegionId(),
                 additionalRegionIds == null ? Set.of() : additionalRegionIds
-            )
+            ),
+            user.getPhone(),
+            user.getRegionCode(),
+            user.getComunaCode(),
+            organizationName
         );
     }
 

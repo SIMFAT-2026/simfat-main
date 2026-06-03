@@ -13,6 +13,7 @@ const ForestLossPage = lazy(() => import('../pages/ForestLossPage'));
 const AlertsPage = lazy(() => import('../pages/AlertsPage'));
 const RulesPage = lazy(() => import('../pages/RulesPage'));
 const AccessControlPage = lazy(() => import('../pages/AccessControlPage'));
+const AccountPage = lazy(() => import('../pages/AccountPage'));
 const NotFoundPage = lazy(() => import('../pages/NotFoundPage'));
 const LoginPage = lazy(() => import('../pages/auth/LoginPage'));
 const RegisterPage = lazy(() => import('../pages/auth/RegisterPage'));
@@ -62,6 +63,8 @@ function AppRouter() {
         <Route path="/admin/forest-loss" element={withSuspense(<ForestLossPage />)} />
         <Route path="/admin/rules" element={withSuspense(<RulesPage />)} />
         <Route path="/admin/access-control" element={withSuspense(<AccessControlPage />)} />
+
+        <Route path="/account" element={withSuspense(<AccountPage />)} />
 
         <Route path="/dashboard" element={<Navigate to="/territorio" replace />} />
         <Route path="/alerts" element={<Navigate to="/alertas" replace />} />

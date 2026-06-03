@@ -273,6 +273,11 @@ public class AuthServiceImpl implements AuthService {
         refreshTokenRepository.save(record);
     }
 
+    @Override
+    public void revokeAllTokens(String userId) {
+        revokeAllUserRefreshTokens(userId);
+    }
+
     private void revokeAllUserRefreshTokens(String userId) {
         List<RefreshTokenRecord> activeTokens = refreshTokenRepository.findByUserIdAndRevokedAtIsNull(userId);
         Instant now = Instant.now();

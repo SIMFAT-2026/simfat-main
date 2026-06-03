@@ -26,5 +26,7 @@ export const API_ENDPOINTS = {
   dashboardSummary: '/api/dashboard/summary',
   dashboardCriticalRegions: '/api/dashboard/critical-regions',
   dashboardLossTrend: '/api/dashboard/loss-trend',
-  dashboardAlertsSummary: '/api/dashboard/alerts-summary'
+  dashboardAlertsSummary: '/api/dashboard/alerts-summary',
+  accountMe: '/api/account/me',
+  accountChangePassword: '/api/account/change-password'
 };

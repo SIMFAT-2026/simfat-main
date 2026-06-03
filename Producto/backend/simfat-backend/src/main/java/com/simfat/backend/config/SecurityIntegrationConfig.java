@@ -54,6 +54,7 @@ public class SecurityIntegrationConfig {
                 .requestMatchers(HttpMethod.POST, "/api/auth/dev/seed-users").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/auth/me").authenticated()
                 .requestMatchers(HttpMethod.POST, "/api/auth/logout").authenticated()
+                .requestMatchers("/api/account/**").authenticated()
                 .anyRequest().permitAll()
             )
             .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
