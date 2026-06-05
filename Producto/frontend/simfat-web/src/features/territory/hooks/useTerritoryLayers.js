@@ -16,6 +16,16 @@ const REGION_CONFIG = {
     ],
     zoom: 9
   },
+  nuble: {
+    id: 'nuble',
+    label: 'Nuble',
+    center: [-36.6, -71.9],
+    bounds: [
+      [-37.4, -72.8],
+      [-35.8, -71.0]
+    ],
+    zoom: 9
+  },
   araucania: {
     id: 'araucania',
     label: 'La Araucania',
@@ -46,6 +56,51 @@ function createPointFeature(id, lng, lat, properties) {
 }
 
 function createMockLayers(regionId) {
+  if (regionId === 'nuble') {
+    return {
+      NDVI: {
+        type: 'FeatureCollection',
+        features: [
+          createPointFeature('nu-ndvi-1', -72.12, -36.61, { label: 'Chillan', indicator: 'NDVI', value: 0.52 }),
+          createPointFeature('nu-ndvi-2', -71.65, -36.42, { label: 'San Carlos', indicator: 'NDVI', value: 0.47 })
+        ]
+      },
+      NDMI: {
+        type: 'FeatureCollection',
+        features: [
+          createPointFeature('nu-ndmi-1', -72.10, -36.60, { label: 'Chillan', indicator: 'NDMI', value: 0.30 }),
+          createPointFeature('nu-ndmi-2', -71.96, -36.78, { label: 'Yungay', indicator: 'NDMI', value: 0.26 })
+        ]
+      },
+      LOSS: {
+        type: 'FeatureCollection',
+        features: [
+          createPointFeature('nu-loss-1', -71.88, -36.90, { label: 'Bulnes', indicator: 'LOSS', hectares: 5 }),
+          createPointFeature('nu-loss-2', -71.52, -36.52, { label: 'San Nicolas', indicator: 'LOSS', hectares: 4 })
+        ]
+      },
+      ALERTS: {
+        type: 'FeatureCollection',
+        features: [
+          createPointFeature('nu-alert-1', -72.08, -36.62, { label: 'Alerta preventiva', indicator: 'ALERTS', level: 'PREVENTIVO' })
+        ]
+      },
+      REPORTS: {
+        type: 'FeatureCollection',
+        features: [
+          createPointFeature('nu-report-1', -72.11, -36.59, { label: 'Humo reportado', indicator: 'REPORTS', category: 'HUMO' })
+        ]
+      },
+      FIRMS: { type: 'FeatureCollection', features: [] },
+      RISK_SCORE: {
+        type: 'FeatureCollection',
+        features: [
+          createPointFeature('nu-risk', -71.9, -36.6, { label: 'Nuble', indicator: 'RISK_SCORE', score: 0.0, alertLevel: 'NORMAL' })
+        ]
+      }
+    };
+  }
+
   if (regionId === 'araucania') {
     return {
       NDVI: {
