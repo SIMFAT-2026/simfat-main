@@ -1,6 +1,7 @@
 import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../auth/AuthContext';
 import { primaryNavigationLinks } from '../../router/navigationConfig';
+import NotificationBell from './NotificationBell';
 
 function Navbar() {
   const navigate = useNavigate();
@@ -32,6 +33,7 @@ function Navbar() {
         </nav>
 
         <div className="navbar-user">
+          <NotificationBell />
           <Link to="/account" className="navbar-user-name navbar-account-link">
             {user?.name || user?.fullName || 'Usuario'}
           </Link>

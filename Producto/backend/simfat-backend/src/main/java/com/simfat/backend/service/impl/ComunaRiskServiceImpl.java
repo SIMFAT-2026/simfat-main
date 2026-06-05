@@ -13,6 +13,7 @@ import com.simfat.backend.repository.HeatAlertEventRepository;
 import com.simfat.backend.repository.OpenEoIndicatorObservationRepository;
 import com.simfat.backend.repository.TerritoryWeatherObservationRepository;
 import com.simfat.backend.service.ComunaRiskService;
+import com.simfat.backend.service.NotificationService;
 import com.simfat.backend.service.OpenWeatherFwiService;
 import java.time.LocalDateTime;
 import java.util.HashMap;
@@ -73,6 +74,7 @@ public class ComunaRiskServiceImpl implements ComunaRiskService {
     private final CitizenReportRepository citizenReportRepository;
     private final OpenWeatherFwiService fwiService;
     private final OpenEoIndicatorObservationRepository openEoObsRepository;
+    private final NotificationService notificationService;
 
     public ComunaRiskServiceImpl(
         ComunaInfoRepository comunaRepository,
@@ -81,7 +83,8 @@ public class ComunaRiskServiceImpl implements ComunaRiskService {
         HeatAlertEventRepository heatAlertRepository,
         CitizenReportRepository citizenReportRepository,
         OpenWeatherFwiService fwiService,
-        OpenEoIndicatorObservationRepository openEoObsRepository
+        OpenEoIndicatorObservationRepository openEoObsRepository,
+        NotificationService notificationService
     ) {
         this.comunaRepository = comunaRepository;
         this.snapshotRepository = snapshotRepository;
@@ -90,6 +93,7 @@ public class ComunaRiskServiceImpl implements ComunaRiskService {
         this.citizenReportRepository = citizenReportRepository;
         this.fwiService = fwiService;
         this.openEoObsRepository = openEoObsRepository;
+        this.notificationService = notificationService;
     }
 
     @Scheduled(cron = "${territory.riesgo.comunal.cron:0 30 1,13 * * *}")
@@ -219,6 +223,11 @@ public class ComunaRiskServiceImpl implements ComunaRiskService {
 
         String alertLevel = resolveAlertLevel(scoreComposite, fwiRaw, firmsCount);
 
+        // Nivel anterior para deduplicacion de notificaciones (antes de guardar el nuevo snapshot)
+        String previousAlertLevel = snapshotRepository.findTopByComunaIdOrderByComputedAtDesc(comunaId)
+            .map(ComunaRiskSnapshot::getAlertLevel)
+            .orElse("NORMAL");
+
         ComunaRiskSnapshot snapshot = new ComunaRiskSnapshot();
         snapshot.setComunaId(comunaId);
         snapshot.setRegionId(comuna.getRegionId());
@@ -243,6 +252,7 @@ public class ComunaRiskServiceImpl implements ComunaRiskService {
         snapshot.setReportsCount((int) reportsCount);
 
         snapshotRepository.save(snapshot);
+        notificationService.triggerComunaRiskAlert(snapshot, previousAlertLevel);
         return snapshot;
     }
 

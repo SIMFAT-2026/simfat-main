@@ -28,5 +28,8 @@ export const API_ENDPOINTS = {
   dashboardLossTrend: '/api/dashboard/loss-trend',
   dashboardAlertsSummary: '/api/dashboard/alerts-summary',
   accountMe: '/api/account/me',
-  accountChangePassword: '/api/account/change-password'
+  accountChangePassword: '/api/account/change-password',
+  notificationsUnread: '/api/notifications/unread',
+  notifications: '/api/notifications',
+  adminAccessPendingReview: '/api/admin/access/users/pending-review'
 };
