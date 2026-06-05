@@ -469,6 +469,9 @@ public class TerritoryController {
             if ("araucania".equals(normalized)) {
                 return new RegionGeometry("araucania", "La Araucania", -38.7, -72.4, -39.8, -73.9, -37.8, -71.2, 9);
             }
+            if ("nuble".equals(normalized)) {
+                return new RegionGeometry("nuble", "Ñuble", -36.6, -71.9, -37.4, -72.8, -35.8, -71.0, 9);
+            }
             return new RegionGeometry("biobio", "Biobio", -37.5, -72.5, -38.9, -74.1, -36.3, -71.0, 9);
         }
     }

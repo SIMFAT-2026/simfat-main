@@ -29,12 +29,14 @@ public class MonitoredComunasConfig {
 
     private static final Map<String, String> GEOJSON_BY_REGION = Map.of(
         "biobio", "static/geojson/comunas-biobio.geojson",
+        "nuble", "static/geojson/comunas-nuble.geojson",
         "araucania", "static/geojson/comunas-araucania.geojson"
     );
 
     // [west, south, east, north] EPSG:4326 — bboxes piloto derivados de GADM 4.1
     private static final Map<String, Object[]> REGION_SEED = Map.of(
         "biobio",    new Object[]{"Región del Biobío",    "BIOBIO",    "SUR", 1500000.0, List.of(-73.6, -38.5, -71.0, -36.7)},
+        "nuble",     new Object[]{"Región de Ñuble",       "NUBLE",     "SUR", 480000.0,  List.of(-73.0, -37.4, -71.0, -35.8)},
         "araucania", new Object[]{"Región de La Araucanía", "ARAUCANIA", "SUR", 1750000.0, List.of(-73.6, -40.0, -70.8, -37.6)}
     );
 

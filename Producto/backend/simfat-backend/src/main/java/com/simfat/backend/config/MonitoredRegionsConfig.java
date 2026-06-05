@@ -36,6 +36,14 @@ public class MonitoredRegionsConfig {
             List.of(-74.1, -38.9, -71.0, -36.3)
         );
         upsertRegion(
+            "nuble",
+            "Ñuble",
+            "NUBLE",
+            "SUR",
+            480000.0,
+            List.of(-73.0, -37.4, -71.0, -35.8)
+        );
+        upsertRegion(
             "araucania",
             "La Araucania",
             "ARAUCANIA",
