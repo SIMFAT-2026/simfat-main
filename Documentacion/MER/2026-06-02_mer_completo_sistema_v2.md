@@ -1,7 +1,8 @@
-# MER Completo — SIMFAT Sistema v2
+# MER Completo — SIMFAT Sistema v4
 
-Fecha: 2026-06-02
+Fecha: 2026-06-05
 Estado: vigente
+Cambios v3→v4: tabla notifications (V6) para CU09; nuevos eventTypes en verification_events para CU15
 
 ---
 
@@ -12,6 +13,7 @@ Estado: vigente
 ```
 app_users ──────────────────────────────────────────────────────────
   id PK │ email UNIQUE │ full_name │ password_hash │ enabled │ roles
+  phone │ region_code  │ comuna_code
         │              │           │               │         │
         │◄─────────────────────────────────────────┘         │
         │                                                     │
@@ -40,24 +42,35 @@ app_users ───────────────────────�
         │──── user_community_profiles (1:1)
         │     user_id PK FK · primary_region_id · updated_at
         │
-        └──── community_chat_room_access (1:N)
-              id PK · user_id FK · region_id · granted_by FK
-              granted_at · revoked_at
+        │──── community_chat_room_access (1:N)
+        │     id PK · user_id FK · region_id · granted_by FK
+        │     granted_at · revoked_at
+        │
+        └──── notifications (1:N) [V6 — CU09]
+              id PK · user_id FK(logica) · type · title · message
+              region_id · comuna_id · alert_level · is_read · created_at
 ```
 
 ### Tablas — detalle completo
 
 #### app_users
-| Columna | Tipo | Constraint |
-|---|---|---|
-| id | VARCHAR(36) | PK |
-| email | VARCHAR(180) | NOT NULL UNIQUE |
-| full_name | VARCHAR(120) | NOT NULL |
-| password_hash | VARCHAR(100) | NOT NULL |
-| enabled | BOOLEAN | NOT NULL DEFAULT TRUE |
-| roles | VARCHAR(255) | NOT NULL |
-| created_at | TIMESTAMPTZ | NOT NULL |
-| updated_at | TIMESTAMPTZ | NOT NULL |
+| Columna | Tipo | Constraint | Notas |
+|---|---|---|---|
+| id | VARCHAR(36) | PK | UUID generado al registro |
+| email | VARCHAR(180) | NOT NULL UNIQUE | |
+| full_name | VARCHAR(120) | NOT NULL | |
+| password_hash | VARCHAR(100) | NOT NULL | BCrypt |
+| enabled | BOOLEAN | NOT NULL DEFAULT TRUE | |
+| roles | VARCHAR(255) | NOT NULL | Roles legacy en CSV |
+| phone | VARCHAR(20) | NULL | Agregado V4 — texto libre, sin formato validado |
+| region_code | VARCHAR(20) | NULL | Agregado V4/V5 — ej. "biobio", "araucania" |
+| comuna_code | VARCHAR(20) | NULL | Agregado V4/V5 — GADM GID ej. "CHL.6.3.2_1" |
+| created_at | TIMESTAMPTZ | NOT NULL | |
+| updated_at | TIMESTAMPTZ | NOT NULL | |
+
+**Historial de migraciones:**
+- V4: agrega phone VARCHAR(20), region_code VARCHAR(10), comuna_code VARCHAR(10)
+- V5: expande region_code y comuna_code a VARCHAR(20) (IDs GADM Level 3 llegan a 13 chars)
 
 #### refresh_tokens
 | Columna | Tipo | Constraint |

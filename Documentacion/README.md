@@ -40,6 +40,44 @@ Este directorio centraliza la documentaci?n acad?mica del proyecto.
 - Spec inicial de gestion de cuenta y perfil:
   - `Informes/2026-05-27_spec_gestion_cuenta_perfil_v1.md`
 
+## Notificaciones In-App y Gestion de Usuarios - SDD 2026-06-05 (CU09 / CU15 brecha)
+
+- SDD de implementacion (as-built):
+  - `Informes/2026-06-05_notificaciones_gestion_usuarios_sdd_v1.md`
+- MER especifico del sprint:
+  - `MER/2026-06-05_mer_notificaciones_gestion_usuarios_sdd_v1.md`
+- MER completo del sistema (v4 — incluye tabla notifications):
+  - `MER/2026-06-02_mer_completo_sistema_v2.md`
+- Arquitectura UML (componentes y secuencias):
+  - `UML/2026-06-05_arquitectura_notificaciones_gestion_usuarios_sdd_v1.md`
+- Plan de pruebas:
+  - `Evidencias/2026-06-05_plan_pruebas_notificaciones_gestion_usuarios_v1.md`
+- Checklist QA:
+  - `Evidencias/2026-06-05_checklist_qa_notificaciones_gestion_usuarios_v1.md`
+- Evidencia de implementacion:
+  - `Evidencias/2026-06-05_evidencia_notificaciones_gestion_usuarios_sdd_v1.md`
+- Contrato API completo (v4 — incluye /api/notifications + endpoints admin nuevos):
+  - `Informes/2026-06-02_contrato_api_completo_v2.md`
+
+## Gestion de Cuenta y Perfil - SDD 2026-06-05 (CU12/CU13/CU14)
+
+- SDD de implementacion (as-built):
+  - `Informes/2026-06-02_gestion_cuenta_perfil_sdd_v1.md`
+- MER especifico del sprint:
+  - `MER/2026-06-05_mer_gestion_cuenta_perfil_sdd_v1.md`
+- MER completo del sistema (v3 — incluye campos nuevos en app_users):
+  - `MER/2026-06-02_mer_completo_sistema_v2.md`
+- Arquitectura UML (diagramas de clases, secuencia y componentes):
+  - `UML/2026-06-05_arquitectura_gestion_cuenta_perfil_sdd_v1.md`
+- Plan de pruebas:
+  - `Evidencias/2026-06-05_plan_pruebas_gestion_cuenta_perfil_v1.md`
+- Checklist QA:
+  - `Evidencias/2026-06-05_checklist_qa_gestion_cuenta_perfil_v1.md`
+- Evidencia de implementacion:
+  - `Evidencias/2026-06-05_evidencia_gestion_cuenta_perfil_sdd_v1.md`
+- Contrato API completo (v3 — incluye /api/account):
+  - `Informes/2026-06-02_contrato_api_completo_v2.md`
+
 ## Chat comunitario territorial - SDD 2026-05-28
 
 - Informe de implementacion:

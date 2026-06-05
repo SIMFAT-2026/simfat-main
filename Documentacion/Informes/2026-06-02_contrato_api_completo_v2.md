@@ -1,8 +1,9 @@
-# Contrato API Completo — SIMFAT Backend v2
+# Contrato API Completo — SIMFAT Backend v4
 
-Fecha: 2026-06-02
+Fecha: 2026-06-05
 Base URL: `https://<railway-backend>/`
 Autenticación: Bearer JWT en header `Authorization`
+Cambios v3→v4: seccion nueva `/api/notifications` (CU09); endpoints nuevos en `/api/admin/access` (CU15 brecha)
 
 ---
 
@@ -88,7 +89,101 @@ Refrescar el access token usando el refresh token.
 
 ---
 
-## 2. Regiones — `/api/regions`
+## 2. Cuenta y Perfil — `/api/account`
+
+Todos los endpoints requieren JWT valido (cualquier usuario autenticado).
+
+### GET /api/account/me
+Obtener el perfil propio del usuario autenticado.
+
+**Response 200:**
+```json
+{
+  "success": true,
+  "message": "Perfil obtenido correctamente",
+  "data": {
+    "id": "uuid",
+    "email": "usuario@example.com",
+    "fullName": "Maria Paz Lopez",
+    "phone": "+56912345678",
+    "regionCode": "biobio",
+    "comunaCode": "CHL.6.3.2_1",
+    "organizationName": "Brigada Biobio Norte",
+    "verificationStatus": "FULLY_VERIFIED",
+    "roles": ["ROLE_COMMUNITY_USER", "ROLE_VERIFIED_USER"],
+    "createdAt": "2026-01-15T10:00:00Z"
+  }
+}
+```
+
+`phone`, `regionCode`, `comunaCode`, `organizationName` son null si no han sido completados.
+
+### PATCH /api/account/me
+Actualizar datos del perfil propio. Todos los campos son opcionales — solo se actualizan los presentes en el body.
+
+**Body:**
+```json
+{
+  "fullName": "Maria Paz Lopez Soto",
+  "phone": "+56912345678",
+  "regionCode": "biobio",
+  "comunaCode": "CHL.6.3.2_1"
+}
+```
+
+**Response 200:** igual que GET /me con los datos actualizados.
+
+**Efectos colaterales:**
+- Si `fullName` cambia y el usuario tenia `verificationStatus` = `IDENTITY_VERIFIED` o `FULLY_VERIFIED`, el status se degrada a `EMAIL_VERIFIED` y se registra un `VerificationEvent(type=IDENTITY_RESET)`.
+- Si `regionCode` cambia, se hace upsert de `user_community_profiles.primary_region_id` con el mismo valor, otorgando acceso automatico a la sala de chat regional.
+
+**Validaciones:**
+
+| Campo | Constraint | Error |
+|---|---|---|
+| fullName | @Size(min=1, max=120) | 400 "El nombre no puede estar en blanco ni exceder 120 caracteres" |
+| phone | @Size(max=20) | 400 "El telefono no puede exceder 20 caracteres" |
+| regionCode | @Size(max=20) | 400 "Codigo de region invalido" |
+| comunaCode | @Size(max=20) | 400 "Codigo de comuna invalido" |
+
+### POST /api/account/change-password
+Cambiar la contrasena del usuario autenticado. Requiere la contrasena actual. Al completar, revoca todos los refresh tokens activos del usuario.
+
+**Body:**
+```json
+{
+  "currentPassword": "Contrasena$Actual1",
+  "newPassword": "NuevaContrasena$2",
+  "confirmPassword": "NuevaContrasena$2"
+}
+```
+
+**Politica de contrasena:** `^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d]).{12,72}$`
+(minimo 12 chars, maximo 72, al menos 1 minuscula, 1 mayuscula, 1 numero, 1 simbolo)
+
+**Response 200:**
+```json
+{
+  "success": true,
+  "message": "Contrasena actualizada. Por seguridad se cerraron todas las sesiones activas.",
+  "data": null
+}
+```
+
+**Errores:**
+
+| Caso | HTTP | Mensaje |
+|---|---|---|
+| currentPassword incorrecta | 400 | "La contrasena actual no es correcta" |
+| newPassword == currentPassword | 400 | "La nueva contrasena debe ser distinta a la actual" |
+| newPassword != confirmPassword | 400 | "La confirmacion de contrasena no coincide" |
+| newPassword debil | 400 | "La contrasena debe tener 12-72 caracteres, mayuscula, minuscula, numero y simbolo" |
+
+**Nota de sesiones:** tras cambio exitoso, todos los refresh tokens con `revoked_at IS NULL` del usuario quedan revocados. El frontend redirige a `/login` a los 2.5 segundos.
+
+---
+
+## 3. Regiones — `/api/regions`
 
 ### GET /api/regions
 Listar todas las regiones monitoreadas.
@@ -583,11 +678,127 @@ Obtener último valor promedio de un indicador para un AOI.
 
 ---
 
-## 12. Tabla de permisos por endpoint
+## 12. Notificaciones in-app — `/api/notifications` [CU09 — nuevo]
+
+### GET /api/notifications/unread
+@Autenticado — Obtener notificaciones no leidas del usuario autenticado.
+
+**Response 200:**
+```json
+{
+  "success": true,
+  "data": {
+    "notifications": [
+      {
+        "id": "uuid",
+        "type": "RISK_ALERT",
+        "title": "Alerta CRITICO — Los Angeles",
+        "message": "Score de riesgo: 0.872. La comuna presenta nivel CRITICO.",
+        "regionId": "biobio",
+        "comunaId": "CHL.6.2.1_1",
+        "alertLevel": "CRITICO",
+        "read": false,
+        "createdAt": "2026-06-05T01:15:00Z"
+      }
+    ],
+    "unreadCount": 3
+  }
+}
+```
+
+### PATCH /api/notifications/{id}/read
+@Autenticado — Marcar una notificacion como leida (solo el dueno puede marcarla).
+
+**Response 200:** mismo formato que un item de la lista anterior, con `"read": true`.
+
+**Errores:**
+- `401` si el token es invalido o la notificacion pertenece a otro usuario.
+- `404` si el id no existe.
+
+---
+
+## 12b. Control de acceso — endpoints nuevos `/api/admin/access` [CU15 brecha — nuevo]
+
+### GET /api/admin/access/users/{userId}/verification-events
+@ROLE_ADMIN — Historial de VerificationEvent de un usuario, ordenado por fecha desc.
+
+**Response 200:**
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": "uuid",
+      "eventType": "IDENTITY_RESET",
+      "oldStatus": "IDENTITY_VERIFIED",
+      "newStatus": "EMAIL_VERIFIED",
+      "reviewedBy": null,
+      "notes": "Nombre cambiado por el propio usuario",
+      "createdAt": "2026-06-05T10:00:00Z"
+    }
+  ]
+}
+```
+
+### PUT /api/admin/access/users/{userId}/verification
+@ROLE_ADMIN — Cambiar estado de verificacion de un usuario. Notas obligatorias.
+
+**Body:**
+```json
+{
+  "newStatus": "IDENTITY_VERIFIED",
+  "notes": "Revisado documento de identidad. Nombre correcto."
+}
+```
+
+**Estados validos:** `EMAIL_VERIFIED`, `PHONE_VERIFIED`, `IDENTITY_VERIFIED`, `FULLY_VERIFIED`, `SUSPENDED`.
+
+**Response 200:** AccessUserDTO con `verificationStatus` actualizado.
+
+**Errores:**
+- `400` si `newStatus` o `notes` estan vacios.
+- `400` si `newStatus` no es un estado valido del enum.
+- `404` si el usuario no existe.
+
+### GET /api/admin/access/users/pending-review
+@ROLE_ADMIN — Lista de usuarios cuyo ultimo VerificationEvent es `IDENTITY_RESET` sin evento posterior.
+
+**Response 200:**
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": "uuid",
+      "email": "usuario@ejemplo.cl",
+      "fullName": "Juan Perez",
+      "currentStatus": "EMAIL_VERIFIED",
+      "lastEvent": {
+        "id": "uuid",
+        "eventType": "IDENTITY_RESET",
+        "oldStatus": "IDENTITY_VERIFIED",
+        "newStatus": "EMAIL_VERIFIED",
+        "reviewedBy": null,
+        "notes": "Nombre cambiado por el propio usuario",
+        "createdAt": "2026-06-05T10:00:00Z"
+      }
+    }
+  ]
+}
+```
+
+---
+
+## 13. Tabla de permisos por endpoint
 
 | Endpoint | Público | V. User | Moderador | Admin | Super Admin |
 |---|:---:|:---:|:---:|:---:|:---:|
 | GET /auth/*, /api/regions, /api/alerts, /api/rules, /api/forest-loss | ✓ | ✓ | ✓ | ✓ | ✓ |
+| GET /api/notifications/unread | — | ✓ | ✓ | ✓ | ✓ |
+| PATCH /api/notifications/{id}/read | — | ✓ | ✓ | ✓ | ✓ |
+| GET /api/account/me | — | ✓ | ✓ | ✓ | ✓ |
+| PATCH /api/account/me | — | ✓ | ✓ | ✓ | ✓ |
+| POST /api/account/change-password | — | ✓ | ✓ | ✓ | ✓ |
 | GET /api/territory/* | — | ✓ | ✓ | ✓ | ✓ |
 | GET /api/community/*, /api/citizen-reports | — | ✓ | ✓ | ✓ | ✓ |
 | GET /api/dashboard/* | — | ✓ | ✓ | ✓ | ✓ |
@@ -595,7 +806,12 @@ Obtener último valor promedio de un indicador para un AOI.
 | POST /api/community/board, /resources | — | — | ✓ | ✓ | ✓ |
 | PATCH /api/citizen-reports/{id}/status | — | — | ✓ | ✓ | ✓ |
 | POST /api/territory/sync | — | — | — | ✓ | ✓ |
-| POST/PUT/DELETE /api/regions, /alerts, /rules, /forest-loss | — | — | — | ✓ | ✓ |
+| POST/PUT/DELETE /api/regions, /alerts, /rules, /api/forest-loss | — | — | — | ✓ | ✓ |
 | POST /api/community/contacts | — | — | — | ✓ | ✓ |
 | POST /api/dashboard/sync/run | — | — | — | ✓ | ✓ |
-| Gestión de roles/permisos (/api/access) | — | — | — | — | ✓ |
+| GET /api/admin/access/users/{id}/verification-events | — | — | — | ✓ | ✓ |
+| PUT /api/admin/access/users/{id}/verification | — | — | — | ✓ | ✓ |
+| GET /api/admin/access/users/pending-review | — | — | — | ✓ | ✓ |
+| Gestion de roles/permisos (/api/access) | — | — | — | — | ✓ |
+
+**Nota:** "V. User" incluye cualquier usuario autenticado (ROLE_COMMUNITY_USER, ROLE_VERIFIED_USER o superior). Los endpoints de `/api/account` requieren unicamente estar autenticado, sin rol especifico.

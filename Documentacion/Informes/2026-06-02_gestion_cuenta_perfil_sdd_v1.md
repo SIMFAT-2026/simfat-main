@@ -3,7 +3,7 @@
 Fecha: 2026-06-02
 Cambio SDD: `gestion-cuenta-perfil-v1`
 Modulo propietario: Cuenta / Identidad
-Estado: especificacion aprobada — pendiente de implementacion
+Estado: **implementado y verificado en produccion — 2026-06-05**
 
 Spec base: `2026-05-27_spec_gestion_cuenta_perfil_v1.md`
 
@@ -21,14 +21,16 @@ Usuarios afectados: cualquier usuario autenticado para perfil propio; ROLE_ADMIN
 
 ### Entra en este sprint
 
-| Area | Alcance |
-|---|---|
-| GET /api/account/me | Devolver perfil propio completo incluidos campos nuevos |
-| PATCH /api/account/me | Editar campos permitidos; degradar verificacion si fullName cambia en usuario verificado |
-| POST /api/account/change-password | Cambio autenticado con contrasena actual; revocar todos los refresh tokens activos |
-| Migracion BD | Agregar phone, region_code, comuna_code a app_users |
-| Admin: extension AccessUserDTO | phone, regionCode, comunaCode, organizationName visibles para admins |
-| Frontend: vista de perfil | Formulario de edicion + formulario de contrasena integrados en /account |
+| Area | Alcance | Estado |
+|---|---|---|
+| GET /api/account/me | Devolver perfil propio completo incluidos campos nuevos | ✓ implementado |
+| PATCH /api/account/me | Editar campos permitidos; degradar verificacion si fullName cambia en usuario verificado | ✓ implementado |
+| POST /api/account/change-password | Cambio autenticado con contrasena actual; revocar todos los refresh tokens activos | ✓ implementado |
+| Migracion BD V4 | Agregar phone, region_code, comuna_code a app_users (VARCHAR iniciales) | ✓ implementado |
+| Migracion BD V5 | Expandir region_code y comuna_code a VARCHAR(20) para IDs GADM largos | ✓ implementado |
+| Admin: extension AccessUserDTO | phone, regionCode, comunaCode, organizationName visibles para admins | ✓ implementado |
+| Frontend: vista de perfil | Formulario de edicion con selects de region/comuna + formulario de contrasena en /account | ✓ implementado |
+| Sync region → chat | Al guardar regionCode, auto-sync a UserCommunityProfile.primaryRegionId para acceso al chat | ✓ implementado |
 
 ### Queda diferido (deuda documentada)
 
@@ -44,15 +46,15 @@ Usuarios afectados: cualquier usuario autenticado para perfil propio; ROLE_ADMIN
 
 ## 3. Decisiones de diseno cerradas
 
-Estas decisiones fueron acordadas explicitamente antes de escribir este SDD.
-
 ### 3.1 Cambio de nombre en usuario verificado
 
 Si `UserVerification.status ∈ {IDENTITY_VERIFIED, FULLY_VERIFIED}` y el usuario cambia `fullName`:
 
 - `status` se degrada automaticamente a `EMAIL_VERIFIED`
-- Se inserta un `VerificationEvent(type=IDENTITY_RESET, reason=NAME_CHANGE_BY_USER, triggeredBy=userId)`
+- Se inserta un `VerificationEvent(type=IDENTITY_RESET, reviewedBy=userId, notes="Nombre cambiado por el propio usuario")`
 - El admin puede restaurar el estado via CU15 cuando valide el cambio
+
+**Implementacion real:** `VerificationEvent.eventType` es un campo String (no enum), por lo que se persiste directamente la cadena `"IDENTITY_RESET"`. No se requirio crear un enum nuevo.
 
 Razon: proporcionalidad — el email sigue validado, solo la identidad personal cambia. No se introduce un estado PENDING_REVIEW nuevo para no ampliar el alcance.
 
@@ -60,28 +62,51 @@ Razon: proporcionalidad — el email sigue validado, solo la identidad personal 
 
 Tres campos nuevos en `app_users` (PostgreSQL):
 
-| Campo | Tipo BD | Reglas |
+| Campo | Tipo BD final | Reglas |
 |---|---|---|
 | `phone` | VARCHAR(20), nullable | Opcional; sin validacion de formato en esta fase |
-| `region_code` | VARCHAR(10), nullable | Codigo de region GADM ("08" Biobio, "09" Araucania) |
-| `comuna_code` | VARCHAR(10), nullable | Codigo de comuna GADM — coherente con el choropleth existente |
+| `region_code` | VARCHAR(20), nullable | ID de region del mapa: "biobio", "araucania", "nuble" |
+| `comuna_code` | VARCHAR(20), nullable | GADM GID Level 3 — ej. "CHL.6.3.2_1" (hasta 13 chars) |
+
+**Nota as-built:** la especificacion inicial definia VARCHAR(10). Tras implementar los selects con datos GADM reales se detecto que los IDs como "CHL.13.3.5_1" tienen 12-13 caracteres. Se agrego la migracion V5 para expandir a VARCHAR(20) y se corrigio el constraint `@Size(max=20)` en el DTO.
 
 `organizationName` permanece en `user_verification` — es parte del flujo de verificacion, no del perfil editable.
 
 ### 3.3 Politica de sesiones post cambio de contrasena
 
-Al cambiar contrasena: revocar **todos** los refresh tokens activos del usuario via el metodo existente `revokeAllUserRefreshTokens(userId)` en `AuthServiceImpl`. No se emite nuevo token — el access token actual permanece valido por su TTL restante; el cliente hace login normal al expirar.
+Al cambiar contrasena: revocar **todos** los refresh tokens activos del usuario via `revokeAllUserRefreshTokens(userId)` en `AuthServiceImpl`. El metodo existia como privado; se expuso via interfaz `AuthService.revokeAllTokens(userId)` que delega al metodo privado.
+
+El frontend redirige al usuario a `/login` automaticamente 2.5 segundos despues del cambio exitoso (no espera expiracion natural del access token).
 
 ### 3.4 Visibilidad de datos para admins
 
-`GET /api/admin/users/{id}` expande `AccessUserDTO` con `phone`, `regionCode`, `comunaCode`, `organizationName`. El admin **no recibe** passwordHash ni timestamps de tokens. El endpoint propio del usuario (`/api/account/me`) no expone datos de otros usuarios.
+`GET /api/admin/users/{id}` expande `AccessUserDTO` con `phone`, `regionCode`, `comunaCode`, `organizationName`. El admin **no recibe** passwordHash ni timestamps de tokens.
+
+### 3.5 Region/comuna: datos estaticos locales en frontend
+
+En lugar de llamar a una API externa, el frontend usa el archivo `src/data/territorioChile.js` que contiene 86 comunas extraidas de los GeoJSON GADM del classpath del backend. Las regiones cubiertas en el piloto son:
+
+| regionCode | Label visible |
+|---|---|
+| `"biobio"` | Biobío |
+| `"nuble"` | Ñuble |
+| `"araucania"` | Araucanía |
+
+Los valores de `regionCode` coinciden exactamente con los `regionId` de las salas de chat, lo que habilita el auto-sync documentado en 3.6.
+
+### 3.6 Sync automatico region → chat comunitario
+
+Al persistir un cambio de `regionCode` en `PATCH /api/account/me`, el servicio hace upsert de `UserCommunityProfile.primaryRegionId` con el mismo valor. Esto otorga acceso automatico a la sala de chat de la region seleccionada.
+
+El admin conserva la capacidad de revocar el acceso al chat desde el panel de administracion, independientemente del valor guardado en el perfil.
 
 ---
 
 ## 4. Modelo de datos — cambios
 
-### 4.1 Migracion PostgreSQL (Flyway o DDL directo)
+### 4.1 Migraciones PostgreSQL (Flyway)
 
+**V4__add_user_profile_fields.sql** — agrega columnas iniciales:
 ```sql
 ALTER TABLE app_users
     ADD COLUMN phone       VARCHAR(20),
@@ -89,36 +114,75 @@ ALTER TABLE app_users
     ADD COLUMN comuna_code VARCHAR(10);
 ```
 
+**V5__expand_user_profile_codes.sql** — expande a VARCHAR(20) para IDs GADM:
+```sql
+ALTER TABLE app_users
+    ALTER COLUMN region_code TYPE VARCHAR(20),
+    ALTER COLUMN comuna_code TYPE VARCHAR(20);
+```
+
 Columnas nullable sin valor por defecto — compatibles con usuarios existentes sin necesidad de backfill.
 
 ### 4.2 Entidad AppUser — campos nuevos
 
+```java
+@Column(name = "phone", length = 20)
+private String phone;
+
+@Column(name = "region_code", length = 20)
+private String regionCode;
+
+@Column(name = "comuna_code", length = 20)
+private String comunaCode;
 ```
-phone       : String  (nullable)
-regionCode  : String  (nullable)
-comunaCode  : String  (nullable)
+
+Los tres con `@Column(nullable = true)` implicito.
+
+### 4.3 DTOs nuevos
+
+**AccountProfileDTO** (respuesta de GET y PATCH):
+```java
+public record AccountProfileDTO(
+    String id, String email, String fullName, String phone,
+    String regionCode, String comunaCode, String organizationName,
+    String verificationStatus, Set<String> roles, Instant createdAt
+) {}
 ```
 
-Los tres con `@Column(nullable = true)` en la entidad JPA. Sin validaciones de formato en la capa de persistencia — la validacion de regionCode/comunaCode se hace en el servicio comparando contra la lista de codigos GADM conocidos (Biobio + Araucania).
+**UpdateProfileRequestDTO** (body de PATCH):
+```java
+public record UpdateProfileRequestDTO(
+    @Size(min = 1, max = 120) String fullName,
+    @Size(max = 20)           String phone,
+    @Size(max = 20)           String regionCode,
+    @Size(max = 20)           String comunaCode
+) {}
+```
 
-### 4.3 VerificationEvent (sin cambio de schema)
+**ChangePasswordRequestDTO** (body de POST /change-password):
+```java
+public record ChangePasswordRequestDTO(
+    @NotBlank String currentPassword,
+    @NotBlank @Pattern(regexp = "^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[^A-Za-z\\d]).{12,72}$")
+    String newPassword,
+    @NotBlank String confirmPassword
+) {}
+```
 
-`VerificationEvent` ya existe. Se usa el tipo `IDENTITY_RESET` o se agrega si no existe. Verificar el enum `VerificationEventType` antes de implementar.
+### 4.4 VerificationEvent (sin cambio de schema)
 
-### 4.4 AccessUserDTO — extension admin
+`VerificationEvent.eventType` es String. Se persiste el literal `"IDENTITY_RESET"` al degradar identidad por cambio de nombre.
+
+### 4.5 AccessUserDTO — extension admin
 
 ```java
 public record AccessUserDTO(
-    String id,
-    String email,
-    String fullName,
+    String id, String email, String fullName,
     boolean enabled,
-    Set<String> legacyRoles,
-    Set<String> assignedRoles,
-    Set<String> effectiveRoles,
+    Set<String> legacyRoles, Set<String> assignedRoles, Set<String> effectiveRoles,
     String verificationStatus,
     CommunityChatAccessDTO communityChatAccess,
-    // campos nuevos:
+    // campos nuevos en este sprint:
     String phone,
     String regionCode,
     String comunaCode,
@@ -126,7 +190,11 @@ public record AccessUserDTO(
 ) {}
 ```
 
-`organizationName` se lee desde `UserVerification.organizationName` al construir el DTO en `AccessAdminServiceImpl`.
+`organizationName` se lee desde `UserVerification.organizationName` en `AccessAdminServiceImpl`.
+
+### 4.6 UserCommunityProfile — sin cambio de schema, logica nueva
+
+No se modifico el schema. El campo `primary_region_id` existia. Lo nuevo es que ahora se hace **upsert automatico** desde `AccountServiceImpl.updateProfile()` cuando cambia `regionCode`.
 
 ---
 
@@ -137,7 +205,6 @@ public record AccessUserDTO(
 Requiere: JWT valido (cualquier rol autenticado).
 
 Respuesta 200:
-
 ```json
 {
   "success": true,
@@ -147,8 +214,8 @@ Respuesta 200:
     "email": "usuario@example.com",
     "fullName": "Maria Paz Lopez",
     "phone": "+56912345678",
-    "regionCode": "08",
-    "comunaCode": "08301",
+    "regionCode": "biobio",
+    "comunaCode": "CHL.6.3.2_1",
     "organizationName": "Brigada Biobio Norte",
     "verificationStatus": "FULLY_VERIFIED",
     "roles": ["ROLE_COMMUNITY_USER", "ROLE_VERIFIED_USER"],
@@ -164,18 +231,16 @@ Respuesta 200:
 Requiere: JWT valido.
 
 Payload (todos los campos opcionales — solo se actualizan los presentes):
-
 ```json
 {
   "fullName": "Maria Paz Lopez Soto",
   "phone": "+56912345678",
-  "regionCode": "08",
-  "comunaCode": "08301"
+  "regionCode": "biobio",
+  "comunaCode": "CHL.6.3.2_1"
 }
 ```
 
 Respuesta 200:
-
 ```json
 {
   "success": true,
@@ -185,8 +250,8 @@ Respuesta 200:
     "email": "usuario@example.com",
     "fullName": "Maria Paz Lopez Soto",
     "phone": "+56912345678",
-    "regionCode": "08",
-    "comunaCode": "08301",
+    "regionCode": "biobio",
+    "comunaCode": "CHL.6.3.2_1",
     "organizationName": "Brigada Biobio Norte",
     "verificationStatus": "EMAIL_VERIFIED",
     "roles": ["ROLE_COMMUNITY_USER", "ROLE_VERIFIED_USER"],
@@ -201,17 +266,17 @@ Errores:
 
 | Caso | HTTP | Mensaje |
 |---|---|---|
-| fullName en blanco | 400 | "El nombre no puede estar en blanco" |
-| fullName > 120 chars | 400 | "El nombre no puede exceder 120 caracteres" |
-| regionCode invalido | 400 | "Codigo de region no reconocido" |
-| comunaCode invalido | 400 | "Codigo de comuna no reconocido" |
+| fullName en blanco (string vacio) | 400 | "El nombre no puede estar en blanco ni exceder 120 caracteres" |
+| fullName > 120 chars | 400 | "El nombre no puede estar en blanco ni exceder 120 caracteres" |
+| regionCode > 20 chars | 400 | "Codigo de region invalido" |
+| comunaCode > 20 chars | 400 | "Codigo de comuna invalido" |
+| Sin JWT | 401 | (RestAuthenticationEntryPoint) |
 
 ### 5.3 POST /api/account/change-password
 
 Requiere: JWT valido.
 
 Payload:
-
 ```json
 {
   "currentPassword": "Contrasena$Actual1",
@@ -221,7 +286,6 @@ Payload:
 ```
 
 Respuesta 200:
-
 ```json
 {
   "success": true,
@@ -239,83 +303,108 @@ Errores:
 | newPassword != confirmPassword | 400 | "La confirmacion de contrasena no coincide" |
 | newPassword no cumple politica | 400 | "La contrasena debe tener 12-72 caracteres, mayuscula, minuscula, numero y simbolo" |
 
-La politica de contrasena es la misma regex que `RegisterRequestDTO`: `^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d]).{12,72}$`.
+La politica de contrasena usa la misma regex que `RegisterRequestDTO`: `^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d]).{12,72}$`.
 
-**Efecto colateral documentado**: se invoca `revokeAllUserRefreshTokens(userId)` — todos los refresh tokens con `revokedAt IS NULL` quedan con `revokedAt = NOW()`.
+**Efecto colateral:** se invoca `revokeAllUserRefreshTokens(userId)` — todos los refresh tokens con `revokedAt IS NULL` quedan con `revokedAt = NOW()`. El frontend redirige a `/login` tras 2.5s.
 
 ---
 
 ## 6. Reglas de negocio por endpoint
 
-### 6.1 PATCH /api/account/me — logica de degradacion
+### 6.1 PATCH /api/account/me — logica de degradacion y sync
 
 ```
 si request.fullName != null y request.fullName != user.fullName:
     user.fullName = request.fullName
-    si verification.status == IDENTITY_VERIFIED o FULLY_VERIFIED:
+    si verification.status ∈ {IDENTITY_VERIFIED, FULLY_VERIFIED}:
         verification.status = EMAIL_VERIFIED
         insertar VerificationEvent(
-            userId, type=IDENTITY_RESET, reason=NAME_CHANGE_BY_USER,
-            triggeredBy=userId, timestamp=now()
+            userId, eventType="IDENTITY_RESET",
+            oldStatus=prev, newStatus=EMAIL_VERIFIED,
+            reviewedBy=userId, notes="Nombre cambiado por el propio usuario"
         )
-si request.phone != null: user.phone = request.phone (vaciar con "" acepta null)
-si request.regionCode != null: validar contra lista; user.regionCode = request.regionCode
-si request.comunaCode != null: validar contra lista; user.comunaCode = request.comunaCode
+
+si request.phone != null:
+    user.phone = request.phone.isBlank() ? null : request.phone
+
+si request.regionCode != null:
+    user.regionCode = request.regionCode.isBlank() ? null : request.regionCode
+
+si request.comunaCode != null:
+    user.comunaCode = request.comunaCode.isBlank() ? null : request.comunaCode
+
+appUserRepository.save(user)
+
+si request.regionCode != null:
+    userCommunityProfile = findById(userId).orElseCreate(new UserCommunityProfile())
+    userCommunityProfile.primaryRegionId = request.regionCode.isBlank() ? null : request.regionCode
+    userCommunityProfileRepository.save(userCommunityProfile)
 ```
 
-La lista de codigos validos es la misma fuente que el choropleth: codigos GADM de Biobio y Araucania. Para esta fase se acepta cualquier codigo de 2 a 10 caracteres para no bloquear usuarios de otras regiones en el futuro.
+Los valores de `regionCode` del frontend son `"biobio"`, `"nuble"`, `"araucania"` — coinciden con los `regionId` de las salas de chat, de modo que el acceso se habilita automaticamente al guardar.
 
 ### 6.2 POST /api/account/change-password — logica completa
 
 ```
 1. resolver userId desde SecurityContext
-2. cargar AppUser; si no existe → 404 (no deberia ocurrir con JWT valido)
+2. cargar AppUser; si no existe → 404
 3. BCrypt.matches(currentPassword, user.passwordHash) → si false → 400
 4. si newPassword == currentPassword → 400
 5. si newPassword != confirmPassword → 400
 6. validar regex politica sobre newPassword → si falla → 400
 7. user.passwordHash = BCrypt.encode(newPassword)
 8. appUserRepository.save(user)
-9. revokeAllUserRefreshTokens(userId)   // metodo existente en AuthServiceImpl
+9. authService.revokeAllTokens(userId)  ← metodo publico en AuthService que delega a revokeAllUserRefreshTokens
 10. retornar 200
 ```
 
 ---
 
-## 7. Iteraciones planificadas
+## 7. Iteraciones — resultado
 
-### Iteracion 1 — Backend: migracion + AccountController
+### Iteracion 1 — Backend (completada)
 
-- Migracion SQL: `ALTER TABLE app_users ADD COLUMN phone/region_code/comuna_code`
-- Extension entidad `AppUser` con los tres campos nuevos
-- Nuevo `AccountController` en `/api/account` con los tres endpoints
-- `AccountService` + `AccountServiceImpl` con logica de degradacion y cambio de contrasena
-- Extension `AccessUserDTO` + `AccessAdminServiceImpl` para incluir campos nuevos
+- [x] Migracion V4: `ALTER TABLE app_users ADD COLUMN phone/region_code/comuna_code`
+- [x] Migracion V5: expandir region_code y comuna_code a VARCHAR(20)
+- [x] Extension entidad `AppUser` con los tres campos nuevos (`@Column(length=20)`)
+- [x] Nuevo `AccountController` en `/api/account` con los tres endpoints
+- [x] `AccountService` + `AccountServiceImpl` con logica de degradacion, sync y cambio de contrasena
+- [x] Extension `AccessUserDTO` + `AccessAdminServiceImpl` para incluir campos nuevos
+- [x] Exponer `AuthService.revokeAllTokens(userId)` como metodo publico
+- [x] CORS: agregar PATCH a `allowedMethods` en `CorsConfig`
+- [x] Security: agregar `OPTIONS /**` como primera regla `permitAll()` en `SecurityIntegrationConfig`
 
-### Iteracion 2 — Frontend: vista /account
+### Iteracion 2 — Frontend (completada)
 
-- Ruta `/account` protegida (cualquier usuario autenticado)
-- Formulario de datos personales: fullName, phone, regionCode, comunaCode con selects o texto libre
-- Formulario de contrasena: currentPassword, newPassword, confirmPassword con show/hide
-- Feedback visual: confirmacion de guardado, mensaje de degradacion de verificacion si aplica
-- Cierre de sesion automatico post cambio de contrasena (el frontend detecta 401 en el siguiente refresh y redirige a login)
+- [x] Ruta `/account` protegida con lazy loading
+- [x] Link al perfil desde el nombre de usuario en Navbar
+- [x] Selects de region (3 opciones) + commons filtradas por region (reset al cambiar region)
+- [x] Datos estaticos en `src/data/territorioChile.js`: 86 comunas extraidas de GeoJSON GADM
+- [x] Campo phone alineado correctamente en layout form-grid 2 columnas
+- [x] Formulario de contrasena con show/hide, redirige a `/login` 2.5s tras exito
+- [x] Mensaje de advertencia de degradacion de verificacion
+- [x] Endpoints en `src/api/endpoints.js` y servicio en `src/services/accountService.js`
 
 ---
 
-## 8. Criterios de aceptacion
+## 8. Criterios de aceptacion — verificados
 
-1. Usuario autenticado llama `GET /api/account/me` y recibe perfil completo con todos los campos nuevos (null si no configurados).
-2. Usuario actualiza `fullName`, `phone`, `regionCode`, `comunaCode` via `PATCH /api/account/me` y la respuesta refleja los valores nuevos.
-3. Usuario con `verificationStatus=FULLY_VERIFIED` cambia su `fullName` → la respuesta devuelve `verificationStatus=EMAIL_VERIFIED` y se crea un `VerificationEvent` de tipo `IDENTITY_RESET`.
-4. Usuario con `verificationStatus=EMAIL_VERIFIED` o inferior cambia su nombre → `verificationStatus` no cambia.
-5. `POST /api/account/change-password` con `currentPassword` incorrecta devuelve 400 sin modificar credenciales.
-6. `POST /api/account/change-password` con `newPassword == currentPassword` devuelve 400.
-7. `POST /api/account/change-password` con `newPassword != confirmPassword` devuelve 400.
-8. `POST /api/account/change-password` con contrasena debil devuelve 400 con el mensaje de politica.
-9. Cambio de contrasena exitoso → todos los refresh tokens activos del usuario quedan con `revokedAt` no nulo en BD.
-10. Admin llama `GET /api/admin/users/{id}` y recibe `phone`, `regionCode`, `comunaCode`, `organizationName` en la respuesta.
-11. El formulario frontend muestra aviso cuando el cambio de nombre baja el estado de verificacion.
-12. El frontend redirige a login si el access token expira despues del cambio de contrasena (comportamiento natural por TTL — no requiere implementacion especial).
+| # | Criterio | Estado |
+|---|---|---|
+| 1 | GET /api/account/me devuelve perfil con todos los campos nuevos | ✓ |
+| 2 | PATCH /api/account/me actualiza fullName, phone, regionCode, comunaCode | ✓ |
+| 3 | Usuario FULLY_VERIFIED cambia fullName → verificationStatus=EMAIL_VERIFIED en respuesta | ✓ |
+| 4 | Usuario EMAIL_VERIFIED cambia nombre → verificationStatus no cambia | ✓ |
+| 5 | POST /change-password con currentPassword incorrecta → 400 | ✓ |
+| 6 | POST /change-password con newPassword == currentPassword → 400 | ✓ |
+| 7 | POST /change-password con newPassword != confirmPassword → 400 | ✓ |
+| 8 | POST /change-password con contrasena debil → 400 con mensaje de politica | ✓ |
+| 9 | Cambio de contrasena exitoso → todos los refresh tokens activos revocados | ✓ |
+| 10 | Admin GET /api/admin/users/{id} incluye phone, regionCode, comunaCode, organizationName | ✓ |
+| 11 | Formulario frontend muestra aviso de degradacion si cambia nombre con verificacion alta | ✓ |
+| 12 | Frontend redirige a /login 2.5s tras cambio de contrasena exitoso | ✓ |
+| 13 | Al guardar regionCode, UserCommunityProfile.primaryRegionId se sincroniza automaticamente | ✓ |
+| 14 | Selects de region/comuna en frontend muestran las 3 regiones piloto y sus comunas GADM | ✓ |
 
 ---
 
@@ -325,7 +414,19 @@ La lista de codigos validos es la misma fuente que el choropleth: codigos GADM d
 |---|---|---|
 | Cambio de correo | Media | Requiere flujo de verificacion por email con token de confirmacion — spec separada |
 | Verificacion de telefono | Baja | Actualmente phone es texto libre; verificacion OTP queda para post-defensa |
-| Validacion estricta region/comuna | Baja | Actualmente acepta cualquier codigo corto; idealmente validar contra lista GADM en memoria |
+| Validacion estricta region/comuna en backend | Baja | Frontend enforcea via selects; backend acepta cualquier VARCHAR(20). Idealmente validar lista en memoria |
 | Foto de perfil | Baja | Requiere integracion Supabase Storage — spec separada |
 | Workflow de re-verificacion de identidad | Media | Cuando admin restaura IDENTITY_VERIFIED post NAME_CHANGE, deberia existir formulario dedicado en CU15 |
 | Notificacion por email post cambio de contrasena | Baja | Util para UX de seguridad; sin fecha definida |
+| Regiones adicionales | Baja | Actualmente solo biobio, nuble, araucania en territorioChile.js. Escalar requiere agregar datos o consumir API |
+
+---
+
+## 10. Bugs resueltos durante implementacion
+
+| Bug | Causa raiz | Solucion |
+|---|---|---|
+| CORS 403 en OPTIONS (preflight) | `requestMatchers("/api/account/**").authenticated()` bloqueaba OPTIONS antes del filtro CORS | Agregar `HttpMethod.OPTIONS, "/**"` como primera regla `permitAll()` en SecurityIntegrationConfig |
+| CORS 403 real en PATCH | PATCH no estaba en `allowedMethods` de CorsConfig | Agregar `"PATCH"` al array de metodos permitidos |
+| Validation 400 "Uno o mas campos son invalidos" | `@Size(max=10)` en comunaCode pero GADM IDs como "CHL.13.3.5_1" tienen 12-13 chars | Cambiar `@Size(max=20)` en UpdateProfileRequestDTO + migracion V5 para columna BD |
+| Campo phone desalineado en formulario | `<span class="field-optional">` era hijo directo del `<label>` (flex-column), creando 3 flex items | Envolver texto de etiqueta + span opcional en un `<span>` padre |
