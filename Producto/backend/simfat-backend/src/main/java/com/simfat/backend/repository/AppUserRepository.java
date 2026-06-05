@@ -12,4 +12,6 @@ public interface AppUserRepository extends JpaRepository<AppUser, String> {
     boolean existsByEmailIgnoreCase(String email);
 
     List<AppUser> findAllByOrderByCreatedAtDesc();
+
+    List<AppUser> findByComunaCode(String comunaCode);
 }

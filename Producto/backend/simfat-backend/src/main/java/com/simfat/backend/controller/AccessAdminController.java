@@ -4,8 +4,11 @@ import com.simfat.backend.dto.ApiResponse;
 import com.simfat.backend.dto.admin.AccessPermissionDTO;
 import com.simfat.backend.dto.admin.AccessRoleDTO;
 import com.simfat.backend.dto.admin.AccessUserDTO;
+import com.simfat.backend.dto.admin.PendingReviewUserDTO;
 import com.simfat.backend.dto.admin.UpdateCommunityChatAccessRequestDTO;
 import com.simfat.backend.dto.admin.UpdateUserRolesRequestDTO;
+import com.simfat.backend.dto.admin.UpdateVerificationStatusRequestDTO;
+import com.simfat.backend.dto.admin.VerificationEventDTO;
 import com.simfat.backend.security.SecurityUtils;
 import com.simfat.backend.service.AccessAdminService;
 import jakarta.validation.Valid;
@@ -61,5 +64,26 @@ public class AccessAdminController {
     ) {
         AccessUserDTO updated = accessAdminService.updateCommunityChatAccess(userId, request, SecurityUtils.currentUserIdOrThrow());
         return ResponseEntity.ok(ApiResponse.ok("Acceso regional de chat actualizado correctamente", updated));
+    }
+
+    @GetMapping("/users/{userId}/verification-events")
+    public ResponseEntity<ApiResponse<List<VerificationEventDTO>>> getVerificationEvents(
+        @PathVariable String userId
+    ) {
+        return ResponseEntity.ok(ApiResponse.ok("Eventos de verificacion obtenidos", accessAdminService.getVerificationEvents(userId)));
+    }
+
+    @PutMapping("/users/{userId}/verification")
+    public ResponseEntity<ApiResponse<AccessUserDTO>> updateVerificationStatus(
+        @PathVariable String userId,
+        @Valid @RequestBody UpdateVerificationStatusRequestDTO request
+    ) {
+        AccessUserDTO updated = accessAdminService.updateVerificationStatus(userId, request, SecurityUtils.currentUserIdOrThrow());
+        return ResponseEntity.ok(ApiResponse.ok("Estado de verificacion actualizado correctamente", updated));
+    }
+
+    @GetMapping("/users/pending-review")
+    public ResponseEntity<ApiResponse<List<PendingReviewUserDTO>>> getPendingReview() {
+        return ResponseEntity.ok(ApiResponse.ok("Usuarios pendientes de revision obtenidos", accessAdminService.getPendingReview()));
     }
 }
