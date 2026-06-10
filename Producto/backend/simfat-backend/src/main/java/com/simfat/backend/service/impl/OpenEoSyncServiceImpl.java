@@ -44,6 +44,10 @@ public class OpenEoSyncServiceImpl implements OpenEoSyncService {
     private static final String STATUS_NO_DATA = "no_data";
     private static final String STATUS_AOI_MISSING = "aoi_missing";
 
+    // Solo NDVI/NDMI provienen de OpenEO. Los indicadores climaticos (WIND, HUMIDITY, AIR_TEMP,
+    // SOIL_TEMP) se persisten via OpenWeatherFwiServiceImpl y NUNCA deben sincronizarse aqui.
+    private static final List<IndicatorType> OPENEO_INDICATORS = List.of(IndicatorType.NDVI, IndicatorType.NDMI);
+
     private final OpenEoServiceClient openEoServiceClient;
     private final RegionRepository regionRepository;
     private final OpenEoJobRunRepository jobRunRepository;
@@ -105,7 +109,7 @@ public class OpenEoSyncServiceImpl implements OpenEoSyncService {
         int errorCount = 0;
 
         for (Region region : regions) {
-            for (IndicatorType indicator : IndicatorType.values()) {
+            for (IndicatorType indicator : OPENEO_INDICATORS) {
                 String lockKey = buildLockKey(region.getId(), indicator, dateRange.from(), dateRange.to());
                 long flowStartNs = System.nanoTime();
 
