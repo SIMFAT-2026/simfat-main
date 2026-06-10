@@ -1,7 +1,5 @@
 package com.simfat.backend.service.impl;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.simfat.backend.model.HeatAlertEvent;
 import com.simfat.backend.model.Region;
 import com.simfat.backend.model.RiskLevel;
@@ -15,7 +13,9 @@ import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -33,7 +33,6 @@ public class NasaFirmsServiceImpl implements NasaFirmsService {
 
     private final HeatAlertEventRepository heatAlertEventRepository;
     private final RegionRepository regionRepository;
-    private final ObjectMapper objectMapper;
 
     @Value("${firms.api.map-key:}")
     private String mapKey;
@@ -52,12 +51,10 @@ public class NasaFirmsServiceImpl implements NasaFirmsService {
 
     public NasaFirmsServiceImpl(
         HeatAlertEventRepository heatAlertEventRepository,
-        RegionRepository regionRepository,
-        ObjectMapper objectMapper
+        RegionRepository regionRepository
     ) {
         this.heatAlertEventRepository = heatAlertEventRepository;
         this.regionRepository = regionRepository;
-        this.objectMapper = objectMapper;
     }
 
     @Scheduled(cron = "${firms.sync.cron:0 0 */12 * * *}")
@@ -87,7 +84,7 @@ public class NasaFirmsServiceImpl implements NasaFirmsService {
     @Override
     public int syncActiveFiresByRegion(String regionId, double west, double south, double east, double north) {
         String area = west + "," + south + "," + east + "," + north;
-        String url = baseUrl + "/area/json/" + mapKey + "/" + firmsSource + "/" + area + "/" + dayRange;
+        String url = baseUrl + "/area/csv/" + mapKey + "/" + firmsSource + "/" + area + "/" + dayRange;
 
         try {
             HttpRequest request = HttpRequest.newBuilder()
@@ -103,43 +100,7 @@ public class NasaFirmsServiceImpl implements NasaFirmsService {
                 return 0;
             }
 
-            JsonNode root = objectMapper.readTree(response.body());
-            if (!root.isArray()) {
-                return 0;
-            }
-
-            List<HeatAlertEvent> toSave = new ArrayList<>();
-            for (JsonNode node : root) {
-                String confidence = node.path("confidence").asText("").toLowerCase();
-                if ("l".equals(confidence)) {
-                    continue;
-                }
-
-                double lat = node.path("latitude").asDouble(0);
-                double lon = node.path("longitude").asDouble(0);
-                double frp = node.path("frp").asDouble(0);
-                String satellite = node.path("satellite").asText(null);
-                String acqDate = node.path("acq_date").asText("");
-                String acqTime = node.path("acq_time").asText("0000");
-
-                RiskLevel nivelRiesgo = "h".equals(confidence) ? RiskLevel.ALTO : RiskLevel.MEDIO;
-
-                HeatAlertEvent event = new HeatAlertEvent();
-                event.setRegionId(regionId);
-                event.setLatitud(lat);
-                event.setLongitud(lon);
-                event.setNivelRiesgo(nivelRiesgo);
-                event.setFuente(SOURCE);
-                event.setFechaEvento(parseAcqDateTime(acqDate, acqTime));
-                event.setDescripcion("Foco activo VIIRS. FRP=" + frp + " MW. Confidence=" + confidence);
-                event.setFirmsConfidence(confidence);
-                event.setFirmsFrp(frp);
-                event.setFirmsSatellite(satellite);
-                event.setFirmsSource(firmsSource);
-
-                toSave.add(event);
-            }
-
+            List<HeatAlertEvent> toSave = parseCsvResponse(response.body(), regionId);
             heatAlertEventRepository.saveAll(toSave);
             return toSave.size();
 
@@ -150,6 +111,89 @@ public class NasaFirmsServiceImpl implements NasaFirmsService {
         } catch (Exception ex) {
             LOGGER.warn("firms_api status=exception regionId={} error={}", regionId, ex.getMessage());
             return 0;
+        }
+    }
+
+    private List<HeatAlertEvent> parseCsvResponse(String body, String regionId) {
+        List<HeatAlertEvent> toSave = new ArrayList<>();
+        if (body == null || body.isBlank()) {
+            return toSave;
+        }
+
+        String[] lines = body.strip().split("\\r?\\n");
+        if (lines.length < 2) {
+            return toSave;
+        }
+
+        String[] headers = lines[0].split(",");
+        Map<String, Integer> col = new HashMap<>();
+        for (int i = 0; i < headers.length; i++) {
+            col.put(headers[i].trim().toLowerCase(), i);
+        }
+
+        Integer latIdx = col.get("latitude");
+        Integer lonIdx = col.get("longitude");
+        Integer confidenceIdx = col.get("confidence");
+        Integer frpIdx = col.get("frp");
+        Integer satelliteIdx = col.get("satellite");
+        Integer acqDateIdx = col.get("acq_date");
+        Integer acqTimeIdx = col.get("acq_time");
+
+        if (latIdx == null || lonIdx == null) {
+            LOGGER.warn("firms_api status=unexpected_format regionId={} header={}", regionId, lines[0]);
+            return toSave;
+        }
+
+        for (int i = 1; i < lines.length; i++) {
+            String[] fields = lines[i].split(",");
+            if (fields.length < headers.length) {
+                continue;
+            }
+
+            String confidence = confidenceIdx != null ? fields[confidenceIdx].trim().toLowerCase() : "";
+            if ("l".equals(confidence)) {
+                continue;
+            }
+
+            double lat = parseDouble(fields[latIdx]);
+            double lon = parseDouble(fields[lonIdx]);
+            double frp = frpIdx != null ? parseDouble(fields[frpIdx]) : 0.0;
+            String satellite = satelliteIdx != null ? fields[satelliteIdx].trim() : null;
+            String acqDate = acqDateIdx != null ? fields[acqDateIdx].trim() : "";
+            String acqTime = acqTimeIdx != null ? fields[acqTimeIdx].trim() : "0000";
+            LocalDateTime fechaEvento = parseAcqDateTime(acqDate, acqTime);
+
+            if (heatAlertEventRepository.existsByRegionIdAndLatitudAndLongitudAndFechaEventoAndFuente(
+                regionId, lat, lon, fechaEvento, SOURCE)) {
+                continue;
+            }
+
+            RiskLevel nivelRiesgo = "h".equals(confidence) ? RiskLevel.ALTO : RiskLevel.MEDIO;
+
+            HeatAlertEvent event = new HeatAlertEvent();
+            event.setRegionId(regionId);
+            event.setLatitud(lat);
+            event.setLongitud(lon);
+            event.setNivelRiesgo(nivelRiesgo);
+            event.setFuente(SOURCE);
+            event.setFechaEvento(fechaEvento);
+            event.setDescripcion("Foco activo VIIRS. FRP=" + frp + " MW. Confidence=" + confidence);
+            event.setFirmsConfidence(confidence);
+            event.setFirmsFrp(frp);
+            event.setFirmsSatellite(satellite);
+            event.setFirmsSource(firmsSource);
+
+            toSave.add(event);
+        }
+
+        return toSave;
+    }
+
+    private double parseDouble(String value) {
+        try {
+            return Double.parseDouble(value.trim());
+        } catch (Exception ex) {
+            return 0.0;
         }
     }
 
