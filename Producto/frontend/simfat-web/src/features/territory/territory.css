@@ -91,6 +91,35 @@
   border-radius: 999px;
 }
 
+.territory-climate-legend {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid #e2e8f0;
+}
+
+.territory-climate-legend h5 {
+  margin: 0 0 6px;
+  color: #0f172a;
+  font-size: 0.85rem;
+}
+
+.territory-climate-legend ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 5px;
+}
+
+.territory-climate-legend li {
+  display: grid;
+  grid-template-columns: 12px 1fr;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.8rem;
+  color: #475569;
+}
+
 .territory-meta {
   margin: 12px 0 0;
   color: #64748b;
@@ -491,6 +520,24 @@
   display: flex;
   flex-direction: column;
   gap: 5px;
+}
+
+.panel-fwi-inputs {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.panel-fwi-input-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.78rem;
+  color: #334155;
+}
+
+.panel-fwi-input-value {
+  font-weight: 600;
+  color: #0f172a;
 }
 
 .panel-component-row {

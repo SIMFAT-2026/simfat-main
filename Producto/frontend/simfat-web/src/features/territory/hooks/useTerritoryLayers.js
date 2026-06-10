@@ -6,16 +6,6 @@ const pendingByKey = new Map();
 const cacheByKey = new Map();
 
 const REGION_CONFIG = {
-  biobio: {
-    id: 'biobio',
-    label: 'Biobio',
-    center: [-37.5, -72.5],
-    bounds: [
-      [-38.9, -74.1],
-      [-36.3, -71.0]
-    ],
-    zoom: 9
-  },
   nuble: {
     id: 'nuble',
     label: 'Nuble',
@@ -23,6 +13,16 @@ const REGION_CONFIG = {
     bounds: [
       [-37.4, -72.8],
       [-35.8, -71.0]
+    ],
+    zoom: 9
+  },
+  biobio: {
+    id: 'biobio',
+    label: 'Biobio',
+    center: [-37.5, -72.5],
+    bounds: [
+      [-38.9, -74.1],
+      [-36.3, -71.0]
     ],
     zoom: 9
   },
@@ -39,7 +39,9 @@ const REGION_CONFIG = {
 };
 
 const REGION_OPTIONS = Object.values(REGION_CONFIG);
-const DEFAULT_INDICATORS = ['NDVI', 'NDMI', 'LOSS', 'ALERTS', 'FIRMS', 'REPORTS', 'RISK_SCORE'];
+const DEFAULT_INDICATORS = ['NDVI', 'NDMI', 'LOSS', 'ALERTS', 'FIRMS', 'REPORTS', 'RISK_SCORE', 'WIND', 'HUMIDITY', 'AIR_TEMP', 'SOIL_TEMP'];
+// WIND/HUMIDITY/AIR_TEMP/SOIL_TEMP are opt-in climate layers: fetched alongside
+// the rest but not shown until the user toggles them on (DEC-B).
 const DEFAULT_VISIBLE_INDICATORS = ['RISK_SCORE', 'FIRMS', 'ALERTS', 'REPORTS'];
 const REGION_IDS = new Set(REGION_OPTIONS.map((region) => region.id));
 
@@ -97,7 +99,8 @@ function createMockLayers(regionId) {
         features: [
           createPointFeature('nu-risk', -71.9, -36.6, { label: 'Nuble', indicator: 'RISK_SCORE', score: 0.0, alertLevel: 'NORMAL' })
         ]
-      }
+      },
+      ...createMockClimateLayers()
     };
   }
 
@@ -148,7 +151,8 @@ function createMockLayers(regionId) {
         features: [
           createPointFeature('ar-risk', -72.4, -38.7, { label: 'La Araucania', indicator: 'RISK_SCORE', score: 0.0, alertLevel: 'NORMAL' })
         ]
-      }
+      },
+      ...createMockClimateLayers()
     };
   }
 
@@ -194,7 +198,20 @@ function createMockLayers(regionId) {
       features: [
         createPointFeature('bb-risk', -72.5, -37.5, { label: 'Biobio', indicator: 'RISK_SCORE', score: 0.0, alertLevel: 'NORMAL' })
       ]
-    }
+    },
+    ...createMockClimateLayers()
+  };
+}
+
+// Empty value-maps for the opt-in climate layers — keeps the mock-data shape
+// consistent with the backend's value-map contract so rendering code can
+// rely on `layers[indicator].values` always being an object.
+function createMockClimateLayers() {
+  return {
+    WIND: { indicator: 'WIND', unit: 'km/h', values: {} },
+    HUMIDITY: { indicator: 'HUMIDITY', unit: '%', values: {} },
+    AIR_TEMP: { indicator: 'AIR_TEMP', unit: '°C', values: {} },
+    SOIL_TEMP: { indicator: 'SOIL_TEMP', unit: '°C', values: {} }
   };
 }
 

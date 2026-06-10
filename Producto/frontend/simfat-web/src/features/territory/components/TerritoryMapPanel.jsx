@@ -36,8 +36,82 @@ const INDICATOR_COLORS = {
   ALERTS: '#dc2626',
   FIRMS: '#ff4500',
   REPORTS: '#7c3aed',
-  RISK_SCORE: '#b45309'
+  RISK_SCORE: '#b45309',
+  WIND: '#0891b2',
+  HUMIDITY: '#2563eb',
+  AIR_TEMP: '#dc2626',
+  SOIL_TEMP: '#b45309'
 };
+
+// Per-variable color scales (DEC-A): each climate indicator gets its own
+// bins/ramp tuned for fire-risk relevance, rather than a shared generic scale.
+// `bins` are ascending upper-bounds; the last entry's `max` is Infinity.
+const CLIMATE_SCALES = {
+  // Wind speed (km/h): higher wind = faster fire spread.
+  WIND: {
+    unit: 'km/h',
+    label: 'Viento',
+    bins: [
+      { max: 10, color: '#a7f3d0', label: '< 10 (calma)' },
+      { max: 20, color: '#5eead4', label: '10-20 (leve)' },
+      { max: 35, color: '#38bdf8', label: '20-35 (moderado)' },
+      { max: 50, color: '#2563eb', label: '35-50 (fuerte)' },
+      { max: Infinity, color: '#1e3a8a', label: '> 50 (severo)' }
+    ]
+  },
+  // Relative humidity (%): LOWER humidity = HIGHER fire risk, so the ramp
+  // is inverted (most alarming color for the lowest band).
+  HUMIDITY: {
+    unit: '%',
+    label: 'Humedad relativa',
+    bins: [
+      { max: 20, color: '#dc2626', label: '< 20 (crítico)' },
+      { max: 30, color: '#f97316', label: '20-30 (bajo)' },
+      { max: 50, color: '#facc15', label: '30-50 (moderado)' },
+      { max: 70, color: '#86efac', label: '50-70 (normal)' },
+      { max: Infinity, color: '#16a34a', label: '> 70 (alto)' }
+    ]
+  },
+  // Air temperature max (°C): finer bins in the fire-relevant high range.
+  AIR_TEMP: {
+    unit: '°C',
+    label: 'Temp. del aire',
+    bins: [
+      { max: 10, color: '#bfdbfe', label: '< 10' },
+      { max: 20, color: '#93c5fd', label: '10-20' },
+      { max: 25, color: '#fde047', label: '20-25' },
+      { max: 30, color: '#fb923c', label: '25-30' },
+      { max: 35, color: '#f97316', label: '30-35' },
+      { max: Infinity, color: '#dc2626', label: '> 35' }
+    ]
+  },
+  // Soil temperature (°C): typically narrower variance than air temp.
+  SOIL_TEMP: {
+    unit: '°C',
+    label: 'Temp. del suelo',
+    bins: [
+      { max: 10, color: '#bfdbfe', label: '< 10' },
+      { max: 15, color: '#93c5fd', label: '10-15' },
+      { max: 20, color: '#fde047', label: '15-20' },
+      { max: 25, color: '#fb923c', label: '20-25' },
+      { max: Infinity, color: '#dc2626', label: '> 25' }
+    ]
+  }
+};
+
+const CLIMATE_INDICATORS = ['WIND', 'HUMIDITY', 'AIR_TEMP', 'SOIL_TEMP'];
+const NEUTRAL_FILL = '#cbd5e1';
+
+function climateColorForValue(indicator, value) {
+  if (value === null || value === undefined || Number.isNaN(Number(value))) {
+    return NEUTRAL_FILL;
+  }
+  const scale = CLIMATE_SCALES[indicator];
+  if (!scale) return NEUTRAL_FILL;
+  const numeric = Number(value);
+  const bin = scale.bins.find((b) => numeric < b.max);
+  return bin ? bin.color : scale.bins[scale.bins.length - 1].color;
+}
 
 const ALERT_LEVEL_CONFIG = {
   NORMAL:     { color: '#16a34a', bg: '#dcfce7', label: 'Normal',     fill: '#22c55e' },
@@ -88,6 +162,44 @@ const ComunaChoropleth = memo(function ComunaChoropleth({ geoJson, comunalScores
         layer.on('click', () => {
           onComunaClick?.(comunaId, nombre, score);
         });
+      }}
+    />
+  );
+});
+
+// Renders a climate layer (WIND/HUMIDITY/AIR_TEMP/SOIL_TEMP) as a choropleth
+// by joining the backend's per-comuna value map onto the existing comuna
+// GeoJSON polygons (mirrors ComunaChoropleth's join with comunalScores).
+// Comunas without data render with a neutral fill instead of breaking.
+const ClimateChoropleth = memo(function ClimateChoropleth({ geoJson, indicator, valueMap }) {
+  if (!geoJson || !geoJson.features) return null;
+
+  const values = valueMap?.values || {};
+  const unit = valueMap?.unit || CLIMATE_SCALES[indicator]?.unit || '';
+
+  return (
+    <GeoJSON
+      key={`climate-${indicator}`}
+      data={geoJson}
+      style={(feature) => {
+        const comunaId = feature?.properties?.comunaId;
+        const entry = values[comunaId];
+        return {
+          fillColor: climateColorForValue(indicator, entry?.value),
+          fillOpacity: entry ? 0.55 : 0.12,
+          color: '#334155',
+          weight: 0.8,
+          opacity: 0.7
+        };
+      }}
+      onEachFeature={(feature, layer) => {
+        const comunaId = feature?.properties?.comunaId;
+        const nombre = feature?.properties?.nombre || comunaId;
+        const entry = values[comunaId];
+        const valueLabel = entry?.value !== undefined && entry?.value !== null
+          ? `${Number(entry.value).toFixed(1)} ${entry.unit || unit}`
+          : 'Sin datos';
+        layer.bindTooltip(`${nombre}: ${valueLabel}`, { sticky: true });
       }}
     />
   );
@@ -357,7 +469,10 @@ function TerritoryMapPanel({
         </button>
       </div>
 
-      {regionData && visibleIndicators.includes('RISK_SCORE') && <RiskScoreBadge regionData={regionData} />}
+      {/* Persistent region-level risk breakdown panel: always visible when
+          regionData is available, independent of the RISK_SCORE map-layer
+          toggle (spec: risk-score-breakdown-panel). */}
+      {regionData && <RiskScoreBadge regionData={regionData} />}
 
       <div className="filter-bar territory-controls">
         <label>
@@ -380,6 +495,18 @@ function TerritoryMapPanel({
                 onChange={() => toggleIndicator(indicator)}
               />
               <span>{indicator}</span>
+            </label>
+          ))}
+          {/* Opt-in climate layers (DEC-B): off by default, each with its own
+              color scale (DEC-A) rendered as a comuna choropleth. */}
+          {CLIMATE_INDICATORS.map((indicator) => (
+            <label key={indicator} className="territory-toggle">
+              <input
+                type="checkbox"
+                checked={visibleIndicators.includes(indicator)}
+                onChange={() => toggleIndicator(indicator)}
+              />
+              <span>{CLIMATE_SCALES[indicator]?.label || indicator}</span>
             </label>
           ))}
         </div>
@@ -416,7 +543,16 @@ function TerritoryMapPanel({
               />
             )}
 
-            {visibleIndicators.filter((i) => i !== 'RISK_SCORE' && i !== 'REPORTS').map((indicator) => (
+            {comunalGeoJson && CLIMATE_INDICATORS.filter((indicator) => visibleIndicators.includes(indicator)).map((indicator) => (
+              <ClimateChoropleth
+                key={`${regionData.regionId}-${indicator}`}
+                geoJson={comunalGeoJson}
+                indicator={indicator}
+                valueMap={regionData.layers?.[indicator]}
+              />
+            ))}
+
+            {visibleIndicators.filter((i) => i !== 'RISK_SCORE' && i !== 'REPORTS' && !CLIMATE_INDICATORS.includes(i)).map((indicator) => (
               <GeoJSON
                 key={`${regionData.regionId}-${indicator}`}
                 data={regionData.layers[indicator]}
@@ -483,6 +619,29 @@ function TerritoryMapPanel({
                   </li>
                 ))}
               </ul>
+
+              {CLIMATE_INDICATORS.filter((indicator) => visibleIndicators.includes(indicator)).map((indicator) => {
+                const scale = CLIMATE_SCALES[indicator];
+                if (!scale) return null;
+                return (
+                  <div key={indicator} className="territory-climate-legend">
+                    <h5>{scale.label} ({scale.unit})</h5>
+                    <ul>
+                      {scale.bins.map((bin) => (
+                        <li key={bin.label}>
+                          <span className="territory-color-dot" style={{ backgroundColor: bin.color }} />
+                          <span>{bin.label}</span>
+                        </li>
+                      ))}
+                      <li>
+                        <span className="territory-color-dot" style={{ backgroundColor: NEUTRAL_FILL }} />
+                        <span>Sin datos</span>
+                      </li>
+                    </ul>
+                  </div>
+                );
+              })}
+
               <p className="territory-meta">
                 Fuente: {regionData.source === 'backend' ? 'Backend' : 'Mock local'} | Ultima actualizacion:{' '}
                 {parseUtcDate(regionData.generatedAt)}

@@ -89,6 +89,37 @@ function RiskHistoryChart({ gadmGid }) {
   );
 }
 
+// Open-Meteo inputs feeding the FWI proxy (transparency view, spec
+// fwi-proxy-breakdown). Any component may be null — rendered as "—" without
+// breaking the layout, and never affects the FWI proxy value shown elsewhere.
+const FWI_INPUT_META = [
+  { key: 'tempMax', label: 'Temp. máxima', unit: '°C' },
+  { key: 'humidityMin', label: 'Humedad mínima', unit: '%' },
+  { key: 'windMax', label: 'Viento máximo', unit: 'km/h' },
+  { key: 'precip', label: 'Precipitación', unit: 'mm' }
+];
+
+function FwiInputsBreakdown({ fwiInputs }) {
+  if (!fwiInputs) {
+    return <p className="panel-chart-empty">Sin datos de componentes FWI disponibles.</p>;
+  }
+
+  return (
+    <div className="panel-fwi-inputs">
+      {FWI_INPUT_META.map(({ key, label, unit }) => {
+        const val = fwiInputs[key];
+        const display = typeof val === 'number' ? `${val.toFixed(1)} ${unit}` : '—';
+        return (
+          <div key={key} className="panel-fwi-input-row">
+            <span className="panel-fwi-input-label">{label}</span>
+            <span className="panel-fwi-input-value">{display}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function ComunaRiskPanel({ comunaId, score, onClose, canSync, onSync }) {
   if (!comunaId || !score) return null;
 
@@ -147,6 +178,11 @@ export default function ComunaRiskPanel({ comunaId, score, onClose, canSync, onS
             );
           })}
         </div>
+      </section>
+
+      <section className="panel-section">
+        <h5 className="panel-section-title">Componentes FWI proxy</h5>
+        <FwiInputsBreakdown fwiInputs={score.fwiInputs} />
       </section>
 
       <section className="panel-section">
