@@ -31,6 +31,13 @@ public class TerritoryWeatherObservation {
     private Double lat;
     private Double lon;
 
+    // Climate variables (Slice A - Frente 1)
+    private Double tempMax;
+    private Double humidityMin;
+    private Double windMax;
+    private Double precip;
+    private Double soilTemp;
+
     private LocalDateTime ingestedAt;
 
     public String getId() { return id; }
@@ -74,4 +81,19 @@ public class TerritoryWeatherObservation {
 
     public LocalDateTime getIngestedAt() { return ingestedAt; }
     public void setIngestedAt(LocalDateTime ingestedAt) { this.ingestedAt = ingestedAt; }
+
+    public Double getTempMax() { return tempMax; }
+    public void setTempMax(Double tempMax) { this.tempMax = tempMax; }
+
+    public Double getHumidityMin() { return humidityMin; }
+    public void setHumidityMin(Double humidityMin) { this.humidityMin = humidityMin; }
+
+    public Double getWindMax() { return windMax; }
+    public void setWindMax(Double windMax) { this.windMax = windMax; }
+
+    public Double getPrecip() { return precip; }
+    public void setPrecip(Double precip) { this.precip = precip; }
+
+    public Double getSoilTemp() { return soilTemp; }
+    public void setSoilTemp(Double soilTemp) { this.soilTemp = soilTemp; }
 }

@@ -84,6 +84,7 @@ public class OpenWeatherFwiServiceImpl implements OpenWeatherFwiService {
             + "?latitude=" + lat
             + "&longitude=" + lon
             + "&daily=temperature_2m_max,relative_humidity_2m_min,windspeed_10m_max,precipitation_sum"
+            + "&hourly=soil_temperature_0cm"
             + "&forecast_days=1"
             + "&timezone=America%2FSantiago";
 
@@ -103,11 +104,13 @@ public class OpenWeatherFwiServiceImpl implements OpenWeatherFwiService {
 
             JsonNode root = objectMapper.readTree(response.body());
             JsonNode daily = root.path("daily");
+            JsonNode hourly = root.path("hourly");
 
             Double tempMax = getFirstDouble(daily, "temperature_2m_max");
             Double rhMin = getFirstDouble(daily, "relative_humidity_2m_min");
             Double windMax = getFirstDouble(daily, "windspeed_10m_max");
             Double precip = getFirstDouble(daily, "precipitation_sum");
+            Double soilTemp = getDailyAggregateFromHourly(hourly, "soil_temperature_0cm");
 
             if (tempMax == null || rhMin == null || windMax == null || precip == null) {
                 LOGGER.warn("fwi_api status=missing_fields regionId={}", regionId);
@@ -123,6 +126,11 @@ public class OpenWeatherFwiServiceImpl implements OpenWeatherFwiService {
             obs.setLat(lat);
             obs.setLon(lon);
             obs.setFwi(round2(proxyFwi));
+            obs.setTempMax(tempMax);
+            obs.setHumidityMin(rhMin);
+            obs.setWindMax(windMax);
+            obs.setPrecip(precip);
+            obs.setSoilTemp(soilTemp == null ? null : round2(soilTemp));
             obs.setIngestedAt(LocalDateTime.now());
             weatherRepository.save(obs);
 
@@ -169,6 +177,31 @@ public class OpenWeatherFwiServiceImpl implements OpenWeatherFwiService {
             return null;
         }
         return arr.get(0).asDouble();
+    }
+
+    /**
+     * Open-Meteo no expone un agregado diario de temperatura de suelo en el tier gratuito;
+     * se solicita la serie horaria (24 valores) y se promedia para obtener un valor diario.
+     * Retorna null sin lanzar excepcion si el campo no esta disponible (graceful degradation).
+     */
+    private Double getDailyAggregateFromHourly(JsonNode hourly, String field) {
+        JsonNode arr = hourly.path(field);
+        if (arr.isMissingNode() || !arr.isArray() || arr.isEmpty()) {
+            return null;
+        }
+        double sum = 0.0;
+        int count = 0;
+        for (JsonNode value : arr) {
+            if (value.isNull()) {
+                continue;
+            }
+            sum += value.asDouble();
+            count++;
+        }
+        if (count == 0) {
+            return null;
+        }
+        return sum / count;
     }
 
     private double round2(double value) {
