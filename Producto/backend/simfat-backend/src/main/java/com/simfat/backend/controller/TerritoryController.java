@@ -286,7 +286,6 @@ public class TerritoryController {
     }
 
     @GetMapping("/risk-score/{regionId}")
-    @PreAuthorize("hasAnyAuthority('ROLE_VERIFIED_USER','ROLE_MODERATOR','ROLE_ADMIN','ROLE_SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<Map<String, Object>>> getRiskScore(@PathVariable String regionId) {
         TerritoryRiskSnapshot snapshot = territoryRiskService.getLatestSnapshot(regionId);
         if (snapshot == null) {
@@ -338,7 +337,6 @@ public class TerritoryController {
     }
 
     @GetMapping("/risk-score/comunas/{regionId}")
-    @PreAuthorize("hasAnyAuthority('ROLE_VERIFIED_USER','ROLE_MODERATOR','ROLE_ADMIN','ROLE_SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<Map<String, Object>>> getComunalRiskScores(@PathVariable String regionId) {
         Map<String, ComunaRiskSnapshot> snapshots = comunaRiskService.getLatestSnapshotsByRegion(regionId);
         Map<String, Object> result = new LinkedHashMap<>();
@@ -370,7 +368,6 @@ public class TerritoryController {
     }
 
     @GetMapping("/risk-score/comunas/{gadmGid}/history")
-    @PreAuthorize("hasAnyAuthority('ROLE_VERIFIED_USER','ROLE_MODERATOR','ROLE_ADMIN','ROLE_SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<Map<String, Object>>> getComunaHistory(
         @PathVariable String gadmGid,
         @RequestParam(defaultValue = "7") int days
