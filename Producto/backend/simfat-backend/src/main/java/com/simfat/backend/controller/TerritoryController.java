@@ -146,17 +146,27 @@ public class TerritoryController {
         if (requestedIndicators.contains("RISK_SCORE")) {
             layers.put("RISK_SCORE", riskScoreLayer(regionId, geometry));
         }
-        if (requestedIndicators.contains("WIND")) {
-            layers.put("WIND", climateValueMap(regionId, "WIND", "km/h", TerritoryWeatherObservation::getWindMax));
-        }
-        if (requestedIndicators.contains("HUMIDITY")) {
-            layers.put("HUMIDITY", climateValueMap(regionId, "HUMIDITY", "%", TerritoryWeatherObservation::getHumidityMin));
-        }
-        if (requestedIndicators.contains("AIR_TEMP")) {
-            layers.put("AIR_TEMP", climateValueMap(regionId, "AIR_TEMP", "°C", TerritoryWeatherObservation::getTempMax));
-        }
-        if (requestedIndicators.contains("SOIL_TEMP")) {
-            layers.put("SOIL_TEMP", climateValueMap(regionId, "SOIL_TEMP", "°C", TerritoryWeatherObservation::getSoilTemp));
+        boolean needsClimateLayers = requestedIndicators.contains("WIND")
+            || requestedIndicators.contains("HUMIDITY")
+            || requestedIndicators.contains("AIR_TEMP")
+            || requestedIndicators.contains("SOIL_TEMP");
+
+        if (needsClimateLayers) {
+            List<ComunaInfo> comunas = comunaInfoRepository.findByRegionId(regionId);
+            Map<String, TerritoryWeatherObservation> latestByComuna = latestWeatherByComuna(comunas);
+
+            if (requestedIndicators.contains("WIND")) {
+                layers.put("WIND", climateValueMap(comunas, latestByComuna, "WIND", "km/h", TerritoryWeatherObservation::getWindMax));
+            }
+            if (requestedIndicators.contains("HUMIDITY")) {
+                layers.put("HUMIDITY", climateValueMap(comunas, latestByComuna, "HUMIDITY", "%", TerritoryWeatherObservation::getHumidityMin));
+            }
+            if (requestedIndicators.contains("AIR_TEMP")) {
+                layers.put("AIR_TEMP", climateValueMap(comunas, latestByComuna, "AIR_TEMP", "°C", TerritoryWeatherObservation::getTempMax));
+            }
+            if (requestedIndicators.contains("SOIL_TEMP")) {
+                layers.put("SOIL_TEMP", climateValueMap(comunas, latestByComuna, "SOIL_TEMP", "°C", TerritoryWeatherObservation::getSoilTemp));
+            }
         }
 
         TerritoryLayersResponseDTO dto = new TerritoryLayersResponseDTO();
@@ -452,32 +462,49 @@ public class TerritoryController {
     }
 
     /**
+     * Resuelve la ultima observacion meteorologica de cada comuna en una unica consulta
+     * (en vez de una consulta por comuna), para evitar el patron N+1 al construir las
+     * capas climaticas (WIND/HUMIDITY/AIR_TEMP/SOIL_TEMP) de /layers.
+     */
+    private Map<String, TerritoryWeatherObservation> latestWeatherByComuna(List<ComunaInfo> comunas) {
+        List<String> comunaIds = comunas.stream().map(ComunaInfo::getId).collect(Collectors.toList());
+        Map<String, TerritoryWeatherObservation> latestByComuna = new LinkedHashMap<>();
+
+        for (TerritoryWeatherObservation obs : weatherObservationRepository.findByRegionIdInOrderByObservedAtDesc(comunaIds)) {
+            latestByComuna.putIfAbsent(obs.getRegionId(), obs);
+        }
+
+        return latestByComuna;
+    }
+
+    /**
      * Construye un mapa de valores por comuna {comunaId: {value, unit, observedAt}} para una capa
      * climatica (WIND/HUMIDITY/AIR_TEMP/SOIL_TEMP), a partir de la ultima observacion meteorologica
      * persistida por comuna. Comunas sin observacion se omiten (no error) por requisito de spec.
      */
     private Map<String, Object> climateValueMap(
-        String regionId,
+        List<ComunaInfo> comunas,
+        Map<String, TerritoryWeatherObservation> latestByComuna,
         String indicator,
         String unit,
         Function<TerritoryWeatherObservation, Double> valueExtractor
     ) {
-        List<ComunaInfo> comunas = comunaInfoRepository.findByRegionId(regionId);
         Map<String, Object> values = new LinkedHashMap<>();
 
         for (ComunaInfo comuna : comunas) {
-            weatherObservationRepository.findTopByRegionIdOrderByObservedAtDesc(comuna.getId())
-                .ifPresent(obs -> {
-                    Double value = valueExtractor.apply(obs);
-                    if (value == null) {
-                        return;
-                    }
-                    Map<String, Object> entry = new LinkedHashMap<>();
-                    entry.put("value", value);
-                    entry.put("unit", unit);
-                    entry.put("observedAt", obs.getObservedAt());
-                    values.put(comuna.getId(), entry);
-                });
+            TerritoryWeatherObservation obs = latestByComuna.get(comuna.getId());
+            if (obs == null) {
+                continue;
+            }
+            Double value = valueExtractor.apply(obs);
+            if (value == null) {
+                continue;
+            }
+            Map<String, Object> entry = new LinkedHashMap<>();
+            entry.put("value", value);
+            entry.put("unit", unit);
+            entry.put("observedAt", obs.getObservedAt());
+            values.put(comuna.getId(), entry);
         }
 
         Map<String, Object> result = new LinkedHashMap<>();

@@ -13,4 +13,6 @@ public interface TerritoryWeatherObservationRepository extends MongoRepository<T
     List<TerritoryWeatherObservation> findByRegionIdAndObservedAtBetweenOrderByObservedAtDesc(
         String regionId, LocalDateTime from, LocalDateTime to
     );
+
+    List<TerritoryWeatherObservation> findByRegionIdInOrderByObservedAtDesc(List<String> regionIds);
 }
