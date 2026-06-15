@@ -96,7 +96,8 @@ const FWI_INPUT_META = [
   { key: 'tempMax', label: 'Temp. máxima', unit: '°C' },
   { key: 'humidityMin', label: 'Humedad mínima', unit: '%' },
   { key: 'windMax', label: 'Viento máximo', unit: 'km/h' },
-  { key: 'precip', label: 'Precipitación', unit: 'mm' }
+  { key: 'precip', label: 'Precipitación', unit: 'mm' },
+  { key: 'soilTemp', label: 'Temp. del suelo', unit: '°C' }
 ];
 
 function FwiInputsBreakdown({ fwiInputs }) {

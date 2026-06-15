@@ -487,7 +487,9 @@ function TerritoryMapPanel({
         </label>
 
         <div className="territory-layer-toggles">
-          {['RISK_SCORE', 'FIRMS', 'NDVI', 'NDMI', 'LOSS', 'ALERTS', 'REPORTS'].map((indicator) => (
+          {/* RISK_SCORE no es un toggle: el choropleth comunal y el panel de
+              riesgo se muestran siempre (spec: risk-score-breakdown-panel). */}
+          {['FIRMS', 'NDVI', 'NDMI', 'LOSS', 'ALERTS', 'REPORTS'].map((indicator) => (
             <label key={indicator} className="territory-toggle">
               <input
                 type="checkbox"

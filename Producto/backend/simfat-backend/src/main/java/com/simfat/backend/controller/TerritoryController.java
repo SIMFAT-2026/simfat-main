@@ -37,7 +37,6 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.http.MediaType;
-import java.util.Map;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
@@ -135,7 +134,7 @@ public class TerritoryController {
             layers.put("LOSS", lossLayer(regionId, geometry));
         }
         if (requestedIndicators.contains("ALERTS")) {
-            layers.put("ALERTS", alertsLayer(fromDate, toDate));
+            layers.put("ALERTS", alertsLayer(regionId, fromDate, toDate));
         }
         if (requestedIndicators.contains("FIRMS")) {
             layers.put("FIRMS", firmsLayer(regionId, fromDate, toDate));
@@ -259,8 +258,8 @@ public class TerritoryController {
         return featureCollection(features);
     }
 
-    private Map<String, Object> alertsLayer(LocalDateTime from, LocalDateTime to) {
-        List<Map<String, Object>> features = heatAlertRepository.findAll()
+    private Map<String, Object> alertsLayer(String regionId, LocalDateTime from, LocalDateTime to) {
+        List<Map<String, Object>> features = heatAlertRepository.findByRegionId(regionId)
             .stream()
             .filter(alert -> alert.getFechaEvento() != null && !alert.getFechaEvento().isBefore(from) && !alert.getFechaEvento().isAfter(to))
             .map(this::toAlertFeature)
@@ -528,6 +527,7 @@ public class TerritoryController {
         inputs.put("humidityMin", latest.map(TerritoryWeatherObservation::getHumidityMin).orElse(null));
         inputs.put("windMax", latest.map(TerritoryWeatherObservation::getWindMax).orElse(null));
         inputs.put("precip", latest.map(TerritoryWeatherObservation::getPrecip).orElse(null));
+        inputs.put("soilTemp", latest.map(TerritoryWeatherObservation::getSoilTemp).orElse(null));
         return inputs;
     }
 
