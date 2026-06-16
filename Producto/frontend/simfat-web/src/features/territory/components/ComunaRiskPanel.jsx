@@ -121,10 +121,11 @@ function FwiInputsBreakdown({ fwiInputs }) {
   );
 }
 
-const COPERNICUS_WAIT_S = 70;
+const COPERNICUS_WAIT_S = 75;
+const COPERNICUS_RETRY_WAIT_S = 35;
 
 export default function ComunaRiskPanel({ comunaId, score, regionId, onClose, canSync, onSync }) {
-  const [syncState, setSyncState] = useState({ phase: 'idle', countdown: 0, error: null, result: null });
+  const [syncState, setSyncState] = useState({ phase: 'idle', countdown: 0, error: null, result: null, retries: 0 });
 
   useEffect(() => {
     if (syncState.phase !== 'waiting') return;
@@ -133,14 +134,22 @@ export default function ComunaRiskPanel({ comunaId, score, regionId, onClose, ca
       fetchComunalRiskScores(regionId)
         .then((scores) => {
           const updated = scores[comunaId];
-          if (updated) {
-            setSyncState({ phase: 'done', countdown: 0, error: null, result: updated });
+          const isValid = updated &&
+            Number.isFinite(updated.scoreComposite) &&
+            updated.alertLevel;
+          if (isValid) {
+            setSyncState({ phase: 'done', countdown: 0, error: null, result: updated, retries: 0 });
           } else {
-            setSyncState({ phase: 'done', countdown: 0, error: 'No se encontró el score actualizado', result: null });
+            setSyncState((s) => {
+              if (s.retries < 1) {
+                return { phase: 'waiting', countdown: COPERNICUS_RETRY_WAIT_S, error: null, result: null, retries: s.retries + 1 };
+              }
+              return { phase: 'done', countdown: 0, error: 'Copernicus está procesando. El score se actualizará en el próximo ciclo automático (~01:30 UTC).', result: null, retries: 0 };
+            });
           }
         })
         .catch(() => {
-          setSyncState({ phase: 'done', countdown: 0, error: 'Error al obtener el score actualizado', result: null });
+          setSyncState({ phase: 'done', countdown: 0, error: 'Error al obtener el score actualizado', result: null, retries: 0 });
         });
       return;
     }
@@ -164,19 +173,20 @@ export default function ComunaRiskPanel({ comunaId, score, regionId, onClose, ca
     : null;
 
   async function handleCopernicusSync() {
-    setSyncState({ phase: 'requesting', countdown: 0, error: null, result: null });
+    setSyncState({ phase: 'requesting', countdown: 0, error: null, result: null, retries: 0 });
     try {
       await syncComunaCopernicus(comunaId);
-      setSyncState({ phase: 'waiting', countdown: COPERNICUS_WAIT_S, error: null, result: null });
+      setSyncState({ phase: 'waiting', countdown: COPERNICUS_WAIT_S, error: null, result: null, retries: 0 });
     } catch (err) {
       const msg = err?.response?.data?.message || err?.message || 'Error al conectar con Copernicus';
-      setSyncState({ phase: 'done', countdown: 0, error: msg, result: null });
+      setSyncState({ phase: 'done', countdown: 0, error: msg, result: null, retries: 0 });
     }
   }
 
   const isLoading = syncState.phase === 'requesting' || syncState.phase === 'waiting' || syncState.phase === 'fetching';
   const btnLabel = syncState.phase === 'requesting' ? 'Iniciando…'
-    : syncState.phase === 'waiting' ? `Copernicus procesando… ${syncState.countdown}s`
+    : syncState.phase === 'waiting' && syncState.retries === 0 ? `Copernicus procesando… ${syncState.countdown}s`
+    : syncState.phase === 'waiting' && syncState.retries > 0 ? `Verificando resultado… ${syncState.countdown}s`
     : syncState.phase === 'fetching' ? 'Obteniendo resultado…'
     : 'Confirmar con Copernicus';
 
