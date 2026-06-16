@@ -134,17 +134,16 @@ export default function ComunaRiskPanel({ comunaId, score, regionId, onClose, ca
       fetchComunalRiskScores(regionId)
         .then((scores) => {
           const updated = scores[comunaId];
-          const isValid = updated &&
-            Number.isFinite(updated.scoreComposite) &&
-            updated.alertLevel;
-          if (isValid) {
+          const isEnhanced = updated?.mode === 'ENHANCED' && Number.isFinite(updated?.scoreComposite);
+          if (isEnhanced) {
             setSyncState({ phase: 'done', countdown: 0, error: null, result: updated, retries: 0 });
           } else {
             setSyncState((s) => {
               if (s.retries < 1) {
                 return { phase: 'waiting', countdown: COPERNICUS_RETRY_WAIT_S, error: null, result: null, retries: s.retries + 1 };
               }
-              return { phase: 'done', countdown: 0, error: 'Copernicus está procesando. El score se actualizará en el próximo ciclo automático (~01:30 UTC).', result: null, retries: 0 };
+              const noData = 'Copernicus no devolvió datos de vegetación para esta área (posible nubosidad o sin cobertura reciente).';
+              return { phase: 'done', countdown: 0, error: noData, result: null, retries: 0 };
             });
           }
         })
