@@ -544,7 +544,7 @@ public class OpenEoSyncServiceImpl implements OpenEoSyncService {
         if (region.getCodigo() == null || region.getCodigo().isBlank()) {
             return null;
         }
-        return aoiBboxByRegionCode.get(region.getCodigo().trim().toUpperCase());
+        return aoiBboxByRegionCode.get(region.getId().trim().toUpperCase());
     }
 
     private BoundingBox toBoundingBox(List<Double> bbox) {
