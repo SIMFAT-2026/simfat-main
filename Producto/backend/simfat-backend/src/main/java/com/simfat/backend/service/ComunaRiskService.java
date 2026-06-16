@@ -15,4 +15,6 @@ public interface ComunaRiskService {
     List<ComunaRiskSnapshot> getLatestSnapshotsListByRegion(String regionId);
 
     List<ComunaRiskSnapshot> getSnapshotHistory(String gadmGid, int days);
+
+    ComunaRiskSnapshot syncCopernicusAndRecompute(String comunaId);
 }

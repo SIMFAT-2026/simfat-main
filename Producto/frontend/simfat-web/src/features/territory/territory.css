@@ -597,7 +597,7 @@
 .panel-footer {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  flex-wrap: wrap;
   gap: 8px;
   padding-top: 6px;
   border-top: 1px solid #e2e8f0;
@@ -606,11 +606,37 @@
 .panel-meta {
   font-size: 0.72rem;
   color: #94a3b8;
+  flex: 1 1 100%;
 }
 
 .panel-sync-btn {
   font-size: 0.78rem;
   padding: 4px 10px;
+}
+
+.panel-copernicus-btn {
+  font-size: 0.78rem;
+  padding: 4px 10px;
+}
+
+.panel-copernicus-btn:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
+
+.panel-sync-ok {
+  font-size: 0.72rem;
+  color: #16a34a;
+  font-weight: 500;
+  flex: 1 1 100%;
+}
+
+.panel-sync-error {
+  font-size: 0.72rem;
+  color: #dc2626;
+  font-weight: 500;
+  flex: 1 1 100%;
+  cursor: help;
 }
 
 @media (max-width: 1080px) {

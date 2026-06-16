@@ -398,6 +398,32 @@ public class TerritoryController {
         return ResponseEntity.ok(ApiResponse.ok("Historial de riesgo para " + gadmGid, result));
     }
 
+    @PostMapping("/risk-score/comunas/{comunaId}/copernicus-sync")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> syncCopernicusForComuna(@PathVariable String comunaId) {
+        try {
+            ComunaRiskSnapshot snapshot = comunaRiskService.syncCopernicusAndRecompute(comunaId);
+            Map<String, Object> result = new LinkedHashMap<>();
+            result.put("comunaId", comunaId);
+            result.put("nombreComuna", snapshot.getNombreComuna());
+            result.put("mode", snapshot.getMode());
+            result.put("alertLevel", snapshot.getAlertLevel());
+            result.put("scoreComposite", snapshot.getScoreComposite());
+            result.put("ndviRaw", snapshot.getNdviRaw());
+            result.put("ndmiRaw", snapshot.getNdmiRaw());
+            result.put("computedAt", snapshot.getComputedAt());
+            result.put("qualityFlag", snapshot.getQualityFlag());
+            return ResponseEntity.ok(ApiResponse.ok("Sync Copernicus completado para " + comunaId, result));
+        } catch (Exception ex) {
+            Map<String, Object> error = Map.of(
+                "comunaId", comunaId,
+                "error", ex.getMessage() != null ? ex.getMessage() : "Error al sincronizar con Copernicus"
+            );
+            return ResponseEntity.internalServerError()
+                .body(ApiResponse.ok("Error en sync Copernicus para " + comunaId, error));
+        }
+    }
+
     @PostMapping("/sync")
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<Map<String, Object>>> triggerSync(@RequestParam String regionId) {

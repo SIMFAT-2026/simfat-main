@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { LineChart, Line, XAxis, YAxis, Tooltip as ChartTooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
-import { fetchComunaHistory } from '../services/territoryApiService';
+import { fetchComunaHistory, syncComunaCopernicus } from '../services/territoryApiService';
 
 const ALERT_LEVEL_CONFIG = {
   NORMAL:     { color: '#16a34a', label: 'Normal' },
@@ -122,24 +122,38 @@ function FwiInputsBreakdown({ fwiInputs }) {
 }
 
 export default function ComunaRiskPanel({ comunaId, score, onClose, canSync, onSync }) {
+  const [syncState, setSyncState] = useState({ loading: false, error: null, result: null });
+
   if (!comunaId || !score) return null;
 
-  const level = ALERT_LEVEL_CONFIG[score.alertLevel] || ALERT_LEVEL_CONFIG.NORMAL;
-  const pct = typeof score.scoreComposite === 'number' ? (score.scoreComposite * 100).toFixed(0) : '—';
-  const mode = score.mode || 'STANDARD';
-  const components = score.components || {};
+  const displayScore = syncState.result || score;
+  const level = ALERT_LEVEL_CONFIG[displayScore.alertLevel] || ALERT_LEVEL_CONFIG.NORMAL;
+  const pct = typeof displayScore.scoreComposite === 'number' ? (displayScore.scoreComposite * 100).toFixed(0) : '—';
+  const mode = displayScore.mode || 'STANDARD';
+  const components = displayScore.components || {};
   const meta = COMPONENT_META[mode] || COMPONENT_META.STANDARD;
 
-  const computedAt = score.computedAt
-    ? (() => { const u = /Z|[+-]\d{2}:?\d{2}$/.test(score.computedAt) ? score.computedAt : score.computedAt + 'Z'; return new Date(u).toLocaleString('es-CL', { timeZone: 'America/Santiago', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }); })()
+  const computedAt = displayScore.computedAt
+    ? (() => { const u = /Z|[+-]\d{2}:?\d{2}$/.test(displayScore.computedAt) ? displayScore.computedAt : displayScore.computedAt + 'Z'; return new Date(u).toLocaleString('es-CL', { timeZone: 'America/Santiago', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }); })()
     : null;
+
+  async function handleCopernicusSync() {
+    setSyncState({ loading: true, error: null, result: null });
+    try {
+      const result = await syncComunaCopernicus(comunaId);
+      setSyncState({ loading: false, error: null, result });
+    } catch (err) {
+      const msg = err?.response?.data?.message || err?.message || 'Error al conectar con Copernicus';
+      setSyncState({ loading: false, error: msg, result: null });
+    }
+  }
 
   return (
     <aside className="comuna-risk-panel">
       <div className="panel-header">
         <div>
-          <p className="panel-region">{score.regionId}</p>
-          <h4 className="panel-nombre">{score.nombreComuna || comunaId}</h4>
+          <p className="panel-region">{displayScore.regionId}</p>
+          <h4 className="panel-nombre">{displayScore.nombreComuna || comunaId}</h4>
         </div>
         <button type="button" className="panel-close" onClick={onClose} aria-label="Cerrar">×</button>
       </div>
@@ -151,8 +165,8 @@ export default function ComunaRiskPanel({ comunaId, score, onClose, canSync, onS
         </div>
         <div className="panel-badges">
           <span className={`panel-mode-badge ${mode === 'ENHANCED' ? 'enhanced' : 'standard'}`}>{mode}</span>
-          {score.qualityFlag && (
-            <span className="panel-quality-flag" title={score.qualityFlag}>⚠ parcial</span>
+          {displayScore.qualityFlag && (
+            <span className="panel-quality-flag" title={displayScore.qualityFlag}>⚠ parcial</span>
           )}
         </div>
       </div>
@@ -183,7 +197,7 @@ export default function ComunaRiskPanel({ comunaId, score, onClose, canSync, onS
 
       <section className="panel-section">
         <h5 className="panel-section-title">Componentes FWI proxy</h5>
-        <FwiInputsBreakdown fwiInputs={score.fwiInputs} />
+        <FwiInputsBreakdown fwiInputs={displayScore.fwiInputs} />
       </section>
 
       <section className="panel-section">
@@ -202,6 +216,25 @@ export default function ComunaRiskPanel({ comunaId, score, onClose, canSync, onS
           <button type="button" className="btn btn-secondary btn-sm panel-sync-btn" onClick={onSync}>
             Sync ahora
           </button>
+        )}
+        <button
+          type="button"
+          className="btn btn-primary btn-sm panel-copernicus-btn"
+          onClick={handleCopernicusSync}
+          disabled={syncState.loading}
+          title="Consulta NDVI y NDMI directamente desde Copernicus para esta comuna (~60s)"
+        >
+          {syncState.loading ? 'Consultando Copernicus…' : 'Confirmar con Copernicus'}
+        </button>
+        {syncState.result && (
+          <span className="panel-sync-ok">
+            NDVI {typeof syncState.result.ndviRaw === 'number' ? syncState.result.ndviRaw.toFixed(3) : '—'} ·
+            NDMI {typeof syncState.result.ndmiRaw === 'number' ? syncState.result.ndmiRaw.toFixed(3) : '—'} ·
+            {syncState.result.mode}
+          </span>
+        )}
+        {syncState.error && (
+          <span className="panel-sync-error" title={syncState.error}>Error Copernicus</span>
         )}
       </div>
     </aside>

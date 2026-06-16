@@ -6,7 +6,8 @@ const TERRITORY_ENDPOINTS = {
   riskScore: (regionId) => `/api/territory/risk-score/${regionId}`,
   geojson: (regionId) => `/api/territory/geojson/${regionId}`,
   comunalScores: (regionId) => `/api/territory/risk-score/comunas/${regionId}`,
-  comunaHistory: (gadmGid, days) => `/api/territory/risk-score/comunas/${gadmGid}/history?days=${days}`
+  comunaHistory: (gadmGid, days) => `/api/territory/risk-score/comunas/${gadmGid}/history?days=${days}`,
+  copernicusSync: (comunaId) => `/api/territory/risk-score/comunas/${comunaId}/copernicus-sync`
 };
 
 function isFeatureCollection(value) {
@@ -157,6 +158,12 @@ export async function fetchComunalRiskScores(regionId) {
 
 export async function fetchComunaHistory(gadmGid, days = 7) {
   const response = await axiosClient.get(TERRITORY_ENDPOINTS.comunaHistory(gadmGid, days));
+  const source = (response.data && response.data.data) || response.data || {};
+  return source;
+}
+
+export async function syncComunaCopernicus(comunaId) {
+  const response = await axiosClient.post(TERRITORY_ENDPOINTS.copernicusSync(comunaId));
   const source = (response.data && response.data.data) || response.data || {};
   return source;
 }

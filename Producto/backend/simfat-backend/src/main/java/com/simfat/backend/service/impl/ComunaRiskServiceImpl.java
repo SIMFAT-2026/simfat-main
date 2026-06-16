@@ -1,5 +1,8 @@
 package com.simfat.backend.service.impl;
 
+import com.simfat.backend.integration.openeo.OpenEoIndicatorLatestRequest;
+import com.simfat.backend.integration.openeo.OpenEoIndicatorLatestResponse;
+import com.simfat.backend.integration.openeo.OpenEoServiceClient;
 import com.simfat.backend.model.ComunaInfo;
 import com.simfat.backend.model.ComunaRiskSnapshot;
 import com.simfat.backend.model.HeatAlertEvent;
@@ -15,6 +18,7 @@ import com.simfat.backend.repository.TerritoryWeatherObservationRepository;
 import com.simfat.backend.service.ComunaRiskService;
 import com.simfat.backend.service.NotificationService;
 import com.simfat.backend.service.OpenWeatherFwiService;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
@@ -64,6 +68,8 @@ public class ComunaRiskServiceImpl implements ComunaRiskService {
     private static final double FWI_PREVENTIVO = 20.0;
     private static final double FWI_CRITICO = 45.0;
 
+    private static final double COPERNICUS_COMUNA_PAD_DEG = 0.15;
+
     private final ComunaInfoRepository comunaRepository;
     private final ComunaRiskSnapshotRepository snapshotRepository;
     private final TerritoryWeatherObservationRepository weatherRepository;
@@ -72,6 +78,7 @@ public class ComunaRiskServiceImpl implements ComunaRiskService {
     private final OpenWeatherFwiService fwiService;
     private final OpenEoIndicatorObservationRepository openEoObsRepository;
     private final NotificationService notificationService;
+    private final OpenEoServiceClient openEoServiceClient;
 
     public ComunaRiskServiceImpl(
         ComunaInfoRepository comunaRepository,
@@ -81,7 +88,8 @@ public class ComunaRiskServiceImpl implements ComunaRiskService {
         CitizenReportRepository citizenReportRepository,
         OpenWeatherFwiService fwiService,
         OpenEoIndicatorObservationRepository openEoObsRepository,
-        NotificationService notificationService
+        NotificationService notificationService,
+        OpenEoServiceClient openEoServiceClient
     ) {
         this.comunaRepository = comunaRepository;
         this.snapshotRepository = snapshotRepository;
@@ -91,6 +99,7 @@ public class ComunaRiskServiceImpl implements ComunaRiskService {
         this.fwiService = fwiService;
         this.openEoObsRepository = openEoObsRepository;
         this.notificationService = notificationService;
+        this.openEoServiceClient = openEoServiceClient;
     }
 
     @Scheduled(cron = "${territory.riesgo.comunal.cron:0 30 1,13 * * *}")
@@ -273,6 +282,54 @@ public class ComunaRiskServiceImpl implements ComunaRiskService {
     @Override
     public List<ComunaRiskSnapshot> getLatestSnapshotsListByRegion(String regionId) {
         return getLatestSnapshotsByRegion(regionId).values().stream().toList();
+    }
+
+    @Override
+    public ComunaRiskSnapshot syncCopernicusAndRecompute(String comunaId) {
+        ComunaInfo comuna = comunaRepository.findById(comunaId)
+            .orElseThrow(() -> new IllegalArgumentException("Comuna no encontrada: " + comunaId));
+
+        if (comuna.getCenterLat() == null || comuna.getCenterLon() == null) {
+            LOGGER.warn("copernicus_comuna_sync status=skip reason=no_centroid comunaId={}", comunaId);
+            return recomputeByComuna(comunaId);
+        }
+
+        double west = comuna.getCenterLon() - COPERNICUS_COMUNA_PAD_DEG;
+        double south = comuna.getCenterLat() - COPERNICUS_COMUNA_PAD_DEG;
+        double east = comuna.getCenterLon() + COPERNICUS_COMUNA_PAD_DEG;
+        double north = comuna.getCenterLat() + COPERNICUS_COMUNA_PAD_DEG;
+        LocalDate today = LocalDate.now();
+        String periodStart = today.minusDays(30).toString();
+        String periodEnd = today.toString();
+
+        for (IndicatorType indicator : List.of(IndicatorType.NDVI, IndicatorType.NDMI)) {
+            try {
+                OpenEoIndicatorLatestRequest req = new OpenEoIndicatorLatestRequest();
+                req.setRegionId(comunaId);
+                req.setAoi(new OpenEoIndicatorLatestRequest.AoiRequest("bbox", List.of(west, south, east, north)));
+                req.setPeriodStart(periodStart);
+                req.setPeriodEnd(periodEnd);
+
+                OpenEoIndicatorLatestResponse resp = openEoServiceClient.fetchLatestIndicator(indicator, req);
+
+                if (resp.getValue() != null && comuna.getRegionId() != null) {
+                    OpenEoIndicatorObservation obs = new OpenEoIndicatorObservation();
+                    obs.setRegionId(comuna.getRegionId());
+                    obs.setIndicator(indicator);
+                    obs.setObservedAt(resp.getMeasuredAt() != null ? resp.getMeasuredAt() : LocalDateTime.now());
+                    obs.setValue(resp.getValue());
+                    obs.setSource("openeo-service-manual");
+                    obs.setQuality(resp.getQuality() != null ? resp.getQuality() : "measured");
+                    obs.setIngestedAt(LocalDateTime.now());
+                    openEoObsRepository.save(obs);
+                    LOGGER.info("copernicus_comuna_sync status=ok comunaId={} indicator={} value={}", comunaId, indicator, resp.getValue());
+                }
+            } catch (Exception ex) {
+                LOGGER.warn("copernicus_comuna_sync status=error comunaId={} indicator={} error={}", comunaId, indicator, ex.getMessage());
+            }
+        }
+
+        return recomputeByComuna(comunaId);
     }
 
     private List<HeatAlertEvent> assignFocosToComuna(
