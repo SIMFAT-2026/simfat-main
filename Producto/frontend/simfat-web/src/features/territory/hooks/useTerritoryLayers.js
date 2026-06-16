@@ -279,9 +279,10 @@ async function loadRegionData({ regionId, indicators, from, to, force = false })
 
   try {
     const data = await requestPromise;
+    const ttl = data.source === 'mock' ? 8_000 : CACHE_TTL_MS;
     cacheByKey.set(key, {
       data,
-      expiresAt: Date.now() + CACHE_TTL_MS
+      expiresAt: Date.now() + ttl
     });
     return data;
   } finally {
@@ -366,14 +367,25 @@ export function useTerritoryLayers(options = {}) {
       await loadRegion(selectedRegionId, false);
       const remaining = REGION_OPTIONS.filter((region) => region.id !== selectedRegionId);
       for (const region of remaining) {
-        if (!mounted) {
-          break;
-        }
+        if (!mounted) break;
         await loadRegion(region.id, false);
       }
     }
 
-    bootstrap();
+    async function bootstrapWithRetry() {
+      await bootstrap();
+      // If the initial load hit a cold-start timeout and fell back to mock data,
+      // retry once after the container has had time to warm up.
+      await new Promise((resolve) => setTimeout(resolve, 10_000));
+      if (!mounted) return;
+      setDataByRegion((current) => {
+        const isMock = current[selectedRegionId]?.source === 'mock';
+        if (isMock) loadRegion(selectedRegionId, true);
+        return current;
+      });
+    }
+
+    bootstrapWithRetry();
 
     return () => {
       mounted = false;

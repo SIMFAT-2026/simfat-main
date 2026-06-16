@@ -57,9 +57,6 @@ public class ComunaRiskServiceImpl implements ComunaRiskService {
     private static final double NDVI_MIN = 0.1;
     private static final double NDVI_MAX = 0.8;
 
-    // Umbral para activar Copernicus
-    private static final double COPERNICUS_TRIGGER_THRESHOLD = 0.50;
-
     // Umbrales de alerta
     private static final double SCORE_PREVENTIVO = 0.50;
     private static final double SCORE_ALTO = 0.70;
@@ -180,7 +177,7 @@ public class ComunaRiskServiceImpl implements ComunaRiskService {
         Double ndviRawVal = null;
         String openeoObsId = null;
 
-        if (scoreStandard >= COPERNICUS_TRIGGER_THRESHOLD) {
+        {
             LocalDateTime cutoff = now.minusDays(COPERNICUS_STALENESS_DAYS);
             Optional<OpenEoIndicatorObservation> ndmiObs = openEoObsRepository
                 .findTopByRegionIdAndIndicatorOrderByObservedAtDesc(comuna.getRegionId(), IndicatorType.NDMI);
