@@ -374,13 +374,14 @@ export function useTerritoryLayers(options = {}) {
 
     async function bootstrapWithRetry() {
       await bootstrap();
-      // If the initial load hit a cold-start timeout and fell back to mock data,
-      // retry once after the container has had time to warm up.
+      // If the initial load hit a cold-start timeout (mock fallback) or returned
+      // backend data with missing comunalScores (partial success), retry once.
       await new Promise((resolve) => setTimeout(resolve, 10_000));
       if (!mounted) return;
       setDataByRegion((current) => {
-        const isMock = current[selectedRegionId]?.source === 'mock';
-        if (isMock) loadRegion(selectedRegionId, true);
+        const regionEntry = current[selectedRegionId];
+        const needsRetry = regionEntry?.source === 'mock' || regionEntry?.comunalScores == null;
+        if (needsRetry) loadRegion(selectedRegionId, true);
         return current;
       });
     }
