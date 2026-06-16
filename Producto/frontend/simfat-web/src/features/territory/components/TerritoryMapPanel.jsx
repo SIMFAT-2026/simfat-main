@@ -603,6 +603,7 @@ function TerritoryMapPanel({
             <ComunaRiskPanel
               comunaId={selectedComuna.comunaId}
               score={selectedComuna.score}
+              regionId={selectedRegionId}
               onClose={() => setSelectedComuna(null)}
               canSync={false}
             />

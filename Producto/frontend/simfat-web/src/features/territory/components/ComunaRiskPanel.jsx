@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { LineChart, Line, XAxis, YAxis, Tooltip as ChartTooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
-import { fetchComunaHistory, syncComunaCopernicus } from '../services/territoryApiService';
+import { fetchComunaHistory, fetchComunalRiskScores, syncComunaCopernicus } from '../services/territoryApiService';
 
 const ALERT_LEVEL_CONFIG = {
   NORMAL:     { color: '#16a34a', label: 'Normal' },
@@ -121,8 +121,34 @@ function FwiInputsBreakdown({ fwiInputs }) {
   );
 }
 
-export default function ComunaRiskPanel({ comunaId, score, onClose, canSync, onSync }) {
-  const [syncState, setSyncState] = useState({ loading: false, error: null, result: null });
+const COPERNICUS_WAIT_S = 70;
+
+export default function ComunaRiskPanel({ comunaId, score, regionId, onClose, canSync, onSync }) {
+  const [syncState, setSyncState] = useState({ phase: 'idle', countdown: 0, error: null, result: null });
+
+  useEffect(() => {
+    if (syncState.phase !== 'waiting') return;
+    if (syncState.countdown <= 0) {
+      setSyncState((s) => ({ ...s, phase: 'fetching' }));
+      fetchComunalRiskScores(regionId)
+        .then((scores) => {
+          const updated = scores[comunaId];
+          if (updated) {
+            setSyncState({ phase: 'done', countdown: 0, error: null, result: updated });
+          } else {
+            setSyncState({ phase: 'done', countdown: 0, error: 'No se encontró el score actualizado', result: null });
+          }
+        })
+        .catch(() => {
+          setSyncState({ phase: 'done', countdown: 0, error: 'Error al obtener el score actualizado', result: null });
+        });
+      return;
+    }
+    const timer = setTimeout(() => {
+      setSyncState((s) => s.phase === 'waiting' ? { ...s, countdown: s.countdown - 1 } : s);
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, [syncState.phase, syncState.countdown, comunaId, regionId]);
 
   if (!comunaId || !score) return null;
 
@@ -138,15 +164,21 @@ export default function ComunaRiskPanel({ comunaId, score, onClose, canSync, onS
     : null;
 
   async function handleCopernicusSync() {
-    setSyncState({ loading: true, error: null, result: null });
+    setSyncState({ phase: 'requesting', countdown: 0, error: null, result: null });
     try {
-      const result = await syncComunaCopernicus(comunaId);
-      setSyncState({ loading: false, error: null, result });
+      await syncComunaCopernicus(comunaId);
+      setSyncState({ phase: 'waiting', countdown: COPERNICUS_WAIT_S, error: null, result: null });
     } catch (err) {
       const msg = err?.response?.data?.message || err?.message || 'Error al conectar con Copernicus';
-      setSyncState({ loading: false, error: msg, result: null });
+      setSyncState({ phase: 'done', countdown: 0, error: msg, result: null });
     }
   }
+
+  const isLoading = syncState.phase === 'requesting' || syncState.phase === 'waiting' || syncState.phase === 'fetching';
+  const btnLabel = syncState.phase === 'requesting' ? 'Iniciando…'
+    : syncState.phase === 'waiting' ? `Copernicus procesando… ${syncState.countdown}s`
+    : syncState.phase === 'fetching' ? 'Obteniendo resultado…'
+    : 'Confirmar con Copernicus';
 
   return (
     <aside className="comuna-risk-panel">
@@ -221,19 +253,19 @@ export default function ComunaRiskPanel({ comunaId, score, onClose, canSync, onS
           type="button"
           className="btn btn-primary btn-sm panel-copernicus-btn"
           onClick={handleCopernicusSync}
-          disabled={syncState.loading}
-          title="Consulta NDVI y NDMI directamente desde Copernicus para esta comuna (~60s)"
+          disabled={isLoading}
+          title="Consulta NDVI y NDMI directamente desde Copernicus para esta comuna (~70s)"
         >
-          {syncState.loading ? 'Consultando Copernicus…' : 'Confirmar con Copernicus'}
+          {btnLabel}
         </button>
-        {syncState.result && (
+        {syncState.phase === 'done' && syncState.result && (
           <span className="panel-sync-ok">
             NDVI {typeof syncState.result.ndviRaw === 'number' ? syncState.result.ndviRaw.toFixed(3) : '—'} ·
             NDMI {typeof syncState.result.ndmiRaw === 'number' ? syncState.result.ndmiRaw.toFixed(3) : '—'} ·
             {syncState.result.mode}
           </span>
         )}
-        {syncState.error && (
+        {syncState.phase === 'done' && syncState.error && (
           <span className="panel-sync-error" title={syncState.error}>Error Copernicus</span>
         )}
       </div>

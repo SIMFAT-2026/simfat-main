@@ -401,27 +401,18 @@ public class TerritoryController {
     @PostMapping("/risk-score/comunas/{comunaId}/copernicus-sync")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<Map<String, Object>>> syncCopernicusForComuna(@PathVariable String comunaId) {
-        try {
-            ComunaRiskSnapshot snapshot = comunaRiskService.syncCopernicusAndRecompute(comunaId);
-            Map<String, Object> result = new LinkedHashMap<>();
-            result.put("comunaId", comunaId);
-            result.put("nombreComuna", snapshot.getNombreComuna());
-            result.put("mode", snapshot.getMode());
-            result.put("alertLevel", snapshot.getAlertLevel());
-            result.put("scoreComposite", snapshot.getScoreComposite());
-            result.put("ndviRaw", snapshot.getNdviRaw());
-            result.put("ndmiRaw", snapshot.getNdmiRaw());
-            result.put("computedAt", snapshot.getComputedAt());
-            result.put("qualityFlag", snapshot.getQualityFlag());
-            return ResponseEntity.ok(ApiResponse.ok("Sync Copernicus completado para " + comunaId, result));
-        } catch (Exception ex) {
-            Map<String, Object> error = Map.of(
-                "comunaId", comunaId,
-                "error", ex.getMessage() != null ? ex.getMessage() : "Error al sincronizar con Copernicus"
-            );
-            return ResponseEntity.internalServerError()
-                .body(ApiResponse.ok("Error en sync Copernicus para " + comunaId, error));
-        }
+        new Thread(() -> {
+            try {
+                comunaRiskService.syncCopernicusAndRecompute(comunaId);
+            } catch (Exception ex) {
+                // logged inside syncCopernicusAndRecompute
+            }
+        }, "copernicus-sync-" + comunaId).start();
+
+        return ResponseEntity.accepted().body(ApiResponse.ok(
+            "Sync Copernicus iniciado para " + comunaId,
+            Map.of("comunaId", comunaId, "status", "accepted", "estimatedSeconds", 70)
+        ));
     }
 
     @PostMapping("/sync")
