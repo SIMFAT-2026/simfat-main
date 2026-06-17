@@ -124,7 +124,7 @@ function FwiInputsBreakdown({ fwiInputs }) {
 const COPERNICUS_WAIT_S = 75;
 const COPERNICUS_RETRY_WAIT_S = 35;
 
-export default function ComunaRiskPanel({ comunaId, score, regionId, onClose, canSync, onSync }) {
+export default function ComunaRiskPanel({ comunaId, score, regionId, onClose, canSync, onSync, onScoreUpdated }) {
   const [syncState, setSyncState] = useState({ phase: 'idle', countdown: 0, error: null, result: null, retries: 0 });
 
   useEffect(() => {
@@ -137,6 +137,7 @@ export default function ComunaRiskPanel({ comunaId, score, regionId, onClose, ca
           const isEnhanced = updated?.mode === 'ENHANCED' && Number.isFinite(updated?.scoreComposite);
           if (isEnhanced) {
             setSyncState({ phase: 'done', countdown: 0, error: null, result: updated, retries: 0 });
+            onScoreUpdated?.(updated);
           } else {
             setSyncState((s) => {
               if (s.retries < 1) {

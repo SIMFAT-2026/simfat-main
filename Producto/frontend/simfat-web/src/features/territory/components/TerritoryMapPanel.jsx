@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, memo } from 'react';
+import { useEffect, useState, useCallback, useMemo, memo } from 'react';
 import L from 'leaflet';
 import ComunaRiskPanel from './ComunaRiskPanel';
 import { GeoJSON, MapContainer, TileLayer, useMap } from 'react-leaflet';
@@ -290,6 +290,8 @@ function RiskScoreBadge({ regionData }) {
   const level = alertLevel || 'NORMAL';
   const config = ALERT_LEVEL_CONFIG[level] || ALERT_LEVEL_CONFIG.NORMAL;
   const scoreDisplay = typeof score === 'number' ? (score * 100).toFixed(0) : '—';
+  const ndviRaw = detail?.ndviRaw ?? null;
+  const ndmiRaw = detail?.ndmiRaw ?? null;
 
   return (
     <div className="risk-score-badge" style={{ borderColor: config.color, backgroundColor: config.bg }}>
@@ -315,6 +317,12 @@ function RiskScoreBadge({ regionData }) {
               </div>
             );
           })}
+        </div>
+      )}
+      {(ndviRaw != null || ndmiRaw != null) && (
+        <div className="risk-score-copernicus">
+          {ndviRaw != null && <span className="risk-copernicus-chip">NDVI {ndviRaw.toFixed(3)}</span>}
+          {ndmiRaw != null && <span className="risk-copernicus-chip">NDMI {ndmiRaw.toFixed(3)}</span>}
         </div>
       )}
     </div>
@@ -445,6 +453,15 @@ function TerritoryMapPanel({
   const [selectedComuna, setSelectedComuna] = useState(null);
   const [selectedReport, setSelectedReport] = useState(null);
   const [reportPos, setReportPos] = useState(null);
+  const [scoreOverrides, setScoreOverrides] = useState({});
+
+  // Merge Copernicus-confirmed scores on top of the loaded comunalScores so
+  // the map tooltip and next panel open reflect the updated score immediately,
+  // without requiring a full layer reload. Resets when regionData changes.
+  const effectiveComunalScores = useMemo(
+    () => (comunalScores ? { ...comunalScores, ...scoreOverrides } : null),
+    [comunalScores, scoreOverrides]
+  );
 
   const handleComunaHover = useCallback((comunaId, nombre, score, containerPoint) => {
     setHoveredComuna({ comunaId, nombre, score });
@@ -459,6 +476,12 @@ function TerritoryMapPanel({
   const handleComunaClick = useCallback((comunaId, nombre, score) => {
     setSelectedComuna((prev) => prev?.comunaId === comunaId ? null : { comunaId, nombre, score });
   }, []);
+
+  const handleScoreUpdated = useCallback((updatedScore) => {
+    if (!updatedScore || !selectedComuna) return;
+    setScoreOverrides((prev) => ({ ...prev, [selectedComuna.comunaId]: updatedScore }));
+    setSelectedComuna((prev) => prev ? { ...prev, score: updatedScore } : null);
+  }, [selectedComuna]);
 
   return (
     <article className="dashboard-card territory-map-card">
@@ -538,7 +561,7 @@ function TerritoryMapPanel({
             {comunalGeoJson && (
               <ComunaChoropleth
                 geoJson={comunalGeoJson}
-                comunalScores={comunalScores}
+                comunalScores={effectiveComunalScores}
                 onComunaHover={handleComunaHover}
                 onComunaHoverEnd={handleComunaHoverEnd}
                 onComunaClick={handleComunaClick}
@@ -605,6 +628,7 @@ function TerritoryMapPanel({
               score={selectedComuna.score}
               regionId={selectedRegionId}
               onClose={() => setSelectedComuna(null)}
+              onScoreUpdated={handleScoreUpdated}
               canSync={false}
             />
           ) : (

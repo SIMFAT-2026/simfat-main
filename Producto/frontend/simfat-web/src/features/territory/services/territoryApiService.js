@@ -178,6 +178,8 @@ export async function fetchTerritoryRiskScore(regionId) {
     qualityFlag: source.qualityFlag || 'NO_DATA',
     computedAt: source.computedAt || null,
     components: source.components || null,
-    fwiInputs: source.fwiInputs || null
+    fwiInputs: source.fwiInputs || null,
+    ndviRaw: source.components?.ndvi?.rawValue ?? null,
+    ndmiRaw: source.components?.ndmi?.rawValue ?? null
   };
 }
