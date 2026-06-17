@@ -27,6 +27,8 @@ class OpenEOClient:
         refresh_token: str = "",
         refresh_client_id: str = "",
         refresh_client_secret: str = "",
+        username: str = "",
+        password: str = "",
     ) -> None:
         self.base_url = base_url.rstrip("/")
         self.client_id = client_id
@@ -35,6 +37,8 @@ class OpenEOClient:
         self.refresh_token = refresh_token.strip()
         self.refresh_client_id = refresh_client_id.strip()
         self.refresh_client_secret = refresh_client_secret.strip()
+        self.username = username.strip()
+        self.password = password.strip()
         self.identity_token_url = (
             "https://identity.dataspace.copernicus.eu/auth/realms/CDSE/protocol/openid-connect/token"
         )
@@ -270,6 +274,10 @@ class OpenEOClient:
             raise ExternalServiceError(f"Identity connectivity error while refreshing token: {exc}") from exc
 
         if response.status_code >= 400:
+            body = response.text
+            is_expired = "invalid_grant" in body or "Token is not active" in body
+            if is_expired and self.username and self.password:
+                return self._request_token_by_password()
             detail = self._extract_openeo_error(response)
             raise ExternalServiceError(
                 f"Identity refresh token request failed with status {response.status_code}: {detail}",
@@ -286,10 +294,56 @@ class OpenEOClient:
         self._token_cache["processing_access_token"] = access_token
         self._token_cache["processing_expires_at"] = datetime.now(timezone.utc) + timedelta(seconds=safe_ttl)
 
-        # If the provider rotates refresh tokens, keep it in memory for this process.
         rotated_refresh_token = payload.get("refresh_token")
         if isinstance(rotated_refresh_token, str) and rotated_refresh_token.strip():
             self.refresh_token = rotated_refresh_token.strip()
+
+        return access_token
+
+    def _request_token_by_password(self) -> str:
+        client_id = self.refresh_client_id or self.client_id
+        data = {
+            "grant_type": "password",
+            "client_id": client_id,
+            "username": self.username,
+            "password": self.password,
+            "scope": "openid offline_access",
+        }
+        if self.refresh_client_secret:
+            data["client_secret"] = self.refresh_client_secret
+
+        try:
+            with httpx.Client(timeout=self.timeout_seconds) as client:
+                response = self._request_with_retry(
+                    client=client,
+                    method="POST",
+                    url=self.identity_token_url,
+                    data=data,
+                )
+        except httpx.HTTPError as exc:
+            raise ExternalServiceError(f"Identity connectivity error during password auth: {exc}") from exc
+
+        if response.status_code >= 400:
+            detail = self._extract_openeo_error(response)
+            raise ExternalServiceError(
+                f"Identity password auth failed with status {response.status_code}: {detail}",
+                status_code=response.status_code,
+            )
+
+        payload = response.json()
+        access_token = payload.get("access_token")
+        if not access_token:
+            raise ExternalServiceError("Identity password auth response did not include access_token")
+
+        expires_in = int(payload.get("expires_in", 1800))
+        safe_ttl = max(expires_in - 60, 60)
+        self._token_cache["processing_access_token"] = access_token
+        self._token_cache["processing_expires_at"] = datetime.now(timezone.utc) + timedelta(seconds=safe_ttl)
+
+        # Store the new refresh token so future calls use it instead of re-doing password auth
+        new_refresh_token = payload.get("refresh_token")
+        if isinstance(new_refresh_token, str) and new_refresh_token.strip():
+            self.refresh_token = new_refresh_token.strip()
 
         return access_token
 

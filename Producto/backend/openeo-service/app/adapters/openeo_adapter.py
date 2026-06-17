@@ -17,6 +17,8 @@ class OpenEOAdapter:
             refresh_token=settings.openeo_refresh_token,
             refresh_client_id=settings.openeo_refresh_client_id,
             refresh_client_secret=settings.openeo_refresh_client_secret,
+            username=settings.openeo_username,
+            password=settings.openeo_password,
         )
 
     def get_capabilities(self) -> dict[str, Any]:

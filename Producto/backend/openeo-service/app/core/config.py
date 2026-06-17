@@ -17,6 +17,8 @@ class Settings(BaseSettings):
     openeo_refresh_token: str = Field(default="", alias="OPENEO_REFRESH_TOKEN")
     openeo_refresh_client_id: str = Field(default="", alias="OPENEO_REFRESH_CLIENT_ID")
     openeo_refresh_client_secret: str = Field(default="", alias="OPENEO_REFRESH_CLIENT_SECRET")
+    openeo_username: str = Field(default="", alias="OPENEO_USERNAME")
+    openeo_password: str = Field(default="", alias="OPENEO_PASSWORD")
 
     simfat_backend_url: str = Field(default="", alias="SIMFAT_BACKEND_URL")
     simfat_backend_indicator_ingest_path: str = Field(
