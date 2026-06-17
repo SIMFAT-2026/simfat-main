@@ -358,10 +358,8 @@ function RiskScoreBadge({ regionData }) {
             const info = COMPONENT_INFO[key];
             return (
               <div key={key} className="risk-score-component">
-                <span className="risk-component-label">
-                  {COMPONENT_LABELS[key] || key}
-                  {info && <IndexInfo info={info} label={COMPONENT_LABELS[key] || key} />}
-                </span>
+                <span className="risk-component-label">{COMPONENT_LABELS[key] || key}</span>
+                {info ? <IndexInfo info={info} label={COMPONENT_LABELS[key] || key} /> : <span />}
                 <div className="risk-component-bar-wrap">
                   <div
                     className="risk-component-bar"

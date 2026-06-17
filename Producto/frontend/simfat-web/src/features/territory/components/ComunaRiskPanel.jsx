@@ -276,10 +276,8 @@ export default function ComunaRiskPanel({ comunaId, score, regionId, onClose, ca
             const info = COMPONENT_INFO[key];
             return (
               <div key={key} className="panel-component-row">
-                <span className="panel-comp-label">
-                  {label}
-                  {info && <IndexInfo info={info} label={label} />}
-                </span>
+                <span className="panel-comp-label">{label}</span>
+                {info ? <IndexInfo info={info} label={label} /> : <span />}
                 <div className="panel-comp-bar-wrap">
                   <div
                     className="panel-comp-bar"
