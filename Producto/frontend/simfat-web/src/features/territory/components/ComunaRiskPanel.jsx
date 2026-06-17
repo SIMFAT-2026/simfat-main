@@ -149,7 +149,7 @@ function IndexInfo({ info, label }) {
         type="button"
         className="comp-info-icon"
         aria-label={`Info sobre ${label}`}
-        onClick={(e) => { e.stopPropagation(); setOpen((v) => !v); }}
+        onMouseDown={(e) => { e.stopPropagation(); setOpen((v) => !v); }}
       >ⓘ</button>
       {open && <span className="comp-info-tooltip">{info}</span>}
     </span>
