@@ -20,7 +20,7 @@ import com.simfat.backend.service.NotificationService;
 import com.simfat.backend.service.OpenWeatherFwiService;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -270,11 +270,10 @@ public class ComunaRiskServiceImpl implements ComunaRiskService {
 
     @Override
     public Map<String, ComunaRiskSnapshot> getLatestSnapshotsByRegion(String regionId) {
-        List<ComunaInfo> comunas = comunaRepository.findByRegionId(regionId);
-        Map<String, ComunaRiskSnapshot> result = new HashMap<>();
-        for (ComunaInfo comuna : comunas) {
-            snapshotRepository.findTopByComunaIdOrderByComputedAtDesc(comuna.getId())
-                .ifPresent(s -> result.put(comuna.getId(), s));
+        // Single query sorted desc; first occurrence of each comunaId is the latest snapshot.
+        Map<String, ComunaRiskSnapshot> result = new LinkedHashMap<>();
+        for (ComunaRiskSnapshot snap : snapshotRepository.findByRegionIdOrderByComputedAtDesc(regionId)) {
+            result.putIfAbsent(snap.getComunaId(), snap);
         }
         return result;
     }

@@ -351,6 +351,14 @@ public class TerritoryController {
     @GetMapping("/risk-score/comunas/{regionId}")
     public ResponseEntity<ApiResponse<Map<String, Object>>> getComunalRiskScores(@PathVariable String regionId) {
         Map<String, ComunaRiskSnapshot> snapshots = comunaRiskService.getLatestSnapshotsByRegion(regionId);
+
+        // Pre-fetch all weather observations in a single query to avoid N+1.
+        List<String> comunaIds = new ArrayList<>(snapshots.keySet());
+        Map<String, TerritoryWeatherObservation> weatherByComuna = new LinkedHashMap<>();
+        for (TerritoryWeatherObservation obs : weatherObservationRepository.findByRegionIdInOrderByObservedAtDesc(comunaIds)) {
+            weatherByComuna.putIfAbsent(obs.getRegionId(), obs);
+        }
+
         Map<String, Object> result = new LinkedHashMap<>();
         snapshots.forEach((comunaId, s) -> {
             Map<String, Object> data = new LinkedHashMap<>();
@@ -373,7 +381,7 @@ public class TerritoryController {
             components.put("ndvi", s.getComponentNdvi());
             components.put("loss", s.getComponentLoss());
             data.put("components", components);
-            data.put("fwiInputs", buildFwiInputs(comunaId));
+            data.put("fwiInputs", buildFwiInputs(weatherByComuna.get(comunaId)));
             result.put(comunaId, data);
         });
         return ResponseEntity.ok(ApiResponse.ok("Scores comunales para " + regionId, result));
@@ -547,15 +555,18 @@ public class TerritoryController {
      * se exponen como null sin fallar el request.
      */
     private Map<String, Object> buildFwiInputs(String regionOrComunaId) {
-        Map<String, Object> inputs = new LinkedHashMap<>();
         Optional<TerritoryWeatherObservation> latest = weatherObservationRepository
             .findTopByRegionIdOrderByObservedAtDesc(regionOrComunaId);
+        return buildFwiInputs(latest.orElse(null));
+    }
 
-        inputs.put("tempMax", latest.map(TerritoryWeatherObservation::getTempMax).orElse(null));
-        inputs.put("humidityMin", latest.map(TerritoryWeatherObservation::getHumidityMin).orElse(null));
-        inputs.put("windMax", latest.map(TerritoryWeatherObservation::getWindMax).orElse(null));
-        inputs.put("precip", latest.map(TerritoryWeatherObservation::getPrecip).orElse(null));
-        inputs.put("soilTemp", latest.map(TerritoryWeatherObservation::getSoilTemp).orElse(null));
+    private Map<String, Object> buildFwiInputs(TerritoryWeatherObservation obs) {
+        Map<String, Object> inputs = new LinkedHashMap<>();
+        inputs.put("tempMax",     obs != null ? obs.getTempMax()     : null);
+        inputs.put("humidityMin", obs != null ? obs.getHumidityMin() : null);
+        inputs.put("windMax",     obs != null ? obs.getWindMax()     : null);
+        inputs.put("precip",      obs != null ? obs.getPrecip()      : null);
+        inputs.put("soilTemp",    obs != null ? obs.getSoilTemp()    : null);
         return inputs;
     }
 
