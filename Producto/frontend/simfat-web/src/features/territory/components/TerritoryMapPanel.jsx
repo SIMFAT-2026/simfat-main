@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback, useMemo, memo } from 'react';
+import { createPortal } from 'react-dom';
 import L from 'leaflet';
 import ComunaRiskPanel from './ComunaRiskPanel';
 import { GeoJSON, MapContainer, TileLayer, useMap } from 'react-leaflet';
@@ -278,27 +279,44 @@ const COMPONENT_LABELS = {
 };
 
 function IndexInfo({ info, label }) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef(null);
+  const [tooltipStyle, setTooltipStyle] = useState(null);
+  const btnRef = useRef(null);
 
-  useEffect(() => {
-    if (!open) return;
-    function handleOutside(e) {
-      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+  function handleToggle(e) {
+    e.stopPropagation();
+    if (tooltipStyle) {
+      setTooltipStyle(null);
+      return;
     }
-    document.addEventListener('mousedown', handleOutside);
-    return () => document.removeEventListener('mousedown', handleOutside);
-  }, [open]);
+    const rect = btnRef.current.getBoundingClientRect();
+    setTooltipStyle({
+      position: 'fixed',
+      top: `${rect.top + rect.height / 2}px`,
+      left: `${rect.right + 8}px`,
+      transform: 'translateY(-50%)',
+    });
+  }
 
   return (
-    <span ref={ref} className="comp-info-wrap">
+    <span className="comp-info-wrap">
       <button
+        ref={btnRef}
         type="button"
         className="comp-info-icon"
         aria-label={`Info sobre ${label}`}
-        onMouseDown={(e) => { e.stopPropagation(); setOpen((v) => !v); }}
+        onClick={handleToggle}
       >ⓘ</button>
-      {open && <span className="comp-info-tooltip">{info}</span>}
+      {tooltipStyle && createPortal(
+        <span className="comp-info-tooltip" style={tooltipStyle}>
+          {info}
+          <button
+            type="button"
+            className="comp-info-close"
+            onClick={(e) => { e.stopPropagation(); setTooltipStyle(null); }}
+          >×</button>
+        </span>,
+        document.body
+      )}
     </span>
   );
 }
