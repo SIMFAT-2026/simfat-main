@@ -217,8 +217,10 @@ export default function ComunaRiskPanel({ comunaId, score, regionId, onClose, ca
         <div className="panel-components">
           {meta.map(({ key, label, weight }) => {
             const val = components[key];
-            const compPct = typeof val === 'number' ? Math.round(val * 100) : null;
-            const barWidth = compPct != null ? Math.min(compPct, 100) : 0;
+            // Normalize against the component's own maximum (its weight) so the bar
+            // shows indicator saturation (0-100%) rather than weighted contribution.
+            const indicatorPct = typeof val === 'number' ? Math.round((val / weight) * 100) : null;
+            const barWidth = indicatorPct != null ? Math.min(indicatorPct, 100) : 0;
             return (
               <div key={key} className="panel-component-row">
                 <span className="panel-comp-label">{label}</span>
@@ -228,7 +230,7 @@ export default function ComunaRiskPanel({ comunaId, score, regionId, onClose, ca
                     style={{ width: `${barWidth}%`, backgroundColor: level.color }}
                   />
                 </div>
-                <span className="panel-comp-val">{compPct != null ? compPct : '—'}</span>
+                <span className="panel-comp-val">{indicatorPct != null ? indicatorPct : '—'}</span>
                 <span className="panel-comp-weight">{(weight * 100).toFixed(0)}%</span>
               </div>
             );
