@@ -269,12 +269,21 @@ function toPointStyle(indicator, feature) {
 }
 
 const COMPONENT_LABELS = {
-  fwi: 'FWI meteorológico',
-  ndmi: 'Humedad vegetación',
-  firms: 'Focos activos',
-  loss: 'Cobertura forestal',
-  ndvi: 'Índice vegetación',
+  fwi:     'FWI meteorológico',
+  ndmi:    'Humedad vegetación (NDMI)',
+  firms:   'Focos activos',
+  loss:    'Cobertura forestal',
+  ndvi:    'Índice vegetación (NDVI)',
   reports: 'Reportes'
+};
+
+const COMPONENT_INFO = {
+  fwi:     'Índice de Peligro de Incendio (FWI). Escala 0–100+:\n• 0–11: Bajo\n• 11–21: Moderado\n• 21–38: Alto\n• 38–50: Muy alto\n• >50: Extremo',
+  ndmi:    'NDMI — Humedad de la vegetación. Rango -1 a 1:\n• >0.1: Vegetación húmeda, bajo riesgo\n• -0.1 a 0.1: Estrés hídrico leve\n• <-0.1: Estrés hídrico severo, alto riesgo',
+  ndvi:    'NDVI — Índice de vegetación. Rango -1 a 1:\n• >0.5: Vegetación densa y sana\n• 0.2–0.5: Vegetación moderada\n• 0–0.2: Vegetación escasa o suelo desnudo\n• <0: Superficie no vegetada (agua, suelo expuesto)',
+  firms:   'Focos activos detectados por satélite NASA (FIRMS) en las últimas 24 h. A mayor número de focos de alta confianza, mayor riesgo inmediato.',
+  loss:    'Tasa de pérdida de cobertura forestal reciente. 0 = sin pérdida detectada, 1 = pérdida total en el área.',
+  reports: 'Reportes ciudadanos verificados de humo, focos o incendios activos en la comuna.'
 };
 
 function RiskScoreBadge({ regionData }) {
@@ -290,8 +299,6 @@ function RiskScoreBadge({ regionData }) {
   const level = alertLevel || 'NORMAL';
   const config = ALERT_LEVEL_CONFIG[level] || ALERT_LEVEL_CONFIG.NORMAL;
   const scoreDisplay = typeof score === 'number' ? (score * 100).toFixed(0) : '—';
-  const ndviRaw = detail?.ndviRaw ?? null;
-  const ndmiRaw = detail?.ndmiRaw ?? null;
 
   return (
     <div className="risk-score-badge" style={{ borderColor: config.color, backgroundColor: config.bg }}>
@@ -304,9 +311,18 @@ function RiskScoreBadge({ regionData }) {
         <div className="risk-score-breakdown">
           {Object.entries(components).map(([key, comp]) => {
             const pct = typeof comp?.score === 'number' ? (comp.score * 100).toFixed(0) : '—';
+            const info = COMPONENT_INFO[key];
             return (
               <div key={key} className="risk-score-component">
-                <span className="risk-component-label">{COMPONENT_LABELS[key] || key}</span>
+                <span className="risk-component-label">
+                  {COMPONENT_LABELS[key] || key}
+                  {info && (
+                    <span className="comp-info-wrap">
+                      <span className="comp-info-icon" aria-label={`Info sobre ${COMPONENT_LABELS[key] || key}`}>ⓘ</span>
+                      <span className="comp-info-tooltip">{info}</span>
+                    </span>
+                  )}
+                </span>
                 <div className="risk-component-bar-wrap">
                   <div
                     className="risk-component-bar"
@@ -317,12 +333,6 @@ function RiskScoreBadge({ regionData }) {
               </div>
             );
           })}
-        </div>
-      )}
-      {(ndviRaw != null || ndmiRaw != null) && (
-        <div className="risk-score-copernicus">
-          {ndviRaw != null && <span className="risk-copernicus-chip">NDVI {ndviRaw.toFixed(3)}</span>}
-          {ndmiRaw != null && <span className="risk-copernicus-chip">NDMI {ndmiRaw.toFixed(3)}</span>}
         </div>
       )}
     </div>

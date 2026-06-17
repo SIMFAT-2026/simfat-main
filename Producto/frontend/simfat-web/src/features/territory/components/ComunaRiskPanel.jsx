@@ -11,18 +11,27 @@ const ALERT_LEVEL_CONFIG = {
 
 const COMPONENT_META = {
   STANDARD: [
-    { key: 'fwi',     label: 'FWI meteorológico',  weight: 0.52 },
-    { key: 'firms',   label: 'Focos activos',       weight: 0.33 },
-    { key: 'reports', label: 'Reportes ciudadanos', weight: 0.15 }
+    { key: 'fwi',     label: 'FWI meteorológico',        weight: 0.52 },
+    { key: 'firms',   label: 'Focos activos',             weight: 0.33 },
+    { key: 'reports', label: 'Reportes ciudadanos',       weight: 0.15 }
   ],
   ENHANCED: [
-    { key: 'fwi',     label: 'FWI meteorológico',  weight: 0.38 },
-    { key: 'ndmi',    label: 'Humedad vegetación',  weight: 0.22 },
-    { key: 'firms',   label: 'Focos activos',       weight: 0.18 },
-    { key: 'loss',    label: 'Cobertura forestal',  weight: 0.10 },
-    { key: 'ndvi',    label: 'Índice vegetación',   weight: 0.08 },
-    { key: 'reports', label: 'Reportes ciudadanos', weight: 0.04 }
+    { key: 'fwi',     label: 'FWI meteorológico',        weight: 0.38 },
+    { key: 'ndmi',    label: 'Humedad vegetación (NDMI)', weight: 0.22 },
+    { key: 'firms',   label: 'Focos activos',             weight: 0.18 },
+    { key: 'loss',    label: 'Cobertura forestal',        weight: 0.10 },
+    { key: 'ndvi',    label: 'Índice vegetación (NDVI)',  weight: 0.08 },
+    { key: 'reports', label: 'Reportes ciudadanos',       weight: 0.04 }
   ]
+};
+
+const COMPONENT_INFO = {
+  fwi: 'Índice de Peligro de Incendio (FWI). Escala 0–100+:\n• 0–11: Bajo\n• 11–21: Moderado\n• 21–38: Alto\n• 38–50: Muy alto\n• >50: Extremo',
+  ndmi: 'NDMI — Humedad de la vegetación. Rango -1 a 1:\n• >0.1: Vegetación húmeda, bajo riesgo\n• -0.1 a 0.1: Estrés hídrico leve\n• <-0.1: Estrés hídrico severo, alto riesgo',
+  ndvi: 'NDVI — Índice de vegetación. Rango -1 a 1:\n• >0.5: Vegetación densa y sana\n• 0.2–0.5: Vegetación moderada\n• 0–0.2: Vegetación escasa o suelo desnudo\n• <0: Superficie no vegetada (agua, suelo expuesto)',
+  firms: 'Focos activos detectados por satélite NASA (FIRMS) en las últimas 24 h. A mayor número de focos de alta confianza, mayor riesgo inmediato.',
+  loss: 'Tasa de pérdida de cobertura forestal reciente. 0 = sin pérdida detectada, 1 = pérdida total en el área. Valores altos indican degradación acumulada del bosque.',
+  reports: 'Reportes ciudadanos verificados de humo, focos o incendios activos en la comuna. Complementa los datos satelitales con observación en terreno.'
 };
 
 function levelColor(level) {
@@ -218,13 +227,20 @@ export default function ComunaRiskPanel({ comunaId, score, regionId, onClose, ca
         <div className="panel-components">
           {meta.map(({ key, label, weight }) => {
             const val = components[key];
-            // Normalize against the component's own maximum (its weight) so the bar
-            // shows indicator saturation (0-100%) rather than weighted contribution.
             const indicatorPct = typeof val === 'number' ? Math.round((val / weight) * 100) : null;
             const barWidth = indicatorPct != null ? Math.min(indicatorPct, 100) : 0;
+            const info = COMPONENT_INFO[key];
             return (
               <div key={key} className="panel-component-row">
-                <span className="panel-comp-label">{label}</span>
+                <span className="panel-comp-label">
+                  {label}
+                  {info && (
+                    <span className="comp-info-wrap">
+                      <span className="comp-info-icon" aria-label={`Info sobre ${label}`}>ⓘ</span>
+                      <span className="comp-info-tooltip">{info}</span>
+                    </span>
+                  )}
+                </span>
                 <div className="panel-comp-bar-wrap">
                   <div
                     className="panel-comp-bar"
