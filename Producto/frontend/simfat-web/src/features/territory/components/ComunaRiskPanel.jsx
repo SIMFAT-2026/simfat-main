@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { LineChart, Line, XAxis, YAxis, Tooltip as ChartTooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 import { fetchComunaHistory, fetchComunalRiskScores, syncComunaCopernicus } from '../services/territoryApiService';
 
@@ -130,6 +130,32 @@ function FwiInputsBreakdown({ fwiInputs }) {
   );
 }
 
+function IndexInfo({ info, label }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function handleOutside(e) {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+    }
+    document.addEventListener('mousedown', handleOutside);
+    return () => document.removeEventListener('mousedown', handleOutside);
+  }, [open]);
+
+  return (
+    <span ref={ref} className="comp-info-wrap">
+      <button
+        type="button"
+        className="comp-info-icon"
+        aria-label={`Info sobre ${label}`}
+        onClick={(e) => { e.stopPropagation(); setOpen((v) => !v); }}
+      >ⓘ</button>
+      {open && <span className="comp-info-tooltip">{info}</span>}
+    </span>
+  );
+}
+
 const COPERNICUS_WAIT_S = 75;
 const COPERNICUS_RETRY_WAIT_S = 35;
 
@@ -234,12 +260,7 @@ export default function ComunaRiskPanel({ comunaId, score, regionId, onClose, ca
               <div key={key} className="panel-component-row">
                 <span className="panel-comp-label">
                   {label}
-                  {info && (
-                    <span className="comp-info-wrap">
-                      <span className="comp-info-icon" aria-label={`Info sobre ${label}`}>ⓘ</span>
-                      <span className="comp-info-tooltip">{info}</span>
-                    </span>
-                  )}
+                  {info && <IndexInfo info={info} label={label} />}
                 </span>
                 <div className="panel-comp-bar-wrap">
                   <div

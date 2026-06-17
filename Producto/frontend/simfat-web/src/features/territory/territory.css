@@ -226,9 +226,12 @@
 .comp-info-icon {
   font-size: 10px;
   color: #64748b;
-  cursor: default;
+  cursor: pointer;
   line-height: 1;
   user-select: none;
+  background: none;
+  border: none;
+  padding: 0;
 }
 
 .comp-info-icon:hover {
@@ -236,7 +239,6 @@
 }
 
 .comp-info-tooltip {
-  display: none;
   position: absolute;
   left: 14px;
   top: 50%;
@@ -251,12 +253,7 @@
   border-radius: 6px;
   border: 1px solid #334155;
   width: 220px;
-  pointer-events: none;
   box-shadow: 0 4px 12px rgba(0,0,0,0.4);
-}
-
-.comp-info-wrap:hover .comp-info-tooltip {
-  display: block;
 }
 
 /* ── Tooltip comunal ── */

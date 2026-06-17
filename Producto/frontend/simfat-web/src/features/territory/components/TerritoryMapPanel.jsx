@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useMemo, memo } from 'react';
+import { useEffect, useRef, useState, useCallback, useMemo, memo } from 'react';
 import L from 'leaflet';
 import ComunaRiskPanel from './ComunaRiskPanel';
 import { GeoJSON, MapContainer, TileLayer, useMap } from 'react-leaflet';
@@ -277,6 +277,32 @@ const COMPONENT_LABELS = {
   reports: 'Reportes'
 };
 
+function IndexInfo({ info, label }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function handleOutside(e) {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+    }
+    document.addEventListener('mousedown', handleOutside);
+    return () => document.removeEventListener('mousedown', handleOutside);
+  }, [open]);
+
+  return (
+    <span ref={ref} className="comp-info-wrap">
+      <button
+        type="button"
+        className="comp-info-icon"
+        aria-label={`Info sobre ${label}`}
+        onClick={(e) => { e.stopPropagation(); setOpen((v) => !v); }}
+      >ⓘ</button>
+      {open && <span className="comp-info-tooltip">{info}</span>}
+    </span>
+  );
+}
+
 const COMPONENT_INFO = {
   fwi:     'Índice de Peligro de Incendio (FWI). Escala 0–100+:\n• 0–11: Bajo\n• 11–21: Moderado\n• 21–38: Alto\n• 38–50: Muy alto\n• >50: Extremo',
   ndmi:    'NDMI — Humedad de la vegetación. Rango -1 a 1:\n• >0.1: Vegetación húmeda, bajo riesgo\n• -0.1 a 0.1: Estrés hídrico leve\n• <-0.1: Estrés hídrico severo, alto riesgo',
@@ -316,12 +342,7 @@ function RiskScoreBadge({ regionData }) {
               <div key={key} className="risk-score-component">
                 <span className="risk-component-label">
                   {COMPONENT_LABELS[key] || key}
-                  {info && (
-                    <span className="comp-info-wrap">
-                      <span className="comp-info-icon" aria-label={`Info sobre ${COMPONENT_LABELS[key] || key}`}>ⓘ</span>
-                      <span className="comp-info-tooltip">{info}</span>
-                    </span>
-                  )}
+                  {info && <IndexInfo info={info} label={COMPONENT_LABELS[key] || key} />}
                 </span>
                 <div className="risk-component-bar-wrap">
                   <div
