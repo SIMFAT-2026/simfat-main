@@ -259,8 +259,11 @@ public class TerritoryController {
     }
 
     private Map<String, Object> alertsLayer(String regionId, LocalDateTime from, LocalDateTime to) {
+        // Exclude NASA_FIRMS events — those are already shown in the FIRMS layer.
+        // ALERTS shows non-satellite sources (CONAF, manual, temperature alerts, etc.).
         List<Map<String, Object>> features = heatAlertRepository.findByRegionId(regionId)
             .stream()
+            .filter(alert -> !"NASA_FIRMS".equals(alert.getFuente()))
             .filter(alert -> alert.getFechaEvento() != null && !alert.getFechaEvento().isBefore(from) && !alert.getFechaEvento().isAfter(to))
             .map(this::toAlertFeature)
             .toList();
@@ -440,12 +443,20 @@ public class TerritoryController {
                    "comunalSyncTriggered", true)));
     }
 
+    // Cap prevents Leaflet from rendering thousands of markers and covering the
+    // choropleth. Sorted by FRP descending so the most intense fires are kept.
+    private static final int FIRMS_LAYER_MAX_FEATURES = 300;
+
     private Map<String, Object> firmsLayer(String regionId, LocalDateTime from, LocalDateTime to) {
         List<Map<String, Object>> features = heatAlertRepository.findByRegionId(regionId)
             .stream()
             .filter(e -> "NASA_FIRMS".equals(e.getFuente()))
             .filter(e -> e.getFechaEvento() != null && !e.getFechaEvento().isBefore(from) && !e.getFechaEvento().isAfter(to))
             .filter(e -> e.getFirmsConfidence() != null && !"l".equals(e.getFirmsConfidence()))
+            .sorted(java.util.Comparator.comparingDouble(
+                (com.simfat.backend.model.HeatAlertEvent e) -> e.getFirmsFrp() == null ? 0.0 : e.getFirmsFrp()
+            ).reversed())
+            .limit(FIRMS_LAYER_MAX_FEATURES)
             .map(e -> {
                 Map<String, Object> props = new LinkedHashMap<>();
                 props.put("label", "Foco activo VIIRS");
