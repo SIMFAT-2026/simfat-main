@@ -182,7 +182,7 @@
 
 .risk-score-component {
   display: grid;
-  grid-template-columns: 1fr 16px auto 28px;
+  grid-template-columns: minmax(0, 1fr) 16px minmax(60px, 1.2fr) 28px;
   align-items: center;
   gap: 6px;
   font-size: 0.78rem;

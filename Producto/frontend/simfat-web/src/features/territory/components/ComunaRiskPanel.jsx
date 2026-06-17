@@ -142,10 +142,12 @@ function IndexInfo({ info, label }) {
       return;
     }
     const rect = btnRef.current.getBoundingClientRect();
+    const TOOLTIP_W = 238;
+    const fitsRight = rect.right + 8 + TOOLTIP_W < window.innerWidth;
     setTooltipStyle({
       position: 'fixed',
       top: `${rect.top + rect.height / 2}px`,
-      left: `${rect.right + 8}px`,
+      left: fitsRight ? `${rect.right + 8}px` : `${rect.left - TOOLTIP_W - 8}px`,
       transform: 'translateY(-50%)',
     });
   }
