@@ -4,9 +4,10 @@
 
 :root {
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  font-size: 14px;
   color: #1f2937;
   background-color: #f3f5f7;
-  line-height: 1.5;
+  line-height: 1.35;
 }
 
 body {
@@ -24,7 +25,7 @@ a {
   background: #ffffff;
   border: 1px solid #e5e7eb;
   border-radius: 12px;
-  padding: 24px;
+  padding: 12px;
   min-height: 300px;
   box-shadow: 0 2px 6px rgba(15, 23, 42, 0.04);
 }
@@ -35,7 +36,8 @@ a {
 }
 
 .section-title h2 {
-  margin-bottom: 4px;
+  margin-bottom: 2px;
+  font-size: 1.35rem;
 }
 
 .section-title p {
@@ -63,7 +65,7 @@ select,
 textarea {
   border: 1px solid #cbd5e1;
   border-radius: 8px;
-  padding: 8px 10px;
+  padding: 5px 8px;
   font: inherit;
   color: #0f172a;
   background: #fff;
@@ -82,7 +84,7 @@ textarea {
 .btn {
   border: 1px solid #0b5cab;
   border-radius: 8px;
-  padding: 8px 12px;
+  padding: 5px 9px;
   background: #0b5cab;
   color: #fff;
   cursor: pointer;
@@ -131,8 +133,8 @@ textarea {
 .filter-bar {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
-  padding: 12px;
+  gap: 8px;
+  padding: 8px;
   border: 1px solid #e2e8f0;
   border-radius: 10px;
   background: #f8fafc;
@@ -412,9 +414,9 @@ textarea {
 .dashboard-card {
   border: 1px solid #e2e8f0;
   border-radius: 10px;
-  padding: 14px;
+  padding: 10px;
   background: #fff;
-  margin-top: 12px;
+  margin-top: 10px;
 }
 
 .critical-list {

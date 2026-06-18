@@ -1,57 +1,81 @@
 .territory-page {
   display: grid;
-  gap: 14px;
+  gap: 4px;
 }
 
-.territory-page-note {
-  margin: 0;
-  color: #64748b;
+.territory-page .section-title h2 {
+  margin-bottom: 0;
 }
 
-.territory-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
-.territory-header h3 {
-  margin: 0;
+.territory-map-card {
+  margin-top: 0;
+  padding-top: 6px;
 }
 
 .territory-controls {
-  margin-top: 12px;
+  margin-top: 6px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 5px 8px;
 }
 
 .territory-layer-toggles {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 6px;
   flex-wrap: wrap;
+}
+
+.territory-controls-title {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: #0f172a;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.territory-refresh-button {
+  justify-self: end;
+  white-space: nowrap;
 }
 
 .territory-toggle {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 4px 8px;
-  border-radius: 8px;
+  gap: 4px;
+  padding: 2px 7px;
+  border-radius: 7px;
   border: 1px solid #d7e0ea;
   background: #fff;
   color: #334155;
+  font-size: 0.82rem;
+}
+
+.territory-toggle input {
+  width: 13px;
+  height: 13px;
+}
+
+.territory-controls > label {
+  gap: 3px;
+  font-size: 0.82rem;
+}
+
+.territory-controls select {
+  min-width: 140px;
 }
 
 .territory-map-wrapper {
-  margin-top: 12px;
+  margin-top: 6px;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 240px;
-  gap: 12px;
+  grid-template-columns: minmax(0, 1fr) 190px;
+  gap: 8px;
   position: relative;
 }
 
 .territory-map {
-  height: 460px;
+  height: 430px;
   border-radius: 12px;
   border: 1px solid #e2e8f0;
   overflow: hidden;
@@ -61,11 +85,11 @@
   border: 1px solid #e2e8f0;
   border-radius: 10px;
   background: #f8fafc;
-  padding: 12px;
+  padding: 8px;
 }
 
 .territory-legend h4 {
-  margin: 0 0 8px;
+  margin: 0 0 6px;
   color: #0f172a;
 }
 
@@ -74,33 +98,33 @@
   margin: 0;
   padding: 0;
   display: grid;
-  gap: 7px;
+  gap: 6px;
 }
 
 .territory-legend li {
   display: grid;
   grid-template-columns: 12px 1fr auto;
   align-items: center;
-  gap: 8px;
-  font-size: 0.9rem;
+  gap: 6px;
+  font-size: 0.76rem;
 }
 
 .territory-color-dot {
-  width: 12px;
-  height: 12px;
+  width: 10px;
+  height: 10px;
   border-radius: 999px;
 }
 
 .territory-climate-legend {
   margin-top: 10px;
-  padding-top: 10px;
+  padding-top: 8px;
   border-top: 1px solid #e2e8f0;
 }
 
 .territory-climate-legend h5 {
   margin: 0 0 6px;
   color: #0f172a;
-  font-size: 0.85rem;
+  font-size: 0.78rem;
 }
 
 .territory-climate-legend ul {
@@ -121,7 +145,7 @@
 }
 
 .territory-meta {
-  margin: 12px 0 0;
+  margin: 8px 0 0;
   color: #64748b;
   font-size: 0.8rem;
 }
@@ -130,46 +154,59 @@
   margin-top: 2px;
 }
 
+.regional-summary-panel {
+  display: grid;
+  gap: 4px;
+  margin-top: 0;
+}
+
+.regional-summary-title {
+  margin: 0 0 2px;
+  color: #0f172a;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
 .risk-score-badge {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  padding: 10px 16px;
+  gap: 3px;
+  padding: 6px 12px;
   border-radius: 10px;
   border: 2px solid;
-  margin-top: 8px;
+  margin-top: 0;
   margin-bottom: 4px;
 }
 
 .risk-score-main {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding-bottom: 6px;
+  gap: 8px;
+  padding-bottom: 3px;
   border-bottom: 1px solid rgba(0,0,0,0.08);
 }
 
 .risk-score-label {
-  font-size: 0.85rem;
+  font-size: 0.74rem;
   color: #475569;
   font-weight: 500;
 }
 
 .risk-score-level {
-  font-size: 1rem;
+  font-size: 0.84rem;
   font-weight: 700;
   letter-spacing: 0.03em;
 }
 
 .risk-score-value {
   margin-left: auto;
-  font-size: 1.5rem;
+  font-size: 1.15rem;
   font-weight: 800;
   line-height: 1;
 }
 
 .risk-score-value small {
-  font-size: 0.75rem;
+  font-size: 0.65rem;
   font-weight: 500;
   opacity: 0.7;
   margin-left: 1px;
@@ -177,16 +214,16 @@
 
 .risk-score-breakdown {
   display: grid;
-  gap: 5px;
-  padding-top: 2px;
+  gap: 2px;
+  padding-top: 1px;
 }
 
 .risk-score-component {
   display: grid;
-  grid-template-columns: minmax(176px, 220px) 16px minmax(0, 1fr) 28px;
+  grid-template-columns: minmax(136px, 170px) 12px minmax(0, 1fr) 42px;
   align-items: center;
-  gap: 10px;
-  font-size: 0.78rem;
+  gap: 6px;
+  font-size: 0.68rem;
 }
 
 .risk-component-label {
@@ -197,7 +234,7 @@
 }
 
 .risk-component-bar-wrap {
-  height: 6px;
+  height: 4px;
   background: rgba(0,0,0,0.08);
   border-radius: 3px;
   overflow: hidden;
@@ -214,6 +251,13 @@
   text-align: right;
   font-weight: 600;
   color: #334155;
+}
+
+.risk-component-value small {
+  font-size: 0.62rem;
+  font-weight: 500;
+  opacity: 0.7;
+  margin-left: 1px;
 }
 
 /* ── Component info tooltip ── */
@@ -454,7 +498,7 @@
   flex-direction: column;
   gap: 12px;
   overflow-y: auto;
-  max-height: 460px;
+  max-height: 440px;
 }
 
 .panel-header {
