@@ -9,6 +9,7 @@ import com.simfat.backend.model.DashboardRegionSnapshot;
 import com.simfat.backend.model.ForestLossRecord;
 import com.simfat.backend.model.Region;
 import com.simfat.backend.model.RiskLevel;
+import com.simfat.backend.repository.ComunaRiskSnapshotRepository;
 import com.simfat.backend.repository.DashboardRegionSnapshotRepository;
 import com.simfat.backend.repository.ForestLossRecordRepository;
 import com.simfat.backend.repository.HeatAlertEventRepository;
@@ -31,6 +32,7 @@ public class DashboardServiceImpl implements DashboardService {
     private final HeatAlertEventRepository heatAlertRepository;
     private final RegionRepository regionRepository;
     private final DashboardRegionSnapshotRepository snapshotRepository;
+    private final ComunaRiskSnapshotRepository comunaRiskSnapshotRepository;
     private final AlertRuleService alertRuleService;
 
     @Value("${app.alert.default-loss-threshold:1.0}")
@@ -44,12 +46,14 @@ public class DashboardServiceImpl implements DashboardService {
         HeatAlertEventRepository heatAlertRepository,
         RegionRepository regionRepository,
         DashboardRegionSnapshotRepository snapshotRepository,
+        ComunaRiskSnapshotRepository comunaRiskSnapshotRepository,
         AlertRuleService alertRuleService
     ) {
         this.forestLossRepository = forestLossRepository;
         this.heatAlertRepository = heatAlertRepository;
         this.regionRepository = regionRepository;
         this.snapshotRepository = snapshotRepository;
+        this.comunaRiskSnapshotRepository = comunaRiskSnapshotRepository;
         this.alertRuleService = alertRuleService;
     }
 
@@ -64,7 +68,8 @@ public class DashboardServiceImpl implements DashboardService {
             .filter(value -> value != null)
             .reduce(0.0, Double::sum));
         dto.setRegionesCriticas(resolveCriticalRegionsCount());
-        dto.setTotalAlertas(Math.toIntExact(heatAlertRepository.count()));
+        Long highRiskCount = comunaRiskSnapshotRepository.countComunasWithHighOrCriticalAlertLevel();
+        dto.setTotalAlertas(highRiskCount != null ? highRiskCount.intValue() : 0);
         dto.setAnioMayorPerdida(resolveYearWithHighestLoss(records));
         dto.setTendenciaGeneral(resolveGeneralTrend(trend));
         return dto;
