@@ -256,7 +256,7 @@ function toPointStyle(indicator, feature) {
   let radius = indicator === 'ALERTS' ? 8 : 7;
 
   if (indicator === 'FIRMS') {
-    radius = frp ? Math.min(6 + frp / 15, 16) : 8;
+    radius = frp ? Math.min(4 + Math.sqrt(Number(frp)) / 4, 8) : 5;
     const fillColor = confidence === 'h' ? '#dc2626' : '#f97316';
     return {
       pane: 'territory-points-pane',
@@ -264,7 +264,7 @@ function toPointStyle(indicator, feature) {
       radius,
       fillColor,
       color: '#7f1d1d',
-      weight: 1.5,
+      weight: 1,
       opacity: 0.9,
       fillOpacity: 0.85
     };
@@ -336,16 +336,73 @@ function IndexInfo({ info, label }) {
 }
 
 const COMPONENT_INFO = {
-  fwi:     'Índice de Peligro de Incendio (FWI). Escala 0–100+:\n• 0–11: Bajo\n• 11–21: Moderado\n• 21–38: Alto\n• 38–50: Muy alto\n• >50: Extremo',
-  ndmi:    'NDMI — Humedad de la vegetación. Rango -1 a 1:\n• >0.1: Vegetación húmeda, bajo riesgo\n• -0.1 a 0.1: Estrés hídrico leve\n• <-0.1: Estrés hídrico severo, alto riesgo',
-  ndvi:    'NDVI — Índice de vegetación. Rango -1 a 1:\n• >0.5: Vegetación densa y sana\n• 0.2–0.5: Vegetación moderada\n• 0–0.2: Vegetación escasa o suelo desnudo\n• <0: Superficie no vegetada (agua, suelo expuesto)',
-  firms:   'Focos activos detectados por satélite NASA (FIRMS) en las últimas 24 h. A mayor número de focos de alta confianza, mayor riesgo inmediato.',
-  reports: 'Reportes ciudadanos verificados de humo, focos o incendios activos en la comuna.'
+  fwi: {
+    description: 'Índice de Peligro de Incendio meteorológico.',
+    rawLabel: 'FWI observado',
+    rawValue: (component) => component?.rawValue,
+    scale: 'Escala raw 0–100+:\n• 0–11: Bajo\n• 11–21: Moderado\n• 21–38: Alto\n• 38–50: Muy alto\n• >50: Extremo'
+  },
+  ndmi: {
+    description: 'Humedad de la vegetación derivada de NDMI.',
+    rawLabel: 'NDMI observado',
+    rawValue: (component) => component?.rawValue,
+    scale: 'Escala raw -1 a 1:\n• >0.1: Vegetación húmeda, bajo riesgo\n• -0.1 a 0.1: Estrés hídrico leve\n• <-0.1: Estrés hídrico severo'
+  },
+  firms: {
+    description: 'Focos activos detectados por NASA FIRMS.',
+    rawLabel: 'Focos detectados',
+    rawValue: (component) => component?.focosCount,
+    scale: 'A mayor cantidad de focos y FRP, mayor riesgo inmediato.'
+  },
+  ndvi: {
+    description: 'Índice de vegetación derivado de NDVI.',
+    rawLabel: 'NDVI observado',
+    rawValue: (component) => component?.rawValue,
+    scale: 'Escala raw -1 a 1:\n• >0.5: Vegetación densa y sana\n• 0.2–0.5: Vegetación moderada\n• 0–0.2: Vegetación escasa\n• <0: Superficie no vegetada'
+  },
+  reports: {
+    description: 'Reportes ciudadanos verificados.',
+    rawLabel: 'Reportes activos',
+    rawValue: (component) => component?.count,
+    scale: 'A mayor cantidad de reportes verificados, mayor aporte al riesgo.'
+  }
 };
 
 const VISIBLE_RISK_COMPONENTS = new Set(['fwi', 'ndmi', 'firms', 'ndvi', 'reports']);
 const POINT_LAYER_INDICATORS = ['FIRMS', 'NDVI', 'NDMI', 'ALERTS', 'REPORTS'];
 const ALERT_TOOLTIP_COMPONENTS = ['firms', 'fwi', 'ndvi'];
+
+function componentScoreParts(component) {
+  const score = typeof component?.score === 'number' ? component.score : null;
+  const max = typeof component?.weight === 'number' ? component.weight : 1;
+
+  return {
+    value: score != null ? (score * 100).toFixed(0) : '—',
+    max: (max * 100).toFixed(0),
+    fillPct: score != null && max > 0 ? Math.min((score / max) * 100, 100) : 0
+  };
+}
+
+function formatRawValue(value) {
+  if (value === null || value === undefined || Number.isNaN(Number(value))) {
+    return 'Sin dato';
+  }
+
+  return Number.isInteger(Number(value)) ? String(Number(value)) : Number(value).toFixed(2);
+}
+
+function componentInfoText(key, component, scoreParts) {
+  const info = COMPONENT_INFO[key];
+  if (!info) return null;
+  const rawValue = info.rawValue?.(component);
+
+  return [
+    info.description,
+    `Aporte mostrado: ${scoreParts.value}/${scoreParts.max} pts del score global.`,
+    `${info.rawLabel}: ${formatRawValue(rawValue)}.`,
+    info.scale
+  ].filter(Boolean).join('\n');
+}
 
 function RiskScoreBadge({ regionData }) {
   const detail = regionData?.riskScore;
@@ -371,8 +428,8 @@ function RiskScoreBadge({ regionData }) {
       {components && (
         <div className="risk-score-breakdown">
           {Object.entries(components).filter(([key]) => VISIBLE_RISK_COMPONENTS.has(key)).map(([key, comp]) => {
-            const pct = typeof comp?.score === 'number' ? (comp.score * 100).toFixed(0) : '—';
-            const info = COMPONENT_INFO[key];
+            const scoreParts = componentScoreParts(comp);
+            const info = componentInfoText(key, comp, scoreParts);
             return (
               <div key={key} className="risk-score-component">
                 <span className="risk-component-label">{COMPONENT_LABELS[key] || key}</span>
@@ -380,10 +437,10 @@ function RiskScoreBadge({ regionData }) {
                 <div className="risk-component-bar-wrap">
                   <div
                     className="risk-component-bar"
-                    style={{ width: `${Math.min(comp?.score * 100 || 0, 100)}%`, backgroundColor: config.color }}
+                    style={{ width: `${scoreParts.fillPct}%`, backgroundColor: config.color }}
                   />
                 </div>
-                <span className="risk-component-value">{pct}</span>
+                <span className="risk-component-value">{scoreParts.value}<small>/{scoreParts.max}</small></span>
               </div>
             );
           })}
@@ -570,19 +627,18 @@ function TerritoryMapPanel({
 
   return (
     <article className="dashboard-card territory-map-card">
-      <div className="territory-header">
-        <h3>Mapa territorial interactivo</h3>
-        <button type="button" className="btn btn-secondary" onClick={onRetry} disabled={loading || refreshing}>
-          {refreshing ? 'Actualizando...' : 'Actualizar capas'}
-        </button>
-      </div>
-
       {/* Persistent region-level risk breakdown panel: always visible when
           regionData is available, independent of the RISK_SCORE map-layer
           toggle (spec: risk-score-breakdown-panel). */}
-      {regionData && <RiskScoreBadge regionData={regionData} />}
+      {regionData && (
+        <section className="regional-summary-panel" aria-label="Panel de resumen regional">
+          <h4 className="regional-summary-title">Panel de resumen regional</h4>
+          <RiskScoreBadge regionData={regionData} />
+        </section>
+      )}
 
       <div className="filter-bar territory-controls">
+        <h3 className="territory-controls-title">Mapa territorial interactivo</h3>
         <label>
           Region
           <select value={selectedRegionId} onChange={(event) => setSelectedRegionId(event.target.value)}>
@@ -620,6 +676,15 @@ function TerritoryMapPanel({
             </label>
           ))}
         </div>
+
+        <button
+          type="button"
+          className="btn btn-secondary territory-refresh-button"
+          onClick={onRetry}
+          disabled={loading || refreshing}
+        >
+          {refreshing ? 'Actualizando...' : 'Actualizar capas'}
+        </button>
       </div>
 
       {loading ? <LoadingSpinner label="Cargando capas territoriales..." /> : null}
@@ -721,8 +786,9 @@ function TerritoryMapPanel({
 
           {selectedComuna ? (
             <ComunaRiskPanel
+              key={selectedComuna.comunaId}
               comunaId={selectedComuna.comunaId}
-              score={selectedComuna.score}
+              score={effectiveComunalScores?.[selectedComuna.comunaId] || selectedComuna.score}
               regionId={selectedRegionId}
               onClose={() => setSelectedComuna(null)}
               onScoreUpdated={handleScoreUpdated}
