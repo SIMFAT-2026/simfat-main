@@ -407,6 +407,7 @@ class OpenEOClient:
             nir_band = "B08"
             red_band = "B04"
         else:
+            # NDMI: B08 (10m) and B11 (20m) — mixed resolution requires resampling
             nir_band = "B08"
             red_band = "B11"
 
@@ -419,7 +420,8 @@ class OpenEOClient:
                 }
             }
         }
-        return {
+
+        graph: dict[str, Any] = {
             "load_collection": {
                 "process_id": "load_collection",
                 "arguments": {
@@ -429,39 +431,55 @@ class OpenEOClient:
                     "bands": [red_band, nir_band],
                 },
             },
-            "index": {
-                "process_id": "ndvi",
+        }
+
+        # B11 is 20m vs B08/B04 at 10m. Without explicit resampling CDSE returns
+        # application/octet-stream binary raster instead of JSON for mixed-resolution graphs.
+        index_input_node = "load_collection"
+        if indicator_type != IndicatorType.NDVI:
+            graph["resample"] = {
+                "process_id": "resample_spatial",
                 "arguments": {
                     "data": {"from_node": "load_collection"},
-                    "nir": nir_band,
-                    "red": red_band,
+                    "resolution": 10,
+                    "method": "bilinear",
                 },
-            },
-            "reduce_time": {
-                "process_id": "reduce_dimension",
-                "arguments": {
-                    "data": {"from_node": "index"},
-                    "dimension": "t",
-                    "reducer": mean_reducer,
-                },
-            },
-            "aggregate_spatial": {
-                "process_id": "aggregate_spatial",
-                "arguments": {
-                    "data": {"from_node": "reduce_time"},
-                    "geometries": polygon,
-                    "reducer": mean_reducer,
-                },
-            },
-            "save": {
-                "process_id": "save_result",
-                "arguments": {
-                    "data": {"from_node": "aggregate_spatial"},
-                    "format": "JSON",
-                },
-                "result": True,
+            }
+            index_input_node = "resample"
+
+        graph["index"] = {
+            "process_id": "ndvi",
+            "arguments": {
+                "data": {"from_node": index_input_node},
+                "nir": nir_band,
+                "red": red_band,
             },
         }
+        graph["reduce_time"] = {
+            "process_id": "reduce_dimension",
+            "arguments": {
+                "data": {"from_node": "index"},
+                "dimension": "t",
+                "reducer": mean_reducer,
+            },
+        }
+        graph["aggregate_spatial"] = {
+            "process_id": "aggregate_spatial",
+            "arguments": {
+                "data": {"from_node": "reduce_time"},
+                "geometries": polygon,
+                "reducer": mean_reducer,
+            },
+        }
+        graph["save"] = {
+            "process_id": "save_result",
+            "arguments": {
+                "data": {"from_node": "aggregate_spatial"},
+                "format": "JSON",
+            },
+            "result": True,
+        }
+        return graph
 
     def _extract_openeo_error(self, response: httpx.Response) -> str:
         try:
@@ -482,7 +500,8 @@ class OpenEOClient:
     def _extract_first_numeric(self, response: httpx.Response) -> float | None:
         try:
             payload = response.json()
-        except ValueError:
+        except (ValueError, UnicodeDecodeError):
+            # CDSE can return application/octet-stream (binary GeoTIFF) for some queries
             return None
 
         value = self._extract_numeric_recursive(payload)
