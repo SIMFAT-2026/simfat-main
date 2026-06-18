@@ -17,6 +17,7 @@ import com.simfat.backend.repository.OpenEoJobRunRepository;
 import com.simfat.backend.repository.RegionRepository;
 import com.simfat.backend.service.DashboardSnapshotService;
 import com.simfat.backend.service.OpenEoSyncService;
+import com.simfat.backend.service.TerritoryRiskService;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -53,6 +54,7 @@ public class OpenEoSyncServiceImpl implements OpenEoSyncService {
     private final OpenEoJobRunRepository jobRunRepository;
     private final OpenEoIndicatorObservationRepository observationRepository;
     private final DashboardSnapshotService snapshotService;
+    private final TerritoryRiskService territoryRiskService;
     private final DashboardQueryCache dashboardQueryCache;
     private final OpenEoProperties openEoProperties;
 
@@ -70,6 +72,7 @@ public class OpenEoSyncServiceImpl implements OpenEoSyncService {
         OpenEoJobRunRepository jobRunRepository,
         OpenEoIndicatorObservationRepository observationRepository,
         DashboardSnapshotService snapshotService,
+        TerritoryRiskService territoryRiskService,
         DashboardQueryCache dashboardQueryCache,
         OpenEoProperties openEoProperties
     ) {
@@ -78,6 +81,7 @@ public class OpenEoSyncServiceImpl implements OpenEoSyncService {
         this.jobRunRepository = jobRunRepository;
         this.observationRepository = observationRepository;
         this.snapshotService = snapshotService;
+        this.territoryRiskService = territoryRiskService;
         this.dashboardQueryCache = dashboardQueryCache;
         this.openEoProperties = openEoProperties;
     }
@@ -190,6 +194,7 @@ public class OpenEoSyncServiceImpl implements OpenEoSyncService {
 
                     upsertObservation(region.getId(), indicator, normalizedResponse, bbox);
                     snapshotService.recomputeSnapshot(region.getId());
+                    territoryRiskService.recomputeRiskByRegion(region.getId());
                     invalidateDashboardCacheForRegion(region.getId());
 
                     OpenEoJobRun finishedJobRun = buildFinishedJobRun(region, indicator, dateRange, requestedAt, normalizedResponse);
