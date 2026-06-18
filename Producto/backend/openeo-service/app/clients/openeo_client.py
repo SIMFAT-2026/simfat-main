@@ -154,7 +154,7 @@ class OpenEOClient:
         )
 
         try:
-            with httpx.Client(timeout=120) as client:
+            with httpx.Client(timeout=200) as client:
                 response = self._request_with_retry(
                     client=client,
                     method="POST",
