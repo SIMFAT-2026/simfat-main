@@ -20,7 +20,6 @@ const COMPONENT_META = {
     { key: 'fwi',     label: 'FWI meteorológico',        weight: 0.38 },
     { key: 'ndmi',    label: 'Humedad vegetación (NDMI)', weight: 0.22 },
     { key: 'firms',   label: 'Focos activos',             weight: 0.18 },
-    { key: 'loss',    label: 'Cobertura forestal',        weight: 0.10 },
     { key: 'ndvi',    label: 'Índice vegetación (NDVI)',  weight: 0.08 },
     { key: 'reports', label: 'Reportes ciudadanos',       weight: 0.04 }
   ]
@@ -31,7 +30,6 @@ const COMPONENT_INFO = {
   ndmi: 'NDMI — Humedad de la vegetación. Rango -1 a 1:\n• >0.1: Vegetación húmeda, bajo riesgo\n• -0.1 a 0.1: Estrés hídrico leve\n• <-0.1: Estrés hídrico severo, alto riesgo',
   ndvi: 'NDVI — Índice de vegetación. Rango -1 a 1:\n• >0.5: Vegetación densa y sana\n• 0.2–0.5: Vegetación moderada\n• 0–0.2: Vegetación escasa o suelo desnudo\n• <0: Superficie no vegetada (agua, suelo expuesto)',
   firms: 'Focos activos detectados por satélite NASA (FIRMS) en las últimas 24 h. A mayor número de focos de alta confianza, mayor riesgo inmediato.',
-  loss: 'Tasa de pérdida de cobertura forestal reciente. 0 = sin pérdida detectada, 1 = pérdida total en el área. Valores altos indican degradación acumulada del bosque.',
   reports: 'Reportes ciudadanos verificados de humo, focos o incendios activos en la comuna. Complementa los datos satelitales con observación en terreno.'
 };
 

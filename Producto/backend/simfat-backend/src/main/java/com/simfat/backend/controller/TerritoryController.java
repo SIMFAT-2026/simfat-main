@@ -313,7 +313,6 @@ public class TerritoryController {
         components.put("fwi", Map.of("score", nullSafe(snapshot.getComponentFwi()), "rawValue", nullSafe(snapshot.getFwiRaw()), "weight", 0.38));
         components.put("ndmi", Map.of("score", nullSafe(snapshot.getComponentNdmi()), "rawValue", nullSafe(snapshot.getNdmiRaw()), "weight", 0.22));
         components.put("firms", Map.of("score", nullSafe(snapshot.getComponentFirms()), "focosCount", nullSafe(snapshot.getFirmsCount()), "frpMean", nullSafe(snapshot.getFirmsFrpMean()), "weight", 0.18));
-        components.put("loss", Map.of("score", nullSafe(snapshot.getComponentLoss()), "lossRate", nullSafe(snapshot.getLossRateRaw()), "weight", 0.10));
         components.put("ndvi", Map.of("score", nullSafe(snapshot.getComponentNdvi()), "rawValue", nullSafe(snapshot.getNdviRaw()), "weight", 0.08));
         components.put("reports", Map.of("score", nullSafe(snapshot.getComponentReports()), "count", nullSafe(snapshot.getReportsCount()), "weight", 0.04));
 
@@ -379,7 +378,6 @@ public class TerritoryController {
             components.put("reports", s.getComponentReports());
             components.put("ndmi", s.getComponentNdmi());
             components.put("ndvi", s.getComponentNdvi());
-            components.put("loss", s.getComponentLoss());
             data.put("components", components);
             data.put("fwiInputs", buildFwiInputs(weatherByComuna.get(comunaId)));
             result.put(comunaId, data);

@@ -44,7 +44,6 @@ public class ComunaRiskServiceImpl implements ComunaRiskService {
     private static final double W_FWI_ENH = 0.38;
     private static final double W_NDMI_ENH = 0.22;
     private static final double W_FIRMS_ENH = 0.18;
-    private static final double W_LOSS_ENH = 0.10;
     private static final double W_NDVI_ENH = 0.08;
     private static final double W_REPORTS_ENH = 0.04;
 
@@ -205,11 +204,9 @@ public class ComunaRiskServiceImpl implements ComunaRiskService {
                 double ndmiNorm = 1.0 - normalize(ndmi, NDMI_DRY, NDMI_WET);
                 // NDVI: mayor densidad = mayor combustible disponible
                 double ndviNorm = normalize(ndvi, NDVI_MIN, NDVI_MAX);
-                // Loss forestal comunal no disponible en fase piloto → contribución 0
                 double scoreEnhanced = fwiNorm * W_FWI_ENH
                     + ndmiNorm * W_NDMI_ENH
                     + firmsNorm * W_FIRMS_ENH
-                    + 0.0 * W_LOSS_ENH
                     + ndviNorm * W_NDVI_ENH
                     + reportsNorm * W_REPORTS_ENH;
                 mode = "ENHANCED";
@@ -248,7 +245,7 @@ public class ComunaRiskServiceImpl implements ComunaRiskService {
         snapshot.setComponentReports(round4(cReports));
         snapshot.setComponentNdmi(cNdmi);
         snapshot.setComponentNdvi(cNdvi);
-        snapshot.setComponentLoss(mode.equals("ENHANCED") ? 0.0 : null);
+        snapshot.setComponentLoss(null);
         snapshot.setNdmiRaw(ndmiRawVal);
         snapshot.setNdviRaw(ndviRawVal);
         snapshot.setOpeneoObservationId(openeoObsId);

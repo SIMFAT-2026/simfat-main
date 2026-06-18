@@ -39,7 +39,7 @@ const REGION_CONFIG = {
 };
 
 const REGION_OPTIONS = Object.values(REGION_CONFIG);
-const DEFAULT_INDICATORS = ['NDVI', 'NDMI', 'LOSS', 'ALERTS', 'FIRMS', 'REPORTS', 'RISK_SCORE', 'WIND', 'HUMIDITY', 'AIR_TEMP', 'SOIL_TEMP'];
+const DEFAULT_INDICATORS = ['NDVI', 'NDMI', 'ALERTS', 'FIRMS', 'REPORTS', 'RISK_SCORE', 'WIND', 'HUMIDITY', 'AIR_TEMP', 'SOIL_TEMP'];
 // WIND/HUMIDITY/AIR_TEMP/SOIL_TEMP are opt-in climate layers: fetched alongside
 // the rest but not shown until the user toggles them on (DEC-B).
 const DEFAULT_VISIBLE_INDICATORS = ['RISK_SCORE', 'FIRMS', 'ALERTS', 'REPORTS'];
@@ -72,13 +72,6 @@ function createMockLayers(regionId) {
         features: [
           createPointFeature('nu-ndmi-1', -72.10, -36.60, { label: 'Chillan', indicator: 'NDMI', value: 0.30 }),
           createPointFeature('nu-ndmi-2', -71.96, -36.78, { label: 'Yungay', indicator: 'NDMI', value: 0.26 })
-        ]
-      },
-      LOSS: {
-        type: 'FeatureCollection',
-        features: [
-          createPointFeature('nu-loss-1', -71.88, -36.90, { label: 'Bulnes', indicator: 'LOSS', hectares: 5 }),
-          createPointFeature('nu-loss-2', -71.52, -36.52, { label: 'San Nicolas', indicator: 'LOSS', hectares: 4 })
         ]
       },
       ALERTS: {
@@ -118,13 +111,6 @@ function createMockLayers(regionId) {
         features: [
           createPointFeature('ar-ndmi-1', -72.62, -38.73, { label: 'Temuco', indicator: 'NDMI', value: 0.31 }),
           createPointFeature('ar-ndmi-2', -71.95, -38.68, { label: 'Curacautin', indicator: 'NDMI', value: 0.28 })
-        ]
-      },
-      LOSS: {
-        type: 'FeatureCollection',
-        features: [
-          createPointFeature('ar-loss-1', -72.75, -38.98, { label: 'Nueva Imperial', indicator: 'LOSS', hectares: 11 }),
-          createPointFeature('ar-loss-2', -72.05, -38.95, { label: 'Padre Las Casas', indicator: 'LOSS', hectares: 8 })
         ]
       },
       ALERTS: {
@@ -169,13 +155,6 @@ function createMockLayers(regionId) {
       features: [
         createPointFeature('bb-ndmi-1', -73.12, -36.73, { label: 'Talcahuano', indicator: 'NDMI', value: 0.35 }),
         createPointFeature('bb-ndmi-2', -72.93, -37.08, { label: 'Florida', indicator: 'NDMI', value: 0.29 })
-      ]
-    },
-    LOSS: {
-      type: 'FeatureCollection',
-      features: [
-        createPointFeature('bb-loss-1', -72.9, -37.05, { label: 'Coronel', indicator: 'LOSS', hectares: 9 }),
-        createPointFeature('bb-loss-2', -72.42, -37.38, { label: 'Nacimiento', indicator: 'LOSS', hectares: 7 })
       ]
     },
     ALERTS: {

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useCallback, useMemo, memo } from 'react';
 import { createPortal } from 'react-dom';
 import L from 'leaflet';
 import ComunaRiskPanel from './ComunaRiskPanel';
-import { GeoJSON, MapContainer, TileLayer, useMap } from 'react-leaflet';
+import { GeoJSON, MapContainer, Pane, TileLayer, useMap } from 'react-leaflet';
 import marker2x from 'leaflet/dist/images/marker-icon-2x.png';
 import markerIcon from 'leaflet/dist/images/marker-icon.png';
 import markerShadow from 'leaflet/dist/images/marker-shadow.png';
@@ -33,7 +33,6 @@ L.Icon.Default.mergeOptions({
 const INDICATOR_COLORS = {
   NDVI: '#16a34a',
   NDMI: '#0ea5e9',
-  LOSS: '#f97316',
   ALERTS: '#dc2626',
   FIRMS: '#ff4500',
   REPORTS: '#7c3aed',
@@ -102,6 +101,8 @@ const CLIMATE_SCALES = {
 
 const CLIMATE_INDICATORS = ['WIND', 'HUMIDITY', 'AIR_TEMP', 'SOIL_TEMP'];
 const NEUTRAL_FILL = '#cbd5e1';
+const POINT_LAYER_RENDERER = L.svg({ pane: 'territory-points-pane' });
+const REPORT_LAYER_RENDERER = L.svg({ pane: 'territory-report-pane' });
 
 function climateColorForValue(indicator, value) {
   if (value === null || value === undefined || Number.isNaN(Number(value))) {
@@ -139,6 +140,7 @@ const ComunaChoropleth = memo(function ComunaChoropleth({ geoJson, comunalScores
   return (
     <GeoJSON
       key="choropleth"
+      pane="comuna-risk-pane"
       data={geoJson}
       style={(feature) => {
         const score = comunalScores?.[feature?.properties?.comunaId];
@@ -151,7 +153,6 @@ const ComunaChoropleth = memo(function ComunaChoropleth({ geoJson, comunalScores
 
         layer.on('mouseover', (e) => {
           layer.setStyle({ fillOpacity: 0.68, weight: 1.4, color: '#475569' });
-          layer.bringToFront();
           onComunaHover?.(comunaId, nombre, score, e.containerPoint);
         });
 
@@ -181,6 +182,7 @@ const ClimateChoropleth = memo(function ClimateChoropleth({ geoJson, indicator, 
   return (
     <GeoJSON
       key={`climate-${indicator}`}
+      pane="climate-layer-pane"
       data={geoJson}
       style={(feature) => {
         const comunaId = feature?.properties?.comunaId;
@@ -256,10 +258,21 @@ function toPointStyle(indicator, feature) {
   if (indicator === 'FIRMS') {
     radius = frp ? Math.min(6 + frp / 15, 16) : 8;
     const fillColor = confidence === 'h' ? '#dc2626' : '#f97316';
-    return { radius, fillColor, color: '#7f1d1d', weight: 1.5, opacity: 0.9, fillOpacity: 0.85 };
+    return {
+      pane: 'territory-points-pane',
+      renderer: POINT_LAYER_RENDERER,
+      radius,
+      fillColor,
+      color: '#7f1d1d',
+      weight: 1.5,
+      opacity: 0.9,
+      fillOpacity: 0.85
+    };
   }
 
   return {
+    pane: indicator === 'REPORTS' ? 'territory-report-pane' : 'territory-points-pane',
+    renderer: indicator === 'REPORTS' ? REPORT_LAYER_RENDERER : POINT_LAYER_RENDERER,
     radius,
     fillColor: INDICATOR_COLORS[indicator] || '#64748b',
     color: '#0f172a',
@@ -273,7 +286,6 @@ const COMPONENT_LABELS = {
   fwi:     'FWI meteorológico',
   ndmi:    'Humedad vegetación (NDMI)',
   firms:   'Focos activos',
-  loss:    'Cobertura forestal',
   ndvi:    'Índice vegetación (NDVI)',
   reports: 'Reportes'
 };
@@ -328,9 +340,12 @@ const COMPONENT_INFO = {
   ndmi:    'NDMI — Humedad de la vegetación. Rango -1 a 1:\n• >0.1: Vegetación húmeda, bajo riesgo\n• -0.1 a 0.1: Estrés hídrico leve\n• <-0.1: Estrés hídrico severo, alto riesgo',
   ndvi:    'NDVI — Índice de vegetación. Rango -1 a 1:\n• >0.5: Vegetación densa y sana\n• 0.2–0.5: Vegetación moderada\n• 0–0.2: Vegetación escasa o suelo desnudo\n• <0: Superficie no vegetada (agua, suelo expuesto)',
   firms:   'Focos activos detectados por satélite NASA (FIRMS) en las últimas 24 h. A mayor número de focos de alta confianza, mayor riesgo inmediato.',
-  loss:    'Tasa de pérdida de cobertura forestal reciente. 0 = sin pérdida detectada, 1 = pérdida total en el área.',
   reports: 'Reportes ciudadanos verificados de humo, focos o incendios activos en la comuna.'
 };
+
+const VISIBLE_RISK_COMPONENTS = new Set(['fwi', 'ndmi', 'firms', 'ndvi', 'reports']);
+const POINT_LAYER_INDICATORS = ['FIRMS', 'NDVI', 'NDMI', 'ALERTS', 'REPORTS'];
+const ALERT_TOOLTIP_COMPONENTS = ['firms', 'fwi', 'ndvi'];
 
 function RiskScoreBadge({ regionData }) {
   const detail = regionData?.riskScore;
@@ -355,7 +370,7 @@ function RiskScoreBadge({ regionData }) {
       </div>
       {components && (
         <div className="risk-score-breakdown">
-          {Object.entries(components).map(([key, comp]) => {
+          {Object.entries(components).filter(([key]) => VISIBLE_RISK_COMPONENTS.has(key)).map(([key, comp]) => {
             const pct = typeof comp?.score === 'number' ? (comp.score * 100).toFixed(0) : '—';
             const info = COMPONENT_INFO[key];
             return (
@@ -425,6 +440,31 @@ function indicatorCount(regionData, indicator) {
   return regionData?.layers?.[indicator]?.features?.length || 0;
 }
 
+function tooltipComponentEntries(components) {
+  const allEntries = Object.entries(components || {})
+    .filter(([key, v]) => VISIBLE_RISK_COMPONENTS.has(key) && v != null);
+  const entries = allEntries.filter(([, v]) => v > 0);
+
+  if (!allEntries.length) {
+    return [];
+  }
+
+  const hasActiveFirms = Number(components?.firms || 0) > 0;
+  if (!hasActiveFirms) {
+    return entries.sort(([, a], [, b]) => b - a).slice(0, 2);
+  }
+
+  const byKey = new Map(allEntries);
+  const prioritized = ALERT_TOOLTIP_COMPONENTS
+    .filter((key) => byKey.has(key))
+    .map((key) => [key, byKey.get(key)]);
+  const fallback = entries
+    .filter(([key]) => !ALERT_TOOLTIP_COMPONENTS.includes(key))
+    .sort(([, a], [, b]) => b - a);
+
+  return [...prioritized, ...fallback].slice(0, 3);
+}
+
 function ComunaTooltip({ comunaId, nombre, score, pos }) {
   if (!comunaId || !pos) return null;
   const level = ALERT_LEVEL_CONFIG[score?.alertLevel] || ALERT_LEVEL_CONFIG.NORMAL;
@@ -432,11 +472,7 @@ function ComunaTooltip({ comunaId, nombre, score, pos }) {
   const displayNombre = nombre || score?.nombreComuna || comunaId;
   const mode = score?.mode;
 
-  const components = score?.components || {};
-  const componentEntries = Object.entries(components)
-    .filter(([, v]) => v != null && v > 0)
-    .sort(([, a], [, b]) => b - a)
-    .slice(0, 2);
+  const componentEntries = tooltipComponentEntries(score?.components);
 
   return (
     <div
@@ -561,7 +597,7 @@ function TerritoryMapPanel({
         <div className="territory-layer-toggles">
           {/* RISK_SCORE no es un toggle: el choropleth comunal y el panel de
               riesgo se muestran siempre (spec: risk-score-breakdown-panel). */}
-          {['FIRMS', 'NDVI', 'NDMI', 'LOSS', 'ALERTS', 'REPORTS'].map((indicator) => (
+          {POINT_LAYER_INDICATORS.map((indicator) => (
             <label key={indicator} className="territory-toggle">
               <input
                 type="checkbox"
@@ -607,51 +643,63 @@ function TerritoryMapPanel({
             />
             <FitRegionBounds bounds={regionData.bounds} />
 
-            {comunalGeoJson && (
-              <ComunaChoropleth
-                geoJson={comunalGeoJson}
-                comunalScores={effectiveComunalScores}
-                onComunaHover={handleComunaHover}
-                onComunaHoverEnd={handleComunaHoverEnd}
-                onComunaClick={handleComunaClick}
-              />
-            )}
+            <Pane name="comuna-risk-pane" style={{ zIndex: 410 }}>
+              {comunalGeoJson && (
+                <ComunaChoropleth
+                  geoJson={comunalGeoJson}
+                  comunalScores={effectiveComunalScores}
+                  onComunaHover={handleComunaHover}
+                  onComunaHoverEnd={handleComunaHoverEnd}
+                  onComunaClick={handleComunaClick}
+                />
+              )}
+            </Pane>
 
-            {comunalGeoJson && CLIMATE_INDICATORS.filter((indicator) => visibleIndicators.includes(indicator)).map((indicator) => (
-              <ClimateChoropleth
-                key={`${regionData.regionId}-${indicator}`}
-                geoJson={comunalGeoJson}
-                indicator={indicator}
-                valueMap={regionData.layers?.[indicator]}
-              />
-            ))}
+            <Pane name="climate-layer-pane" style={{ zIndex: 420 }}>
+              {comunalGeoJson && CLIMATE_INDICATORS.filter((indicator) => visibleIndicators.includes(indicator)).map((indicator) => (
+                <ClimateChoropleth
+                  key={`${regionData.regionId}-${indicator}`}
+                  geoJson={comunalGeoJson}
+                  indicator={indicator}
+                  valueMap={regionData.layers?.[indicator]}
+                />
+              ))}
+            </Pane>
 
-            {visibleIndicators.filter((i) => i !== 'RISK_SCORE' && i !== 'REPORTS' && !CLIMATE_INDICATORS.includes(i)).map((indicator) => (
-              <GeoJSON
-                key={`${regionData.regionId}-${indicator}`}
-                data={regionData.layers[indicator]}
-                pointToLayer={(feature, latlng) => L.circleMarker(latlng, toPointStyle(indicator, feature))}
-                onEachFeature={(feature, layer) => {
-                  const label = featureLabel(feature);
-                  const meta = featureMeta(feature);
-                  layer.bindPopup(`${label}${meta ? ` | ${meta}` : ''}`);
-                }}
-              />
-            ))}
+            <Pane name="territory-points-pane" style={{ zIndex: 650 }}>
+              {visibleIndicators.filter((i) => i !== 'RISK_SCORE' && i !== 'REPORTS' && !CLIMATE_INDICATORS.includes(i)).map((indicator) => (
+                <GeoJSON
+                  key={`${regionData.regionId}-${indicator}`}
+                  pane="territory-points-pane"
+                  data={regionData.layers[indicator]}
+                  pointToLayer={(feature, latlng) => L.circleMarker(latlng, toPointStyle(indicator, feature))}
+                  onEachFeature={(feature, layer) => {
+                    const label = featureLabel(feature);
+                    const meta = featureMeta(feature);
+                    layer.bindPopup(`${label}${meta ? ` | ${meta}` : ''}`);
+                    layer.on('add mouseover', () => layer.bringToFront());
+                  }}
+                />
+              ))}
+            </Pane>
 
-            {visibleIndicators.includes('REPORTS') && regionData.layers.REPORTS && (
-              <GeoJSON
-                key={`${regionData.regionId}-REPORTS`}
-                data={regionData.layers.REPORTS}
-                pointToLayer={(feature, latlng) => L.circleMarker(latlng, toPointStyle('REPORTS', feature))}
-                onEachFeature={(feature, layer) => {
-                  layer.on('click', (e) => {
-                    setSelectedReport(feature);
-                    setReportPos({ x: e.containerPoint.x, y: e.containerPoint.y });
-                  });
-                }}
-              />
-            )}
+            <Pane name="territory-report-pane" style={{ zIndex: 660 }}>
+              {visibleIndicators.includes('REPORTS') && regionData.layers.REPORTS && (
+                <GeoJSON
+                  key={`${regionData.regionId}-REPORTS`}
+                  pane="territory-report-pane"
+                  data={regionData.layers.REPORTS}
+                  pointToLayer={(feature, latlng) => L.circleMarker(latlng, toPointStyle('REPORTS', feature))}
+                  onEachFeature={(feature, layer) => {
+                    layer.on('add mouseover', () => layer.bringToFront());
+                    layer.on('click', (e) => {
+                      setSelectedReport(feature);
+                      setReportPos({ x: e.containerPoint.x, y: e.containerPoint.y });
+                    });
+                  }}
+                />
+              )}
+            </Pane>
           </MapContainer>
 
           {selectedReport && (
@@ -684,7 +732,7 @@ function TerritoryMapPanel({
             <div className="territory-legend">
               <h4>Leyenda de capas</h4>
               <ul>
-                {['FIRMS', 'NDVI', 'NDMI', 'LOSS', 'ALERTS', 'REPORTS'].map((indicator) => (
+                {POINT_LAYER_INDICATORS.map((indicator) => (
                   <li key={indicator}>
                     <span
                       className="territory-color-dot"

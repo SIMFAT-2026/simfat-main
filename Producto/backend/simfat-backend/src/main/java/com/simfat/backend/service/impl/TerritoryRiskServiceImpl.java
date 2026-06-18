@@ -1,7 +1,6 @@
 package com.simfat.backend.service.impl;
 
 import com.simfat.backend.model.CitizenReport;
-import com.simfat.backend.model.ForestLossRecord;
 import com.simfat.backend.model.HeatAlertEvent;
 import com.simfat.backend.model.IndicatorType;
 import com.simfat.backend.model.OpenEoIndicatorObservation;
@@ -9,7 +8,6 @@ import com.simfat.backend.model.Region;
 import com.simfat.backend.model.TerritoryRiskSnapshot;
 import com.simfat.backend.model.TerritoryWeatherObservation;
 import com.simfat.backend.repository.CitizenReportRepository;
-import com.simfat.backend.repository.ForestLossRecordRepository;
 import com.simfat.backend.repository.HeatAlertEventRepository;
 import com.simfat.backend.repository.OpenEoIndicatorObservationRepository;
 import com.simfat.backend.repository.RegionRepository;
@@ -19,7 +17,6 @@ import com.simfat.backend.service.TerritoryRiskService;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
-import java.util.OptionalDouble;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -34,7 +31,6 @@ public class TerritoryRiskServiceImpl implements TerritoryRiskService {
     private static final double W_FWI = 0.38;
     private static final double W_NDMI = 0.22;
     private static final double W_FIRMS = 0.18;
-    private static final double W_LOSS = 0.10;
     private static final double W_NDVI = 0.08;
     private static final double W_REPORTS = 0.04;
 
@@ -46,7 +42,6 @@ public class TerritoryRiskServiceImpl implements TerritoryRiskService {
     private static final double NDVI_MAX = 0.8;
     private static final double FIRMS_MAX_COUNT = 10.0;
     private static final double FIRMS_MAX_FRP = 100.0;
-    private static final double LOSS_MAX_RATE = 20.0;
     private static final double REPORTS_MAX = 5.0;
 
     // Umbrales de alerta (SDD v1)
@@ -61,7 +56,6 @@ public class TerritoryRiskServiceImpl implements TerritoryRiskService {
     private final OpenEoIndicatorObservationRepository observationRepository;
     private final TerritoryWeatherObservationRepository weatherRepository;
     private final HeatAlertEventRepository heatAlertEventRepository;
-    private final ForestLossRecordRepository forestLossRecordRepository;
     private final CitizenReportRepository citizenReportRepository;
     private final TerritoryRiskSnapshotRepository snapshotRepository;
 
@@ -70,7 +64,6 @@ public class TerritoryRiskServiceImpl implements TerritoryRiskService {
         OpenEoIndicatorObservationRepository observationRepository,
         TerritoryWeatherObservationRepository weatherRepository,
         HeatAlertEventRepository heatAlertEventRepository,
-        ForestLossRecordRepository forestLossRecordRepository,
         CitizenReportRepository citizenReportRepository,
         TerritoryRiskSnapshotRepository snapshotRepository
     ) {
@@ -78,7 +71,6 @@ public class TerritoryRiskServiceImpl implements TerritoryRiskService {
         this.observationRepository = observationRepository;
         this.weatherRepository = weatherRepository;
         this.heatAlertEventRepository = heatAlertEventRepository;
-        this.forestLossRecordRepository = forestLossRecordRepository;
         this.citizenReportRepository = citizenReportRepository;
         this.snapshotRepository = snapshotRepository;
     }
@@ -159,22 +151,6 @@ public class TerritoryRiskServiceImpl implements TerritoryRiskService {
             availableComponents++;
         }
 
-        // Forest loss
-        Double lossRateRaw = null;
-        double lossNorm = 0.0;
-        List<ForestLossRecord> lossRecords = forestLossRecordRepository.findByRegionId(regionId);
-        if (!lossRecords.isEmpty()) {
-            OptionalDouble maxLoss = lossRecords.stream()
-                .filter(r -> r.getPorcentajePerdida() != null)
-                .mapToDouble(ForestLossRecord::getPorcentajePerdida)
-                .max();
-            if (maxLoss.isPresent()) {
-                lossRateRaw = maxLoss.getAsDouble();
-                lossNorm = normalize(lossRateRaw, 0.0, LOSS_MAX_RATE);
-                availableComponents++;
-            }
-        }
-
         // Community reports (ultimos 7 dias)
         LocalDateTime reports7dAgo = now.minusDays(7);
         long reportsCount = citizenReportRepository.findByRegionId(regionId).stream()
@@ -190,7 +166,6 @@ public class TerritoryRiskServiceImpl implements TerritoryRiskService {
         double score = fwiNorm * W_FWI
             + ndmiNorm * W_NDMI
             + firmsNorm * W_FIRMS
-            + lossNorm * W_LOSS
             + ndviNorm * W_NDVI
             + reportsNorm * W_REPORTS;
 
@@ -208,7 +183,7 @@ public class TerritoryRiskServiceImpl implements TerritoryRiskService {
         snapshot.setComponentFwi(round4(fwiNorm * W_FWI));
         snapshot.setComponentNdmi(round4(ndmiNorm * W_NDMI));
         snapshot.setComponentFirms(round4(firmsNorm * W_FIRMS));
-        snapshot.setComponentLoss(round4(lossNorm * W_LOSS));
+        snapshot.setComponentLoss(null);
         snapshot.setComponentNdvi(round4(ndviNorm * W_NDVI));
         snapshot.setComponentReports(round4(reportsNorm * W_REPORTS));
         snapshot.setFwiRaw(fwiRaw);
@@ -216,7 +191,7 @@ public class TerritoryRiskServiceImpl implements TerritoryRiskService {
         snapshot.setNdviRaw(ndviRaw);
         snapshot.setFirmsCount(firmsCountFiltered);
         snapshot.setFirmsFrpMean(round4(firmsFrpMean));
-        snapshot.setLossRateRaw(lossRateRaw);
+        snapshot.setLossRateRaw(null);
         snapshot.setReportsCount((int) reportsCount);
 
         snapshotRepository.save(snapshot);

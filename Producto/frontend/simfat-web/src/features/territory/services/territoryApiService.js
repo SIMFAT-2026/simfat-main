@@ -92,7 +92,6 @@ function normalizeLayerPayload(payload, regionId) {
   const normalizedLayers = {
     NDVI: toFeatureCollection(layers.NDVI),
     NDMI: toFeatureCollection(layers.NDMI),
-    LOSS: toFeatureCollection(layers.LOSS),
     ALERTS: toFeatureCollection(layers.ALERTS),
     FIRMS: toFeatureCollection(layers.FIRMS),
     REPORTS: toFeatureCollection(layers.REPORTS),

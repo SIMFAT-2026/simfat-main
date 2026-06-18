@@ -133,7 +133,7 @@
 .risk-score-badge {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
   padding: 10px 16px;
   border-radius: 10px;
   border: 2px solid;
@@ -145,6 +145,8 @@
   display: flex;
   align-items: center;
   gap: 12px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid rgba(0,0,0,0.08);
 }
 
 .risk-score-label {
@@ -175,16 +177,15 @@
 
 .risk-score-breakdown {
   display: grid;
-  gap: 4px;
-  padding-top: 4px;
-  border-top: 1px solid rgba(0,0,0,0.08);
+  gap: 5px;
+  padding-top: 2px;
 }
 
 .risk-score-component {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 16px minmax(60px, 1.2fr) 28px;
+  grid-template-columns: minmax(176px, 220px) 16px minmax(0, 1fr) 28px;
   align-items: center;
-  gap: 6px;
+  gap: 10px;
   font-size: 0.78rem;
 }
 
@@ -599,7 +600,7 @@
 
 .panel-component-row {
   display: grid;
-  grid-template-columns: 1fr 16px 80px 22px 28px;
+  grid-template-columns: minmax(104px, 126px) 16px 76px 22px 28px;
   align-items: center;
   gap: 6px;
   font-size: 0.75rem;
