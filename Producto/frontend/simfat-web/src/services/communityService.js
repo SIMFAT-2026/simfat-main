@@ -25,7 +25,9 @@ export async function createCommunityBoardPost(payload, file) {
     formData.append('payload', JSON.stringify(body));
     formData.append('file', file);
 
-    const response = await axiosClient.post(API_ENDPOINTS.communityBoard, formData);
+    const response = await axiosClient.post(API_ENDPOINTS.communityBoard, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
     return extractData(response.data);
   }
 
@@ -53,7 +55,9 @@ export async function createCommunityResource(payload, file) {
     formData.append('payload', JSON.stringify(body));
     formData.append('file', file || payloadFile);
 
-    const response = await axiosClient.post(API_ENDPOINTS.communityResources, formData);
+    const response = await axiosClient.post(API_ENDPOINTS.communityResources, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
     return extractData(response.data);
   }
 
