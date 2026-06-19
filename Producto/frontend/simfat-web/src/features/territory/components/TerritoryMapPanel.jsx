@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useCallback, useMemo, memo } from 'react';
 import { createPortal } from 'react-dom';
 import L from 'leaflet';
 import ComunaRiskPanel from './ComunaRiskPanel';
-import { GeoJSON, MapContainer, Pane, TileLayer, useMap } from 'react-leaflet';
+import { GeoJSON, MapContainer, Marker, Pane, TileLayer, Tooltip, useMap } from 'react-leaflet';
 import marker2x from 'leaflet/dist/images/marker-icon-2x.png';
 import markerIcon from 'leaflet/dist/images/marker-icon.png';
 import markerShadow from 'leaflet/dist/images/marker-shadow.png';
@@ -269,6 +269,85 @@ const VegetationChoropleth = memo(function VegetationChoropleth({ geoJson, indic
       }}
     />
   );
+});
+
+// Same UTC-forcing rule as parseUtcDate, but returns a Date instead of a
+// formatted string — needed to compare/sort hourly wind timestamps.
+function toUtcDate(str) {
+  if (!str) return null;
+  const utc = /Z|[+-]\d{2}:?\d{2}$/.test(str) ? str : str + 'Z';
+  return new Date(utc);
+}
+
+function formatHourLabel(str) {
+  const date = toUtcDate(str);
+  if (!date) return '—';
+  return date.toLocaleString('es-CL', { timeZone: 'America/Santiago', hour: '2-digit', minute: '2-digit' });
+}
+
+const COMPASS_LABELS = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+
+// Open-Meteo's winddirection is the bearing the wind comes FROM (meteorological
+// convention). For an arrow that visually shows where the wind is heading, we
+// rotate by +180°; the compass label below still describes the source bearing.
+function compassLabelFrom(directionFromDeg) {
+  const index = Math.round(directionFromDeg / 45) % 8;
+  return COMPASS_LABELS[index];
+}
+
+function featureCentroid(feature) {
+  try {
+    return L.geoJSON(feature).getBounds().getCenter();
+  } catch {
+    return null;
+  }
+}
+
+function windArrowIcon(speed, bearingTo) {
+  const color = climateColorForValue('WIND', speed);
+  const html = `<div class="wind-arrow" style="transform: rotate(${bearingTo}deg); border-bottom-color: ${color};"></div>`;
+  return L.divIcon({
+    className: 'wind-arrow-icon',
+    html,
+    iconSize: [20, 20],
+    iconAnchor: [10, 10]
+  });
+}
+
+// Renders one rotated arrow per comuna centroid showing wind direction
+// (spec: wind-arrow-overlay). Speed/direction come either from the latest
+// daily observation or, when a slider hour is selected, from that comuna's
+// hourly series — both populated by the same Open-Meteo sync.
+const WindArrowLayer = memo(function WindArrowLayer({ geoJson, valueMap, hourIndex }) {
+  if (!geoJson || !geoJson.features) return null;
+  const values = valueMap?.values || {};
+
+  const markers = geoJson.features.map((feature) => {
+    const comunaId = feature?.properties?.comunaId;
+    const entry = values[comunaId];
+    if (!entry) return null;
+
+    const hourlyPoint = hourIndex != null ? entry.hourly?.[hourIndex] : null;
+    const speed = hourlyPoint ? hourlyPoint.speed : entry.value;
+    const directionFrom = hourlyPoint ? hourlyPoint.direction : entry.direction;
+    if (speed == null || directionFrom == null) return null;
+
+    const center = featureCentroid(feature);
+    if (!center) return null;
+
+    const bearingTo = (directionFrom + 180) % 360;
+    const nombre = feature?.properties?.nombre || comunaId;
+
+    return (
+      <Marker key={comunaId} position={center} pane="wind-arrow-pane" icon={windArrowIcon(speed, bearingTo)}>
+        <Tooltip direction="top" offset={[0, -8]}>
+          {nombre}: {Number(speed).toFixed(1)} km/h desde el {compassLabelFrom(directionFrom)}
+        </Tooltip>
+      </Marker>
+    );
+  }).filter(Boolean);
+
+  return markers;
 });
 
 function FitRegionBounds({ bounds }) {
@@ -714,6 +793,36 @@ function TerritoryMapPanel({
   const [selectedReport, setSelectedReport] = useState(null);
   const [reportPos, setReportPos] = useState(null);
   const [scoreOverrides, setScoreOverrides] = useState({});
+  const [windHourIndex, setWindHourIndex] = useState(null);
+
+  // Hourly timestamps shared across comunas (they sync close enough in time
+  // to use one comuna's series as the slider's tick labels). Falls back to
+  // empty when no comuna has hourly data yet (sync not run / still loading).
+  const windHourlyTimestamps = useMemo(() => {
+    const values = regionData?.layers?.WIND?.values || {};
+    const withHourly = Object.values(values).find((v) => Array.isArray(v.hourly) && v.hourly.length > 0);
+    return withHourly ? withHourly.hourly.map((point) => point.timestamp) : [];
+  }, [regionData]);
+
+  // Defaults the slider to the hour closest to "now" whenever the wind series
+  // (re)loads, so users see the current wind state before scrubbing manually.
+  useEffect(() => {
+    if (!windHourlyTimestamps.length) {
+      setWindHourIndex(null);
+      return;
+    }
+    const now = Date.now();
+    let closestIndex = 0;
+    let closestDiff = Infinity;
+    windHourlyTimestamps.forEach((ts, index) => {
+      const diff = Math.abs((toUtcDate(ts)?.getTime() ?? Infinity) - now);
+      if (diff < closestDiff) {
+        closestDiff = diff;
+        closestIndex = index;
+      }
+    });
+    setWindHourIndex(closestIndex);
+  }, [windHourlyTimestamps]);
 
   // Merge Copernicus-confirmed scores on top of the loaded comunalScores so
   // the map tooltip and next panel open reflect the updated score immediately,
@@ -803,6 +912,22 @@ function TerritoryMapPanel({
         >
           {refreshing ? 'Actualizando...' : 'Actualizar capas'}
         </button>
+
+        {visibleIndicators.includes('WIND') && windHourlyTimestamps.length > 0 && (
+          <div className="wind-hour-slider">
+            <label htmlFor="wind-hour-range">
+              Dirección del viento — {windHourIndex != null ? formatHourLabel(windHourlyTimestamps[windHourIndex]) : '—'}
+            </label>
+            <input
+              id="wind-hour-range"
+              type="range"
+              min={0}
+              max={windHourlyTimestamps.length - 1}
+              value={windHourIndex ?? 0}
+              onChange={(event) => setWindHourIndex(Number(event.target.value))}
+            />
+          </div>
+        )}
       </div>
 
       {loading ? <LoadingSpinner label="Cargando capas territoriales..." /> : null}
@@ -855,6 +980,16 @@ function TerritoryMapPanel({
                   valueMap={regionData.layers?.[indicator]}
                 />
               ))}
+            </Pane>
+
+            <Pane name="wind-arrow-pane" style={{ zIndex: 430 }}>
+              {comunalGeoJson && visibleIndicators.includes('WIND') && (
+                <WindArrowLayer
+                  geoJson={comunalGeoJson}
+                  valueMap={regionData.layers?.WIND}
+                  hourIndex={windHourIndex}
+                />
+              )}
             </Pane>
 
             <Pane name="territory-points-pane" style={{ zIndex: 650 }}>
