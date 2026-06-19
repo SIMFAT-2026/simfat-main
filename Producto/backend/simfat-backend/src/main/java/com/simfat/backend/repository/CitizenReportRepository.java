@@ -2,6 +2,7 @@ package com.simfat.backend.repository;
 
 import com.simfat.backend.model.CitizenReport;
 import com.simfat.backend.model.CitizenReportStatus;
+import java.time.LocalDateTime;
 import java.util.List;
 import org.springframework.data.mongodb.repository.MongoRepository;
 
@@ -14,4 +15,12 @@ public interface CitizenReportRepository extends MongoRepository<CitizenReport, 
     List<CitizenReport> findByCategoryIgnoreCase(String category);
 
     List<CitizenReport> findByRegionIdAndStatus(String regionId, CitizenReportStatus status);
+
+    List<CitizenReport> findByStatusAndValidatedAtBefore(CitizenReportStatus status, LocalDateTime cutoff);
+
+    List<CitizenReport> findByStatusAndStaleCountAndStaleSinceBefore(
+        CitizenReportStatus status,
+        int staleCount,
+        LocalDateTime cutoff
+    );
 }

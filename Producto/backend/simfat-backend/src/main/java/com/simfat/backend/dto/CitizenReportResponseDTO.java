@@ -8,7 +8,9 @@ public class CitizenReportResponseDTO {
 
     private String id;
     private String regionId;
+    private String comunaId;
     private String category;
+    private String subCategory;
     private String description;
     private Double latitude;
     private Double longitude;
@@ -16,6 +18,10 @@ public class CitizenReportResponseDTO {
     private Integer photoCount;
     private List<String> photos;
     private LocalDateTime createdAt;
+    private LocalDateTime validatedAt;
+    private int staleCount;
+    private LocalDateTime staleSince;
+    private String discardReason;
 
     public String getId() {
         return id;
@@ -33,12 +39,28 @@ public class CitizenReportResponseDTO {
         this.regionId = regionId;
     }
 
+    public String getComunaId() {
+        return comunaId;
+    }
+
+    public void setComunaId(String comunaId) {
+        this.comunaId = comunaId;
+    }
+
     public String getCategory() {
         return category;
     }
 
     public void setCategory(String category) {
         this.category = category;
+    }
+
+    public String getSubCategory() {
+        return subCategory;
+    }
+
+    public void setSubCategory(String subCategory) {
+        this.subCategory = subCategory;
     }
 
     public String getDescription() {
@@ -95,5 +117,37 @@ public class CitizenReportResponseDTO {
 
     public void setCreatedAt(LocalDateTime createdAt) {
         this.createdAt = createdAt;
+    }
+
+    public LocalDateTime getValidatedAt() {
+        return validatedAt;
+    }
+
+    public void setValidatedAt(LocalDateTime validatedAt) {
+        this.validatedAt = validatedAt;
+    }
+
+    public int getStaleCount() {
+        return staleCount;
+    }
+
+    public void setStaleCount(int staleCount) {
+        this.staleCount = staleCount;
+    }
+
+    public LocalDateTime getStaleSince() {
+        return staleSince;
+    }
+
+    public void setStaleSince(LocalDateTime staleSince) {
+        this.staleSince = staleSince;
+    }
+
+    public String getDiscardReason() {
+        return discardReason;
+    }
+
+    public void setDiscardReason(String discardReason) {
+        this.discardReason = discardReason;
     }
 }

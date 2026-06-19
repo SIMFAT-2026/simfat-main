@@ -108,14 +108,20 @@ function normalizeReports(items = []) {
     return {
       id: String(item.id || createId(`report-${index}`)),
       regionId: String(item.regionId || item.region_id || ''),
+      comunaId: String(item.comunaId || item.comuna_id || ''),
       category: String(item.category || item.categoria || 'OTRO').toUpperCase(),
+      subCategory: item.subCategory || item.sub_categoria || '',
       description: item.description || item.descripcion || '',
       latitude: Number(item.latitude ?? item.latitud ?? item.lat ?? 0),
       longitude: Number(item.longitude ?? item.longitud ?? item.lng ?? 0),
       status: normalizeStatus(item.status || item.estado),
       photos,
       photoCount: photos.length,
-      createdAt: item.createdAt || item.created_at || item.fechaCreacion || new Date().toISOString()
+      createdAt: item.createdAt || item.created_at || item.fechaCreacion || new Date().toISOString(),
+      validatedAt: item.validatedAt || null,
+      staleCount: Number(item.staleCount ?? 0),
+      staleSince: item.staleSince || null,
+      discardReason: item.discardReason || ''
     };
   });
 }
@@ -184,7 +190,9 @@ export function useCitizenReportsData() {
       const local = {
         id: createId('report'),
         regionId: payload.regionId,
+        comunaId: payload.comunaId || '',
         category: String(payload.category || 'OTRO').toUpperCase(),
+        subCategory: payload.subCategory || '',
         description: payload.description || '',
         latitude: Number(payload.latitude),
         longitude: Number(payload.longitude),

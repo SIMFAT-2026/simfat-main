@@ -16,6 +16,7 @@ import jakarta.validation.Valid;
 import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -37,6 +38,46 @@ import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 public class CitizenReportController {
 
     private static final String STORAGE_NAMESPACE = "citizen-reports";
+
+    // Catalogo cerrado de subcategorias por categoria. Espejo manual de
+    // REPORT_SUBCATEGORIES en CitizenReportsPage.jsx - si Pablo trae una lista
+    // nueva, hay que actualizar ambos lados.
+    private static final Map<String, List<String>> SUBCATEGORIES_BY_CATEGORY = Map.of(
+        "IGNICION_POTENCIAL", List.of(
+            "Quemas agrícolas",
+            "Fogatas en zonas no habilitadas",
+            "Parrillas o cocinillas en áreas vegetadas",
+            "Quema de basura",
+            "Quema de residuos forestales",
+            "Uso de maquinaria que genera chispas",
+            "Faenas de soldadura al aire libre",
+            "Trabajos con esmeriles o galleteras",
+            "Vehículos estacionados sobre pastizales secos",
+            "Colillas de cigarro / personas fumando",
+            "Fuegos artificiales",
+            "Actividades recreativas con fuego",
+            "Actos intencionales o sospecha de incendio provocado"
+        ),
+        "INFRAESTRUCTURA_ELECTRICA", List.of(
+            "Cables eléctricos caídos",
+            "Cables en contacto con vegetación",
+            "Postes en mal estado",
+            "Chispas provenientes de tendidos eléctricos",
+            "Transformadores defectuosos",
+            "Árboles con riesgo de caer sobre líneas eléctricas"
+        ),
+        "COMBUSTIBLE_VEGETAL", List.of(
+            "Pastizales secos sin manejo",
+            "Acumulación de ramas y residuos forestales",
+            "Microbasurales con material combustible",
+            "Sitios eriazos abandonados",
+            "Plantaciones con exceso de material seco",
+            "Matorrales densos cercanos a viviendas",
+            "Ausencia de cortafuegos",
+            "Cortafuegos deteriorados o interrumpidos",
+            "Regeneración de especies exóticas creciendo sin control"
+        )
+    );
 
     private final CitizenReportRepository citizenReportRepository;
     private final ObjectMapper objectMapper;
@@ -84,10 +125,16 @@ public class CitizenReportController {
         @RequestPart(value = "files", required = false) List<MultipartFile> files
     ) {
         CitizenReportPayloadDTO dto = parsePayload(payload);
+        if (dto.getComunaId() == null || dto.getComunaId().isBlank()) {
+            throw new BadRequestException("La comuna es obligatoria");
+        }
+        String category = dto.getCategory().toUpperCase();
 
         CitizenReport report = new CitizenReport();
         report.setRegionId(dto.getRegionId());
-        report.setCategory(dto.getCategory().toUpperCase());
+        report.setComunaId(dto.getComunaId());
+        report.setCategory(category);
+        report.setSubCategory(resolveSubCategory(category, dto.getSubCategory()));
         report.setDescription(dto.getDescription());
         report.setLatitude(dto.getLatitude());
         report.setLongitude(dto.getLongitude());
@@ -114,6 +161,10 @@ public class CitizenReportController {
 
         existing.setStatus(patch.getStatus());
         existing.setUpdatedAt(LocalDateTime.now());
+        if (patch.getStatus() == CitizenReportStatus.VALIDADO) {
+            existing.setValidatedAt(LocalDateTime.now());
+            existing.setStaleSince(null);
+        }
 
         CitizenReport updated = citizenReportRepository.save(existing);
         return ResponseEntity.ok(ApiResponse.ok("Estado de reporte actualizado correctamente", toResponse(updated)));
@@ -127,6 +178,22 @@ public class CitizenReportController {
 
         citizenReportRepository.delete(existing);
         return ResponseEntity.ok(ApiResponse.ok("Reporte ciudadano eliminado correctamente", id));
+    }
+
+    private String resolveSubCategory(String category, String rawSubCategory) {
+        List<String> options = SUBCATEGORIES_BY_CATEGORY.get(category);
+        if (options == null) {
+            return null;
+        }
+
+        if (rawSubCategory == null || rawSubCategory.isBlank()) {
+            throw new BadRequestException("La subcategoria es obligatoria para la categoria " + category);
+        }
+
+        return options.stream()
+            .filter(option -> option.equalsIgnoreCase(rawSubCategory.trim()))
+            .findFirst()
+            .orElseThrow(() -> new BadRequestException("Subcategoria invalida para la categoria " + category));
     }
 
     private CitizenReportPayloadDTO parsePayload(String rawPayload) {
@@ -186,7 +253,9 @@ public class CitizenReportController {
         CitizenReportResponseDTO dto = new CitizenReportResponseDTO();
         dto.setId(item.getId());
         dto.setRegionId(item.getRegionId());
+        dto.setComunaId(item.getComunaId());
         dto.setCategory(item.getCategory());
+        dto.setSubCategory(item.getSubCategory());
         dto.setDescription(item.getDescription());
         dto.setLatitude(item.getLatitude());
         dto.setLongitude(item.getLongitude());
@@ -194,6 +263,10 @@ public class CitizenReportController {
         dto.setPhotoCount(item.getPhotos() == null ? 0 : item.getPhotos().size());
         dto.setPhotos(item.getPhotos());
         dto.setCreatedAt(item.getCreatedAt());
+        dto.setValidatedAt(item.getValidatedAt());
+        dto.setStaleCount(item.getStaleCount());
+        dto.setStaleSince(item.getStaleSince());
+        dto.setDiscardReason(item.getDiscardReason());
         return dto;
     }
 }
