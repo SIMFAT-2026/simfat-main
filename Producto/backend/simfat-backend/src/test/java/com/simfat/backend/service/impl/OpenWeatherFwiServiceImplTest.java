@@ -154,6 +154,42 @@ class OpenWeatherFwiServiceImplTest {
     }
 
     @Test
+    void syncFwiByRegion_persistsTempMinAndCurrentHourWeatherCode() throws InterruptedException {
+        // weather_code daily would be "the day's worst condition" — using the
+        // hourly value closest to now avoids showing "rain" hours after it
+        // stopped (same class of bug as the wind hourly window).
+        java.time.LocalDateTime now = java.time.LocalDateTime.now();
+        String nowHourIso = now.withMinute(0).withSecond(0).withNano(0).toString();
+
+        server.enqueue(new MockResponse()
+            .setResponseCode(200)
+            .addHeader("Content-Type", "application/json")
+            .setBody("{"
+                + "\"daily\":{"
+                + "\"temperature_2m_max\":[28.5],"
+                + "\"temperature_2m_min\":[12.0],"
+                + "\"relative_humidity_2m_min\":[35.0],"
+                + "\"windspeed_10m_max\":[20.0],"
+                + "\"precipitation_sum\":[0.0]"
+                + "},"
+                + "\"hourly\":{"
+                + "\"time\":[\"2020-01-01T00:00\",\"" + nowHourIso + "\"],"
+                + "\"weather_code\":[0,61]"
+                + "}"
+                + "}"));
+
+        boolean result = service.syncFwiByRegion("comuna-1", -38.0, -72.0);
+        assertTrue(result);
+
+        ArgumentCaptor<TerritoryWeatherObservation> captor = ArgumentCaptor.forClass(TerritoryWeatherObservation.class);
+        verify(weatherRepository).save(captor.capture());
+        TerritoryWeatherObservation saved = captor.getValue();
+
+        assertEquals(12.0, saved.getTempMin());
+        assertEquals(61, saved.getWeatherCode());
+    }
+
+    @Test
     void syncFwiByRegion_soilTempMissing_persistsNullWithoutFailingSync() throws InterruptedException {
         server.enqueue(new MockResponse()
             .setResponseCode(200)

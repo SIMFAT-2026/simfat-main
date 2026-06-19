@@ -615,10 +615,12 @@ public class TerritoryController {
     private Map<String, Object> buildFwiInputs(TerritoryWeatherObservation obs) {
         Map<String, Object> inputs = new LinkedHashMap<>();
         inputs.put("tempMax",     obs != null ? obs.getTempMax()     : null);
+        inputs.put("tempMin",     obs != null ? obs.getTempMin()     : null);
         inputs.put("humidityMin", obs != null ? obs.getHumidityMin() : null);
         inputs.put("windMax",     obs != null ? obs.getWindMax()     : null);
         inputs.put("precip",      obs != null ? obs.getPrecip()      : null);
         inputs.put("soilTemp",    obs != null ? obs.getSoilTemp()    : null);
+        inputs.put("weatherCode", obs != null ? obs.getWeatherCode() : null);
         return inputs;
     }
 

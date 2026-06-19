@@ -438,6 +438,21 @@
   color: #f8fafc;
 }
 
+.comuna-tooltip-weather {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 5px;
+  padding-bottom: 5px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.comuna-tooltip-weather-text {
+  font-size: 0.72rem;
+  color: #cbd5e1;
+  white-space: nowrap;
+}
+
 .comuna-tooltip-level {
   font-size: 0.75rem;
   font-weight: 600;

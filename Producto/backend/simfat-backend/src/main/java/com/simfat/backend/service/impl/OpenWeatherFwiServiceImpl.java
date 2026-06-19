@@ -91,8 +91,8 @@ public class OpenWeatherFwiServiceImpl implements OpenWeatherFwiService {
         String url = baseUrl + "/v1/forecast"
             + "?latitude=" + lat
             + "&longitude=" + lon
-            + "&daily=temperature_2m_max,relative_humidity_2m_min,windspeed_10m_max,winddirection_10m_dominant,precipitation_sum"
-            + "&hourly=soil_temperature_0cm,windspeed_10m,winddirection_10m"
+            + "&daily=temperature_2m_max,temperature_2m_min,relative_humidity_2m_min,windspeed_10m_max,winddirection_10m_dominant,precipitation_sum"
+            + "&hourly=soil_temperature_0cm,windspeed_10m,winddirection_10m,weather_code"
             + "&past_hours=24"
             + "&forecast_hours=24"
             + "&forecast_days=1"
@@ -117,11 +117,13 @@ public class OpenWeatherFwiServiceImpl implements OpenWeatherFwiService {
             JsonNode hourly = root.path("hourly");
 
             Double tempMax = getFirstDouble(daily, "temperature_2m_max");
+            Double tempMin = getFirstDouble(daily, "temperature_2m_min");
             Double rhMin = getFirstDouble(daily, "relative_humidity_2m_min");
             Double windMax = getFirstDouble(daily, "windspeed_10m_max");
             Double windDirection = getFirstDouble(daily, "winddirection_10m_dominant");
             Double precip = getFirstDouble(daily, "precipitation_sum");
             Double soilTemp = getDailyAggregateFromHourly(hourly, "soil_temperature_0cm");
+            Integer weatherCode = getCurrentHourInt(hourly, "weather_code");
 
             if (tempMax == null || rhMin == null || windMax == null || precip == null) {
                 LOGGER.warn("fwi_api status=missing_fields regionId={}", regionId);
@@ -138,11 +140,13 @@ public class OpenWeatherFwiServiceImpl implements OpenWeatherFwiService {
             obs.setLon(lon);
             obs.setFwi(round2(proxyFwi));
             obs.setTempMax(tempMax);
+            obs.setTempMin(tempMin);
             obs.setHumidityMin(rhMin);
             obs.setWindMax(windMax);
             obs.setWindDirection(windDirection);
             obs.setPrecip(precip);
             obs.setSoilTemp(soilTemp == null ? null : round2(soilTemp));
+            obs.setWeatherCode(weatherCode);
             obs.setHourlyTimestamps(getHourlyTimestamps(hourly));
             obs.setHourlyWindSpeed(getHourlyDoubles(hourly, "windspeed_10m"));
             obs.setHourlyWindDirection(getHourlyDoubles(hourly, "winddirection_10m"));
@@ -192,6 +196,42 @@ public class OpenWeatherFwiServiceImpl implements OpenWeatherFwiService {
             return null;
         }
         return arr.get(0).asDouble();
+    }
+
+    /**
+     * Toma el valor horario mas cercano a "ahora" en lugar del agregado diario:
+     * weather_code diario representa la condicion mas severa del dia entero, lo
+     * que mostraria "lluvia" horas despues de que paro de llover. Se usa para
+     * el widget de clima del tooltip comunal (no necesita serie completa, solo
+     * el estado actual).
+     */
+    private Integer getCurrentHourInt(JsonNode hourly, String field) {
+        JsonNode times = hourly.path("time");
+        JsonNode values = hourly.path(field);
+        if (times.isMissingNode() || !times.isArray() || values.isMissingNode() || !values.isArray()) {
+            return null;
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+        int closestIndex = -1;
+        long closestDiffMinutes = Long.MAX_VALUE;
+        for (int i = 0; i < times.size(); i++) {
+            try {
+                LocalDateTime ts = LocalDateTime.parse(times.get(i).asText());
+                long diff = Math.abs(java.time.Duration.between(now, ts).toMinutes());
+                if (diff < closestDiffMinutes) {
+                    closestDiffMinutes = diff;
+                    closestIndex = i;
+                }
+            } catch (Exception ignored) {
+                // timestamp malformado, se ignora ese punto
+            }
+        }
+
+        if (closestIndex < 0 || closestIndex >= values.size() || values.get(closestIndex).isNull()) {
+            return null;
+        }
+        return values.get(closestIndex).asInt();
     }
 
     /**

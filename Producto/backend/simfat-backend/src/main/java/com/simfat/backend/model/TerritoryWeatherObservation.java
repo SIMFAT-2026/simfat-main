@@ -34,10 +34,17 @@ public class TerritoryWeatherObservation {
 
     // Climate variables (Slice A - Frente 1)
     private Double tempMax;
+    private Double tempMin;
     private Double humidityMin;
     private Double windMax;
     private Double precip;
     private Double soilTemp;
+
+    // WMO weather code (sun/cloud/rain/snow classification) for the comuna
+    // tooltip weather widget. Taken from the HOURLY block at the index
+    // closest to "now" at sync time — the daily code represents the day's
+    // worst condition, which would show "rain" hours after it stopped.
+    private Integer weatherCode;
 
     // Dominant wind direction for the day (degrees, 0-360, meteorological
     // convention: direction the wind blows FROM). Feeds the static wind
@@ -97,6 +104,12 @@ public class TerritoryWeatherObservation {
 
     public Double getTempMax() { return tempMax; }
     public void setTempMax(Double tempMax) { this.tempMax = tempMax; }
+
+    public Double getTempMin() { return tempMin; }
+    public void setTempMin(Double tempMin) { this.tempMin = tempMin; }
+
+    public Integer getWeatherCode() { return weatherCode; }
+    public void setWeatherCode(Integer weatherCode) { this.weatherCode = weatherCode; }
 
     public Double getHumidityMin() { return humidityMin; }
     public void setHumidityMin(Double humidityMin) { this.humidityMin = humidityMin; }

@@ -838,6 +838,65 @@ function vegetationColorForValue(indicator, value) {
   return bin ? bin.color : scale.bins[scale.bins.length - 1].color;
 }
 
+// WMO weather_code (Open-Meteo) -> categoria visual. El codigo ya distingue
+// despejado/nublado/lluvia/nieve por si solo (no requiere combinarlo con
+// cloud_cover, que ademas no existe en el bloque "daily" de Open-Meteo).
+function weatherCategoryFromCode(code) {
+  if (code === null || code === undefined) return null;
+  if (code === 0 || code === 1) return 'sunny';
+  if ([2, 3, 45, 48].includes(code)) return 'cloudy';
+  if ([71, 73, 75, 77, 85, 86].includes(code)) return 'snowy';
+  if ([51, 53, 55, 56, 57, 61, 63, 65, 66, 67, 80, 81, 82, 95, 96, 99].includes(code)) return 'rainy';
+  return 'cloudy';
+}
+
+// Ilustraciones planas (varios elementos, no un glifo de icono unico) para el
+// widget de clima del tooltip comunal. Sin animacion por ahora (a futuro).
+function WeatherIllustration({ category, size = 30 }) {
+  if (category === 'sunny') {
+    return (
+      <svg width={size} height={size} viewBox="0 0 32 32" aria-label="Despejado">
+        <circle cx="16" cy="16" r="7" fill="#facc15" />
+        {[0, 45, 90, 135, 180, 225, 270, 315].map((deg) => (
+          <line
+            key={deg}
+            x1="16" y1="3" x2="16" y2="7"
+            stroke="#f59e0b" strokeWidth="2" strokeLinecap="round"
+            transform={`rotate(${deg} 16 16)`}
+          />
+        ))}
+      </svg>
+    );
+  }
+  if (category === 'rainy') {
+    return (
+      <svg width={size} height={size} viewBox="0 0 32 32" aria-label="Lluvia">
+        <path d="M9 18a5 5 0 0 1-1-9.9 6.5 6.5 0 0 1 12.6-2A5.5 5.5 0 0 1 23 18Z" fill="#94a3b8" />
+        <line x1="11" y1="21" x2="9" y2="27" stroke="#38bdf8" strokeWidth="2" strokeLinecap="round" />
+        <line x1="16" y1="21" x2="14" y2="27" stroke="#38bdf8" strokeWidth="2" strokeLinecap="round" />
+        <line x1="21" y1="21" x2="19" y2="27" stroke="#38bdf8" strokeWidth="2" strokeLinecap="round" />
+      </svg>
+    );
+  }
+  if (category === 'snowy') {
+    return (
+      <svg width={size} height={size} viewBox="0 0 32 32" aria-label="Nieve">
+        <path d="M9 18a5 5 0 0 1-1-9.9 6.5 6.5 0 0 1 12.6-2A5.5 5.5 0 0 1 23 18Z" fill="#cbd5e1" />
+        <circle cx="11" cy="25" r="1.4" fill="#bae6fd" />
+        <circle cx="16" cy="27" r="1.4" fill="#bae6fd" />
+        <circle cx="21" cy="25" r="1.4" fill="#bae6fd" />
+      </svg>
+    );
+  }
+  // cloudy (default)
+  return (
+    <svg width={size} height={size} viewBox="0 0 32 32" aria-label="Nublado">
+      <path d="M9 21a5.5 5.5 0 0 1-1-10.9A7 7 0 0 1 21.5 8 6 6 0 0 1 22 21Z" fill="#cbd5e1" />
+      <circle cx="13" cy="11" r="4" fill="#facc15" opacity="0.7" />
+    </svg>
+  );
+}
+
 function ComunaTooltip({ comunaId, nombre, score, pos }) {
   if (!comunaId || !pos) return null;
   const level = ALERT_LEVEL_CONFIG[score?.alertLevel] || ALERT_LEVEL_CONFIG.NORMAL;
@@ -846,6 +905,8 @@ function ComunaTooltip({ comunaId, nombre, score, pos }) {
   const mode = score?.mode;
 
   const componentEntries = tooltipComponentEntries(score?.components);
+  const fwiInputs = score?.fwiInputs;
+  const weatherCategory = weatherCategoryFromCode(fwiInputs?.weatherCode);
 
   return (
     <div
@@ -860,6 +921,21 @@ function ComunaTooltip({ comunaId, nombre, score, pos }) {
           </span>
         )}
       </div>
+      {fwiInputs && weatherCategory && (
+        <div className="comuna-tooltip-weather">
+          <WeatherIllustration category={weatherCategory} size={28} />
+          <span className="comuna-tooltip-weather-text">
+            {typeof fwiInputs.tempMin === 'number' && typeof fwiInputs.tempMax === 'number'
+              ? `${fwiInputs.tempMin.toFixed(0)}°/${fwiInputs.tempMax.toFixed(0)}°`
+              : typeof fwiInputs.tempMax === 'number' ? `${fwiInputs.tempMax.toFixed(0)}°` : '—'}
+            {' · '}
+            {typeof fwiInputs.humidityMin === 'number' ? `${fwiInputs.humidityMin.toFixed(0)}%` : '—'}
+            {' · '}
+            {typeof fwiInputs.windMax === 'number' ? `${fwiInputs.windMax.toFixed(0)}km/h` : '—'}
+            {typeof fwiInputs.precip === 'number' && fwiInputs.precip > 0 ? ` · ${fwiInputs.precip.toFixed(1)}mm` : ''}
+          </span>
+        </div>
+      )}
       {score ? (
         <>
           <div className="comuna-tooltip-level" style={{ color: level.color }}>
