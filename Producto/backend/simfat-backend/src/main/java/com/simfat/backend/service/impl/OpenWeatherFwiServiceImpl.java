@@ -84,12 +84,17 @@ public class OpenWeatherFwiServiceImpl implements OpenWeatherFwiService {
         // windspeed_10m/winddirection_10m + past_hours=24 alimentan el slider
         // horario de viento (spec: wind-arrow-overlay); past_hours respalda las
         // horas ya transcurridas del día, no solo el pronóstico hacia adelante.
+        // IMPORTANTE: forecast_days solo acota el bloque "daily"; cuando se
+        // combina con past_hours, el bloque "hourly" ignora forecast_days y
+        // cae al horizonte default (~16 días). forecast_hours es el parámetro
+        // correcto para acotar el horizonte horario hacia adelante.
         String url = baseUrl + "/v1/forecast"
             + "?latitude=" + lat
             + "&longitude=" + lon
             + "&daily=temperature_2m_max,relative_humidity_2m_min,windspeed_10m_max,winddirection_10m_dominant,precipitation_sum"
             + "&hourly=soil_temperature_0cm,windspeed_10m,winddirection_10m"
             + "&past_hours=24"
+            + "&forecast_hours=24"
             + "&forecast_days=1"
             + "&timezone=America%2FSantiago";
 
