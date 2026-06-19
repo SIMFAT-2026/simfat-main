@@ -1,6 +1,5 @@
 import { useMemo, useRef, useState } from 'react';
 import ConfirmModal from '../components/ConfirmModal';
-import DataTable from '../components/DataTable';
 import EmptyState from '../components/EmptyState';
 import ErrorMessage from '../components/ErrorMessage';
 import FilterBar from '../components/FilterBar';
@@ -35,6 +34,7 @@ const initialContactForm = {
   phone: '',
   email: '',
   regionId: '',
+  comunaId: '',
   protocol: ''
 };
 
@@ -70,6 +70,16 @@ function priorityClass(priority) {
 
 function fallbackBoardPosition(index) {
   return BOARD_CARD_POSITIONS[index % BOARD_CARD_POSITIONS.length];
+}
+
+function contactWhatsAppHref(phone) {
+  const digits = String(phone || '').replace(/\D/g, '');
+  return digits ? `https://wa.me/${digits}` : null;
+}
+
+function contactMailHref(email) {
+  const address = String(email || '').trim();
+  return address ? `mailto:${address}` : null;
 }
 
 function attachmentKind(file) {
@@ -157,6 +167,9 @@ function CommunityPage() {
   const [selectedResourceId, setSelectedResourceId] = useState('');
   const [resourceCatalogRegionId, setResourceCatalogRegionId] = useState('');
   const [resourceCatalogComunaId, setResourceCatalogComunaId] = useState('');
+  const [contactSearchTerm, setContactSearchTerm] = useState('');
+  const [contactRegionFilterId, setContactRegionFilterId] = useState('');
+  const [contactComunaFilterId, setContactComunaFilterId] = useState('');
   const [pendingDelete, setPendingDelete] = useState({ type: '', id: '' });
 
   const regionMap = useMemo(
@@ -256,21 +269,36 @@ function CommunityPage() {
     return catalogResources.find((item) => item.id === selectedResourceId) || catalogResources[0];
   }, [catalogResources, selectedResourceId]);
 
-  const filteredContacts = useMemo(
-    () => contacts.filter((item) => !filterRegionId || item.regionId === filterRegionId),
-    [contacts, filterRegionId]
+  const contactFormComunas = useMemo(
+    () => getComunasByRegion(contactForm.regionId),
+    [contactForm.regionId]
   );
 
-  const contactColumns = useMemo(
-    () => [
-      { key: 'name', header: 'Contacto' },
-      { key: 'organization', header: 'Organizacion' },
-      { key: 'phone', header: 'Telefono' },
-      { key: 'email', header: 'Correo' },
-      { key: 'regionId', header: 'Region', render: (row) => regionMap[row.regionId] || row.regionId || '-' },
-      { key: 'protocol', header: 'Protocolo' }
-    ],
-    [regionMap]
+  const contactFilterComunas = useMemo(
+    () => getComunasByRegion(contactRegionFilterId),
+    [contactRegionFilterId]
+  );
+
+  const filteredContacts = useMemo(
+    () => {
+      const query = contactSearchTerm.trim().toLowerCase();
+      return contacts.filter((item) => {
+        const globalRegionMatches = !filterRegionId || item.regionId === filterRegionId;
+        const agendaRegionMatches = !contactRegionFilterId || item.regionId === contactRegionFilterId;
+        const agendaComunaMatches = !contactComunaFilterId || item.comunaId === contactComunaFilterId;
+        const queryMatches = !query || [
+          item.name,
+          item.organization,
+          item.phone,
+          item.email,
+          item.protocol,
+          regionMap[item.regionId],
+          getLabelForComuna(item.comunaId)
+        ].some((value) => String(value || '').toLowerCase().includes(query));
+        return globalRegionMatches && agendaRegionMatches && agendaComunaMatches && queryMatches;
+      });
+    },
+    [contacts, filterRegionId, contactRegionFilterId, contactComunaFilterId, contactSearchTerm, regionMap]
   );
 
   function handleBoardInput(event) {
@@ -295,7 +323,16 @@ function CommunityPage() {
 
   function handleContactInput(event) {
     const { name, value } = event.target;
-    setContactForm((prev) => ({ ...prev, [name]: value }));
+    setContactForm((prev) => ({
+      ...prev,
+      [name]: value,
+      ...(name === 'regionId' ? { comunaId: '' } : {})
+    }));
+  }
+
+  function handleContactRegionFilter(event) {
+    setContactRegionFilterId(event.target.value);
+    setContactComunaFilterId('');
   }
 
   function handleAttachmentChange(event) {
@@ -866,73 +903,166 @@ function CommunityPage() {
         </div>
       </article>
 
-      <article className="dashboard-card">
-        <h3>Contactos y protocolos</h3>
-        <form className="form-grid" onSubmit={submitContact}>
-          <label>
-            Nombre
-            <input name="name" value={contactForm.name} onChange={handleContactInput} required />
-          </label>
+      <article className="dashboard-card community-contacts-card">
+        <div className="community-contacts-layout">
+          <section className="community-agenda-panel" aria-label="Agenda de contactos">
+            <div className="community-agenda-header">
+              <div>
+                <h3>Agenda de contactos</h3>
+                <p>Responsables y canales de escalamiento por territorio.</p>
+              </div>
+              <span>{filteredContacts.length}</span>
+            </div>
 
-          <label>
-            Organizacion
-            <input name="organization" value={contactForm.organization} onChange={handleContactInput} required />
-          </label>
+            <div className="community-agenda-filters">
+              <label>
+                Buscar
+                <input
+                  type="search"
+                  value={contactSearchTerm}
+                  onChange={(event) => setContactSearchTerm(event.target.value)}
+                  placeholder="Nombre, telefono, correo o protocolo"
+                />
+              </label>
+              <label>
+                Region
+                <select value={contactRegionFilterId} onChange={handleContactRegionFilter}>
+                  <option value="">Todas</option>
+                  {resourceRegionOptions.map((region) => (
+                    <option key={region.id} value={region.id}>
+                      {region.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Comuna
+                <select
+                  value={contactComunaFilterId}
+                  onChange={(event) => setContactComunaFilterId(event.target.value)}
+                  disabled={!contactRegionFilterId}
+                >
+                  <option value="">{contactRegionFilterId ? 'Todas' : 'Seleccione region'}</option>
+                  {contactFilterComunas.map((comuna) => (
+                    <option key={comuna.value} value={comuna.value}>
+                      {comuna.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
 
-          <label>
-            Telefono
-            <input name="phone" value={contactForm.phone} onChange={handleContactInput} required />
-          </label>
+            <div className="community-agenda-book">
+              {loading ? <LoadingSpinner label="Cargando contactos..." /> : null}
+              {!loading && filteredContacts.length === 0 ? (
+                <EmptyState title="Sin contactos" description="Agrega responsables y protocolos de escalamiento." />
+              ) : null}
+              {!loading && filteredContacts.map((contact) => {
+                const whatsappHref = contactWhatsAppHref(contact.phone);
+                const mailHref = contactMailHref(contact.email);
+                return (
+                  <article key={contact.id} className="community-contact-card">
+                    <div className="community-contact-main">
+                      <strong>{contact.name}</strong>
+                      <span>{contact.organization}</span>
+                      <small>{regionMap[contact.regionId] || contact.regionId || 'Sin region'} · {getLabelForComuna(contact.comunaId) || 'Sin comuna'}</small>
+                    </div>
+                    <div className="community-contact-meta">
+                      <a href={`tel:${contact.phone}`} className="community-contact-phone">{contact.phone}</a>
+                      <div className="community-contact-actions" aria-label={`Canales de contacto para ${contact.name}`}>
+                        {whatsappHref ? (
+                          <a className="community-contact-action whatsapp" href={whatsappHref} target="_blank" rel="noreferrer" aria-label={`Abrir WhatsApp para ${contact.name}`}>
+                            💬
+                          </a>
+                        ) : null}
+                        {mailHref ? (
+                          <a className="community-contact-action email" href={mailHref} aria-label={`Enviar correo a ${contact.name}`}>
+                            ✉
+                          </a>
+                        ) : null}
+                        <button
+                          type="button"
+                          className="community-contact-delete"
+                          onClick={() => setPendingDelete({ type: 'contact', id: contact.id })}
+                        >
+                          Eliminar
+                        </button>
+                      </div>
+                    </div>
+                    <p>{contact.protocol}</p>
+                  </article>
+                );
+              })}
+            </div>
+          </section>
 
-          <label>
-            Correo
-            <input name="email" type="email" value={contactForm.email} onChange={handleContactInput} required />
-          </label>
+          <aside className="community-contact-form-panel">
+            <h3>Contactos y protocolos</h3>
+            <p>Registra responsables con teléfono, WhatsApp, correo y protocolo de escalamiento.</p>
+            <form className="community-contact-form" onSubmit={submitContact}>
+              <label>
+                Nombre
+                <input name="name" value={contactForm.name} onChange={handleContactInput} required />
+              </label>
 
-          <label>
-            Region
-            <select name="regionId" value={contactForm.regionId} onChange={handleContactInput} required>
-              <option value="">Seleccione region</option>
-              {regions.map((region) => (
-                <option key={region.id} value={region.id}>
-                  {region.nombre}
-                </option>
-              ))}
-            </select>
-          </label>
+              <label>
+                Organizacion
+                <input name="organization" value={contactForm.organization} onChange={handleContactInput} required />
+              </label>
 
-          <label className="full-width">
-            Protocolo
-            <textarea name="protocol" rows={2} value={contactForm.protocol} onChange={handleContactInput} required />
-          </label>
+              <label>
+                Telefono
+                <input name="phone" value={contactForm.phone} onChange={handleContactInput} required />
+              </label>
 
-          <div className="form-actions">
-            <button type="submit" className="btn">
-              Guardar contacto
-            </button>
-          </div>
-        </form>
+              <label>
+                Correo
+                <input name="email" type="email" value={contactForm.email} onChange={handleContactInput} required />
+              </label>
 
-        {loading ? <LoadingSpinner label="Cargando contactos..." /> : null}
-        {!loading && filteredContacts.length === 0 ? (
-          <EmptyState title="Sin contactos" description="Agrega responsables y protocolos de escalamiento." />
-        ) : null}
-        {!loading && filteredContacts.length > 0 ? (
-          <DataTable
-            columns={contactColumns}
-            rows={filteredContacts}
-            rowKey="id"
-            actions={(row) => (
-              <button
-                type="button"
-                className="btn btn-danger"
-                onClick={() => setPendingDelete({ type: 'contact', id: row.id })}
-              >
-                Eliminar
-              </button>
-            )}
-          />
-        ) : null}
+              <label>
+                Region
+                <select name="regionId" value={contactForm.regionId} onChange={handleContactInput} required>
+                  <option value="">Seleccione region</option>
+                  {resourceRegionOptions.map((region) => (
+                    <option key={region.id} value={region.id}>
+                      {region.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label>
+                Comuna
+                <select
+                  name="comunaId"
+                  value={contactForm.comunaId}
+                  onChange={handleContactInput}
+                  required
+                  disabled={!contactForm.regionId}
+                >
+                  <option value="">{contactForm.regionId ? 'Seleccione comuna' : 'Seleccione una region primero'}</option>
+                  {contactFormComunas.map((comuna) => (
+                    <option key={comuna.value} value={comuna.value}>
+                      {comuna.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="full-width">
+                Protocolo
+                <textarea name="protocol" rows={4} value={contactForm.protocol} onChange={handleContactInput} required />
+              </label>
+
+              <div className="form-actions full-width">
+                <button type="submit" className="btn">
+                  Guardar contacto
+                </button>
+              </div>
+            </form>
+          </aside>
+        </div>
       </article>
 
       {loading && !error ? <LoadingSpinner label="Sincronizando modulo comunitario..." /> : null}

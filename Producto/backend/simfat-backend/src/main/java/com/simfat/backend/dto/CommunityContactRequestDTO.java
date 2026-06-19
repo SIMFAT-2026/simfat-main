@@ -25,6 +25,9 @@ public class CommunityContactRequestDTO {
     @NotBlank(message = "La region es obligatoria")
     private String regionId;
 
+    @NotBlank(message = "La comuna es obligatoria")
+    private String comunaId;
+
     @NotBlank(message = "El protocolo es obligatorio")
     @Size(max = 600, message = "El protocolo no puede exceder 600 caracteres")
     private String protocol;
@@ -67,6 +70,14 @@ public class CommunityContactRequestDTO {
 
     public void setRegionId(String regionId) {
         this.regionId = regionId;
+    }
+
+    public String getComunaId() {
+        return comunaId;
+    }
+
+    public void setComunaId(String comunaId) {
+        this.comunaId = comunaId;
     }
 
     public String getProtocol() {

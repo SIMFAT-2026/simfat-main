@@ -44,6 +44,7 @@ const MOCK_RESOURCES = [
     category: 'PROTOCOLO',
     url: 'https://example.com/protocolo-respuesta',
     regionId: 'biobio',
+    comunaId: 'CHL.8.1.1_1',
     description: 'Flujo recomendado para coordinacion durante las primeras 2 horas.'
   },
   {
@@ -52,6 +53,7 @@ const MOCK_RESOURCES = [
     category: 'GUIA',
     url: 'https://example.com/guia-prevencion',
     regionId: 'araucania',
+    comunaId: 'CHL.9.1.1_1',
     description: 'Checklist comunitario previo a temporada de alto riesgo.'
   }
 ];
@@ -64,6 +66,7 @@ const MOCK_CONTACTS = [
     phone: '+56 9 5555 1111',
     email: 'emergencias@simfat.cl',
     regionId: 'biobio',
+    comunaId: 'CHL.8.1.1_1',
     protocol: 'Escalamiento inmediato ante humo persistente > 20 minutos.'
   },
   {
@@ -73,6 +76,7 @@ const MOCK_CONTACTS = [
     phone: '+56 9 5555 2222',
     email: 'brigadas@simfat.cl',
     regionId: 'araucania',
+    comunaId: 'CHL.9.1.1_1',
     protocol: 'Activacion con prioridad alta ante alerta critica confirmada.'
   }
 ];
@@ -132,6 +136,7 @@ function normalizeContacts(items = []) {
     phone: item.phone || item.telefono || '-',
     email: item.email || item.correo || '-',
     regionId: String(item.regionId || item.region_id || ''),
+    comunaId: String(item.comunaId || item.comuna_id || ''),
     protocol: item.protocol || item.protocolo || ''
   }));
 }
@@ -264,6 +269,7 @@ export function useCommunityData() {
         phone: payload.phone,
         email: payload.email,
         regionId: payload.regionId,
+        comunaId: payload.comunaId,
         protocol: payload.protocol
       };
       setContacts((prev) => [createdLocal, ...prev]);

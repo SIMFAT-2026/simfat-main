@@ -15,6 +15,7 @@ public class CommunityContact {
     private String phone;
     private String email;
     private String regionId;
+    private String comunaId;
     private String protocol;
     private LocalDateTime createdAt;
 
@@ -64,6 +65,14 @@ public class CommunityContact {
 
     public void setRegionId(String regionId) {
         this.regionId = regionId;
+    }
+
+    public String getComunaId() {
+        return comunaId;
+    }
+
+    public void setComunaId(String comunaId) {
+        this.comunaId = comunaId;
     }
 
     public String getProtocol() {

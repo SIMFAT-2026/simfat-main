@@ -194,6 +194,7 @@ public class CommunityController {
         item.setPhone(request.getPhone());
         item.setEmail(request.getEmail());
         item.setRegionId(request.getRegionId());
+        item.setComunaId(request.getComunaId());
         item.setProtocol(request.getProtocol());
         item.setCreatedAt(LocalDateTime.now());
 
@@ -346,6 +347,7 @@ public class CommunityController {
         dto.setPhone(item.getPhone());
         dto.setEmail(item.getEmail());
         dto.setRegionId(item.getRegionId());
+        dto.setComunaId(item.getComunaId());
         dto.setProtocol(item.getProtocol());
         dto.setCreatedAt(item.getCreatedAt());
         return dto;
