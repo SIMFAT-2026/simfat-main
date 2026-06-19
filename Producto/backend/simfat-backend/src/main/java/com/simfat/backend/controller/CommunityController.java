@@ -16,8 +16,8 @@ import com.simfat.backend.model.CommunityResource;
 import com.simfat.backend.repository.CommunityBoardPostRepository;
 import com.simfat.backend.repository.CommunityContactRepository;
 import com.simfat.backend.repository.CommunityResourceRepository;
-import com.simfat.backend.service.SupabaseStorageService;
-import com.simfat.backend.service.impl.LocalImageFallbackStorageService;
+import com.simfat.backend.service.ObjectStorageService;
+import com.simfat.backend.service.impl.LocalObjectFallbackStorageService;
 import jakarta.validation.Valid;
 import java.io.IOException;
 import java.time.LocalDateTime;
@@ -41,27 +41,30 @@ import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 @RequestMapping("/api/community")
 public class CommunityController {
 
+    private static final String BOARD_STORAGE_NAMESPACE = "community-board";
+    private static final String RESOURCE_STORAGE_NAMESPACE = "community-resources";
+
     private final CommunityBoardPostRepository boardRepository;
     private final CommunityResourceRepository resourceRepository;
     private final CommunityContactRepository contactRepository;
     private final ObjectMapper objectMapper;
-    private final SupabaseStorageService storageService;
-    private final LocalImageFallbackStorageService localImageFallbackStorageService;
+    private final ObjectStorageService storageService;
+    private final LocalObjectFallbackStorageService localObjectFallbackStorageService;
 
     public CommunityController(
         CommunityBoardPostRepository boardRepository,
         CommunityResourceRepository resourceRepository,
         CommunityContactRepository contactRepository,
         ObjectMapper objectMapper,
-        SupabaseStorageService storageService,
-        LocalImageFallbackStorageService localImageFallbackStorageService
+        ObjectStorageService storageService,
+        LocalObjectFallbackStorageService localObjectFallbackStorageService
     ) {
         this.boardRepository = boardRepository;
         this.resourceRepository = resourceRepository;
         this.contactRepository = contactRepository;
         this.objectMapper = objectMapper;
         this.storageService = storageService;
-        this.localImageFallbackStorageService = localImageFallbackStorageService;
+        this.localObjectFallbackStorageService = localObjectFallbackStorageService;
     }
 
     @GetMapping("/board")
@@ -92,7 +95,7 @@ public class CommunityController {
         CommunityBoardPost item = buildBoardPost(request);
 
         if (file != null && !file.isEmpty()) {
-            item.setAttachmentUrl(resolveUploadReference(file));
+            item.setAttachmentUrl(resolveUploadReference(file, BOARD_STORAGE_NAMESPACE));
             item.setAttachmentName(file.getOriginalFilename());
             item.setAttachmentContentType(file.getContentType());
             item.setAttachmentSize(file.getSize());
@@ -148,7 +151,7 @@ public class CommunityController {
 
         CommunityResourceRequestDTO request = parseResourcePayload(payload);
         CommunityResource item = buildResource(request);
-        String fileReference = resolveUploadReference(file);
+        String fileReference = resolveUploadReference(file, RESOURCE_STORAGE_NAMESPACE);
         item.setUrl(fileReference);
         item.setFileUrl(fileReference);
         item.setFileName(file.getOriginalFilename());
@@ -287,16 +290,16 @@ public class CommunityController {
         }
     }
 
-    private String resolveUploadReference(MultipartFile file) {
+    private String resolveUploadReference(MultipartFile file, String namespace) {
         try {
-            String reference = storageService.uploadCitizenReportFile(file);
+            String reference = storageService.uploadFile(file, namespace);
             if (reference != null && !reference.isBlank()) {
                 return reference;
             }
         } catch (RuntimeException ex) {
             // En modo demo priorizamos continuidad y visibilidad local de adjuntos.
         }
-        String localReference = localImageFallbackStorageService.storeCitizenReportFile(file);
+        String localReference = localObjectFallbackStorageService.storeFile(file, namespace);
         String absoluteReference = toAbsoluteReference(localReference);
         if (absoluteReference == null || absoluteReference.isBlank()) {
             throw new BadRequestException("No fue posible persistir el archivo adjunto");

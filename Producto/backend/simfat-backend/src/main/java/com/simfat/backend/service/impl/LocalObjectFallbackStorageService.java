@@ -14,15 +14,15 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 @Service
-public class LocalImageFallbackStorageService {
+public class LocalObjectFallbackStorageService {
 
     private final LocalStorageProperties properties;
 
-    public LocalImageFallbackStorageService(LocalStorageProperties properties) {
+    public LocalObjectFallbackStorageService(LocalStorageProperties properties) {
         this.properties = properties;
     }
 
-    public String storeCitizenReportFile(MultipartFile file) {
+    public String storeFile(MultipartFile file, String namespace) {
         if (file == null || file.isEmpty()) {
             return "";
         }
@@ -30,7 +30,7 @@ public class LocalImageFallbackStorageService {
             return "";
         }
 
-        String folder = LocalDate.now().toString();
+        String folder = sanitizeNamespace(namespace) + "/" + LocalDate.now();
         String fileName = buildFileName(file.getOriginalFilename());
 
         try {
@@ -55,6 +55,13 @@ public class LocalImageFallbackStorageService {
         String normalized = originalName == null ? "imagen" : originalName.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9._-]", "-");
         String extension = normalized.contains(".") ? normalized.substring(normalized.lastIndexOf('.')) : ".webp";
         return UUID.randomUUID() + extension;
+    }
+
+    private String sanitizeNamespace(String namespace) {
+        if (namespace == null || namespace.isBlank()) {
+            return "misc";
+        }
+        return namespace.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9/_-]", "-").replaceAll("^/+|/+$", "");
     }
 
     private String normalizePublicBasePath(String raw) {

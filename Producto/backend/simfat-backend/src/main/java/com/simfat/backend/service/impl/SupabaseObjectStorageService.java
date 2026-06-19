@@ -2,7 +2,7 @@ package com.simfat.backend.service.impl;
 
 import com.simfat.backend.config.SupabaseStorageProperties;
 import com.simfat.backend.exception.BadRequestException;
-import com.simfat.backend.service.SupabaseStorageService;
+import com.simfat.backend.service.ObjectStorageService;
 import java.io.IOException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -22,18 +22,18 @@ import org.springframework.web.client.RestTemplate;
 import org.springframework.web.multipart.MultipartFile;
 
 @Service
-public class SupabaseStorageServiceImpl implements SupabaseStorageService {
+public class SupabaseObjectStorageService implements ObjectStorageService {
 
     private final SupabaseStorageProperties properties;
     private final RestTemplate restTemplate;
 
-    public SupabaseStorageServiceImpl(SupabaseStorageProperties properties, RestTemplate restTemplate) {
+    public SupabaseObjectStorageService(SupabaseStorageProperties properties, RestTemplate restTemplate) {
         this.properties = properties;
         this.restTemplate = restTemplate;
     }
 
     @Override
-    public String uploadCitizenReportFile(MultipartFile file) {
+    public String uploadFile(MultipartFile file, String namespace) {
         if (file == null || file.isEmpty()) {
             return "";
         }
@@ -45,7 +45,7 @@ public class SupabaseStorageServiceImpl implements SupabaseStorageService {
         validateConfig();
 
         try {
-            String folder = LocalDate.now().toString();
+            String folder = sanitizeNamespace(namespace) + "/" + LocalDate.now();
             String fileName = buildFileName(file.getOriginalFilename());
             String objectPath = folder + "/" + fileName;
             String encodedPath = encodePath(objectPath);
@@ -99,6 +99,13 @@ public class SupabaseStorageServiceImpl implements SupabaseStorageService {
         String normalized = originalName == null ? "imagen" : originalName.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9._-]", "-");
         String extension = normalized.contains(".") ? normalized.substring(normalized.lastIndexOf('.')) : ".webp";
         return UUID.randomUUID() + extension;
+    }
+
+    private String sanitizeNamespace(String namespace) {
+        if (namespace == null || namespace.isBlank()) {
+            return "misc";
+        }
+        return namespace.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9/_-]", "-").replaceAll("^/+|/+$", "");
     }
 
     private String encodePath(String path) {

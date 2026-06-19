@@ -10,8 +10,8 @@ import com.simfat.backend.exception.ResourceNotFoundException;
 import com.simfat.backend.model.CitizenReport;
 import com.simfat.backend.model.CitizenReportStatus;
 import com.simfat.backend.repository.CitizenReportRepository;
-import com.simfat.backend.service.SupabaseStorageService;
-import com.simfat.backend.service.impl.LocalImageFallbackStorageService;
+import com.simfat.backend.service.ObjectStorageService;
+import com.simfat.backend.service.impl.LocalObjectFallbackStorageService;
 import jakarta.validation.Valid;
 import java.io.IOException;
 import java.time.LocalDateTime;
@@ -36,21 +36,23 @@ import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 @RequestMapping("/api/citizen-reports")
 public class CitizenReportController {
 
+    private static final String STORAGE_NAMESPACE = "citizen-reports";
+
     private final CitizenReportRepository citizenReportRepository;
     private final ObjectMapper objectMapper;
-    private final SupabaseStorageService storageService;
-    private final LocalImageFallbackStorageService localImageFallbackStorageService;
+    private final ObjectStorageService storageService;
+    private final LocalObjectFallbackStorageService localObjectFallbackStorageService;
 
     public CitizenReportController(
         CitizenReportRepository citizenReportRepository,
         ObjectMapper objectMapper,
-        SupabaseStorageService storageService,
-        LocalImageFallbackStorageService localImageFallbackStorageService
+        ObjectStorageService storageService,
+        LocalObjectFallbackStorageService localObjectFallbackStorageService
     ) {
         this.citizenReportRepository = citizenReportRepository;
         this.objectMapper = objectMapper;
         this.storageService = storageService;
-        this.localImageFallbackStorageService = localImageFallbackStorageService;
+        this.localObjectFallbackStorageService = localObjectFallbackStorageService;
     }
 
     @GetMapping
@@ -151,14 +153,14 @@ public class CitizenReportController {
 
     private String safeUploadReference(MultipartFile file) {
         try {
-            String reference = storageService.uploadCitizenReportFile(file);
+            String reference = storageService.uploadFile(file, STORAGE_NAMESPACE);
             if (reference != null && !reference.isBlank()) {
                 return reference;
             }
         } catch (RuntimeException ex) {
             // En modo demo priorizamos continuidad y visibilidad local de adjuntos.
         }
-        String localReference = localImageFallbackStorageService.storeCitizenReportFile(file);
+        String localReference = localObjectFallbackStorageService.storeFile(file, STORAGE_NAMESPACE);
         String absoluteReference = toAbsoluteReference(localReference);
         if (absoluteReference == null || absoluteReference.isBlank()) {
             throw new BadRequestException("No fue posible persistir el archivo adjunto");
