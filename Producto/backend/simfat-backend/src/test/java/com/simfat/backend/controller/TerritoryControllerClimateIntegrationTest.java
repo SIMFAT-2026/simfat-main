@@ -16,6 +16,7 @@ import com.simfat.backend.repository.TerritoryWeatherObservationRepository;
 import com.simfat.backend.service.ComunaRiskService;
 import com.simfat.backend.service.TerritoryRiskService;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -104,6 +105,28 @@ class TerritoryControllerClimateIntegrationTest {
             .andExpect(jsonPath("$.data.layers.AIR_TEMP.values.['comuna-with-data'].value", is(28.5)))
             .andExpect(jsonPath("$.data.layers.SOIL_TEMP.unit", is("°C")))
             .andExpect(jsonPath("$.data.layers.SOIL_TEMP.values.['comuna-with-data'].value", is(19.5)));
+    }
+
+    @Test
+    @WithMockUser(authorities = "ROLE_VERIFIED_USER")
+    void getLayers_wind_includesDirectionAndHourlySeries() throws Exception {
+        TerritoryWeatherObservation obs = weatherObservationRepository
+            .findTopByRegionIdOrderByObservedAtDesc("comuna-with-data")
+            .orElseThrow();
+        obs.setWindDirection(270.0);
+        obs.setHourlyTimestamps(List.of(LocalDateTime.of(2026, 6, 18, 23, 0), LocalDateTime.of(2026, 6, 19, 0, 0)));
+        obs.setHourlyWindSpeed(List.of(5.3, 6.1));
+        obs.setHourlyWindDirection(List.of(18.0, 19.0));
+        weatherObservationRepository.save(obs);
+
+        mockMvc.perform(get("/api/territory/layers")
+                .param("regionId", "biobio")
+                .param("indicators", "WIND"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.layers.WIND.values.['comuna-with-data'].direction", is(270.0)))
+            .andExpect(jsonPath("$.data.layers.WIND.values.['comuna-with-data'].hourly.length()", is(2)))
+            .andExpect(jsonPath("$.data.layers.WIND.values.['comuna-with-data'].hourly[0].speed", is(5.3)))
+            .andExpect(jsonPath("$.data.layers.WIND.values.['comuna-with-data'].hourly[1].direction", is(19.0)));
     }
 
     @Test

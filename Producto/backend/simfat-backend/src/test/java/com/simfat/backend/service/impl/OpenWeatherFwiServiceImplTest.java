@@ -91,6 +91,69 @@ class OpenWeatherFwiServiceImplTest {
     }
 
     @Test
+    void syncFwiByRegion_requestsPastAndForecastHoursCappedAt24() throws InterruptedException {
+        // Regression test: forecast_days=1 alone does NOT cap the hourly block
+        // when past_hours is also set — Open-Meteo falls back to its default
+        // ~16-day forecast horizon for "hourly", producing 408 points instead
+        // of 48 and making the wind slider scrub weeks into the future.
+        // forecast_hours=24 is the parameter that actually caps it.
+        server.enqueue(new MockResponse()
+            .setResponseCode(200)
+            .addHeader("Content-Type", "application/json")
+            .setBody("{"
+                + "\"daily\":{"
+                + "\"temperature_2m_max\":[28.5],"
+                + "\"relative_humidity_2m_min\":[35.0],"
+                + "\"windspeed_10m_max\":[20.0],"
+                + "\"winddirection_10m_dominant\":[270.0],"
+                + "\"precipitation_sum\":[0.0]"
+                + "},"
+                + "\"hourly\":{"
+                + "\"time\":[],\"windspeed_10m\":[],\"winddirection_10m\":[]"
+                + "}"
+                + "}"));
+
+        service.syncFwiByRegion("comuna-1", -38.0, -72.0);
+
+        RecordedRequest request = server.takeRequest();
+        assertTrue(request.getPath().contains("past_hours=24"));
+        assertTrue(request.getPath().contains("forecast_hours=24"));
+    }
+
+    @Test
+    void syncFwiByRegion_persistsWindDirectionAndHourlySeries() throws InterruptedException {
+        server.enqueue(new MockResponse()
+            .setResponseCode(200)
+            .addHeader("Content-Type", "application/json")
+            .setBody("{"
+                + "\"daily\":{"
+                + "\"temperature_2m_max\":[28.5],"
+                + "\"relative_humidity_2m_min\":[35.0],"
+                + "\"windspeed_10m_max\":[20.0],"
+                + "\"winddirection_10m_dominant\":[270.0],"
+                + "\"precipitation_sum\":[0.0]"
+                + "},"
+                + "\"hourly\":{"
+                + "\"time\":[\"2026-06-18T23:00\",\"2026-06-19T00:00\"],"
+                + "\"windspeed_10m\":[5.3,6.1],"
+                + "\"winddirection_10m\":[18.0,19.0]"
+                + "}"
+                + "}"));
+
+        boolean result = service.syncFwiByRegion("comuna-1", -38.0, -72.0);
+        assertTrue(result);
+
+        ArgumentCaptor<TerritoryWeatherObservation> captor = ArgumentCaptor.forClass(TerritoryWeatherObservation.class);
+        verify(weatherRepository).save(captor.capture());
+        TerritoryWeatherObservation saved = captor.getValue();
+
+        assertEquals(270.0, saved.getWindDirection());
+        assertEquals(2, saved.getHourlyTimestamps().size());
+        assertEquals(5.3, saved.getHourlyWindSpeed().get(0));
+        assertEquals(19.0, saved.getHourlyWindDirection().get(1));
+    }
+
+    @Test
     void syncFwiByRegion_soilTempMissing_persistsNullWithoutFailingSync() throws InterruptedException {
         server.enqueue(new MockResponse()
             .setResponseCode(200)
