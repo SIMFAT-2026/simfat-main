@@ -16,7 +16,7 @@
   margin-top: 6px;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
-  align-items: end;
+  align-items: start;
   gap: 5px 8px;
 }
 
@@ -36,6 +36,7 @@
 }
 
 .territory-refresh-button {
+  align-self: center;
   justify-self: end;
   white-space: nowrap;
 }
@@ -43,6 +44,7 @@
 .territory-toggle {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 4px;
   padding: 2px 7px;
   border-radius: 7px;
@@ -50,11 +52,21 @@
   background: #fff;
   color: #334155;
   font-size: 0.82rem;
+  min-width: 90px;
+  min-height: 40px;
 }
 
 .territory-toggle input {
   width: 13px;
   height: 13px;
+  flex: 0 0 auto;
+}
+
+.territory-toggle span {
+  overflow: hidden;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .territory-controls > label {
@@ -69,9 +81,13 @@
 .territory-map-wrapper {
   margin-top: 6px;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 190px;
-  gap: 8px;
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 320px);
+  gap: 10px;
   position: relative;
+}
+
+.sidebar-collapsed .territory-map-wrapper {
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 340px);
 }
 
 .territory-map {
@@ -86,11 +102,30 @@
   border-radius: 10px;
   background: #f8fafc;
   padding: 8px;
+  min-width: 0;
 }
 
 .territory-legend h4 {
   margin: 0 0 6px;
   color: #0f172a;
+}
+
+.territory-legend-section {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid #e2e8f0;
+}
+
+.territory-legend-section:first-of-type {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+}
+
+.territory-legend-section h5 {
+  margin: 0 0 6px;
+  color: #0f172a;
+  font-size: 0.78rem;
 }
 
 .territory-legend ul {
@@ -497,7 +532,9 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
+  min-width: 0;
   overflow-y: auto;
+  overflow-x: hidden;
   max-height: 440px;
 }
 
@@ -644,10 +681,11 @@
 
 .panel-component-row {
   display: grid;
-  grid-template-columns: minmax(104px, 126px) 16px 76px 22px 28px;
+  grid-template-columns: minmax(86px, 112px) 14px minmax(68px, 1fr) 24px 32px;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
   font-size: 0.75rem;
+  min-width: 0;
 }
 
 .panel-comp-label {

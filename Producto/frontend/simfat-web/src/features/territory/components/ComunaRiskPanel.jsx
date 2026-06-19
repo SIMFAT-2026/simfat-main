@@ -132,6 +132,21 @@ function FwiInputsBreakdown({ fwiInputs }) {
 function IndexInfo({ info, label }) {
   const [tooltipStyle, setTooltipStyle] = useState(null);
   const btnRef = useRef(null);
+  const tooltipRef = useRef(null);
+
+  useEffect(() => {
+    if (!tooltipStyle) return undefined;
+
+    function handleDocumentPointerDown(event) {
+      if (btnRef.current?.contains(event.target) || tooltipRef.current?.contains(event.target)) {
+        return;
+      }
+      setTooltipStyle(null);
+    }
+
+    document.addEventListener('pointerdown', handleDocumentPointerDown);
+    return () => document.removeEventListener('pointerdown', handleDocumentPointerDown);
+  }, [tooltipStyle]);
 
   function handleToggle(e) {
     e.stopPropagation();
@@ -160,7 +175,7 @@ function IndexInfo({ info, label }) {
         onClick={handleToggle}
       >ⓘ</button>
       {tooltipStyle && createPortal(
-        <span className="comp-info-tooltip" style={tooltipStyle}>
+        <span ref={tooltipRef} className="comp-info-tooltip" style={tooltipStyle}>
           {info}
           <button
             type="button"

@@ -100,9 +100,32 @@ const CLIMATE_SCALES = {
 };
 
 const CLIMATE_INDICATORS = ['WIND', 'HUMIDITY', 'AIR_TEMP', 'SOIL_TEMP'];
+const INDEX_CHOROPLETH_INDICATORS = ['NDVI', 'NDMI'];
 const NEUTRAL_FILL = '#cbd5e1';
 const POINT_LAYER_RENDERER = L.svg({ pane: 'territory-points-pane' });
 const REPORT_LAYER_RENDERER = L.svg({ pane: 'territory-report-pane' });
+
+const VEGETATION_SCALES = {
+  NDVI: {
+    label: 'Índice vegetación (NDVI)',
+    valueKey: 'ndviRaw',
+    bins: [
+      { max: 0, color: '#dc2626', label: '< 0 (no vegetado)' },
+      { max: 0.2, color: '#f97316', label: '0-0.2 (escasa)' },
+      { max: 0.5, color: '#facc15', label: '0.2-0.5 (moderada)' },
+      { max: Infinity, color: '#16a34a', label: '> 0.5 (densa)' }
+    ]
+  },
+  NDMI: {
+    label: 'Humedad vegetación (NDMI)',
+    valueKey: 'ndmiRaw',
+    bins: [
+      { max: -0.1, color: '#dc2626', label: '< -0.1 (severa)' },
+      { max: 0.1, color: '#facc15', label: '-0.1-0.1 (leve)' },
+      { max: Infinity, color: '#0ea5e9', label: '> 0.1 (húmeda)' }
+    ]
+  }
+};
 
 function climateColorForValue(indicator, value) {
   if (value === null || value === undefined || Number.isNaN(Number(value))) {
@@ -121,6 +144,13 @@ const ALERT_LEVEL_CONFIG = {
   ALTO:       { color: '#ea580c', bg: '#ffedd5', label: 'Alto',       fill: '#f97316' },
   CRITICO:    { color: '#dc2626', bg: '#fee2e2', label: 'Critico',    fill: '#ef4444' }
 };
+
+const RISK_SCORE_LEGEND = [
+  { color: ALERT_LEVEL_CONFIG.NORMAL.fill, label: 'Normal' },
+  { color: ALERT_LEVEL_CONFIG.PREVENTIVO.fill, label: 'Preventivo' },
+  { color: ALERT_LEVEL_CONFIG.ALTO.fill, label: 'Alto' },
+  { color: ALERT_LEVEL_CONFIG.CRITICO.fill, label: 'Crítico' }
+];
 
 function comunaBaseStyle(score) {
   const level = score?.alertLevel || 'NORMAL';
@@ -208,6 +238,39 @@ const ClimateChoropleth = memo(function ClimateChoropleth({ geoJson, indicator, 
   );
 });
 
+const VegetationChoropleth = memo(function VegetationChoropleth({ geoJson, indicator, comunalScores }) {
+  if (!geoJson || !geoJson.features) return null;
+
+  const scale = VEGETATION_SCALES[indicator];
+  if (!scale) return null;
+
+  return (
+    <GeoJSON
+      key={`vegetation-${indicator}`}
+      pane="climate-layer-pane"
+      data={geoJson}
+      style={(feature) => {
+        const comunaId = feature?.properties?.comunaId;
+        const value = comunalScores?.[comunaId]?.[scale.valueKey];
+        return {
+          fillColor: vegetationColorForValue(indicator, value),
+          fillOpacity: value != null ? 0.55 : 0.12,
+          color: '#334155',
+          weight: 0.8,
+          opacity: 0.7
+        };
+      }}
+      onEachFeature={(feature, layer) => {
+        const comunaId = feature?.properties?.comunaId;
+        const nombre = feature?.properties?.nombre || comunaId;
+        const value = comunalScores?.[comunaId]?.[scale.valueKey];
+        const valueLabel = value !== undefined && value !== null ? Number(value).toFixed(3) : 'Sin datos';
+        layer.bindTooltip(`${nombre}: ${scale.label} ${valueLabel}`, { sticky: true });
+      }}
+    />
+  );
+});
+
 function FitRegionBounds({ bounds }) {
   const map = useMap();
 
@@ -290,9 +353,50 @@ const COMPONENT_LABELS = {
   reports: 'Reportes'
 };
 
+const INDICATOR_LABELS = {
+  RISK_SCORE: 'Riesgo',
+  FIRMS: 'Focos',
+  NDVI: 'Índice veg.',
+  NDMI: 'Humedad veg.',
+  ALERTS: 'Alertas',
+  REPORTS: 'Reportes',
+  WIND: 'Viento',
+  HUMIDITY: 'Humedad rel.',
+  AIR_TEMP: 'Temp. del aire',
+  SOIL_TEMP: 'Temp. del suelo'
+};
+
+const INDICATOR_FULL_LABELS = {
+  RISK_SCORE: 'Riesgo comunal',
+  FIRMS: 'Focos activos',
+  NDVI: 'Índice vegetación (NDVI)',
+  NDMI: 'Humedad vegetación (NDMI)',
+  ALERTS: 'Alertas',
+  REPORTS: 'Reportes',
+  WIND: 'Viento',
+  HUMIDITY: 'Humedad relativa',
+  AIR_TEMP: 'Temperatura del aire',
+  SOIL_TEMP: 'Temperatura del suelo'
+};
+
 function IndexInfo({ info, label }) {
   const [tooltipStyle, setTooltipStyle] = useState(null);
   const btnRef = useRef(null);
+  const tooltipRef = useRef(null);
+
+  useEffect(() => {
+    if (!tooltipStyle) return undefined;
+
+    function handleDocumentPointerDown(event) {
+      if (btnRef.current?.contains(event.target) || tooltipRef.current?.contains(event.target)) {
+        return;
+      }
+      setTooltipStyle(null);
+    }
+
+    document.addEventListener('pointerdown', handleDocumentPointerDown);
+    return () => document.removeEventListener('pointerdown', handleDocumentPointerDown);
+  }, [tooltipStyle]);
 
   function handleToggle(e) {
     e.stopPropagation();
@@ -321,7 +425,7 @@ function IndexInfo({ info, label }) {
         onClick={handleToggle}
       >ⓘ</button>
       {tooltipStyle && createPortal(
-        <span className="comp-info-tooltip" style={tooltipStyle}>
+        <span ref={tooltipRef} className="comp-info-tooltip" style={tooltipStyle}>
           {info}
           <button
             type="button"
@@ -369,8 +473,10 @@ const COMPONENT_INFO = {
 };
 
 const VISIBLE_RISK_COMPONENTS = new Set(['fwi', 'ndmi', 'firms', 'ndvi', 'reports']);
-const POINT_LAYER_INDICATORS = ['FIRMS', 'NDVI', 'NDMI', 'ALERTS', 'REPORTS'];
-const ALERT_TOOLTIP_COMPONENTS = ['firms', 'fwi', 'ndvi'];
+const CHOROPLETH_LAYER_INDICATORS = ['RISK_SCORE', 'NDVI', 'NDMI'];
+const POINT_LAYER_INDICATORS = ['FIRMS', 'ALERTS', 'REPORTS'];
+const MAP_TOGGLE_INDICATORS = ['RISK_SCORE', 'FIRMS', 'NDVI', 'NDMI', 'ALERTS', 'REPORTS'];
+const ALERT_TOOLTIP_COMPONENTS = ['firms', 'fwi', 'ndmi', 'ndvi'];
 
 function componentScoreParts(component) {
   const score = typeof component?.score === 'number' ? component.score : null;
@@ -519,7 +625,18 @@ function tooltipComponentEntries(components) {
     .filter(([key]) => !ALERT_TOOLTIP_COMPONENTS.includes(key))
     .sort(([, a], [, b]) => b - a);
 
-  return [...prioritized, ...fallback].slice(0, 3);
+  return [...prioritized, ...fallback].slice(0, 4);
+}
+
+function vegetationColorForValue(indicator, value) {
+  if (value === null || value === undefined || Number.isNaN(Number(value))) {
+    return NEUTRAL_FILL;
+  }
+  const scale = VEGETATION_SCALES[indicator];
+  if (!scale) return NEUTRAL_FILL;
+  const numeric = Number(value);
+  const bin = scale.bins.find((b) => numeric < b.max);
+  return bin ? bin.color : scale.bins[scale.bins.length - 1].color;
 }
 
 function ComunaTooltip({ comunaId, nombre, score, pos }) {
@@ -589,6 +706,7 @@ function TerritoryMapPanel({
 }) {
   const comunalGeoJson = regionData?.comunalGeoJson || null;
   const comunalScores = regionData?.comunalScores || null;
+  const selectedRegionLabel = regionOptions.find((region) => region.id === selectedRegionId)?.label || selectedRegionId;
 
   const [hoveredComuna, setHoveredComuna] = useState(null);
   const [tooltipPos, setTooltipPos] = useState(null);
@@ -632,7 +750,7 @@ function TerritoryMapPanel({
           toggle (spec: risk-score-breakdown-panel). */}
       {regionData && (
         <section className="regional-summary-panel" aria-label="Panel de resumen regional">
-          <h4 className="regional-summary-title">Panel de resumen regional</h4>
+          <h4 className="regional-summary-title">Panel de resumen regional: Región {selectedRegionLabel}</h4>
           <RiskScoreBadge regionData={regionData} />
         </section>
       )}
@@ -651,28 +769,28 @@ function TerritoryMapPanel({
         </label>
 
         <div className="territory-layer-toggles">
-          {/* RISK_SCORE no es un toggle: el choropleth comunal y el panel de
-              riesgo se muestran siempre (spec: risk-score-breakdown-panel). */}
-          {POINT_LAYER_INDICATORS.map((indicator) => (
-            <label key={indicator} className="territory-toggle">
+          {MAP_TOGGLE_INDICATORS.map((indicator) => (
+            <label key={indicator} className="territory-toggle" title={INDICATOR_FULL_LABELS[indicator] || indicator}>
               <input
                 type="checkbox"
+                aria-label={INDICATOR_FULL_LABELS[indicator] || indicator}
                 checked={visibleIndicators.includes(indicator)}
                 onChange={() => toggleIndicator(indicator)}
               />
-              <span>{indicator}</span>
+              <span>{INDICATOR_LABELS[indicator] || indicator}</span>
             </label>
           ))}
           {/* Opt-in climate layers (DEC-B): off by default, each with its own
               color scale (DEC-A) rendered as a comuna choropleth. */}
           {CLIMATE_INDICATORS.map((indicator) => (
-            <label key={indicator} className="territory-toggle">
+            <label key={indicator} className="territory-toggle" title={INDICATOR_FULL_LABELS[indicator] || indicator}>
               <input
                 type="checkbox"
+                aria-label={INDICATOR_FULL_LABELS[indicator] || indicator}
                 checked={visibleIndicators.includes(indicator)}
                 onChange={() => toggleIndicator(indicator)}
               />
-              <span>{CLIMATE_SCALES[indicator]?.label || indicator}</span>
+              <span>{INDICATOR_LABELS[indicator] || CLIMATE_SCALES[indicator]?.label || indicator}</span>
             </label>
           ))}
         </div>
@@ -709,7 +827,7 @@ function TerritoryMapPanel({
             <FitRegionBounds bounds={regionData.bounds} />
 
             <Pane name="comuna-risk-pane" style={{ zIndex: 410 }}>
-              {comunalGeoJson && (
+              {comunalGeoJson && visibleIndicators.includes('RISK_SCORE') && (
                 <ComunaChoropleth
                   geoJson={comunalGeoJson}
                   comunalScores={effectiveComunalScores}
@@ -721,6 +839,14 @@ function TerritoryMapPanel({
             </Pane>
 
             <Pane name="climate-layer-pane" style={{ zIndex: 420 }}>
+              {comunalGeoJson && INDEX_CHOROPLETH_INDICATORS.filter((indicator) => visibleIndicators.includes(indicator)).map((indicator) => (
+                <VegetationChoropleth
+                  key={`${regionData.regionId}-${indicator}`}
+                  geoJson={comunalGeoJson}
+                  indicator={indicator}
+                  comunalScores={effectiveComunalScores}
+                />
+              ))}
               {comunalGeoJson && CLIMATE_INDICATORS.filter((indicator) => visibleIndicators.includes(indicator)).map((indicator) => (
                 <ClimateChoropleth
                   key={`${regionData.regionId}-${indicator}`}
@@ -732,7 +858,7 @@ function TerritoryMapPanel({
             </Pane>
 
             <Pane name="territory-points-pane" style={{ zIndex: 650 }}>
-              {visibleIndicators.filter((i) => i !== 'RISK_SCORE' && i !== 'REPORTS' && !CLIMATE_INDICATORS.includes(i)).map((indicator) => (
+              {visibleIndicators.filter((i) => POINT_LAYER_INDICATORS.includes(i) && i !== 'REPORTS').map((indicator) => (
                 <GeoJSON
                   key={`${regionData.regionId}-${indicator}`}
                   pane="territory-points-pane"
@@ -797,24 +923,63 @@ function TerritoryMapPanel({
           ) : (
             <div className="territory-legend">
               <h4>Leyenda de capas</h4>
-              <ul>
-                {POINT_LAYER_INDICATORS.map((indicator) => (
-                  <li key={indicator}>
-                    <span
-                      className="territory-color-dot"
-                      style={{ backgroundColor: INDICATOR_COLORS[indicator] || '#64748b' }}
-                    />
-                    <span>{indicator === 'FIRMS' ? 'Focos' : indicator}</span>
-                    <strong>{indicatorCount(regionData, indicator)}</strong>
-                  </li>
-                ))}
-              </ul>
+              <div className="territory-legend-section">
+                <h5>Puntos del mapa</h5>
+                <ul>
+                  {POINT_LAYER_INDICATORS.map((indicator) => (
+                    <li key={indicator}>
+                      <span
+                        className="territory-color-dot"
+                        style={{ backgroundColor: INDICATOR_COLORS[indicator] || '#64748b' }}
+                      />
+                      <span>{INDICATOR_FULL_LABELS[indicator] || indicator}</span>
+                      <strong>{indicatorCount(regionData, indicator)}</strong>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              {visibleIndicators.includes('RISK_SCORE') && (
+                <div className="territory-legend-section">
+                  <h5>Riesgo comunal</h5>
+                  <ul>
+                    {RISK_SCORE_LEGEND.map((item) => (
+                      <li key={item.label}>
+                        <span className="territory-color-dot" style={{ backgroundColor: item.color }} />
+                        <span>{item.label}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {INDEX_CHOROPLETH_INDICATORS.filter((indicator) => visibleIndicators.includes(indicator)).map((indicator) => {
+                const scale = VEGETATION_SCALES[indicator];
+                if (!scale) return null;
+                return (
+                  <div key={indicator} className="territory-legend-section">
+                    <h5>{scale.label}</h5>
+                    <ul>
+                      {scale.bins.map((bin) => (
+                        <li key={bin.label}>
+                          <span className="territory-color-dot" style={{ backgroundColor: bin.color }} />
+                          <span>{bin.label}</span>
+                        </li>
+                      ))}
+                      <li>
+                        <span className="territory-color-dot" style={{ backgroundColor: NEUTRAL_FILL }} />
+                        <span>Sin datos</span>
+                      </li>
+                    </ul>
+                  </div>
+                );
+              })}
 
               {CLIMATE_INDICATORS.filter((indicator) => visibleIndicators.includes(indicator)).map((indicator) => {
                 const scale = CLIMATE_SCALES[indicator];
                 if (!scale) return null;
                 return (
-                  <div key={indicator} className="territory-climate-legend">
+                  <div key={indicator} className="territory-legend-section">
                     <h5>{scale.label} ({scale.unit})</h5>
                     <ul>
                       {scale.bins.map((bin) => (

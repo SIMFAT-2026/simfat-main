@@ -80,6 +80,11 @@
   gap: 10px;
   padding: 10px;
   flex: 1;
+  transition: grid-template-columns 0.2s ease;
+}
+
+.sidebar-collapsed .app-content-wrapper {
+  grid-template-columns: 48px 1fr;
 }
 
 .sidebar {
@@ -90,18 +95,60 @@
   align-self: start;
   position: sticky;
   top: 54px;
+  overflow: hidden;
+  transition: padding 0.2s ease;
+}
+
+.sidebar[data-collapsed="true"] {
+  padding: 8px 6px;
+}
+
+.sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
 }
 
 .sidebar h2 {
-  margin: 0 0 8px;
+  margin: 0;
   font-size: 0.9rem;
   color: #0f172a;
+}
+
+.sidebar-toggle {
+  display: inline-flex;
+  width: 26px;
+  height: 26px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #f8fafc;
+  color: #334155;
+  cursor: pointer;
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+.sidebar-toggle:hover {
+  background: #eff6ff;
+  border-color: #bfdbfe;
+  color: #1e40af;
+}
+
+.sidebar[data-collapsed="true"] .sidebar-header {
+  justify-content: center;
 }
 
 .sidebar-section + .sidebar-section {
   margin-top: 8px;
   padding-top: 8px;
   border-top: 1px solid #e5e7eb;
+}
+
+.sidebar-section {
+  margin-top: 8px;
 }
 
 .sidebar-section-title {
@@ -122,11 +169,43 @@
 }
 
 .sidebar-link {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 7px;
   border-radius: 8px;
   padding: 5px 8px;
   font-size: 0.82rem;
   color: #334155;
+}
+
+.sidebar-link-marker {
+  display: none;
+  width: 24px;
+  height: 24px;
+  flex: 0 0 24px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.sidebar[data-collapsed="true"] .sidebar-link {
+  justify-content: center;
+  padding: 4px;
+}
+
+.sidebar[data-collapsed="true"] .sidebar-link-marker {
+  display: inline-flex;
+}
+
+.sidebar[data-collapsed="true"] .sidebar-link-text {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
 }
 
 .sidebar-link:hover {
@@ -137,6 +216,11 @@
   background: #e2e8f0;
   color: #0f172a;
   font-weight: 600;
+}
+
+.sidebar[data-collapsed="true"] .sidebar-link-active .sidebar-link-marker {
+  background: #e2e8f0;
+  color: #0f172a;
 }
 
 .app-main {
@@ -168,7 +252,15 @@
     grid-template-columns: 1fr;
   }
 
+  .sidebar-collapsed .app-content-wrapper {
+    grid-template-columns: 1fr;
+  }
+
   .sidebar {
     position: static;
+  }
+
+  .sidebar[data-collapsed="true"] {
+    display: none;
   }
 }

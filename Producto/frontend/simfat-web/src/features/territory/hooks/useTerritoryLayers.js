@@ -8,7 +8,7 @@ const cacheByKey = new Map();
 const REGION_CONFIG = {
   nuble: {
     id: 'nuble',
-    label: 'Nuble',
+    label: 'Ñuble',
     center: [-36.6, -71.9],
     bounds: [
       [-37.4, -72.8],
@@ -18,7 +18,7 @@ const REGION_CONFIG = {
   },
   biobio: {
     id: 'biobio',
-    label: 'Biobio',
+    label: 'Biobío',
     center: [-37.5, -72.5],
     bounds: [
       [-38.9, -74.1],
@@ -28,7 +28,7 @@ const REGION_CONFIG = {
   },
   araucania: {
     id: 'araucania',
-    label: 'La Araucania',
+    label: 'La Araucanía',
     center: [-38.7, -72.4],
     bounds: [
       [-39.8, -73.9],
