@@ -9,8 +9,27 @@ export async function getCommunityBoard({ regionId } = {}) {
   return extractData(response.data);
 }
 
-export async function createCommunityBoardPost(payload) {
-  const response = await axiosClient.post(API_ENDPOINTS.communityBoard, payload);
+export async function createCommunityBoardPost(payload, file) {
+  const {
+    attachmentFile,
+    attachmentPreviewUrl,
+    attachmentName,
+    attachmentContentType,
+    attachmentSize,
+    attachmentImage,
+    ...body
+  } = payload;
+
+  if (file) {
+    const formData = new FormData();
+    formData.append('payload', JSON.stringify(body));
+    formData.append('file', file);
+
+    const response = await axiosClient.post(API_ENDPOINTS.communityBoard, formData);
+    return extractData(response.data);
+  }
+
+  const response = await axiosClient.post(API_ENDPOINTS.communityBoard, body);
   return extractData(response.data);
 }
 

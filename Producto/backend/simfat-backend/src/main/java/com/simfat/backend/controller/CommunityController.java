@@ -1,5 +1,6 @@
 package com.simfat.backend.controller;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.simfat.backend.dto.ApiResponse;
 import com.simfat.backend.dto.CommunityBoardRequestDTO;
 import com.simfat.backend.dto.CommunityBoardResponseDTO;
@@ -7,6 +8,7 @@ import com.simfat.backend.dto.CommunityContactRequestDTO;
 import com.simfat.backend.dto.CommunityContactResponseDTO;
 import com.simfat.backend.dto.CommunityResourceRequestDTO;
 import com.simfat.backend.dto.CommunityResourceResponseDTO;
+import com.simfat.backend.exception.BadRequestException;
 import com.simfat.backend.exception.ResourceNotFoundException;
 import com.simfat.backend.model.CommunityBoardPost;
 import com.simfat.backend.model.CommunityContact;
@@ -14,9 +16,13 @@ import com.simfat.backend.model.CommunityResource;
 import com.simfat.backend.repository.CommunityBoardPostRepository;
 import com.simfat.backend.repository.CommunityContactRepository;
 import com.simfat.backend.repository.CommunityResourceRepository;
+import com.simfat.backend.service.SupabaseStorageService;
+import com.simfat.backend.service.impl.LocalImageFallbackStorageService;
 import jakarta.validation.Valid;
+import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.List;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -26,7 +32,10 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 @RestController
 @RequestMapping("/api/community")
@@ -35,15 +44,24 @@ public class CommunityController {
     private final CommunityBoardPostRepository boardRepository;
     private final CommunityResourceRepository resourceRepository;
     private final CommunityContactRepository contactRepository;
+    private final ObjectMapper objectMapper;
+    private final SupabaseStorageService storageService;
+    private final LocalImageFallbackStorageService localImageFallbackStorageService;
 
     public CommunityController(
         CommunityBoardPostRepository boardRepository,
         CommunityResourceRepository resourceRepository,
-        CommunityContactRepository contactRepository
+        CommunityContactRepository contactRepository,
+        ObjectMapper objectMapper,
+        SupabaseStorageService storageService,
+        LocalImageFallbackStorageService localImageFallbackStorageService
     ) {
         this.boardRepository = boardRepository;
         this.resourceRepository = resourceRepository;
         this.contactRepository = contactRepository;
+        this.objectMapper = objectMapper;
+        this.storageService = storageService;
+        this.localImageFallbackStorageService = localImageFallbackStorageService;
     }
 
     @GetMapping("/board")
@@ -55,16 +73,31 @@ public class CommunityController {
         return ResponseEntity.ok(ApiResponse.ok("Mural comunitario obtenido correctamente", items.stream().map(this::toBoardResponse).toList()));
     }
 
-    @PostMapping("/board")
+    @PostMapping(value = "/board", consumes = MediaType.APPLICATION_JSON_VALUE)
     @PreAuthorize("hasAnyAuthority('PERM_COMMUNITY_BOARD_MANAGE','ROLE_ADMIN','ROLE_SUPER_ADMIN','ROLE_MODERATOR')")
     public ResponseEntity<ApiResponse<CommunityBoardResponseDTO>> createBoard(@Valid @RequestBody CommunityBoardRequestDTO request) {
-        CommunityBoardPost item = new CommunityBoardPost();
-        item.setTitle(request.getTitle());
-        item.setMessage(request.getMessage());
-        item.setPriority(request.getPriority().toUpperCase());
-        item.setRegionId(request.getRegionId());
-        item.setAuthor(request.getAuthor());
-        item.setPublishedAt(LocalDateTime.now());
+        CommunityBoardPost item = buildBoardPost(request);
+
+        CommunityBoardPost created = boardRepository.save(item);
+        return ResponseEntity.ok(ApiResponse.ok("Aviso comunitario creado correctamente", toBoardResponse(created)));
+    }
+
+    @PostMapping(value = "/board", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasAnyAuthority('PERM_COMMUNITY_BOARD_MANAGE','ROLE_ADMIN','ROLE_SUPER_ADMIN','ROLE_MODERATOR')")
+    public ResponseEntity<ApiResponse<CommunityBoardResponseDTO>> createBoardMultipart(
+        @RequestPart("payload") String payload,
+        @RequestPart(value = "file", required = false) MultipartFile file
+    ) {
+        CommunityBoardRequestDTO request = parseBoardPayload(payload);
+        CommunityBoardPost item = buildBoardPost(request);
+
+        if (file != null && !file.isEmpty()) {
+            item.setAttachmentUrl(resolveUploadReference(file));
+            item.setAttachmentName(file.getOriginalFilename());
+            item.setAttachmentContentType(file.getContentType());
+            item.setAttachmentSize(file.getSize());
+            item.setAttachmentImage(file.getContentType() != null && file.getContentType().startsWith("image/"));
+        }
 
         CommunityBoardPost created = boardRepository.save(item);
         return ResponseEntity.ok(ApiResponse.ok("Aviso comunitario creado correctamente", toBoardResponse(created)));
@@ -165,8 +198,65 @@ public class CommunityController {
         dto.setPriority(item.getPriority());
         dto.setRegionId(item.getRegionId());
         dto.setAuthor(item.getAuthor());
+        dto.setAttachmentUrl(item.getAttachmentUrl());
+        dto.setAttachmentName(item.getAttachmentName());
+        dto.setAttachmentContentType(item.getAttachmentContentType());
+        dto.setAttachmentSize(item.getAttachmentSize());
+        dto.setAttachmentImage(item.isAttachmentImage());
         dto.setPublishedAt(item.getPublishedAt());
         return dto;
+    }
+
+    private CommunityBoardPost buildBoardPost(CommunityBoardRequestDTO request) {
+        CommunityBoardPost item = new CommunityBoardPost();
+        item.setTitle(request.getTitle());
+        item.setMessage(request.getMessage());
+        item.setPriority(request.getPriority().toUpperCase());
+        item.setRegionId(request.getRegionId());
+        item.setAuthor(request.getAuthor());
+        item.setPublishedAt(LocalDateTime.now());
+        return item;
+    }
+
+    private CommunityBoardRequestDTO parseBoardPayload(String rawPayload) {
+        try {
+            String normalized = rawPayload == null ? "" : rawPayload.trim();
+            try {
+                return objectMapper.readValue(normalized, CommunityBoardRequestDTO.class);
+            } catch (IOException first) {
+                String unescaped = objectMapper.readValue(normalized, String.class);
+                return objectMapper.readValue(unescaped, CommunityBoardRequestDTO.class);
+            }
+        } catch (IOException ex) {
+            throw new BadRequestException("Payload de mural comunitario invalido");
+        }
+    }
+
+    private String resolveUploadReference(MultipartFile file) {
+        try {
+            String reference = storageService.uploadCitizenReportFile(file);
+            if (reference != null && !reference.isBlank()) {
+                return reference;
+            }
+        } catch (RuntimeException ex) {
+            // En modo demo priorizamos continuidad y visibilidad local de adjuntos.
+        }
+        String localReference = localImageFallbackStorageService.storeCitizenReportFile(file);
+        return toAbsoluteReference(localReference);
+    }
+
+    private String toAbsoluteReference(String reference) {
+        if (reference == null || reference.isBlank()) {
+            return reference;
+        }
+        if (reference.startsWith("http://") || reference.startsWith("https://") || reference.startsWith("data:") || reference.startsWith("blob:")) {
+            return reference;
+        }
+        String baseUrl = ServletUriComponentsBuilder.fromCurrentContextPath().build().toUriString();
+        if (reference.startsWith("/")) {
+            return baseUrl + reference;
+        }
+        return baseUrl + "/" + reference;
     }
 
     private CommunityResourceResponseDTO toResourceResponse(CommunityResource item) {

@@ -457,6 +457,296 @@ textarea {
   color: #64748b;
 }
 
+.community-mural-card {
+  padding: 14px;
+}
+
+.community-mural-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 380px);
+  gap: 16px;
+  align-items: stretch;
+}
+
+.community-board-panel,
+.community-editor-panel {
+  min-width: 0;
+}
+
+.community-board-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+  margin-bottom: 10px;
+}
+
+.community-board-header h3,
+.community-board-header p,
+.community-editor-panel h3,
+.community-editor-panel p {
+  margin: 0;
+}
+
+.community-board-header p,
+.community-editor-panel p {
+  color: #64748b;
+  font-size: 0.84rem;
+}
+
+.community-board-header span {
+  border: 1px solid #bfdbfe;
+  border-radius: 999px;
+  background: #eff6ff;
+  color: #0b5cab;
+  padding: 4px 10px;
+  font-size: 0.78rem;
+  white-space: nowrap;
+}
+
+.community-board-surface {
+  position: relative;
+  min-height: 520px;
+  overflow: hidden;
+  border: 10px solid #8b5a2b;
+  border-radius: 16px;
+  background:
+    radial-gradient(circle at 18px 18px, rgba(120, 53, 15, 0.14) 0 2px, transparent 2px 100%),
+    linear-gradient(135deg, rgba(255, 247, 237, 0.92), rgba(254, 215, 170, 0.86));
+  background-size: 36px 36px, auto;
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.45), inset 0 0 30px rgba(120, 53, 15, 0.18);
+}
+
+.community-board-pin {
+  position: absolute;
+  width: 13px;
+  height: 13px;
+  border-radius: 999px;
+  background: #b91c1c;
+  box-shadow: 0 2px 4px rgba(15, 23, 42, 0.3);
+  z-index: 2;
+}
+
+.community-board-pin.top-left { top: 12px; left: 12px; }
+.community-board-pin.top-right { top: 12px; right: 12px; }
+.community-board-pin.bottom-left { bottom: 12px; left: 12px; }
+.community-board-pin.bottom-right { bottom: 12px; right: 12px; }
+
+.community-sticky-note {
+  position: absolute;
+  width: 210px;
+  min-height: 148px;
+  cursor: grab;
+  touch-action: none;
+  border: 0;
+  border-radius: 4px 4px 10px 10px;
+  background: #fef3c7;
+  color: #0f172a;
+  padding: 26px 12px 12px;
+  text-align: left;
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.18);
+  transition: box-shadow 0.16s ease, scale 0.16s ease;
+  z-index: 3;
+}
+
+.community-sticky-note:hover {
+  scale: 1.02;
+  box-shadow: 0 16px 30px rgba(15, 23, 42, 0.24);
+  z-index: 5;
+}
+
+.community-sticky-note:active {
+  cursor: grabbing;
+}
+
+.community-sticky-note.media { background: #fef3c7; }
+.community-sticky-note.baja { background: #dcfce7; }
+.community-sticky-note.alta { background: #ffedd5; }
+.community-sticky-note.critica { background: #fee2e2; }
+
+.community-note-tape {
+  position: absolute;
+  top: -10px;
+  left: 50%;
+  width: 72px;
+  height: 22px;
+  transform: translateX(-50%) rotate(-2deg);
+  border-radius: 3px;
+  background: rgba(226, 232, 240, 0.72);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.18);
+}
+
+.community-sticky-note strong {
+  display: block;
+  font-size: 0.95rem;
+  margin-bottom: 4px;
+}
+
+.community-sticky-note small {
+  display: block;
+  color: #64748b;
+  font-size: 0.72rem;
+  margin-bottom: 8px;
+}
+
+.community-sticky-note p {
+  display: -webkit-box;
+  margin: 0 0 10px;
+  color: #334155;
+  font-size: 0.82rem;
+  line-height: 1.35;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.community-note-attachment {
+  display: block;
+  margin-top: 8px;
+  color: #0b5cab;
+  font-size: 0.75rem;
+}
+
+.community-editor-panel {
+  border: 1px solid #dbe2ea;
+  border-radius: 16px;
+  background: linear-gradient(180deg, #ffffff, #f8fafc);
+  padding: 16px;
+}
+
+.community-editor-form {
+  display: grid;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.community-editor-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: #334155;
+  font-size: 0.85rem;
+}
+
+.community-editor-row {
+  display: grid;
+  grid-template-columns: 0.8fr 1.2fr;
+  gap: 10px;
+}
+
+.community-attachment-box {
+  display: grid;
+  gap: 8px;
+  border: 1px dashed #cbd5e1;
+  border-radius: 12px;
+  padding: 12px;
+  background: #f8fafc;
+}
+
+.community-attachment-box p {
+  margin: 0;
+}
+
+.community-attachment-preview {
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.community-attachment-preview img {
+  width: 56px;
+  height: 56px;
+  border-radius: 8px;
+  object-fit: cover;
+}
+
+.community-attachment-preview > span {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 8px;
+  background: #e2e8f0;
+  font-size: 1.4rem;
+}
+
+.community-attachment-preview strong,
+.community-attachment-preview small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.community-post-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(15, 23, 42, 0.48);
+}
+
+.community-post-modal {
+  position: relative;
+  width: min(680px, 100%);
+  max-height: min(760px, calc(100vh - 48px));
+  overflow: auto;
+  border-radius: 18px;
+  background: #ffffff;
+  padding: 22px;
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.35);
+}
+
+.community-post-modal h3 {
+  margin: 10px 0 4px;
+}
+
+.community-post-meta,
+.community-post-empty-attachment {
+  color: #64748b;
+  font-size: 0.86rem;
+}
+
+.community-post-attachment {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid #e2e8f0;
+}
+
+.community-post-attachment img {
+  max-width: 100%;
+  max-height: 360px;
+  border-radius: 12px;
+  object-fit: contain;
+  background: #f8fafc;
+}
+
+@media (max-width: 1180px) {
+  .community-mural-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .community-board-surface {
+    min-height: 460px;
+  }
+}
+
+@media (max-width: 720px) {
+  .community-editor-row,
+  .community-attachment-preview {
+    grid-template-columns: 1fr;
+  }
+
+  .community-sticky-note {
+    width: 180px;
+  }
+}
+
 .alerts-layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 300px;

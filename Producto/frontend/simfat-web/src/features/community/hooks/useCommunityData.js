@@ -99,7 +99,12 @@ function normalizeBoard(items = []) {
     priority: String(item.priority || item.prioridad || 'MEDIA').toUpperCase(),
     regionId: String(item.regionId || item.region_id || ''),
     publishedAt: item.publishedAt || item.fechaPublicacion || new Date().toISOString(),
-    author: item.author || item.autor || 'Equipo comunitario'
+    author: item.author || item.autor || 'Equipo comunitario',
+    attachmentUrl: item.attachmentUrl || '',
+    attachmentName: item.attachmentName || '',
+    attachmentContentType: item.attachmentContentType || '',
+    attachmentSize: item.attachmentSize || null,
+    attachmentImage: Boolean(item.attachmentImage)
   }));
 }
 
@@ -172,10 +177,10 @@ export function useCommunityData() {
     async (payload) => {
       if (source === 'backend') {
         try {
-          const created = await createCommunityBoardPost(payload);
+          const created = await createCommunityBoardPost(payload, payload.attachmentFile);
           const normalized = normalizeBoard([created])[0];
           setBoard((prev) => [normalized, ...prev]);
-          return;
+          return normalized;
         } catch {
           // fallback local controlado
         }
@@ -188,9 +193,15 @@ export function useCommunityData() {
         priority: payload.priority,
         regionId: payload.regionId,
         publishedAt: new Date().toISOString(),
-        author: payload.author || 'Equipo comunitario'
+        author: payload.author || 'Equipo comunitario',
+        attachmentUrl: payload.attachmentPreviewUrl || '',
+        attachmentName: payload.attachmentName || '',
+        attachmentContentType: payload.attachmentContentType || '',
+        attachmentSize: payload.attachmentSize || null,
+        attachmentImage: Boolean(payload.attachmentImage)
       };
       setBoard((prev) => [createdLocal, ...prev]);
+      return createdLocal;
     },
     [source]
   );

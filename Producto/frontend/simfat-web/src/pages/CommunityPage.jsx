@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import ConfirmModal from '../components/ConfirmModal';
 import DataTable from '../components/DataTable';
 import EmptyState from '../components/EmptyState';
@@ -37,6 +37,15 @@ const initialContactForm = {
   protocol: ''
 };
 
+const BOARD_CARD_POSITIONS = [
+  { x: 5, y: 8, rotate: -2 },
+  { x: 36, y: 6, rotate: 1.5 },
+  { x: 18, y: 43, rotate: 2 },
+  { x: 58, y: 36, rotate: -1.5 },
+  { x: 68, y: 10, rotate: 2.5 },
+  { x: 8, y: 62, rotate: -1 }
+];
+
 function formatDate(value) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) {
@@ -52,6 +61,32 @@ function priorityBadge(priority) {
   if (normalized === 'MEDIA') return 'badge badge-medium';
   if (normalized === 'BAJA') return 'badge badge-low';
   return 'badge';
+}
+
+function priorityClass(priority) {
+  return String(priority || 'MEDIA').toLowerCase();
+}
+
+function fallbackBoardPosition(index) {
+  return BOARD_CARD_POSITIONS[index % BOARD_CARD_POSITIONS.length];
+}
+
+function attachmentKind(file) {
+  if (!file) return 'file';
+  if (file.type?.startsWith('image/')) return 'image';
+  if (file.type === 'application/pdf') return 'pdf';
+  return 'file';
+}
+
+function postAttachment(post) {
+  if (!post?.attachmentUrl) return null;
+  return {
+    url: post.attachmentUrl,
+    name: post.attachmentName || 'Adjunto',
+    type: post.attachmentContentType || '',
+    size: post.attachmentSize || 0,
+    kind: post.attachmentImage ? 'image' : 'file'
+  };
 }
 
 function CommunityPage() {
@@ -73,10 +108,16 @@ function CommunityPage() {
   } = useCommunityData();
 
   const feedback = useFeedback();
+  const boardRef = useRef(null);
+  const fileInputRef = useRef(null);
   const [filterRegionId, setFilterRegionId] = useState('');
   const [boardForm, setBoardForm] = useState(initialBoardForm);
   const [resourceForm, setResourceForm] = useState(initialResourceForm);
   const [contactForm, setContactForm] = useState(initialContactForm);
+  const [boardAttachment, setBoardAttachment] = useState(null);
+  const [boardPositions, setBoardPositions] = useState({});
+  const [dragState, setDragState] = useState(null);
+  const [selectedPost, setSelectedPost] = useState(null);
   const [pendingDelete, setPendingDelete] = useState({ type: '', id: '' });
 
   const regionMap = useMemo(
@@ -101,22 +142,6 @@ function CommunityPage() {
   const filteredContacts = useMemo(
     () => contacts.filter((item) => !filterRegionId || item.regionId === filterRegionId),
     [contacts, filterRegionId]
-  );
-
-  const boardColumns = useMemo(
-    () => [
-      { key: 'title', header: 'Titulo' },
-      {
-        key: 'priority',
-        header: 'Prioridad',
-        render: (row) => <span className={priorityBadge(row.priority)}>{row.priority}</span>
-      },
-      { key: 'regionId', header: 'Region', render: (row) => regionMap[row.regionId] || row.regionId || '-' },
-      { key: 'publishedAt', header: 'Publicado', render: (row) => formatDate(row.publishedAt) },
-      { key: 'author', header: 'Autor' },
-      { key: 'message', header: 'Mensaje' }
-    ],
-    [regionMap]
   );
 
   const resourceColumns = useMemo(
@@ -165,20 +190,59 @@ function CommunityPage() {
     setContactForm((prev) => ({ ...prev, [name]: value }));
   }
 
+  function handleAttachmentChange(event) {
+    const file = event.target.files?.[0] || null;
+    if (!file) {
+      setBoardAttachment(null);
+      return;
+    }
+
+    if (boardAttachment?.url) URL.revokeObjectURL(boardAttachment.url);
+    setBoardAttachment({
+      file,
+      name: file.name,
+      type: file.type,
+      size: file.size,
+      kind: attachmentKind(file),
+      url: URL.createObjectURL(file)
+    });
+  }
+
+  function clearBoardAttachment() {
+    if (boardAttachment?.url) URL.revokeObjectURL(boardAttachment.url);
+    setBoardAttachment(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  }
+
   async function submitBoard(event) {
     event.preventDefault();
     feedback.clear();
 
     try {
-      await createBoard({
+      const submittedAttachment = boardAttachment;
+      const created = await createBoard({
         title: boardForm.title.trim(),
         message: boardForm.message.trim(),
         priority: boardForm.priority,
         regionId: boardForm.regionId,
-        author: 'Equipo comunitario'
+        author: 'Equipo comunitario',
+        attachmentFile: submittedAttachment?.file,
+        attachmentPreviewUrl: submittedAttachment?.url,
+        attachmentName: submittedAttachment?.name,
+        attachmentContentType: submittedAttachment?.type,
+        attachmentSize: submittedAttachment?.size,
+        attachmentImage: submittedAttachment?.kind === 'image'
       });
+
+      if (created?.id) {
+        setBoardPositions((prev) => ({ ...prev, [created.id]: { x: 4, y: 8, rotate: -1 } }));
+      }
+
+      if (submittedAttachment?.url) URL.revokeObjectURL(submittedAttachment.url);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      setBoardAttachment(null);
       setBoardForm(initialBoardForm);
-      feedback.showSuccess('Aviso comunitario publicado.');
+      feedback.showSuccess('Aviso comunitario publicado en el mural.');
     } catch (err) {
       feedback.showError(err.message || 'No se pudo publicar el aviso.');
     }
@@ -223,6 +287,42 @@ function CommunityPage() {
     }
   }
 
+  function startPostDrag(event, post, index) {
+    if (!boardRef.current) return;
+    const boardRect = boardRef.current.getBoundingClientRect();
+    const current = boardPositions[post.id] || fallbackBoardPosition(index);
+    setDragState({
+      id: post.id,
+      pointerId: event.pointerId,
+      boardRect,
+      offsetX: event.clientX - (boardRect.left + (current.x / 100) * boardRect.width),
+      offsetY: event.clientY - (boardRect.top + (current.y / 100) * boardRect.height),
+      startedAt: { x: event.clientX, y: event.clientY }
+    });
+    event.currentTarget.setPointerCapture(event.pointerId);
+  }
+
+  function movePost(event) {
+    if (!dragState) return;
+    const x = ((event.clientX - dragState.boardRect.left - dragState.offsetX) / dragState.boardRect.width) * 100;
+    const y = ((event.clientY - dragState.boardRect.top - dragState.offsetY) / dragState.boardRect.height) * 100;
+    setBoardPositions((prev) => ({
+      ...prev,
+      [dragState.id]: {
+        ...(prev[dragState.id] || {}),
+        x: Math.max(2, Math.min(78, x)),
+        y: Math.max(2, Math.min(74, y))
+      }
+    }));
+  }
+
+  function endPostDrag(event, post) {
+    if (!dragState) return;
+    const moved = Math.abs(event.clientX - dragState.startedAt.x) + Math.abs(event.clientY - dragState.startedAt.y);
+    setDragState(null);
+    if (moved < 6) setSelectedPost(post);
+  }
+
   async function confirmDelete() {
     if (!pendingDelete.id || !pendingDelete.type) {
       return;
@@ -231,6 +331,7 @@ function CommunityPage() {
     try {
       if (pendingDelete.type === 'board') {
         await removeBoard(pendingDelete.id);
+        setSelectedPost((prev) => (prev?.id === pendingDelete.id ? null : prev));
       } else if (pendingDelete.type === 'resource') {
         await removeResource(pendingDelete.id);
       } else if (pendingDelete.type === 'contact') {
@@ -278,69 +379,116 @@ function CommunityPage() {
         </div>
       </FilterBar>
 
-      <article className="dashboard-card">
-        <h3>Mural comunitario</h3>
-        <form className="form-grid" onSubmit={submitBoard}>
-          <label>
-            Titulo
-            <input name="title" value={boardForm.title} onChange={handleBoardInput} required />
-          </label>
+      <article className="dashboard-card community-mural-card">
+        <div className="community-mural-layout">
+          <section className="community-board-panel">
+            <div className="community-board-header">
+              <div>
+                <h3>Mural comunitario</h3>
+                <p>Arrastra las notas para ordenar el tablero. Presiona una tarjeta para ver el detalle.</p>
+              </div>
+              <span>{filteredBoard.length} publicaciones</span>
+            </div>
 
-          <label>
-            Prioridad
-            <select name="priority" value={boardForm.priority} onChange={handleBoardInput}>
-              {BOARD_PRIORITIES.map((priority) => (
-                <option key={priority} value={priority}>
-                  {priority}
-                </option>
-              ))}
-            </select>
-          </label>
+            <div ref={boardRef} className="community-board-surface" aria-label="Mural comunitario interactivo">
+              <div className="community-board-pin top-left" />
+              <div className="community-board-pin top-right" />
+              <div className="community-board-pin bottom-left" />
+              <div className="community-board-pin bottom-right" />
 
-          <label>
-            Region
-            <select name="regionId" value={boardForm.regionId} onChange={handleBoardInput} required>
-              <option value="">Seleccione region</option>
-              {regions.map((region) => (
-                <option key={region.id} value={region.id}>
-                  {region.nombre}
-                </option>
-              ))}
-            </select>
-          </label>
+              {loading ? <LoadingSpinner label="Cargando mural..." /> : null}
+              {!loading && filteredBoard.length === 0 ? (
+                <EmptyState title="Sin avisos comunitarios" description="Publica el primer aviso para esta region." />
+              ) : null}
+              {!loading && filteredBoard.map((post, index) => {
+                const position = boardPositions[post.id] || fallbackBoardPosition(index);
+                const attachment = postAttachment(post);
+                return (
+                  <button
+                    key={post.id}
+                    type="button"
+                    className={`community-sticky-note ${priorityClass(post.priority)}`}
+                    style={{ left: `${position.x}%`, top: `${position.y}%`, transform: `rotate(${position.rotate ?? fallbackBoardPosition(index).rotate}deg)` }}
+                    onPointerDown={(event) => startPostDrag(event, post, index)}
+                    onPointerMove={movePost}
+                    onPointerUp={(event) => endPostDrag(event, post)}
+                    onPointerCancel={() => setDragState(null)}
+                  >
+                    <span className="community-note-tape" />
+                    <strong>{post.title}</strong>
+                    <small>{regionMap[post.regionId] || post.regionId || 'Sin region'} · {formatDate(post.publishedAt)}</small>
+                    <p>{post.message}</p>
+                    <span className={priorityBadge(post.priority)}>{post.priority}</span>
+                    {attachment ? <span className="community-note-attachment">📎 {attachment.kind === 'image' ? 'Imagen' : 'Archivo'}</span> : null}
+                  </button>
+                );
+              })}
+            </div>
+          </section>
 
-          <label className="full-width">
-            Mensaje
-            <textarea name="message" rows={3} value={boardForm.message} onChange={handleBoardInput} required />
-          </label>
+          <aside className="community-editor-panel">
+            <h3>Nueva publicación</h3>
+            <p>Crea una nota breve para pegarla en el mural comunitario.</p>
+            <form className="community-editor-form" onSubmit={submitBoard}>
+              <label>
+                Titulo
+                <input name="title" value={boardForm.title} onChange={handleBoardInput} required />
+              </label>
 
-          <div className="form-actions">
-            <button type="submit" className="btn">
-              Publicar aviso
-            </button>
-          </div>
-        </form>
+              <div className="community-editor-row">
+                <label>
+                  Prioridad
+                  <select name="priority" value={boardForm.priority} onChange={handleBoardInput}>
+                    {BOARD_PRIORITIES.map((priority) => (
+                      <option key={priority} value={priority}>
+                        {priority}
+                      </option>
+                    ))}
+                  </select>
+                </label>
 
-        {loading ? <LoadingSpinner label="Cargando mural..." /> : null}
-        {!loading && filteredBoard.length === 0 ? (
-          <EmptyState title="Sin avisos comunitarios" description="Publica el primer aviso para esta region." />
-        ) : null}
-        {!loading && filteredBoard.length > 0 ? (
-          <DataTable
-            columns={boardColumns}
-            rows={filteredBoard}
-            rowKey="id"
-            actions={(row) => (
-              <button
-                type="button"
-                className="btn btn-danger"
-                onClick={() => setPendingDelete({ type: 'board', id: row.id })}
-              >
-                Eliminar
-              </button>
-            )}
-          />
-        ) : null}
+                <label>
+                  Region
+                  <select name="regionId" value={boardForm.regionId} onChange={handleBoardInput} required>
+                    <option value="">Seleccione region</option>
+                    {regions.map((region) => (
+                      <option key={region.id} value={region.id}>
+                        {region.nombre}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+
+              <label>
+                Mensaje
+                <textarea name="message" rows={5} value={boardForm.message} onChange={handleBoardInput} required />
+              </label>
+
+              <div className="community-attachment-box">
+                <input ref={fileInputRef} type="file" onChange={handleAttachmentChange} />
+                {boardAttachment ? (
+                  <div className="community-attachment-preview">
+                    {boardAttachment.kind === 'image' ? <img src={boardAttachment.url} alt="Vista previa adjunta" /> : <span>📎</span>}
+                    <div>
+                      <strong>{boardAttachment.name}</strong>
+                      <small>{Math.ceil(boardAttachment.size / 1024)} KB</small>
+                    </div>
+                    <button type="button" className="btn btn-secondary" onClick={clearBoardAttachment}>Quitar</button>
+                  </div>
+                ) : (
+                  <p>Adjunta una imagen o archivo de apoyo para la publicación.</p>
+                )}
+              </div>
+
+              <div className="form-actions">
+                <button type="submit" className="btn">
+                  Pegar en mural
+                </button>
+              </div>
+            </form>
+          </aside>
+        </div>
       </article>
 
       <article className="dashboard-card">
@@ -490,6 +638,38 @@ function CommunityPage() {
 
       {loading && !error ? <LoadingSpinner label="Sincronizando modulo comunitario..." /> : null}
       {!loading && error && source === 'backend' ? <ErrorMessage error={{ message: error }} onRetry={reload} /> : null}
+
+      {selectedPost ? (
+        <div className="community-post-modal-backdrop" role="presentation" onClick={() => setSelectedPost(null)}>
+          <article className="community-post-modal" role="dialog" aria-modal="true" aria-label="Publicación comunitaria" onClick={(event) => event.stopPropagation()}>
+            <button type="button" className="panel-close" onClick={() => setSelectedPost(null)} aria-label="Cerrar">×</button>
+            <span className={priorityBadge(selectedPost.priority)}>{selectedPost.priority}</span>
+            <h3>{selectedPost.title}</h3>
+            <p className="community-post-meta">
+              {regionMap[selectedPost.regionId] || selectedPost.regionId || 'Sin region'} · {formatDate(selectedPost.publishedAt)} · {selectedPost.author}
+            </p>
+            <p>{selectedPost.message}</p>
+            {postAttachment(selectedPost) ? (
+              <div className="community-post-attachment">
+                <h4>Adjunto</h4>
+                {postAttachment(selectedPost).kind === 'image' ? (
+                  <img src={postAttachment(selectedPost).url} alt={postAttachment(selectedPost).name} />
+                ) : null}
+                <a href={postAttachment(selectedPost).url} target="_blank" rel="noreferrer">
+                  📎 {postAttachment(selectedPost).name}
+                </a>
+              </div>
+            ) : (
+              <p className="community-post-empty-attachment">Esta publicación no contiene adjuntos.</p>
+            )}
+            <div className="form-actions">
+              <button type="button" className="btn btn-danger" onClick={() => setPendingDelete({ type: 'board', id: selectedPost.id })}>
+                Eliminar publicación
+              </button>
+            </div>
+          </article>
+        </div>
+      ) : null}
 
       <ConfirmModal
         isOpen={Boolean(pendingDelete.id)}
