@@ -23,6 +23,8 @@ import com.simfat.backend.repository.AppUserRepository;
 import com.simfat.backend.repository.PasswordResetTokenRepository;
 import com.simfat.backend.repository.RefreshTokenRepository;
 import com.simfat.backend.security.AuthProperties;
+import com.simfat.backend.security.AuthorizationResolverService;
+import com.simfat.backend.security.AuthorizationSnapshot;
 import com.simfat.backend.security.JwtService;
 import com.simfat.backend.security.TokenPair;
 import com.simfat.backend.service.RateLimiterService;
@@ -63,6 +65,8 @@ class AuthServiceImplTest {
     private TurnstileService turnstileService;
     @Mock
     private Environment environment;
+    @Mock
+    private AuthorizationResolverService authorizationResolverService;
 
     private AuthServiceImpl service;
 
@@ -79,7 +83,8 @@ class AuthServiceImplTest {
             rateLimiterService,
             turnstileService,
             authProperties,
-            environment
+            environment,
+            authorizationResolverService
         );
     }
 
@@ -95,6 +100,8 @@ class AuthServiceImplTest {
         TokenPair pair = new TokenPair("access-token", "refresh-token", "rt-1", Instant.now().plusSeconds(900));
         when(jwtService.generateTokenPair(any(AppUser.class))).thenReturn(pair);
         when(jwtService.extractExpiration("refresh-token", JwtService.TOKEN_TYPE_REFRESH)).thenReturn(Instant.now().plusSeconds(3600));
+        when(authorizationResolverService.resolveForUser(any(AppUser.class)))
+            .thenReturn(new AuthorizationSnapshot(Set.of("ROLE_COMMUNITY_USER"), Set.of(), Set.of()));
 
         var response = service.register(
             new RegisterRequestDTO("Ana", "Ana@example.com", "StrongPass!123", null),
@@ -166,6 +173,8 @@ class AuthServiceImplTest {
         TokenPair newPair = new TokenPair("new-access", "new-refresh", "rt-new", Instant.now().plusSeconds(900));
         when(jwtService.generateTokenPair(user)).thenReturn(newPair);
         when(jwtService.extractExpiration("new-refresh", JwtService.TOKEN_TYPE_REFRESH)).thenReturn(Instant.now().plusSeconds(7200));
+        when(authorizationResolverService.resolveForUser(user))
+            .thenReturn(new AuthorizationSnapshot(Set.of("ROLE_COMMUNITY_USER"), Set.of(), Set.of()));
 
         var response = service.refresh(new RefreshTokenRequestDTO(oldRefresh), "127.0.0.1", "JUnit");
 

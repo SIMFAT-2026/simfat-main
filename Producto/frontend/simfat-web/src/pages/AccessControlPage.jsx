@@ -49,8 +49,10 @@ function AccessControlPage() {
   const [savingVerifUserId, setSavingVerifUserId] = useState('');
 
   const canManageAccess = useMemo(() => {
-    const roleSet = new Set(user?.roles || []);
-    return roleSet.has('ROLE_ADMIN') || roleSet.has('ROLE_SUPER_ADMIN') || roleSet.has('ADMIN');
+    // roleCodes es el RBAC real (/api/auth/me); user.roles es el enum legacy
+    // (solo "ADMIN"/"USER") y nunca tendra "ROLE_SUPER_ADMIN".
+    const roleSet = new Set(user?.roleCodes || []);
+    return roleSet.has('ROLE_ADMIN') || roleSet.has('ROLE_SUPER_ADMIN');
   }, [user]);
 
   useEffect(() => {

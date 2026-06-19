@@ -16,8 +16,11 @@ function WeatherSyncButton({ regionId }: WeatherSyncButtonProps) {
   const [loading, setLoading] = useState(false);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
-  const roles: string[] = user?.roles || [];
-  const canSync = roles.some((role) => WEATHER_SYNC_ROLES.has(role));
+  // user.roles es el enum legacy (solo "ADMIN"/"USER", sin SUPER_ADMIN) — no
+  // sirve para gatear esto. roleCodes es el RBAC real (mismo que usa el
+  // backend en @PreAuthorize), ahora expuesto via /api/auth/me.
+  const roleCodes: string[] = user?.roleCodes || [];
+  const canSync = roleCodes.some((role) => WEATHER_SYNC_ROLES.has(role));
 
   if (!canSync) {
     return null;

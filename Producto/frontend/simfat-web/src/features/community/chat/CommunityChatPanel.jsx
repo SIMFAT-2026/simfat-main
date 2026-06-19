@@ -49,8 +49,10 @@ function CommunityChatPanel() {
   } = useCommunityChat();
 
   const canModerate = useMemo(() => {
-    const roles = user?.roles || [];
-    return roles.some((role) => MODERATION_ROLES.has(role));
+    // user.roles es el enum legacy (solo "ADMIN"/"USER", nunca "ROLE_*"
+    // ni SUPER_ADMIN) — roleCodes es el RBAC real expuesto por /api/auth/me.
+    const roleCodes = user?.roleCodes || [];
+    return roleCodes.some((role) => MODERATION_ROLES.has(role));
   }, [user]);
 
   async function handleSubmit(event) {
