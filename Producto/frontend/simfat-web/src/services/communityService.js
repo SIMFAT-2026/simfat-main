@@ -45,8 +45,19 @@ export async function getCommunityResources({ regionId } = {}) {
   return extractData(response.data);
 }
 
-export async function createCommunityResource(payload) {
-  const response = await axiosClient.post(API_ENDPOINTS.communityResources, payload);
+export async function createCommunityResource(payload, file) {
+  const { file: payloadFile, ...body } = payload;
+
+  if (file || payloadFile) {
+    const formData = new FormData();
+    formData.append('payload', JSON.stringify(body));
+    formData.append('file', file || payloadFile);
+
+    const response = await axiosClient.post(API_ENDPOINTS.communityResources, formData);
+    return extractData(response.data);
+  }
+
+  const response = await axiosClient.post(API_ENDPOINTS.communityResources, body);
   return extractData(response.data);
 }
 

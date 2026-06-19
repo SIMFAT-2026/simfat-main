@@ -9,6 +9,7 @@ import markerShadow from 'leaflet/dist/images/marker-shadow.png';
 import EmptyState from '../../../components/EmptyState';
 import ErrorMessage from '../../../components/ErrorMessage';
 import LoadingSpinner from '../../../components/LoadingSpinner';
+import WeatherSyncButton from '../../dashboard/components/WeatherSyncButton';
 
 // LocalDateTime de Java llega sin 'Z' — JS lo interpreta como hora local del browser.
 // Esta utilidad fuerza UTC antes de convertir a Santiago para evitar doble conversión.
@@ -1100,14 +1101,17 @@ function TerritoryMapPanel({
           ))}
         </div>
 
-        <button
-          type="button"
-          className="btn btn-secondary territory-refresh-button"
-          onClick={onRetry}
-          disabled={loading || refreshing}
-        >
-          {refreshing ? 'Actualizando...' : 'Actualizar capas'}
-        </button>
+        <div className="territory-control-actions">
+          <button
+            type="button"
+            className="btn btn-secondary territory-refresh-button"
+            onClick={onRetry}
+            disabled={loading || refreshing}
+          >
+            {refreshing ? 'Actualizando...' : 'Actualizar capas'}
+          </button>
+          <WeatherSyncButton regionId={selectedRegionId} />
+        </div>
 
         {visibleIndicators.includes('WIND') && windHourlyTimestamps.length > 0 && (
           <div className="wind-hour-slider">

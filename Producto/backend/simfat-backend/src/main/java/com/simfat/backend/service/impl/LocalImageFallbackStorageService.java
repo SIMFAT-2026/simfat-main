@@ -27,7 +27,7 @@ public class LocalImageFallbackStorageService {
             return "";
         }
         if (!properties.isEnabled()) {
-            return file.getOriginalFilename() == null ? "archivo" : file.getOriginalFilename();
+            return "";
         }
 
         String folder = LocalDate.now().toString();

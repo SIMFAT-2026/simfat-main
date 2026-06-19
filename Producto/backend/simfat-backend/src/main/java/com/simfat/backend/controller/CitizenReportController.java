@@ -159,7 +159,11 @@ public class CitizenReportController {
             // En modo demo priorizamos continuidad y visibilidad local de adjuntos.
         }
         String localReference = localImageFallbackStorageService.storeCitizenReportFile(file);
-        return toAbsoluteReference(localReference);
+        String absoluteReference = toAbsoluteReference(localReference);
+        if (absoluteReference == null || absoluteReference.isBlank()) {
+            throw new BadRequestException("No fue posible persistir el archivo adjunto");
+        }
+        return absoluteReference;
     }
 
     private String toAbsoluteReference(String reference) {

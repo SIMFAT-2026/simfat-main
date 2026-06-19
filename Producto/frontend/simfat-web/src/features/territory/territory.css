@@ -68,10 +68,38 @@
   font-weight: 700;
 }
 
-.territory-refresh-button {
+.territory-control-actions {
   align-self: center;
   justify-self: end;
+  display: grid;
+  gap: 6px;
+  justify-items: end;
+}
+
+.territory-refresh-button,
+.territory-control-actions .sync-button-block .btn {
   white-space: nowrap;
+}
+
+.territory-control-actions .sync-button-block {
+  display: grid;
+  gap: 4px;
+  justify-items: end;
+}
+
+.territory-control-actions .sync-feedback {
+  max-width: 220px;
+  margin: 0;
+  font-size: 0.72rem;
+  text-align: right;
+}
+
+.territory-control-actions .sync-feedback-success {
+  color: #166534;
+}
+
+.territory-control-actions .sync-feedback-error {
+  color: #b91c1c;
 }
 
 .territory-toggle {
@@ -854,8 +882,17 @@
     grid-template-columns: 1fr;
   }
 
-  .territory-refresh-button {
+  .territory-control-actions {
     justify-self: start;
+    justify-items: start;
+  }
+
+  .territory-control-actions .sync-button-block {
+    justify-items: start;
+  }
+
+  .territory-control-actions .sync-feedback {
+    text-align: left;
   }
 
   .territory-layer-toggles {

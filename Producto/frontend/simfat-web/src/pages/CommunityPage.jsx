@@ -9,6 +9,7 @@ import SectionTitle from '../components/SectionTitle';
 import CommunityChatPanel from '../features/community/chat/CommunityChatPanel';
 import { useFeedback } from '../hooks';
 import { useCommunityData } from '../features/community/hooks/useCommunityData';
+import { getComunasByRegion, getLabelForComuna, getLabelForRegion } from '../data/territorioChile';
 
 const BOARD_PRIORITIES = ['BAJA', 'MEDIA', 'ALTA', 'CRITICA'];
 const RESOURCE_CATEGORIES = ['GUIA', 'PROTOCOLO', 'CAPACITACION', 'MATERIAL'];
@@ -23,8 +24,8 @@ const initialBoardForm = {
 const initialResourceForm = {
   title: '',
   category: 'GUIA',
-  url: '',
   regionId: '',
+  comunaId: '',
   description: ''
 };
 
@@ -89,6 +90,39 @@ function postAttachment(post) {
   };
 }
 
+function formatFileSize(value) {
+  if (!value) return '';
+  if (value < 1024 * 1024) return `${Math.ceil(value / 1024)} KB`;
+  return `${(value / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function isPdfResource(resource) {
+  const contentType = String(resource?.fileContentType || '').toLowerCase();
+  const name = String(resource?.fileName || resource?.url || '').toLowerCase();
+  return contentType.includes('pdf') || name.endsWith('.pdf');
+}
+
+function isDocxResource(resource) {
+  const contentType = String(resource?.fileContentType || '').toLowerCase();
+  const name = String(resource?.fileName || resource?.url || '').toLowerCase();
+  return contentType.includes('wordprocessingml') || name.endsWith('.docx');
+}
+
+function normalizeRegionText(value = '') {
+  return String(value)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+}
+
+function resolveRegionCode(regionId = '', regionName = '') {
+  const source = normalizeRegionText(`${regionId} ${regionName}`);
+  if (source.includes('araucania')) return 'araucania';
+  if (source.includes('nuble') || source.includes('ñuble')) return 'nuble';
+  if (source.includes('biobio') || source.includes('bio-bio') || source.includes('bio bio')) return 'biobio';
+  return regionId;
+}
+
 function CommunityPage() {
   const {
     regions,
@@ -110,22 +144,45 @@ function CommunityPage() {
   const feedback = useFeedback();
   const boardRef = useRef(null);
   const fileInputRef = useRef(null);
+  const resourceFileInputRef = useRef(null);
   const [filterRegionId, setFilterRegionId] = useState('');
   const [boardForm, setBoardForm] = useState(initialBoardForm);
   const [resourceForm, setResourceForm] = useState(initialResourceForm);
   const [contactForm, setContactForm] = useState(initialContactForm);
   const [boardAttachment, setBoardAttachment] = useState(null);
+  const [resourceFile, setResourceFile] = useState(null);
   const [boardPositions, setBoardPositions] = useState({});
   const [dragState, setDragState] = useState(null);
   const [selectedPost, setSelectedPost] = useState(null);
+  const [selectedResourceId, setSelectedResourceId] = useState('');
+  const [resourceCatalogRegionId, setResourceCatalogRegionId] = useState('');
+  const [resourceCatalogComunaId, setResourceCatalogComunaId] = useState('');
   const [pendingDelete, setPendingDelete] = useState({ type: '', id: '' });
 
   const regionMap = useMemo(
     () =>
       regions.reduce((acc, region) => {
         acc[region.id] = region.nombre;
+        acc[resolveRegionCode(region.id, region.nombre)] = region.nombre;
         return acc;
       }, {}),
+    [regions]
+  );
+
+  const resourceRegionOptions = useMemo(
+    () => {
+      const unique = new Map();
+      regions.forEach((region) => {
+        const id = resolveRegionCode(region.id, region.nombre);
+        if (!unique.has(id)) {
+          unique.set(id, {
+            id,
+            label: region.nombre || getLabelForRegion(id)
+          });
+        }
+      });
+      return [...unique.values()];
+    },
     [regions]
   );
 
@@ -139,28 +196,69 @@ function CommunityPage() {
     [resources, filterRegionId]
   );
 
+  const resourceComunas = useMemo(
+    () => getComunasByRegion(resourceForm.regionId),
+    [resourceForm.regionId]
+  );
+
+  const canSelectResourceComuna = resourceComunas.length > 0;
+
+  const resourceCatalogComunas = useMemo(
+    () => getComunasByRegion(resourceCatalogRegionId),
+    [resourceCatalogRegionId]
+  );
+
+  const catalogResources = useMemo(
+    () =>
+      filteredResources.filter((item) => {
+        const regionMatches = !resourceCatalogRegionId || item.regionId === resourceCatalogRegionId;
+        const comunaMatches = !resourceCatalogComunaId || item.comunaId === resourceCatalogComunaId;
+        return regionMatches && comunaMatches;
+      }),
+    [filteredResources, resourceCatalogRegionId, resourceCatalogComunaId]
+  );
+
+  const resourceTree = useMemo(() => {
+    const grouped = new Map();
+
+    catalogResources.forEach((resource) => {
+      const regionId = resource.regionId || 'sin-region';
+      const comunaId = resource.comunaId || 'sin-comuna';
+
+      if (!grouped.has(regionId)) {
+        grouped.set(regionId, {
+          id: regionId,
+          label: regionMap[regionId] || getLabelForRegion(regionId) || 'Sin region',
+          comunas: new Map()
+        });
+      }
+
+      const regionGroup = grouped.get(regionId);
+      if (!regionGroup.comunas.has(comunaId)) {
+        regionGroup.comunas.set(comunaId, {
+          id: comunaId,
+          label: getLabelForComuna(comunaId) || 'Sin comuna',
+          resources: []
+        });
+      }
+
+      regionGroup.comunas.get(comunaId).resources.push(resource);
+    });
+
+    return [...grouped.values()].map((region) => ({
+      ...region,
+      comunas: [...region.comunas.values()]
+    }));
+  }, [catalogResources, regionMap]);
+
+  const selectedResource = useMemo(() => {
+    if (catalogResources.length === 0) return null;
+    return catalogResources.find((item) => item.id === selectedResourceId) || catalogResources[0];
+  }, [catalogResources, selectedResourceId]);
+
   const filteredContacts = useMemo(
     () => contacts.filter((item) => !filterRegionId || item.regionId === filterRegionId),
     [contacts, filterRegionId]
-  );
-
-  const resourceColumns = useMemo(
-    () => [
-      { key: 'title', header: 'Recurso' },
-      { key: 'category', header: 'Categoria' },
-      { key: 'regionId', header: 'Region', render: (row) => regionMap[row.regionId] || row.regionId || '-' },
-      {
-        key: 'url',
-        header: 'Enlace',
-        render: (row) => (
-          <a href={row.url} target="_blank" rel="noreferrer">
-            Abrir
-          </a>
-        )
-      },
-      { key: 'description', header: 'Descripcion' }
-    ],
-    [regionMap]
   );
 
   const contactColumns = useMemo(
@@ -182,7 +280,17 @@ function CommunityPage() {
 
   function handleResourceInput(event) {
     const { name, value } = event.target;
-    setResourceForm((prev) => ({ ...prev, [name]: value }));
+    setResourceForm((prev) => ({
+      ...prev,
+      [name]: value,
+      ...(name === 'regionId' ? { comunaId: '' } : {})
+    }));
+  }
+
+  function handleResourceCatalogRegion(event) {
+    setResourceCatalogRegionId(event.target.value);
+    setResourceCatalogComunaId('');
+    setSelectedResourceId('');
   }
 
   function handleContactInput(event) {
@@ -212,6 +320,35 @@ function CommunityPage() {
     if (boardAttachment?.url) URL.revokeObjectURL(boardAttachment.url);
     setBoardAttachment(null);
     if (fileInputRef.current) fileInputRef.current.value = '';
+  }
+
+  function handleResourceFileChange(event) {
+    const file = event.target.files?.[0] || null;
+    if (!file) {
+      setResourceFile(null);
+      return;
+    }
+
+    const lowerName = file.name.toLowerCase();
+    const isAllowed =
+      file.type === 'application/pdf' ||
+      file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
+      lowerName.endsWith('.pdf') ||
+      lowerName.endsWith('.docx');
+
+    if (!isAllowed) {
+      event.target.value = '';
+      setResourceFile(null);
+      feedback.showError('Solo se permiten recursos en formato PDF o DOCX.');
+      return;
+    }
+
+    setResourceFile(file);
+  }
+
+  function clearResourceFile() {
+    setResourceFile(null);
+    if (resourceFileInputRef.current) resourceFileInputRef.current.value = '';
   }
 
   async function submitBoard(event) {
@@ -253,14 +390,22 @@ function CommunityPage() {
     feedback.clear();
 
     try {
-      await createResource({
+      if (!resourceFile) {
+        feedback.showError('Adjunta un archivo PDF o DOCX para registrar el recurso.');
+        return;
+      }
+
+      const created = await createResource({
         title: resourceForm.title.trim(),
         category: resourceForm.category,
-        url: resourceForm.url.trim(),
         regionId: resourceForm.regionId,
-        description: resourceForm.description.trim()
+        comunaId: resourceForm.comunaId,
+        description: resourceForm.description.trim(),
+        file: resourceFile
       });
+      if (created?.id) setSelectedResourceId(created.id);
       setResourceForm(initialResourceForm);
+      clearResourceFile();
       feedback.showSuccess('Recurso comunitario registrado.');
     } catch (err) {
       feedback.showError(err.message || 'No se pudo guardar el recurso.');
@@ -334,6 +479,7 @@ function CommunityPage() {
         setSelectedPost((prev) => (prev?.id === pendingDelete.id ? null : prev));
       } else if (pendingDelete.type === 'resource') {
         await removeResource(pendingDelete.id);
+        setSelectedResourceId((prev) => (prev === pendingDelete.id ? '' : prev));
       } else if (pendingDelete.type === 'contact') {
         await removeContact(pendingDelete.id);
       }
@@ -491,80 +637,233 @@ function CommunityPage() {
         </div>
       </article>
 
-      <article className="dashboard-card">
-        <h3>Biblioteca de recursos</h3>
-        <form className="form-grid" onSubmit={submitResource}>
-          <label>
-            Titulo
-            <input name="title" value={resourceForm.title} onChange={handleResourceInput} required />
-          </label>
+      <article className="dashboard-card community-resource-card">
+        <div className="community-resource-shell">
+          <aside className="community-resource-uploader">
+            <h3>Biblioteca de recursos</h3>
+            <p>Sube documentos PDF o DOCX y asocialos a una region y comuna.</p>
 
-          <label>
-            Categoria
-            <select name="category" value={resourceForm.category} onChange={handleResourceInput}>
-              {RESOURCE_CATEGORIES.map((category) => (
-                <option key={category} value={category}>
-                  {category}
-                </option>
-              ))}
-            </select>
-          </label>
+            <form className="community-resource-form" onSubmit={submitResource}>
+              <label>
+                Titulo
+                <input name="title" value={resourceForm.title} onChange={handleResourceInput} required />
+              </label>
 
-          <label>
-            Region
-            <select name="regionId" value={resourceForm.regionId} onChange={handleResourceInput} required>
-              <option value="">Seleccione region</option>
-              {regions.map((region) => (
-                <option key={region.id} value={region.id}>
-                  {region.nombre}
-                </option>
-              ))}
-            </select>
-          </label>
+              <div className="community-editor-row">
+                <label>
+                  Categoria
+                  <select name="category" value={resourceForm.category} onChange={handleResourceInput}>
+                    {RESOURCE_CATEGORIES.map((category) => (
+                      <option key={category} value={category}>
+                        {category}
+                      </option>
+                    ))}
+                  </select>
+                </label>
 
-          <label>
-            URL
-            <input name="url" type="url" value={resourceForm.url} onChange={handleResourceInput} required />
-          </label>
+                <label>
+                  Region
+                  <select name="regionId" value={resourceForm.regionId} onChange={handleResourceInput} required>
+                    <option value="">Seleccione region</option>
+                    {resourceRegionOptions.map((region) => (
+                      <option key={region.id} value={region.id}>
+                        {region.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
 
-          <label className="full-width">
-            Descripcion
-            <textarea
-              name="description"
-              rows={2}
-              value={resourceForm.description}
-              onChange={handleResourceInput}
-              required
-            />
-          </label>
+              <label>
+                Comuna
+                <select
+                  name="comunaId"
+                  value={resourceForm.comunaId}
+                  onChange={handleResourceInput}
+                  required
+                  disabled={!canSelectResourceComuna}
+                >
+                  <option value="">
+                    {resourceForm.regionId ? 'Seleccione comuna' : 'Seleccione una region primero'}
+                  </option>
+                  {resourceComunas.map((comuna) => (
+                    <option key={comuna.value} value={comuna.value}>
+                      {comuna.label}
+                    </option>
+                  ))}
+                </select>
+                {resourceForm.regionId && !canSelectResourceComuna ? (
+                  <small className="field-error">No hay comunas configuradas para esta region.</small>
+                ) : null}
+              </label>
 
-          <div className="form-actions">
-            <button type="submit" className="btn">
-              Guardar recurso
-            </button>
-          </div>
-        </form>
+              <label>
+                Descripcion
+                <textarea
+                  name="description"
+                  rows={4}
+                  value={resourceForm.description}
+                  onChange={handleResourceInput}
+                  required
+                />
+              </label>
 
-        {loading ? <LoadingSpinner label="Cargando recursos..." /> : null}
-        {!loading && filteredResources.length === 0 ? (
-          <EmptyState title="Sin recursos" description="Registra guias o protocolos comunitarios para comenzar." />
-        ) : null}
-        {!loading && filteredResources.length > 0 ? (
-          <DataTable
-            columns={resourceColumns}
-            rows={filteredResources}
-            rowKey="id"
-            actions={(row) => (
-              <button
-                type="button"
-                className="btn btn-danger"
-                onClick={() => setPendingDelete({ type: 'resource', id: row.id })}
-              >
-                Eliminar
-              </button>
-            )}
-          />
-        ) : null}
+              <div className="community-resource-filebox">
+                <input
+                  ref={resourceFileInputRef}
+                  type="file"
+                  accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                  onChange={handleResourceFileChange}
+                  required
+                />
+                {resourceFile ? (
+                  <div className="community-resource-file-preview">
+                    <span>{resourceFile.name.toLowerCase().endsWith('.pdf') ? 'PDF' : 'DOCX'}</span>
+                    <div>
+                      <strong>{resourceFile.name}</strong>
+                      <small>{formatFileSize(resourceFile.size)}</small>
+                    </div>
+                    <button type="button" className="btn btn-secondary" onClick={clearResourceFile}>Quitar</button>
+                  </div>
+                ) : (
+                  <p>Formatos permitidos: PDF y DOCX.</p>
+                )}
+              </div>
+
+              <div className="form-actions">
+                <button type="submit" className="btn">
+                  Subir recurso
+                </button>
+              </div>
+            </form>
+          </aside>
+
+          <section className="community-resource-viewer-panel">
+            <aside className="community-resource-catalog" aria-label="Catalogo de recursos">
+              <div className="community-resource-catalog-header">
+                <div>
+                  <h4>Catalogo de recursos</h4>
+                  <p>Filtra por territorio y selecciona un documento.</p>
+                </div>
+                <span>{catalogResources.length}</span>
+              </div>
+
+              <div className="community-resource-catalog-filters">
+                <label>
+                  Region
+                  <select value={resourceCatalogRegionId} onChange={handleResourceCatalogRegion}>
+                    <option value="">Todas</option>
+                    {resourceRegionOptions.map((region) => (
+                      <option key={region.id} value={region.id}>
+                        {region.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label>
+                  Comuna
+                  <select
+                    value={resourceCatalogComunaId}
+                    onChange={(event) => {
+                      setResourceCatalogComunaId(event.target.value);
+                      setSelectedResourceId('');
+                    }}
+                    disabled={!resourceCatalogRegionId}
+                  >
+                    <option value="">{resourceCatalogRegionId ? 'Todas' : 'Seleccione region'}</option>
+                    {resourceCatalogComunas.map((comuna) => (
+                      <option key={comuna.value} value={comuna.value}>
+                        {comuna.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+
+              {loading ? <LoadingSpinner label="Cargando recursos..." /> : null}
+              {!loading && catalogResources.length === 0 ? (
+                <EmptyState title="Sin recursos" description="No hay documentos para los filtros seleccionados." />
+              ) : null}
+              {!loading && catalogResources.length > 0 ? (
+                <div className="community-resource-tree">
+                  {resourceTree.map((region) => (
+                    <div key={region.id} className="community-resource-tree-region">
+                      <div className="community-resource-tree-label">{region.label}</div>
+                      {region.comunas.map((comuna) => (
+                        <div key={comuna.id} className="community-resource-tree-comuna">
+                          <div className="community-resource-tree-branch">{comuna.label}</div>
+                          <div className="community-resource-list">
+                            {comuna.resources.map((resource) => (
+                              <button
+                                key={resource.id}
+                                type="button"
+                                className={`community-resource-item ${selectedResource?.id === resource.id ? 'is-active' : ''}`}
+                                onClick={() => setSelectedResourceId(resource.id)}
+                              >
+                                <span>{isPdfResource(resource) ? 'PDF' : isDocxResource(resource) ? 'DOCX' : 'DOC'}</span>
+                                <strong>{resource.title}</strong>
+                                <small>{resource.category}</small>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+            </aside>
+
+            <div className="community-resource-reader">
+              {selectedResource ? (
+                <>
+                  <header className="community-resource-reader-header">
+                    <div>
+                      <p>{selectedResource.category}</p>
+                      <h4>{selectedResource.title}</h4>
+                      <small>
+                        {regionMap[selectedResource.regionId] || selectedResource.regionId || 'Sin region'} - {getLabelForComuna(selectedResource.comunaId) || 'Sin comuna'}
+                      </small>
+                    </div>
+                    <div className="community-resource-reader-actions">
+                      <a className="btn btn-secondary" href={selectedResource.fileUrl || selectedResource.url} target="_blank" rel="noreferrer">
+                        Abrir
+                      </a>
+                      <button
+                        type="button"
+                        className="btn btn-danger"
+                        onClick={() => setPendingDelete({ type: 'resource', id: selectedResource.id })}
+                      >
+                        Eliminar
+                      </button>
+                    </div>
+                  </header>
+
+                  <p className="community-resource-description">{selectedResource.description}</p>
+
+                  {isPdfResource(selectedResource) ? (
+                    <iframe
+                      title={`Lector PDF - ${selectedResource.title}`}
+                      src={selectedResource.fileUrl || selectedResource.url}
+                      className="community-resource-pdf"
+                    />
+                  ) : (
+                    <div className="community-resource-docx-placeholder">
+                      <strong>Vista previa no disponible para DOCX</strong>
+                      <p>El navegador no puede embeber DOCX de forma nativa. Puedes abrir o descargar el archivo desde el boton superior.</p>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="community-resource-empty-reader">
+                  <strong>Lector PDF embebido</strong>
+                  <p>Selecciona un recurso del catalogo para visualizarlo aqui.</p>
+                </div>
+              )}
+            </div>
+          </section>
+        </div>
       </article>
 
       <article className="dashboard-card">

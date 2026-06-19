@@ -115,7 +115,12 @@ function normalizeResources(items = []) {
     category: String(item.category || item.categoria || 'GUIA').toUpperCase(),
     url: item.url || item.enlace || '',
     regionId: String(item.regionId || item.region_id || ''),
-    description: item.description || item.descripcion || ''
+    comunaId: String(item.comunaId || item.comuna_id || ''),
+    description: item.description || item.descripcion || '',
+    fileUrl: item.fileUrl || item.url || '',
+    fileName: item.fileName || '',
+    fileContentType: item.fileContentType || '',
+    fileSize: item.fileSize || null
   }));
 }
 
@@ -213,21 +218,28 @@ export function useCommunityData() {
           const created = await createCommunityResource(payload);
           const normalized = normalizeResources([created])[0];
           setResources((prev) => [normalized, ...prev]);
-          return;
+          return normalized;
         } catch {
           // fallback local controlado
         }
       }
 
+      const localFileUrl = payload.file ? URL.createObjectURL(payload.file) : payload.url;
       const createdLocal = {
         id: createId('resource'),
         title: payload.title,
         category: payload.category,
-        url: payload.url,
+        url: localFileUrl,
         regionId: payload.regionId,
-        description: payload.description
+        comunaId: payload.comunaId,
+        description: payload.description,
+        fileUrl: localFileUrl,
+        fileName: payload.file?.name || '',
+        fileContentType: payload.file?.type || '',
+        fileSize: payload.file?.size || null
       };
       setResources((prev) => [createdLocal, ...prev]);
+      return createdLocal;
     },
     [source]
   );

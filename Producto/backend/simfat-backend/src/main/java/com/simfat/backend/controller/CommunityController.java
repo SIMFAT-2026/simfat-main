@@ -124,18 +124,36 @@ public class CommunityController {
         return ResponseEntity.ok(ApiResponse.ok("Recursos comunitarios obtenidos correctamente", items.stream().map(this::toResourceResponse).toList()));
     }
 
-    @PostMapping("/resources")
+    @PostMapping(value = "/resources", consumes = MediaType.APPLICATION_JSON_VALUE)
     @PreAuthorize("hasAnyAuthority('PERM_COMMUNITY_RESOURCE_MANAGE','ROLE_ADMIN','ROLE_SUPER_ADMIN','ROLE_MODERATOR')")
     public ResponseEntity<ApiResponse<CommunityResourceResponseDTO>> createResource(
         @Valid @RequestBody CommunityResourceRequestDTO request
     ) {
-        CommunityResource item = new CommunityResource();
-        item.setTitle(request.getTitle());
-        item.setCategory(request.getCategory().toUpperCase());
-        item.setUrl(request.getUrl());
-        item.setRegionId(request.getRegionId());
-        item.setDescription(request.getDescription());
-        item.setCreatedAt(LocalDateTime.now());
+        CommunityResource item = buildResource(request);
+
+        CommunityResource created = resourceRepository.save(item);
+        return ResponseEntity.ok(ApiResponse.ok("Recurso comunitario creado correctamente", toResourceResponse(created)));
+    }
+
+    @PostMapping(value = "/resources", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasAnyAuthority('PERM_COMMUNITY_RESOURCE_MANAGE','ROLE_ADMIN','ROLE_SUPER_ADMIN','ROLE_MODERATOR')")
+    public ResponseEntity<ApiResponse<CommunityResourceResponseDTO>> createResourceMultipart(
+        @RequestPart("payload") String payload,
+        @RequestPart("file") MultipartFile file
+    ) {
+        if (file == null || file.isEmpty()) {
+            throw new BadRequestException("El archivo del recurso es obligatorio");
+        }
+        validateResourceFile(file);
+
+        CommunityResourceRequestDTO request = parseResourcePayload(payload);
+        CommunityResource item = buildResource(request);
+        String fileReference = resolveUploadReference(file);
+        item.setUrl(fileReference);
+        item.setFileUrl(fileReference);
+        item.setFileName(file.getOriginalFilename());
+        item.setFileContentType(file.getContentType());
+        item.setFileSize(file.getSize());
 
         CommunityResource created = resourceRepository.save(item);
         return ResponseEntity.ok(ApiResponse.ok("Recurso comunitario creado correctamente", toResourceResponse(created)));
@@ -232,6 +250,43 @@ public class CommunityController {
         }
     }
 
+    private CommunityResource buildResource(CommunityResourceRequestDTO request) {
+        CommunityResource item = new CommunityResource();
+        item.setTitle(request.getTitle());
+        item.setCategory(request.getCategory().toUpperCase());
+        item.setUrl(request.getUrl());
+        item.setRegionId(request.getRegionId());
+        item.setComunaId(request.getComunaId());
+        item.setDescription(request.getDescription());
+        item.setCreatedAt(LocalDateTime.now());
+        return item;
+    }
+
+    private CommunityResourceRequestDTO parseResourcePayload(String rawPayload) {
+        try {
+            String normalized = rawPayload == null ? "" : rawPayload.trim();
+            try {
+                return objectMapper.readValue(normalized, CommunityResourceRequestDTO.class);
+            } catch (IOException first) {
+                String unescaped = objectMapper.readValue(normalized, String.class);
+                return objectMapper.readValue(unescaped, CommunityResourceRequestDTO.class);
+            }
+        } catch (IOException ex) {
+            throw new BadRequestException("Payload de recurso comunitario invalido");
+        }
+    }
+
+    private void validateResourceFile(MultipartFile file) {
+        String name = file.getOriginalFilename() == null ? "" : file.getOriginalFilename().toLowerCase();
+        String contentType = file.getContentType() == null ? "" : file.getContentType().toLowerCase();
+        boolean pdf = name.endsWith(".pdf") || contentType.equals("application/pdf");
+        boolean docx = name.endsWith(".docx") || contentType.equals("application/vnd.openxmlformats-officedocument.wordprocessingml.document");
+
+        if (!pdf && !docx) {
+            throw new BadRequestException("Solo se permiten recursos PDF o DOCX");
+        }
+    }
+
     private String resolveUploadReference(MultipartFile file) {
         try {
             String reference = storageService.uploadCitizenReportFile(file);
@@ -242,7 +297,11 @@ public class CommunityController {
             // En modo demo priorizamos continuidad y visibilidad local de adjuntos.
         }
         String localReference = localImageFallbackStorageService.storeCitizenReportFile(file);
-        return toAbsoluteReference(localReference);
+        String absoluteReference = toAbsoluteReference(localReference);
+        if (absoluteReference == null || absoluteReference.isBlank()) {
+            throw new BadRequestException("No fue posible persistir el archivo adjunto");
+        }
+        return absoluteReference;
     }
 
     private String toAbsoluteReference(String reference) {
@@ -266,7 +325,12 @@ public class CommunityController {
         dto.setCategory(item.getCategory());
         dto.setUrl(item.getUrl());
         dto.setRegionId(item.getRegionId());
+        dto.setComunaId(item.getComunaId());
         dto.setDescription(item.getDescription());
+        dto.setFileUrl(item.getFileUrl());
+        dto.setFileName(item.getFileName());
+        dto.setFileContentType(item.getFileContentType());
+        dto.setFileSize(item.getFileSize());
         dto.setCreatedAt(item.getCreatedAt());
         return dto;
     }
