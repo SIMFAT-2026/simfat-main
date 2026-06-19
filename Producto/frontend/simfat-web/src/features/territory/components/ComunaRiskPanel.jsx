@@ -2,13 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { LineChart, Line, XAxis, YAxis, Tooltip as ChartTooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 import { fetchComunaHistory, fetchComunalRiskScores, syncComunaCopernicus } from '../services/territoryApiService';
+import { ALERT_LEVEL_CONFIG } from '../constants/colorScales';
 
-const ALERT_LEVEL_CONFIG = {
-  NORMAL:     { color: '#16a34a', label: 'Normal' },
-  PREVENTIVO: { color: '#ca8a04', label: 'Preventivo' },
-  ALTO:       { color: '#ea580c', label: 'Alto' },
-  CRITICO:    { color: '#dc2626', label: 'Crítico' }
-};
 
 const COMPONENT_META = {
   STANDARD: [
@@ -81,8 +76,8 @@ function RiskHistoryChart({ gadmGid }) {
           contentStyle={{ background: '#1e293b', border: 'none', borderRadius: 8, fontSize: 11, color: '#f1f5f9' }}
           formatter={(val, _name, props) => [`${val}/100 ${props?.payload?.mode === 'ENHANCED' ? '✦' : ''}`, 'Score']}
         />
-        <ReferenceLine y={50} stroke="#ca8a04" strokeDasharray="3 3" strokeWidth={1} />
-        <ReferenceLine y={70} stroke="#ea580c" strokeDasharray="3 3" strokeWidth={1} />
+        <ReferenceLine y={50} stroke={ALERT_LEVEL_CONFIG.PREVENTIVO.color} strokeDasharray="3 3" strokeWidth={1} />
+        <ReferenceLine y={70} stroke={ALERT_LEVEL_CONFIG.ALTO.color} strokeDasharray="3 3" strokeWidth={1} />
         <Line
           type="monotone"
           dataKey="score"

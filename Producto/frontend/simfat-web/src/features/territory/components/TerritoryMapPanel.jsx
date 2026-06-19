@@ -10,6 +10,7 @@ import EmptyState from '../../../components/EmptyState';
 import ErrorMessage from '../../../components/ErrorMessage';
 import LoadingSpinner from '../../../components/LoadingSpinner';
 import WeatherSyncButton from '../../dashboard/components/WeatherSyncButton';
+import { ALERT_LEVEL_CONFIG, CLIMATE_SCALES, RISK_SCORE_LEGEND, VEGETATION_SCALES } from '../constants/colorScales';
 
 // LocalDateTime de Java llega sin 'Z' — JS lo interpreta como hora local del browser.
 // Esta utilidad fuerza UTC antes de convertir a Santiago para evitar doble conversión.
@@ -32,72 +33,16 @@ L.Icon.Default.mergeOptions({
 });
 
 const INDICATOR_COLORS = {
-  NDVI: '#16a34a',
+  NDVI: '#88419d',
   NDMI: '#0ea5e9',
   ALERTS: '#dc2626',
   FIRMS: '#ff4500',
   REPORTS: '#7c3aed',
-  RISK_SCORE: '#b45309',
+  RISK_SCORE: '#0570b0',
   WIND: '#0891b2',
-  HUMIDITY: '#2563eb',
+  HUMIDITY: '#2b8cbe',
   AIR_TEMP: '#dc2626',
   SOIL_TEMP: '#b45309'
-};
-
-// Per-variable color scales (DEC-A): each climate indicator gets its own
-// bins/ramp tuned for fire-risk relevance, rather than a shared generic scale.
-// `bins` are ascending upper-bounds; the last entry's `max` is Infinity.
-const CLIMATE_SCALES = {
-  // Wind speed (km/h): higher wind = faster fire spread.
-  WIND: {
-    unit: 'km/h',
-    label: 'Viento',
-    bins: [
-      { max: 10, color: '#a7f3d0', label: '< 10 (calma)' },
-      { max: 20, color: '#5eead4', label: '10-20 (leve)' },
-      { max: 35, color: '#38bdf8', label: '20-35 (moderado)' },
-      { max: 50, color: '#2563eb', label: '35-50 (fuerte)' },
-      { max: Infinity, color: '#1e3a8a', label: '> 50 (severo)' }
-    ]
-  },
-  // Relative humidity (%): LOWER humidity = HIGHER fire risk, so the ramp
-  // is inverted (most alarming color for the lowest band).
-  HUMIDITY: {
-    unit: '%',
-    label: 'Humedad relativa',
-    bins: [
-      { max: 20, color: '#dc2626', label: '< 20 (crítico)' },
-      { max: 30, color: '#f97316', label: '20-30 (bajo)' },
-      { max: 50, color: '#facc15', label: '30-50 (moderado)' },
-      { max: 70, color: '#86efac', label: '50-70 (normal)' },
-      { max: Infinity, color: '#16a34a', label: '> 70 (alto)' }
-    ]
-  },
-  // Air temperature max (°C): finer bins in the fire-relevant high range.
-  AIR_TEMP: {
-    unit: '°C',
-    label: 'Temp. del aire',
-    bins: [
-      { max: 10, color: '#bfdbfe', label: '< 10' },
-      { max: 20, color: '#93c5fd', label: '10-20' },
-      { max: 25, color: '#fde047', label: '20-25' },
-      { max: 30, color: '#fb923c', label: '25-30' },
-      { max: 35, color: '#f97316', label: '30-35' },
-      { max: Infinity, color: '#dc2626', label: '> 35' }
-    ]
-  },
-  // Soil temperature (°C): typically narrower variance than air temp.
-  SOIL_TEMP: {
-    unit: '°C',
-    label: 'Temp. del suelo',
-    bins: [
-      { max: 10, color: '#bfdbfe', label: '< 10' },
-      { max: 15, color: '#93c5fd', label: '10-15' },
-      { max: 20, color: '#fde047', label: '15-20' },
-      { max: 25, color: '#fb923c', label: '20-25' },
-      { max: Infinity, color: '#dc2626', label: '> 25' }
-    ]
-  }
 };
 
 const CLIMATE_INDICATORS = ['WIND', 'HUMIDITY', 'AIR_TEMP', 'SOIL_TEMP'];
@@ -137,28 +82,6 @@ const FIRMS_RECENCY_STYLES = {
   }
 };
 
-const VEGETATION_SCALES = {
-  NDVI: {
-    label: 'Índice vegetación (NDVI)',
-    valueKey: 'ndviRaw',
-    bins: [
-      { max: 0, color: '#dc2626', label: '< 0 (no vegetado)' },
-      { max: 0.2, color: '#f97316', label: '0-0.2 (escasa)' },
-      { max: 0.5, color: '#facc15', label: '0.2-0.5 (moderada)' },
-      { max: Infinity, color: '#16a34a', label: '> 0.5 (densa)' }
-    ]
-  },
-  NDMI: {
-    label: 'Humedad vegetación (NDMI)',
-    valueKey: 'ndmiRaw',
-    bins: [
-      { max: -0.1, color: '#dc2626', label: '< -0.1 (severa)' },
-      { max: 0.1, color: '#facc15', label: '-0.1-0.1 (leve)' },
-      { max: Infinity, color: '#0ea5e9', label: '> 0.1 (húmeda)' }
-    ]
-  }
-};
-
 function climateColorForValue(indicator, value) {
   if (value === null || value === undefined || Number.isNaN(Number(value))) {
     return NEUTRAL_FILL;
@@ -170,29 +93,18 @@ function climateColorForValue(indicator, value) {
   return bin ? bin.color : scale.bins[scale.bins.length - 1].color;
 }
 
-const ALERT_LEVEL_CONFIG = {
-  NORMAL:     { color: '#16a34a', bg: '#dcfce7', label: 'Normal',     fill: '#22c55e' },
-  PREVENTIVO: { color: '#ca8a04', bg: '#fef9c3', label: 'Preventivo', fill: '#eab308' },
-  ALTO:       { color: '#ea580c', bg: '#ffedd5', label: 'Alto',       fill: '#f97316' },
-  CRITICO:    { color: '#dc2626', bg: '#fee2e2', label: 'Critico',    fill: '#ef4444' }
-};
 
-const RISK_SCORE_LEGEND = [
-  { color: ALERT_LEVEL_CONFIG.NORMAL.fill, label: 'Normal' },
-  { color: ALERT_LEVEL_CONFIG.PREVENTIVO.fill, label: 'Preventivo' },
-  { color: ALERT_LEVEL_CONFIG.ALTO.fill, label: 'Alto' },
-  { color: ALERT_LEVEL_CONFIG.CRITICO.fill, label: 'Crítico' }
-];
 
 function comunaBaseStyle(score) {
   const level = score?.alertLevel || 'NORMAL';
   const cfg = ALERT_LEVEL_CONFIG[level] || ALERT_LEVEL_CONFIG.NORMAL;
   return {
     fillColor: cfg.fill,
-    fillOpacity: score ? 0.30 : 0.10,
-    color: '#334155',
-    weight: 0.8,
-    opacity: 0.7
+    fillOpacity: score ? 0.34 : 0.10,
+    color: cfg.color,
+    weight: score ? cfg.weight : 0.8,
+    dashArray: score ? cfg.dashArray : null,
+    opacity: score ? 0.9 : 0.7
   };
 }
 
@@ -667,7 +579,6 @@ const COMPONENT_INFO = {
 };
 
 const VISIBLE_RISK_COMPONENTS = new Set(['fwi', 'ndmi', 'firms', 'ndvi', 'reports']);
-const CHOROPLETH_LAYER_INDICATORS = ['RISK_SCORE', 'NDVI', 'NDMI'];
 const POINT_LAYER_INDICATORS = ['FIRMS', 'ALERTS', 'REPORTS'];
 const MAP_TOGGLE_INDICATORS = ['RISK_SCORE', 'FIRMS', 'NDVI', 'NDMI', 'ALERTS', 'REPORTS'];
 const ALERT_TOOLTIP_COMPONENTS = ['firms', 'fwi', 'ndmi', 'ndvi'];
@@ -1299,7 +1210,11 @@ function TerritoryMapPanel({
                   <ul>
                     {RISK_SCORE_LEGEND.map((item) => (
                       <li key={item.label}>
-                        <span className="territory-color-dot" style={{ backgroundColor: item.color }} />
+                        <span
+                          className="territory-color-dot territory-risk-swatch"
+                          style={{ backgroundColor: item.color, borderColor: item.borderColor, color: item.borderColor }}
+                          aria-hidden="true"
+                        />
                         <span>{item.label}</span>
                       </li>
                     ))}

@@ -74,17 +74,21 @@
   display: grid;
   gap: 6px;
   justify-items: end;
+  min-width: 220px;
 }
 
 .territory-refresh-button,
 .territory-control-actions .sync-button-block .btn {
   white-space: nowrap;
+  width: 100%;
+  justify-content: center;
 }
 
 .territory-control-actions .sync-button-block {
   display: grid;
   gap: 4px;
   justify-items: end;
+  width: 100%;
 }
 
 .territory-control-actions .sync-feedback {
@@ -231,6 +235,20 @@
   width: 10px;
   height: 10px;
   border-radius: 999px;
+}
+.territory-risk-swatch {
+  border: 2px solid currentColor;
+  position: relative;
+  overflow: hidden;
+}
+
+.territory-risk-swatch::after {
+  content: '';
+  position: absolute;
+  inset: 2px;
+  border-top: 2px solid currentColor;
+  transform: rotate(-35deg);
+  transform-origin: center;
 }
 
 .territory-climate-legend {
