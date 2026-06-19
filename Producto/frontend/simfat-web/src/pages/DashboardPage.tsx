@@ -11,6 +11,7 @@ import IndicatorSeriesChart from '../features/dashboard/components/IndicatorSeri
 import LatestIndicatorsPanel from '../features/dashboard/components/LatestIndicatorsPanel';
 import LossTrendChart from '../features/dashboard/components/LossTrendChart';
 import SyncNowButton from '../features/dashboard/components/SyncNowButton';
+import WeatherSyncButton from '../features/dashboard/components/WeatherSyncButton';
 import { useDashboardData } from '../features/dashboard/hooks/useDashboardData';
 import { useDashboardFilters } from '../features/dashboard/hooks/useDashboardFilters';
 import '../features/dashboard/dashboard.css';
@@ -65,6 +66,7 @@ function DashboardPage() {
           onRetry={dashboard.dataFreshness.reload}
         />
         <SyncNowButton onSync={dashboard.syncNow} onSyncSuccess={dashboard.reloadAll} />
+        <WeatherSyncButton regionId={filters.regionId} />
       </div>
 
       <LatestIndicatorsPanel

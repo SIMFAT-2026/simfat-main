@@ -30,7 +30,11 @@ const DASHBOARD_ENDPOINTS = {
   indicatorSeries: '/api/dashboard/indicators/series',
   indicatorMap: '/api/dashboard/indicators/map',
   dataFreshness: '/api/dashboard/data-freshness',
-  syncRun: '/api/dashboard/sync/run'
+  syncRun: '/api/dashboard/sync/run',
+  // ADMIN-only: FIRMS + FWI (clima/viento) por region + recompute comunal
+  // en background. Antes solo se podia disparar via curl con un token
+  // (no tenia consumidor en la UI) — ver WeatherSyncButton.
+  weatherSync: '/api/territory/sync'
 };
 
 function isObject(value: unknown): value is Record<string, unknown> {
@@ -408,6 +412,16 @@ export async function triggerDashboardSync(regionId?: string, from?: string, to?
     'No fue posible iniciar la sincronizacion.',
     120000,
     Object.keys(params).length > 0 ? params : undefined
+  );
+  return normalizeSyncRun(payload, regionId);
+}
+
+export async function triggerWeatherSync(regionId: string): Promise<SyncRunResultDto> {
+  const payload = await postApiDataWithTimeout<unknown>(
+    DASHBOARD_ENDPOINTS.weatherSync,
+    'No fue posible iniciar la sincronizacion de clima.',
+    30000,
+    { regionId }
   );
   return normalizeSyncRun(payload, regionId);
 }
