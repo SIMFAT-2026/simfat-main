@@ -452,6 +452,59 @@ function featureMeta(feature) {
   return '';
 }
 
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#039;');
+}
+
+function firmsConfidenceLabel(confidence) {
+  if (confidence === 'h') return 'Alta confianza';
+  if (confidence === 'n') return 'Confianza nominal';
+  return confidence || 'Sin dato';
+}
+
+function firmsConfidenceHelp(confidence) {
+  if (confidence === 'h') {
+    return 'Alta: NASA estima mayor certeza de que la anomalía térmica corresponde a fuego.';
+  }
+  if (confidence === 'n') {
+    return 'Nominal: detección válida de confianza media; conviene contrastarla con contexto local.';
+  }
+  return 'Confianza reportada por NASA FIRMS para la detección satelital.';
+}
+
+function featurePopupContent(feature) {
+  const props = feature?.properties || {};
+  const label = featureLabel(feature);
+  const meta = featureMeta(feature);
+
+  if (props.indicator !== 'FIRMS') {
+    return `${escapeHtml(label)}${meta ? ` | ${escapeHtml(meta)}` : ''}`;
+  }
+
+  const frp = props.frp != null ? Number(props.frp).toFixed(1) : 'Sin dato';
+  const confidence = firmsConfidenceLabel(props.confidence);
+  const recency = FIRMS_RECENCY_STYLES[firmsRecencyBucket(feature)]?.label || 'Detección FIRMS';
+  const detectedAt = props.acquiredAt ? parseUtcDate(props.acquiredAt) : 'Sin dato';
+
+  return `
+    <div class="firms-popup">
+      <strong>${escapeHtml(label)}</strong>
+      <div>FRP: ${escapeHtml(frp)} MW | ${escapeHtml(confidence)}</div>
+      <div>${escapeHtml(recency)}</div>
+      <div>Detectado: ${escapeHtml(detectedAt)}</div>
+      <div class="firms-popup-help">
+        <div><strong>FRP</strong>: potencia radiativa del fuego; valores más altos indican mayor intensidad térmica.</div>
+        <div><strong>Confianza</strong>: ${escapeHtml(firmsConfidenceHelp(props.confidence))}</div>
+      </div>
+    </div>
+  `;
+}
+
 function toPointStyle(indicator, feature) {
   const frp = feature?.properties?.frp;
   let radius = indicator === 'ALERTS' ? 8 : 7;
@@ -1069,9 +1122,7 @@ function TerritoryMapPanel({
                   data={regionData.layers[indicator]}
                   pointToLayer={(feature, latlng) => L.circleMarker(latlng, toPointStyle(indicator, feature))}
                   onEachFeature={(feature, layer) => {
-                    const label = featureLabel(feature);
-                    const meta = featureMeta(feature);
-                    layer.bindPopup(`${label}${meta ? ` | ${meta}` : ''}`);
+                    layer.bindPopup(featurePopupContent(feature));
                     layer.on('add mouseover', () => layer.bringToFront());
                   }}
                 />

@@ -47,18 +47,17 @@
 .territory-controls {
   margin-top: 6px;
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-columns: minmax(150px, 170px) minmax(0, 1fr) auto;
   align-items: start;
   gap: 5px 8px;
-  padding-right: 150px;
-  position: relative;
 }
 
 .territory-layer-toggles {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(10, minmax(72px, 1fr));
   align-items: center;
   gap: 6px;
-  flex-wrap: wrap;
+  min-width: 0;
 }
 
 .territory-controls-title {
@@ -70,10 +69,8 @@
 }
 
 .territory-refresh-button {
-  position: absolute;
-  right: 12px;
-  top: 50%;
-  transform: translateY(-50%);
+  align-self: center;
+  justify-self: end;
   white-space: nowrap;
 }
 
@@ -89,10 +86,9 @@
   color: #334155;
   font-size: 0.82rem;
   box-sizing: border-box;
-  flex: 0 0 106px;
   min-width: 0;
   min-height: 40px;
-  width: 106px;
+  width: 100%;
 }
 
 .territory-toggle input {
@@ -114,7 +110,8 @@
 }
 
 .territory-controls select {
-  min-width: 140px;
+  min-width: 0;
+  width: 100%;
 }
 
 .territory-map-wrapper {
@@ -134,6 +131,25 @@
   border-radius: 12px;
   border: 1px solid #e2e8f0;
   overflow: hidden;
+}
+
+.firms-popup {
+  display: grid;
+  gap: 3px;
+  max-width: 300px;
+  color: #0f172a;
+  font-size: 0.82rem;
+  line-height: 1.35;
+}
+
+.firms-popup-help {
+  display: grid;
+  gap: 3px;
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid #e2e8f0;
+  color: #475569;
+  font-size: 0.76rem;
 }
 
 .territory-legend {
@@ -821,13 +837,14 @@
 @media (max-width: 1080px) {
   .territory-controls {
     grid-template-columns: 1fr;
-    padding-right: 0;
   }
 
   .territory-refresh-button {
-    position: static;
-    transform: none;
     justify-self: start;
+  }
+
+  .territory-layer-toggles {
+    grid-template-columns: repeat(auto-fit, minmax(88px, 1fr));
   }
 
   .territory-map-wrapper {
