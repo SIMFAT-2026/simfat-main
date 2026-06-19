@@ -155,7 +155,7 @@ public class TerritoryController {
             Map<String, TerritoryWeatherObservation> latestByComuna = latestWeatherByComuna(comunas);
 
             if (requestedIndicators.contains("WIND")) {
-                layers.put("WIND", climateValueMap(comunas, latestByComuna, "WIND", "km/h", TerritoryWeatherObservation::getWindMax));
+                layers.put("WIND", windValueMap(comunas, latestByComuna));
             }
             if (requestedIndicators.contains("HUMIDITY")) {
                 layers.put("HUMIDITY", climateValueMap(comunas, latestByComuna, "HUMIDITY", "%", TerritoryWeatherObservation::getHumidityMin));
@@ -545,6 +545,60 @@ public class TerritoryController {
         result.put("unit", unit);
         result.put("values", values);
         return result;
+    }
+
+    /**
+     * Variante de climateValueMap para WIND: agrega direccion dominante y la
+     * serie horaria (timestamp/speed/direction) por comuna, usada por el slider
+     * horario del overlay de flechas de viento (spec: wind-arrow-overlay).
+     */
+    private Map<String, Object> windValueMap(
+        List<ComunaInfo> comunas,
+        Map<String, TerritoryWeatherObservation> latestByComuna
+    ) {
+        Map<String, Object> values = new LinkedHashMap<>();
+
+        for (ComunaInfo comuna : comunas) {
+            TerritoryWeatherObservation obs = latestByComuna.get(comuna.getId());
+            if (obs == null || obs.getWindMax() == null) {
+                continue;
+            }
+
+            Map<String, Object> entry = new LinkedHashMap<>();
+            entry.put("value", obs.getWindMax());
+            entry.put("unit", "km/h");
+            entry.put("direction", obs.getWindDirection());
+            entry.put("observedAt", obs.getObservedAt());
+            entry.put("hourly", buildHourlyWindSeries(obs));
+            values.put(comuna.getId(), entry);
+        }
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("indicator", "WIND");
+        result.put("unit", "km/h");
+        result.put("values", values);
+        return result;
+    }
+
+    private List<Map<String, Object>> buildHourlyWindSeries(TerritoryWeatherObservation obs) {
+        List<LocalDateTime> timestamps = obs.getHourlyTimestamps();
+        List<Double> speeds = obs.getHourlyWindSpeed();
+        List<Double> directions = obs.getHourlyWindDirection();
+
+        if (timestamps == null || speeds == null || directions == null) {
+            return List.of();
+        }
+
+        List<Map<String, Object>> series = new ArrayList<>();
+        int size = Math.min(timestamps.size(), Math.min(speeds.size(), directions.size()));
+        for (int i = 0; i < size; i++) {
+            Map<String, Object> point = new LinkedHashMap<>();
+            point.put("timestamp", timestamps.get(i));
+            point.put("speed", speeds.get(i));
+            point.put("direction", directions.get(i));
+            series.add(point);
+        }
+        return series;
     }
 
     /**

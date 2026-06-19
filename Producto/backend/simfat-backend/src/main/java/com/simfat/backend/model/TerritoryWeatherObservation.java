@@ -1,6 +1,7 @@
 package com.simfat.backend.model;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.index.CompoundIndex;
 import org.springframework.data.mongodb.core.index.CompoundIndexes;
@@ -37,6 +38,18 @@ public class TerritoryWeatherObservation {
     private Double windMax;
     private Double precip;
     private Double soilTemp;
+
+    // Dominant wind direction for the day (degrees, 0-360, meteorological
+    // convention: direction the wind blows FROM). Feeds the static wind
+    // arrow overlay on the territory map.
+    private Double windDirection;
+
+    // Hourly wind series for "today" (past_hours backfill + remaining forecast
+    // hours), parallel arrays indexed by hour. Powers the time slider that lets
+    // users scrub through how wind direction shifted during the day.
+    private List<LocalDateTime> hourlyTimestamps;
+    private List<Double> hourlyWindSpeed;
+    private List<Double> hourlyWindDirection;
 
     private LocalDateTime ingestedAt;
 
@@ -96,4 +109,16 @@ public class TerritoryWeatherObservation {
 
     public Double getSoilTemp() { return soilTemp; }
     public void setSoilTemp(Double soilTemp) { this.soilTemp = soilTemp; }
+
+    public Double getWindDirection() { return windDirection; }
+    public void setWindDirection(Double windDirection) { this.windDirection = windDirection; }
+
+    public List<LocalDateTime> getHourlyTimestamps() { return hourlyTimestamps; }
+    public void setHourlyTimestamps(List<LocalDateTime> hourlyTimestamps) { this.hourlyTimestamps = hourlyTimestamps; }
+
+    public List<Double> getHourlyWindSpeed() { return hourlyWindSpeed; }
+    public void setHourlyWindSpeed(List<Double> hourlyWindSpeed) { this.hourlyWindSpeed = hourlyWindSpeed; }
+
+    public List<Double> getHourlyWindDirection() { return hourlyWindDirection; }
+    public void setHourlyWindDirection(List<Double> hourlyWindDirection) { this.hourlyWindDirection = hourlyWindDirection; }
 }

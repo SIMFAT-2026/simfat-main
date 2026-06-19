@@ -13,6 +13,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -80,11 +81,15 @@ public class OpenWeatherFwiServiceImpl implements OpenWeatherFwiService {
     public boolean syncFwiByRegion(String regionId, double lat, double lon) {
         // Open-Meteo: variables meteorológicas para proxy FWI
         // (fire_danger_index no existe en Open-Meteo free tier)
+        // windspeed_10m/winddirection_10m + past_hours=24 alimentan el slider
+        // horario de viento (spec: wind-arrow-overlay); past_hours respalda las
+        // horas ya transcurridas del día, no solo el pronóstico hacia adelante.
         String url = baseUrl + "/v1/forecast"
             + "?latitude=" + lat
             + "&longitude=" + lon
-            + "&daily=temperature_2m_max,relative_humidity_2m_min,windspeed_10m_max,precipitation_sum"
-            + "&hourly=soil_temperature_0cm"
+            + "&daily=temperature_2m_max,relative_humidity_2m_min,windspeed_10m_max,winddirection_10m_dominant,precipitation_sum"
+            + "&hourly=soil_temperature_0cm,windspeed_10m,winddirection_10m"
+            + "&past_hours=24"
             + "&forecast_days=1"
             + "&timezone=America%2FSantiago";
 
@@ -109,6 +114,7 @@ public class OpenWeatherFwiServiceImpl implements OpenWeatherFwiService {
             Double tempMax = getFirstDouble(daily, "temperature_2m_max");
             Double rhMin = getFirstDouble(daily, "relative_humidity_2m_min");
             Double windMax = getFirstDouble(daily, "windspeed_10m_max");
+            Double windDirection = getFirstDouble(daily, "winddirection_10m_dominant");
             Double precip = getFirstDouble(daily, "precipitation_sum");
             Double soilTemp = getDailyAggregateFromHourly(hourly, "soil_temperature_0cm");
 
@@ -129,8 +135,12 @@ public class OpenWeatherFwiServiceImpl implements OpenWeatherFwiService {
             obs.setTempMax(tempMax);
             obs.setHumidityMin(rhMin);
             obs.setWindMax(windMax);
+            obs.setWindDirection(windDirection);
             obs.setPrecip(precip);
             obs.setSoilTemp(soilTemp == null ? null : round2(soilTemp));
+            obs.setHourlyTimestamps(getHourlyTimestamps(hourly));
+            obs.setHourlyWindSpeed(getHourlyDoubles(hourly, "windspeed_10m"));
+            obs.setHourlyWindDirection(getHourlyDoubles(hourly, "winddirection_10m"));
             obs.setIngestedAt(LocalDateTime.now());
             weatherRepository.save(obs);
 
@@ -202,6 +212,30 @@ public class OpenWeatherFwiServiceImpl implements OpenWeatherFwiService {
             return null;
         }
         return sum / count;
+    }
+
+    private List<LocalDateTime> getHourlyTimestamps(JsonNode hourly) {
+        JsonNode arr = hourly.path("time");
+        if (arr.isMissingNode() || !arr.isArray()) {
+            return null;
+        }
+        List<LocalDateTime> timestamps = new ArrayList<>();
+        for (JsonNode value : arr) {
+            timestamps.add(LocalDateTime.parse(value.asText()));
+        }
+        return timestamps;
+    }
+
+    private List<Double> getHourlyDoubles(JsonNode hourly, String field) {
+        JsonNode arr = hourly.path(field);
+        if (arr.isMissingNode() || !arr.isArray()) {
+            return null;
+        }
+        List<Double> values = new ArrayList<>();
+        for (JsonNode value : arr) {
+            values.add(value.isNull() ? null : value.asDouble());
+        }
+        return values;
     }
 
     private double round2(double value) {
