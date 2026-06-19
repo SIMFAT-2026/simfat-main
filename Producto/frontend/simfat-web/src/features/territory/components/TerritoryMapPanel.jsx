@@ -105,6 +105,37 @@ const NEUTRAL_FILL = '#cbd5e1';
 const POINT_LAYER_RENDERER = L.svg({ pane: 'territory-points-pane' });
 const REPORT_LAYER_RENDERER = L.svg({ pane: 'territory-report-pane' });
 
+const FIRMS_RECENCY_STYLES = {
+  today: {
+    label: 'Detecciones FIRMS de hoy',
+    fillColor: '#ef4444',
+    color: '#7f1d1d',
+    opacity: 0.95,
+    fillOpacity: 0.9,
+    weight: 1.4,
+    radiusOffset: 1
+  },
+  recent: {
+    label: 'Detecciones FIRMS recientes',
+    fillColor: '#f97316',
+    color: '#9a3412',
+    opacity: 0.75,
+    fillOpacity: 0.45,
+    weight: 1,
+    radiusOffset: 0,
+    dashArray: '3 3'
+  },
+  unknown: {
+    label: 'Detecciones FIRMS sin fecha',
+    fillColor: '#f59e0b',
+    color: '#92400e',
+    opacity: 0.65,
+    fillOpacity: 0.35,
+    weight: 1,
+    radiusOffset: 0
+  }
+};
+
 const VEGETATION_SCALES = {
   NDVI: {
     label: 'Índice vegetación (NDVI)',
@@ -279,10 +310,37 @@ function toUtcDate(str) {
   return new Date(utc);
 }
 
-function formatHourLabel(str) {
+function santiagoDateKey(date) {
+  if (!date || Number.isNaN(date.getTime())) return null;
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Santiago',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).formatToParts(date);
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${values.year}-${values.month}-${values.day}`;
+}
+
+function firmsRecencyBucket(feature) {
+  const detectedAt = toUtcDate(feature?.properties?.acquiredAt);
+  if (!detectedAt || Number.isNaN(detectedAt.getTime())) return 'unknown';
+
+  return santiagoDateKey(detectedAt) === santiagoDateKey(new Date()) ? 'today' : 'recent';
+}
+
+// past_hours=24 + forecast_days=1 in the Open-Meteo request can overlap into
+// up to ~48h depending on what time the sync ran, so the slider isn't always
+// a single day — show the date too once the series crosses that boundary.
+function formatHourLabel(str, includeDate) {
   const date = toUtcDate(str);
   if (!date) return '—';
-  return date.toLocaleString('es-CL', { timeZone: 'America/Santiago', hour: '2-digit', minute: '2-digit' });
+  return date.toLocaleString('es-CL', {
+    timeZone: 'America/Santiago',
+    ...(includeDate ? { day: '2-digit', month: '2-digit' } : {}),
+    hour: '2-digit',
+    minute: '2-digit'
+  });
 }
 
 const COMPASS_LABELS = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
@@ -364,6 +422,7 @@ function FitRegionBounds({ bounds }) {
 
 function featureLabel(feature) {
   const props = feature?.properties || {};
+  if (props.indicator === 'FIRMS') return 'Detección satelital VIIRS';
   return props.label || props.name || props.indicator || 'Punto territorial';
 }
 
@@ -373,8 +432,9 @@ function featureMeta(feature) {
   if (props.indicator === 'FIRMS') {
     const frp = props.frp != null ? `FRP: ${Number(props.frp).toFixed(1)} MW` : '';
     const conf = props.confidence === 'h' ? 'Alta confianza' : props.confidence === 'n' ? 'Confianza nominal' : '';
+    const recency = FIRMS_RECENCY_STYLES[firmsRecencyBucket(feature)]?.label;
     const time = props.acquiredAt ? `Detectado: ${parseUtcDate(props.acquiredAt)}` : '';
-    return [frp, conf, time].filter(Boolean).join(' | ');
+    return [frp, conf, recency, time].filter(Boolean).join(' | ');
   }
 
   if (props.value !== undefined && props.value !== null) {
@@ -394,21 +454,22 @@ function featureMeta(feature) {
 
 function toPointStyle(indicator, feature) {
   const frp = feature?.properties?.frp;
-  const confidence = feature?.properties?.confidence;
   let radius = indicator === 'ALERTS' ? 8 : 7;
 
   if (indicator === 'FIRMS') {
+    const recency = firmsRecencyBucket(feature);
+    const recencyStyle = FIRMS_RECENCY_STYLES[recency] || FIRMS_RECENCY_STYLES.recent;
     radius = frp ? Math.min(4 + Math.sqrt(Number(frp)) / 4, 8) : 5;
-    const fillColor = confidence === 'h' ? '#dc2626' : '#f97316';
     return {
       pane: 'territory-points-pane',
       renderer: POINT_LAYER_RENDERER,
-      radius,
-      fillColor,
-      color: '#7f1d1d',
-      weight: 1,
-      opacity: 0.9,
-      fillOpacity: 0.85
+      radius: radius + recencyStyle.radiusOffset,
+      fillColor: recencyStyle.fillColor,
+      color: recencyStyle.color,
+      weight: recencyStyle.weight,
+      opacity: recencyStyle.opacity,
+      fillOpacity: recencyStyle.fillOpacity,
+      dashArray: recencyStyle.dashArray
     };
   }
 
@@ -427,14 +488,14 @@ function toPointStyle(indicator, feature) {
 const COMPONENT_LABELS = {
   fwi:     'FWI meteorológico',
   ndmi:    'Humedad vegetación (NDMI)',
-  firms:   'Focos activos',
+  firms:   'Detecciones FIRMS',
   ndvi:    'Índice vegetación (NDVI)',
   reports: 'Reportes'
 };
 
 const INDICATOR_LABELS = {
   RISK_SCORE: 'Riesgo',
-  FIRMS: 'Focos',
+  FIRMS: 'FIRMS',
   NDVI: 'Índice veg.',
   NDMI: 'Humedad veg.',
   ALERTS: 'Alertas',
@@ -447,7 +508,7 @@ const INDICATOR_LABELS = {
 
 const INDICATOR_FULL_LABELS = {
   RISK_SCORE: 'Riesgo comunal',
-  FIRMS: 'Focos activos',
+  FIRMS: 'Detecciones FIRMS',
   NDVI: 'Índice vegetación (NDVI)',
   NDMI: 'Humedad vegetación (NDMI)',
   ALERTS: 'Alertas',
@@ -532,8 +593,8 @@ const COMPONENT_INFO = {
     scale: 'Escala raw -1 a 1:\n• >0.1: Vegetación húmeda, bajo riesgo\n• -0.1 a 0.1: Estrés hídrico leve\n• <-0.1: Estrés hídrico severo'
   },
   firms: {
-    description: 'Focos activos detectados por NASA FIRMS.',
-    rawLabel: 'Focos detectados',
+    description: 'Detecciones satelitales recientes de anomalías térmicas NASA FIRMS.',
+    rawLabel: 'Detecciones FIRMS',
     rawValue: (component) => component?.focosCount,
     scale: 'A mayor cantidad de focos y FRP, mayor riesgo inmediato.'
   },
@@ -680,6 +741,12 @@ function ReportCard({ report, pos, onClose }) {
 
 function indicatorCount(regionData, indicator) {
   return regionData?.layers?.[indicator]?.features?.length || 0;
+}
+
+function firmsRecencyCount(regionData, bucket) {
+  return (regionData?.layers?.FIRMS?.features || [])
+    .filter((feature) => firmsRecencyBucket(feature) === bucket)
+    .length;
 }
 
 function tooltipComponentEntries(components) {
@@ -916,7 +983,9 @@ function TerritoryMapPanel({
         {visibleIndicators.includes('WIND') && windHourlyTimestamps.length > 0 && (
           <div className="wind-hour-slider">
             <label htmlFor="wind-hour-range">
-              Dirección del viento — {windHourIndex != null ? formatHourLabel(windHourlyTimestamps[windHourIndex]) : '—'}
+              Dirección del viento — {windHourIndex != null
+                ? formatHourLabel(windHourlyTimestamps[windHourIndex], windHourlyTimestamps.length > 24)
+                : '—'}
             </label>
             <input
               id="wind-hour-range"
@@ -1062,14 +1131,33 @@ function TerritoryMapPanel({
                 <h5>Puntos del mapa</h5>
                 <ul>
                   {POINT_LAYER_INDICATORS.map((indicator) => (
-                    <li key={indicator}>
-                      <span
-                        className="territory-color-dot"
-                        style={{ backgroundColor: INDICATOR_COLORS[indicator] || '#64748b' }}
-                      />
-                      <span>{INDICATOR_FULL_LABELS[indicator] || indicator}</span>
-                      <strong>{indicatorCount(regionData, indicator)}</strong>
-                    </li>
+                    indicator === 'FIRMS' ? (
+                      Object.entries(FIRMS_RECENCY_STYLES)
+                        .filter(([bucket]) => bucket !== 'unknown' || firmsRecencyCount(regionData, bucket) > 0)
+                        .map(([bucket, style]) => (
+                          <li key={`FIRMS-${bucket}`}>
+                            <span
+                              className="territory-color-dot"
+                              style={{
+                                backgroundColor: style.fillColor,
+                                opacity: style.fillOpacity,
+                                border: style.dashArray ? `1px dashed ${style.color}` : 'none'
+                              }}
+                            />
+                            <span>{style.label}</span>
+                            <strong>{firmsRecencyCount(regionData, bucket)}</strong>
+                          </li>
+                        ))
+                    ) : (
+                      <li key={indicator}>
+                        <span
+                          className="territory-color-dot"
+                          style={{ backgroundColor: INDICATOR_COLORS[indicator] || '#64748b' }}
+                        />
+                        <span>{INDICATOR_FULL_LABELS[indicator] || indicator}</span>
+                        <strong>{indicatorCount(regionData, indicator)}</strong>
+                      </li>
+                    )
                   ))}
                 </ul>
               </div>
