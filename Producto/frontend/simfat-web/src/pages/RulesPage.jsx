@@ -250,86 +250,97 @@ function RulesPage() {
 
       {feedback.message ? <p className={`feedback feedback-${feedback.type}`}>{feedback.message}</p> : null}
 
-      <form className="form-grid" onSubmit={onSubmit}>
-        <label>
-          Nombre
-          <input name="nombre" value={form.nombre} onChange={onInputChange} required />
-          {validationErrors.nombre ? <small className="field-error">{validationErrors.nombre}</small> : null}
-        </label>
+      <form onSubmit={onSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
 
-        <label>
-          Region (opcional)
-          <select name="regionId" value={form.regionId} onChange={onInputChange}>
-            <option value="">Global</option>
-            {regions.map((region) => (
-              <option key={region.id} value={region.id}>
-                {region.nombre}
-              </option>
-            ))}
-          </select>
-        </label>
+        {/* Fila 1: identificación */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          <label>
+            Nombre
+            <input name="nombre" value={form.nombre} onChange={onInputChange} required />
+            {validationErrors.nombre ? <small className="field-error">{validationErrors.nombre}</small> : null}
+          </label>
 
-        <label>
-          Umbral FWI <small>(se dispara si el FWI es mayor o igual al valor)</small>
-          <input name="umbralFwi" type="number" step="0.01" value={form.umbralFwi} onChange={onInputChange} />
-          <ThresholdHints fieldName="umbralFwi" onSelect={setThreshold} />
-          {validationErrors.umbralFwi ? <small className="field-error">{validationErrors.umbralFwi}</small> : null}
-        </label>
-
-        <label>
-          Umbral NDMI <small>(se dispara si el NDMI cae por debajo o igual al valor, mas seco = mas riesgo)</small>
-          <input name="umbralNdmi" type="number" step="0.01" value={form.umbralNdmi} onChange={onInputChange} />
-          <ThresholdHints fieldName="umbralNdmi" onSelect={setThreshold} />
-          {validationErrors.umbralNdmi ? <small className="field-error">{validationErrors.umbralNdmi}</small> : null}
-        </label>
-
-        <label>
-          Umbral NDVI <small>(se dispara si el NDVI cae por debajo o igual al valor, menos vegetacion = mas riesgo)</small>
-          <input name="umbralNdvi" type="number" step="0.01" value={form.umbralNdvi} onChange={onInputChange} />
-          <ThresholdHints fieldName="umbralNdvi" onSelect={setThreshold} />
-          {validationErrors.umbralNdvi ? <small className="field-error">{validationErrors.umbralNdvi}</small> : null}
-        </label>
-
-        <label>
-          Umbral conteo FIRMS <small>(se dispara si las detecciones son mayor o igual al valor)</small>
-          <input name="umbralFirmsCount" type="number" value={form.umbralFirmsCount} onChange={onInputChange} />
-          <ThresholdHints fieldName="umbralFirmsCount" onSelect={setThreshold} />
-          {validationErrors.umbralFirmsCount ? <small className="field-error">{validationErrors.umbralFirmsCount}</small> : null}
-        </label>
-
-        <label>
-          Umbral reportes ciudadanos <small>(se dispara si los reportes son mayor o igual al valor)</small>
-          <input
-            name="umbralReportesCiudadanos"
-            type="number"
-            value={form.umbralReportesCiudadanos}
-            onChange={onInputChange}
-          />
-          <ThresholdHints fieldName="umbralReportesCiudadanos" onSelect={setThreshold} />
-          {validationErrors.umbralReportesCiudadanos ? (
-            <small className="field-error">{validationErrors.umbralReportesCiudadanos}</small>
-          ) : null}
-        </label>
-
-        <label>
-          Activa
-          <select name="activa" value={form.activa} onChange={onInputChange}>
-            <option value="true">Si</option>
-            <option value="false">No</option>
-          </select>
-          {validationErrors.activa ? <small className="field-error">{validationErrors.activa}</small> : null}
-        </label>
-
-        <div className="form-actions">
-          <button className="btn" type="submit">
-            {editingId ? 'Actualizar' : 'Crear'}
-          </button>
-          {editingId ? (
-            <button type="button" className="btn btn-secondary" onClick={resetForm}>
-              Cancelar edicion
-            </button>
-          ) : null}
+          <label>
+            Region (opcional)
+            <select name="regionId" value={form.regionId} onChange={onInputChange}>
+              <option value="">Global</option>
+              {regions.map((region) => (
+                <option key={region.id} value={region.id}>
+                  {region.nombre}
+                </option>
+              ))}
+            </select>
+          </label>
         </div>
+
+        {/* Fila 2: umbrales satelitales */}
+        <div>
+          <p style={{ margin: '0 0 8px', fontSize: '0.78rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            Umbrales de activacion
+          </p>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, alignItems: 'start' }}>
+            <label>
+              Umbral FWI <small>(FWI &ge; valor)</small>
+              <input name="umbralFwi" type="number" step="0.01" value={form.umbralFwi} onChange={onInputChange} />
+              <ThresholdHints fieldName="umbralFwi" onSelect={setThreshold} />
+              {validationErrors.umbralFwi ? <small className="field-error">{validationErrors.umbralFwi}</small> : null}
+            </label>
+
+            <label>
+              Umbral NDMI <small>(NDMI &le; valor, mas seco = mas riesgo)</small>
+              <input name="umbralNdmi" type="number" step="0.01" value={form.umbralNdmi} onChange={onInputChange} />
+              <ThresholdHints fieldName="umbralNdmi" onSelect={setThreshold} />
+              {validationErrors.umbralNdmi ? <small className="field-error">{validationErrors.umbralNdmi}</small> : null}
+            </label>
+
+            <label>
+              Umbral NDVI <small>(NDVI &le; valor, menos vegetacion = mas riesgo)</small>
+              <input name="umbralNdvi" type="number" step="0.01" value={form.umbralNdvi} onChange={onInputChange} />
+              <ThresholdHints fieldName="umbralNdvi" onSelect={setThreshold} />
+              {validationErrors.umbralNdvi ? <small className="field-error">{validationErrors.umbralNdvi}</small> : null}
+            </label>
+          </div>
+        </div>
+
+        {/* Fila 3: umbrales de conteo + estado + acciones */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 160px auto', gap: 12, alignItems: 'start' }}>
+          <label>
+            Umbral FIRMS <small>(detecciones &ge; valor)</small>
+            <input name="umbralFirmsCount" type="number" value={form.umbralFirmsCount} onChange={onInputChange} />
+            <ThresholdHints fieldName="umbralFirmsCount" onSelect={setThreshold} />
+            {validationErrors.umbralFirmsCount ? <small className="field-error">{validationErrors.umbralFirmsCount}</small> : null}
+          </label>
+
+          <label>
+            Umbral reportes ciudadanos <small>(reportes &ge; valor)</small>
+            <input name="umbralReportesCiudadanos" type="number" value={form.umbralReportesCiudadanos} onChange={onInputChange} />
+            <ThresholdHints fieldName="umbralReportesCiudadanos" onSelect={setThreshold} />
+            {validationErrors.umbralReportesCiudadanos ? (
+              <small className="field-error">{validationErrors.umbralReportesCiudadanos}</small>
+            ) : null}
+          </label>
+
+          <label>
+            Activa
+            <select name="activa" value={form.activa} onChange={onInputChange}>
+              <option value="true">Si</option>
+              <option value="false">No</option>
+            </select>
+            {validationErrors.activa ? <small className="field-error">{validationErrors.activa}</small> : null}
+          </label>
+
+          <div className="form-actions" style={{ paddingTop: 20 }}>
+            <button className="btn" type="submit">
+              {editingId ? 'Actualizar' : 'Crear'}
+            </button>
+            {editingId ? (
+              <button type="button" className="btn btn-secondary" onClick={resetForm}>
+                Cancelar edicion
+              </button>
+            ) : null}
+          </div>
+        </div>
+
       </form>
 
       {loading ? <LoadingSpinner label="Cargando reglas..." /> : null}
