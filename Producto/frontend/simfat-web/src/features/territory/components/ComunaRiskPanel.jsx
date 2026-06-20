@@ -335,10 +335,15 @@ export default function ComunaRiskPanel({ comunaId, score, regionId, onClose, ca
           className="btn btn-primary btn-sm panel-copernicus-btn"
           onClick={handleCopernicusSync}
           disabled={isLoading}
-          title="Consulta NDVI y NDMI directamente desde Copernicus para esta comuna (~70s)"
+          title="Consulta NDVI y NDMI directamente desde Copernicus para esta comuna"
         >
           {btnLabel}
         </button>
+        {!isLoading && syncState.phase !== 'done' && (
+          <small style={{ color: '#94a3b8', fontSize: '0.68rem', display: 'block', marginTop: 2 }}>
+            ⓘ El proceso tarda aprox. 2–3 min
+          </small>
+        )}
         <button
           type="button"
           className="btn btn-secondary btn-sm"
