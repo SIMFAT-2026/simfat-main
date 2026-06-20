@@ -252,14 +252,10 @@ export function useCommunityData() {
   const createContact = useCallback(
     async (payload) => {
       if (source === 'backend') {
-        try {
-          const created = await createCommunityContact(payload);
-          const normalized = normalizeContacts([created])[0];
-          setContacts((prev) => [normalized, ...prev]);
-          return;
-        } catch {
-          // fallback local controlado
-        }
+        const created = await createCommunityContact(payload);
+        const normalized = normalizeContacts([created])[0];
+        setContacts((prev) => [normalized, ...prev]);
+        return;
       }
 
       const createdLocal = {

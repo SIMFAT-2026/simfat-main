@@ -456,6 +456,7 @@ function CommunityPage() {
         phone: contactForm.phone.trim(),
         email: contactForm.email.trim(),
         regionId: contactForm.regionId,
+        comunaId: contactForm.comunaId,
         protocol: contactForm.protocol.trim()
       });
       setContactForm(initialContactForm);
@@ -759,7 +760,7 @@ function CommunityPage() {
                     <button type="button" className="btn btn-secondary" onClick={clearResourceFile}>Quitar</button>
                   </div>
                 ) : (
-                  <p>Formatos permitidos: PDF.</p>
+                  <p>Solo PDF soportado.</p>
                 )}
               </div>
 
