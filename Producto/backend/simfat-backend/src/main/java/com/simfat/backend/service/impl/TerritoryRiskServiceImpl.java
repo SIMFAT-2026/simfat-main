@@ -129,11 +129,17 @@ public class TerritoryRiskServiceImpl implements TerritoryRiskService {
 
         // FIRMS (focos activos ultimas 48h)
         LocalDateTime firms48hAgo = now.minusHours(48);
-        long firmsCount = heatAlertEventRepository.countByRegionIdAndFechaEventoBetween(regionId, firms48hAgo, now);
+        List<Region> allRegions = regionRepository.findAll();
+        // Reasigna por centroide mas cercano: los aoiBbox de regiones vecinas (ej. Biobio-Nuble,
+        // Biobio-Araucania) se superponen, por lo que el mismo foco puede haberse persistido bajo
+        // mas de un regionId durante el sync. Sin este filtro Biobio queda inflado por ser la unica
+        // region monitoreada con vecinos en ambos lados.
         List<HeatAlertEvent> firmsEvents = heatAlertEventRepository.findByRegionId(regionId).stream()
             .filter(e -> e.getFechaEvento() != null && e.getFechaEvento().isAfter(firms48hAgo))
             .filter(e -> "NASA_FIRMS".equals(e.getFuente()))
             .filter(e -> e.getFirmsConfidence() != null && !"l".equals(e.getFirmsConfidence()))
+            .filter(e -> e.getLatitud() != null && e.getLongitud() != null)
+            .filter(e -> regionId.equals(findNearestRegionId(e.getLatitud(), e.getLongitud(), allRegions)))
             .toList();
 
         int firmsCountFiltered = firmsEvents.size();
@@ -232,5 +238,24 @@ public class TerritoryRiskServiceImpl implements TerritoryRiskService {
 
     private double round4(double value) {
         return Math.round(value * 10000.0) / 10000.0;
+    }
+
+    private String findNearestRegionId(double lat, double lon, List<Region> regions) {
+        String nearest = null;
+        double minDist = Double.MAX_VALUE;
+        for (Region region : regions) {
+            List<Double> bbox = region.getAoiBbox();
+            if (bbox == null || bbox.size() != 4) {
+                continue;
+            }
+            double centerLat = (bbox.get(1) + bbox.get(3)) / 2;
+            double centerLon = (bbox.get(0) + bbox.get(2)) / 2;
+            double dist = Math.pow(lat - centerLat, 2) + Math.pow(lon - centerLon, 2);
+            if (dist < minDist) {
+                minDist = dist;
+                nearest = region.getId();
+            }
+        }
+        return nearest;
     }
 }
