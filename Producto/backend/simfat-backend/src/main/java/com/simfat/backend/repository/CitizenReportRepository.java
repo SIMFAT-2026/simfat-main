@@ -10,6 +10,8 @@ public interface CitizenReportRepository extends MongoRepository<CitizenReport, 
 
     List<CitizenReport> findByRegionId(String regionId);
 
+    List<CitizenReport> findByRegionIdAndCreatedAtBetween(String regionId, LocalDateTime from, LocalDateTime to);
+
     List<CitizenReport> findByStatus(CitizenReportStatus status);
 
     List<CitizenReport> findByCategoryIgnoreCase(String category);

@@ -271,9 +271,9 @@ public class TerritoryController {
     }
 
     private Map<String, Object> reportsLayer(String regionId, LocalDateTime from, LocalDateTime to) {
-        List<Map<String, Object>> features = citizenReportRepository.findByRegionId(regionId)
+        List<Map<String, Object>> features = citizenReportRepository
+            .findByRegionIdAndCreatedAtBetween(regionId, from, to)
             .stream()
-            .filter(item -> item.getCreatedAt() != null && !item.getCreatedAt().isBefore(from) && !item.getCreatedAt().isAfter(to))
             .map(this::toReportFeature)
             .toList();
 
