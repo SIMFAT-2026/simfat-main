@@ -850,17 +850,17 @@ function ComunaTooltip({ comunaId, nombre, score, pos }) {
       )}
       {score ? (
         <>
-          <div className="comuna-tooltip-level" style={{ color: level.color }}>
+          <div className="comuna-tooltip-level" style={{ color: level.darkUiColor }}>
             {level.label}
           </div>
           <div className="comuna-tooltip-score-row">
             <div className="comuna-tooltip-bar-wrap">
               <div
                 className="comuna-tooltip-bar"
-                style={{ width: `${pct}%`, backgroundColor: level.color }}
+                style={{ width: `${pct}%`, backgroundColor: level.darkUiColor }}
               />
             </div>
-            <span className="comuna-tooltip-pct" style={{ color: level.color }}>{pct}<small>/100</small></span>
+            <span className="comuna-tooltip-pct" style={{ color: level.darkUiColor }}>{pct}<small>/100</small></span>
           </div>
         </>
       ) : (

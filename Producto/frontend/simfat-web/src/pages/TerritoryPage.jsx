@@ -45,7 +45,7 @@ function TerritoryPage() {
 
       <div className="territory-dashboard-block">
         <Suspense fallback={<div className="loading-state">Cargando panel analitico...</div>}>
-          <DashboardPage />
+          <DashboardPage selectedRegionId={territory.selectedRegionId} />
         </Suspense>
       </div>
     </>

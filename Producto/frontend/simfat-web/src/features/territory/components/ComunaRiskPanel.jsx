@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { LineChart, Line, XAxis, YAxis, Tooltip as ChartTooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 import { fetchComunaHistory, fetchComunalRiskScores, syncComunaCopernicus } from '../services/territoryApiService';
 import { ALERT_LEVEL_CONFIG } from '../constants/colorScales';
+import { generateComunalReport } from '../utils/reportPrint';
 
 
 const COMPONENT_META = {
@@ -235,6 +236,11 @@ export default function ComunaRiskPanel({ comunaId, score, regionId, onClose, ca
     ? (() => { const u = /Z|[+-]\d{2}:?\d{2}$/.test(displayScore.computedAt) ? displayScore.computedAt : displayScore.computedAt + 'Z'; return new Date(u).toLocaleString('es-CL', { timeZone: 'America/Santiago', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }); })()
     : null;
 
+  function handleExportComunal() {
+    const regionLabel = displayScore.regionId || regionId || '';
+    generateComunalReport({ score: displayScore, comunaId, regionLabel, generatedAt: displayScore.computedAt });
+  }
+
   async function handleCopernicusSync() {
     setSyncState({ phase: 'requesting', countdown: 0, error: null, result: null, retries: 0 });
     try {
@@ -332,6 +338,14 @@ export default function ComunaRiskPanel({ comunaId, score, regionId, onClose, ca
           title="Consulta NDVI y NDMI directamente desde Copernicus para esta comuna (~70s)"
         >
           {btnLabel}
+        </button>
+        <button
+          type="button"
+          className="btn btn-secondary btn-sm"
+          onClick={handleExportComunal}
+          title="Exportar informe comunal en PDF"
+        >
+          Exportar informe
         </button>
         {syncState.phase === 'done' && syncState.result && (
           <span className="panel-sync-ok">
