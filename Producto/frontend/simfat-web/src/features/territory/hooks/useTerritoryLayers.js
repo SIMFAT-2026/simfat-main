@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { fetchTerritoryBounds, fetchTerritoryGeoJson, fetchTerritoryLayers, fetchTerritoryRiskScore, fetchComunalRiskScores } from '../services/territoryApiService';
 
 const CACHE_TTL_MS = 120_000;
-const pendingByKey = new Map();
+const pendingKeys = new Set();
 const cacheByKey = new Map();
 
 const REGION_CONFIG = {
@@ -39,7 +39,13 @@ const REGION_CONFIG = {
 };
 
 const REGION_OPTIONS = Object.values(REGION_CONFIG);
-const DEFAULT_INDICATORS = ['NDVI', 'NDMI', 'ALERTS', 'FIRMS', 'REPORTS', 'RISK_SCORE', 'WIND', 'HUMIDITY', 'AIR_TEMP', 'SOIL_TEMP'];
+
+// Critical: needed for the first meaningful paint (choropleth + active fires + alerts).
+// Secondary: useful context loaded after the map is already interactive.
+const CRITICAL_INDICATORS = ['RISK_SCORE', 'ALERTS', 'FIRMS'];
+const SECONDARY_INDICATORS = ['NDVI', 'NDMI', 'REPORTS', 'WIND', 'HUMIDITY', 'AIR_TEMP', 'SOIL_TEMP'];
+const DEFAULT_INDICATORS = [...CRITICAL_INDICATORS, ...SECONDARY_INDICATORS];
+
 // WIND/HUMIDITY/AIR_TEMP/SOIL_TEMP are opt-in climate layers: fetched alongside
 // the rest but not shown until the user toggles them on (DEC-B).
 const DEFAULT_VISIBLE_INDICATORS = ['RISK_SCORE', 'FIRMS', 'ALERTS', 'REPORTS'];
@@ -208,14 +214,14 @@ function createMockRegionData(regionId, from, to) {
   };
 }
 
-function cacheKey(regionId, indicators, from, to) {
-  return `${regionId}|${indicators.join(',')}|${from}|${to}`;
+function cacheKey(regionId, from, to) {
+  return `${regionId}|${from}|${to}`;
 }
 
 function readCacheSnapshot(dateRange) {
   const snapshot = {};
   for (const region of REGION_OPTIONS) {
-    const key = cacheKey(region.id, DEFAULT_INDICATORS, dateRange.from, dateRange.to);
+    const key = cacheKey(region.id, dateRange.from, dateRange.to);
     const entry = cacheByKey.get(key);
     if (entry && Date.now() < entry.expiresAt) {
       snapshot[region.id] = entry.data;
@@ -224,61 +230,31 @@ function readCacheSnapshot(dateRange) {
   return snapshot;
 }
 
-async function loadRegionData({ regionId, indicators, from, to, force = false }) {
-  const key = cacheKey(regionId, indicators, from, to);
-  const cached = cacheByKey.get(key);
-
-  if (!force && cached && Date.now() < cached.expiresAt) {
-    return cached.data;
-  }
-
-  const existingPromise = pendingByKey.get(key);
-  if (!force && existingPromise) {
-    return existingPromise;
-  }
-
+// Phase 1: fetch metadata + critical indicators (RISK_SCORE, ALERTS, FIRMS) in parallel.
+// Returns enough data to render the choropleth and active fire/alert markers.
+async function loadRegionPhase1(regionId, from, to) {
   const regionFallback = REGION_CONFIG[regionId] || REGION_CONFIG.biobio;
-  const requestPromise = (async () => {
-    try {
-      const [boundsData, layerData, riskScoreData, comunalGeoJson, comunalScores] = await Promise.all([
-        fetchTerritoryBounds(regionId, regionFallback),
-        fetchTerritoryLayers({ regionId, indicators, from, to }),
-        fetchTerritoryRiskScore(regionId).catch(() => null),
-        fetchTerritoryGeoJson(regionId).catch(() => null),
-        fetchComunalRiskScores(regionId).catch(() => null)
-      ]);
+  const [boundsData, layerData, riskScoreData, comunalGeoJson, comunalScores] = await Promise.all([
+    fetchTerritoryBounds(regionId, regionFallback),
+    fetchTerritoryLayers({ regionId, indicators: CRITICAL_INDICATORS, from, to }),
+    fetchTerritoryRiskScore(regionId).catch(() => null),
+    fetchTerritoryGeoJson(regionId).catch(() => null),
+    fetchComunalRiskScores(regionId).catch(() => null)
+  ]);
 
-      return {
-        regionId: layerData.regionId || regionId,
-        center: boundsData.center,
-        bounds: boundsData.bounds,
-        zoom: boundsData.zoom,
-        generatedAt: layerData.generatedAt,
-        source: 'backend',
-        requestedRange: { from, to },
-        layers: layerData.layers,
-        riskScore: riskScoreData,
-        comunalGeoJson,
-        comunalScores
-      };
-    } catch {
-      return createMockRegionData(regionId, from, to);
-    }
-  })();
-
-  pendingByKey.set(key, requestPromise);
-
-  try {
-    const data = await requestPromise;
-    const ttl = data.source === 'mock' ? 8_000 : CACHE_TTL_MS;
-    cacheByKey.set(key, {
-      data,
-      expiresAt: Date.now() + ttl
-    });
-    return data;
-  } finally {
-    pendingByKey.delete(key);
-  }
+  return {
+    regionId: layerData.regionId || regionId,
+    center: boundsData.center,
+    bounds: boundsData.bounds,
+    zoom: boundsData.zoom,
+    generatedAt: layerData.generatedAt,
+    source: 'backend',
+    requestedRange: { from, to },
+    layers: layerData.layers,
+    riskScore: riskScoreData,
+    comunalGeoJson,
+    comunalScores
+  };
 }
 
 function defaultDateRange() {
@@ -307,22 +283,61 @@ export function useTerritoryLayers(options = {}) {
 
   const loadRegion = useCallback(
     async (regionId, force = false) => {
+      const key = cacheKey(regionId, dateRange.from, dateRange.to);
+      const cached = cacheByKey.get(key);
+
+      if (!force && cached && Date.now() < cached.expiresAt) {
+        setDataByRegion((prev) => {
+          if (prev[regionId] === cached.data) return prev;
+          return { ...prev, [regionId]: cached.data };
+        });
+        return;
+      }
+
+      if (!force && pendingKeys.has(key)) return;
+      pendingKeys.add(key);
+
       setLoadingRegions((prev) => new Set([...prev, regionId]));
       setErrorByRegion((prev) => ({ ...prev, [regionId]: '' }));
 
       try {
-        const regionData = await loadRegionData({
-          regionId,
-          indicators: DEFAULT_INDICATORS,
-          from: dateRange.from,
-          to: dateRange.to,
-          force
-        });
+        // Phase 1: critical indicators — user sees the map and can interact
+        let phase1Data;
+        try {
+          phase1Data = await loadRegionPhase1(regionId, dateRange.from, dateRange.to);
+        } catch {
+          const mockData = createMockRegionData(regionId, dateRange.from, dateRange.to);
+          cacheByKey.set(key, { data: mockData, expiresAt: Date.now() + 8_000 });
+          setDataByRegion((prev) => ({ ...prev, [regionId]: mockData }));
+          return;
+        }
 
-        setDataByRegion((prev) => ({
-          ...prev,
-          [regionId]: regionData
-        }));
+        // State update after phase 1: choropleth + FIRMS + ALERTS visible, "refreshing" indicator shown
+        setDataByRegion((prev) => ({ ...prev, [regionId]: phase1Data }));
+
+        // Phase 2: secondary indicators merged silently while user explores phase-1 data
+        try {
+          const secondaryData = await fetchTerritoryLayers({
+            regionId,
+            indicators: SECONDARY_INDICATORS,
+            from: dateRange.from,
+            to: dateRange.to
+          });
+
+          setDataByRegion((prev) => {
+            const current = prev[regionId];
+            if (!current) return prev;
+            const fullData = {
+              ...current,
+              layers: { ...current.layers, ...secondaryData.layers }
+            };
+            cacheByKey.set(key, { data: fullData, expiresAt: Date.now() + CACHE_TTL_MS });
+            return { ...prev, [regionId]: fullData };
+          });
+        } catch {
+          // Secondary load failed — keep phase-1 data with a short TTL so it retries soon
+          cacheByKey.set(key, { data: phase1Data, expiresAt: Date.now() + 30_000 });
+        }
       } catch (error) {
         const message = error instanceof Error ? error.message : 'No fue posible cargar la capa territorial.';
         setErrorByRegion((prev) => ({
@@ -331,6 +346,7 @@ export function useTerritoryLayers(options = {}) {
         }));
       } finally {
         setLoadingRegions((prev) => { const next = new Set(prev); next.delete(regionId); return next; });
+        pendingKeys.delete(key);
       }
     },
     [dateRange.from, dateRange.to]
@@ -355,13 +371,20 @@ export function useTerritoryLayers(options = {}) {
     let mounted = true;
 
     async function bootstrap() {
-      await Promise.all(REGION_OPTIONS.map((region) => loadRegion(region.id, false)));
+      // Load the selected region first so the user sees a working map immediately.
+      await loadRegion(selectedRegionId, false);
+      if (!mounted) return;
+
+      // Preload the other regions in background — no await, runs concurrently.
+      REGION_OPTIONS
+        .filter((r) => r.id !== selectedRegionId)
+        .forEach((r) => { if (mounted) loadRegion(r.id, false); });
     }
 
     async function bootstrapWithRetry() {
       await bootstrap();
       if (!mounted) return;
-      // Only schedule a retry if the initial region came back as mock or with
+      // Only schedule a retry if the selected region came back as mock or with
       // missing comunalScores (backend cold-start / partial success). Skip the
       // 10-second wait entirely when data loaded correctly.
       setDataByRegion((current) => {
