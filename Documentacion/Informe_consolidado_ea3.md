@@ -446,7 +446,7 @@ Las contraseñas de los usuarios de prueba están hasheadas con BCrypt y se gest
 | Base de datos | `simfat` (MongoDB Atlas M0, 512 MB) |
 | Colecciones con datos de prueba | `regions`, `comunaRiskScores`, `regionalRiskScores`, `alertRules`, `communityPosts`, `communityContacts`, `citizenReports`, `firmsDetections`, `weatherReadings` |
 | Script de inicialización | `Producto/database/nosql/init-mongodb-schema.js` |
-| Regiones sembradas | Araucanía, Ñuble, Los Ríos, Los Lagos (con `monitoringEnabled: true`) |
+| Regiones sembradas | Ñuble, Biobío, La Araucanía (con `monitoringEnabled: true`) |
 | Datos satelitales | Generados por sincronización real con NASA FIRMS y Open-Meteo en producción |
 
 Los datos de `comunaRiskScores` y `regionalRiskScores` se actualizan automáticamente cada 12 horas mediante los cron jobs del backend. Los datos presentes durante la ejecución del plan de pruebas corresponden a datos reales de monitoreo forestal, no a datos sintéticos.
@@ -979,7 +979,7 @@ La guía completa con Docker Compose, configuración Nginx y resolución de prob
 1. Clonar el repositorio y configurar `application.properties` con credenciales locales.
 2. Crear base de datos PostgreSQL `simfat` y usuario `simfat_user` (Flyway aplica el esquema automáticamente al iniciar).
 3. Iniciar MongoDB en modo standalone local (la base de datos `simfat` se crea automáticamente).
-4. Levantar el backend: `cd Producto/backend/simfat-api && ./mvnw spring-boot:run`
+4. Levantar el backend: `cd Producto/backend/simfat-backend && ./mvnw spring-boot:run`
 5. Instalar dependencias del frontend y levantar: `cd Producto/frontend/simfat-web && npm install && npm run dev`
 
 **Variables de entorno críticas:**
@@ -990,7 +990,6 @@ La guía completa con Docker Compose, configuración Nginx y resolución de prob
 | `SPRING_DATA_MONGODB_URI` | URI de conexión a MongoDB |
 | `JWT_SECRET` | Clave secreta para firma de tokens (mínimo 256 bits) |
 | `FIRMS_API_KEY` | Clave NASA Earthdata para FIRMS |
-| `OPENWEATHERMAP_API_KEY` | Clave OpenWeatherMap para FWI |
 | `VITE_API_URL` | URL del backend desde el frontend |
 
 **Verificación post-instalación:**
@@ -1133,7 +1132,7 @@ Estructura del repositorio:
 simfat-main/
 ├── Producto/
 │   ├── backend/
-│   │   └── simfat-api/          # API Spring Boot (Java 21)
+│   │   └── simfat-backend/          # API Spring Boot (Java 21)
 │   └── frontend/
 │       └── simfat-web/          # Aplicación React + Vite
 ├── Documentacion/               # Documentación académica y técnica

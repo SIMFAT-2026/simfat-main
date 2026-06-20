@@ -212,6 +212,18 @@ function cacheKey(regionId, indicators, from, to) {
   return `${regionId}|${indicators.join(',')}|${from}|${to}`;
 }
 
+function readCacheSnapshot(dateRange) {
+  const snapshot = {};
+  for (const region of REGION_OPTIONS) {
+    const key = cacheKey(region.id, DEFAULT_INDICATORS, dateRange.from, dateRange.to);
+    const entry = cacheByKey.get(key);
+    if (entry && Date.now() < entry.expiresAt) {
+      snapshot[region.id] = entry.data;
+    }
+  }
+  return snapshot;
+}
+
 async function loadRegionData({ regionId, indicators, from, to, force = false }) {
   const key = cacheKey(regionId, indicators, from, to);
   const cached = cacheByKey.get(key);
@@ -289,7 +301,7 @@ export function useTerritoryLayers(options = {}) {
   const [selectedRegionId, setSelectedRegionId] = useState(initialRegionId);
   const [visibleIndicators, setVisibleIndicators] = useState(initialVisibleIndicators);
   const [dateRange] = useState(defaultDateRange);
-  const [dataByRegion, setDataByRegion] = useState({});
+  const [dataByRegion, setDataByRegion] = useState(() => readCacheSnapshot(dateRange));
   const [loadingRegionId, setLoadingRegionId] = useState('');
   const [errorByRegion, setErrorByRegion] = useState({});
 
@@ -350,14 +362,18 @@ export function useTerritoryLayers(options = {}) {
 
     async function bootstrapWithRetry() {
       await bootstrap();
-      // If the initial load hit a cold-start timeout (mock fallback) or returned
-      // backend data with missing comunalScores (partial success), retry once.
-      await new Promise((resolve) => setTimeout(resolve, 10_000));
       if (!mounted) return;
+      // Only schedule a retry if the initial region came back as mock or with
+      // missing comunalScores (backend cold-start / partial success). Skip the
+      // 10-second wait entirely when data loaded correctly.
       setDataByRegion((current) => {
         const regionEntry = current[selectedRegionId];
         const needsRetry = regionEntry?.source === 'mock' || regionEntry?.comunalScores == null;
-        if (needsRetry) loadRegion(selectedRegionId, true);
+        if (needsRetry) {
+          setTimeout(() => {
+            if (mounted) loadRegion(selectedRegionId, true);
+          }, 10_000);
+        }
         return current;
       });
     }
