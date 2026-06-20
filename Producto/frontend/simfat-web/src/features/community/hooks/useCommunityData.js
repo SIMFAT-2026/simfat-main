@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useAuth } from '../../../auth/AuthContext';
 import {
   createCommunityBoardPost,
   createCommunityContact,
@@ -142,6 +143,7 @@ function normalizeContacts(items = []) {
 }
 
 export function useCommunityData() {
+  const { user } = useAuth();
   const [regions, setRegions] = useState([]);
   const [board, setBoard] = useState([]);
   const [resources, setResources] = useState([]);
@@ -149,6 +151,17 @@ export function useCommunityData() {
   const [source, setSource] = useState('backend');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+
+  const isAdmin = Boolean(
+    user?.roleCodes?.includes('ROLE_ADMIN') || user?.roleCodes?.includes('ROLE_SUPER_ADMIN')
+  );
+  const accessibleRegions = isAdmin ? null : (user?.communityModuleAccess?.regionIds ?? undefined);
+
+  function filterByAccess(items) {
+    if (!accessibleRegions) return items;
+    if (accessibleRegions.length === 0) return [];
+    return items.filter((item) => accessibleRegions.includes(item.regionId));
+  }
 
   const loadAll = useCallback(async () => {
     setLoading(true);
@@ -163,21 +176,22 @@ export function useCommunityData() {
       ]);
 
       setRegions(normalizeRegions(Array.isArray(regionsData) ? regionsData : []));
-      setBoard(normalizeBoard(Array.isArray(boardData) ? boardData : []));
-      setResources(normalizeResources(Array.isArray(resourcesData) ? resourcesData : []));
-      setContacts(normalizeContacts(Array.isArray(contactsData) ? contactsData : []));
+      setBoard(filterByAccess(normalizeBoard(Array.isArray(boardData) ? boardData : [])));
+      setResources(filterByAccess(normalizeResources(Array.isArray(resourcesData) ? resourcesData : [])));
+      setContacts(filterByAccess(normalizeContacts(Array.isArray(contactsData) ? contactsData : [])));
       setSource('backend');
     } catch {
       setRegions(fallbackRegions());
-      setBoard(normalizeBoard(MOCK_BOARD));
-      setResources(normalizeResources(MOCK_RESOURCES));
-      setContacts(normalizeContacts(MOCK_CONTACTS));
+      setBoard(filterByAccess(normalizeBoard(MOCK_BOARD)));
+      setResources(filterByAccess(normalizeResources(MOCK_RESOURCES)));
+      setContacts(filterByAccess(normalizeContacts(MOCK_CONTACTS)));
       setSource('fallback');
       setError('Backend comunitario no disponible. Se muestran datos locales de prueba.');
     } finally {
       setLoading(false);
     }
-  }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAdmin, accessibleRegions]);
 
   useEffect(() => {
     loadAll();
