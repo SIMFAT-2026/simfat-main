@@ -9,7 +9,6 @@ import com.simfat.backend.repository.DashboardRegionSnapshotRepository;
 import com.simfat.backend.repository.ForestLossRecordRepository;
 import com.simfat.backend.repository.HeatAlertEventRepository;
 import com.simfat.backend.repository.RegionRepository;
-import com.simfat.backend.service.AlertRuleService;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -30,8 +29,6 @@ class DashboardServiceImplTest {
     private DashboardRegionSnapshotRepository snapshotRepository;
     @Mock
     private ComunaRiskSnapshotRepository comunaRiskSnapshotRepository;
-    @Mock
-    private AlertRuleService alertRuleService;
 
     private DashboardServiceImpl service;
 
@@ -42,8 +39,7 @@ class DashboardServiceImplTest {
             heatAlertRepository,
             regionRepository,
             snapshotRepository,
-            comunaRiskSnapshotRepository,
-            alertRuleService
+            comunaRiskSnapshotRepository
         );
     }
 

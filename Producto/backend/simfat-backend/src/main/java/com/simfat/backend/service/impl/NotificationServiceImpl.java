@@ -13,6 +13,7 @@ import com.simfat.backend.repository.AlertRuleRepository;
 import com.simfat.backend.repository.AppUserRepository;
 import com.simfat.backend.repository.NotificationRepository;
 import com.simfat.backend.security.AuthorizationResolverService;
+import com.simfat.backend.service.AlertRuleEvaluationService;
 import com.simfat.backend.service.NotificationService;
 import java.util.List;
 import java.util.Map;
@@ -40,17 +41,20 @@ public class NotificationServiceImpl implements NotificationService {
     private final AppUserRepository appUserRepository;
     private final AlertRuleRepository alertRuleRepository;
     private final AuthorizationResolverService authorizationResolverService;
+    private final AlertRuleEvaluationService alertRuleEvaluationService;
 
     public NotificationServiceImpl(
         NotificationRepository notificationRepository,
         AppUserRepository appUserRepository,
         AlertRuleRepository alertRuleRepository,
-        AuthorizationResolverService authorizationResolverService
+        AuthorizationResolverService authorizationResolverService,
+        AlertRuleEvaluationService alertRuleEvaluationService
     ) {
         this.notificationRepository = notificationRepository;
         this.appUserRepository = appUserRepository;
         this.alertRuleRepository = alertRuleRepository;
         this.authorizationResolverService = authorizationResolverService;
+        this.alertRuleEvaluationService = alertRuleEvaluationService;
     }
 
     @Override
@@ -95,9 +99,10 @@ public class NotificationServiceImpl implements NotificationService {
             return;
         }
 
-        // Verificar que existe una AlertRule activa para la region de esta comuna
+        // Verificar que existe una AlertRule activa cuyo umbral fue superado por el snapshot
         List<AlertRule> rules = alertRuleRepository.findByRegionIdAndActivaTrue(snapshot.getRegionId());
-        if (rules.isEmpty()) {
+        boolean anyRuleExceeded = rules.stream().anyMatch(rule -> alertRuleEvaluationService.isThresholdExceeded(snapshot, rule));
+        if (!anyRuleExceeded) {
             return;
         }
 

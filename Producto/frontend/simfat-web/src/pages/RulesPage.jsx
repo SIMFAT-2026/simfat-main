@@ -13,10 +13,23 @@ import { mapValidationErrors } from '../utils/errors';
 const initialForm = {
   nombre: '',
   regionId: '',
-  umbralPorcentajePerdida: '',
-  umbralEventosCalor: '',
+  umbralFwi: '',
+  umbralNdmi: '',
+  umbralNdvi: '',
+  umbralFirmsCount: '',
+  umbralReportesCiudadanos: '',
   activa: 'true'
 };
+
+function summarizeThresholds(rule) {
+  const parts = [];
+  if (rule.umbralFwi != null) parts.push(`FWI >= ${rule.umbralFwi}`);
+  if (rule.umbralNdmi != null) parts.push(`NDMI <= ${rule.umbralNdmi}`);
+  if (rule.umbralNdvi != null) parts.push(`NDVI <= ${rule.umbralNdvi}`);
+  if (rule.umbralFirmsCount != null) parts.push(`FIRMS >= ${rule.umbralFirmsCount}`);
+  if (rule.umbralReportesCiudadanos != null) parts.push(`Reportes >= ${rule.umbralReportesCiudadanos}`);
+  return parts.length > 0 ? parts.join(' · ') : 'Sin umbrales configurados';
+}
 
 function RulesPage() {
   const [regions, setRegions] = useState([]);
@@ -72,8 +85,7 @@ function RulesPage() {
     () => [
       { key: 'nombre', header: 'Nombre' },
       { key: 'regionId', header: 'Region', render: (row) => (row.regionId ? regionMap[row.regionId] || row.regionId : 'Global') },
-      { key: 'umbralPorcentajePerdida', header: 'Umbral % perdida' },
-      { key: 'umbralEventosCalor', header: 'Umbral eventos calor' },
+      { key: 'umbrales', header: 'Umbrales configurados', render: (row) => summarizeThresholds(row) },
       { key: 'activa', header: 'Activa', render: (row) => (row.activa ? 'Si' : 'No') }
     ],
     [regionMap]
@@ -96,8 +108,11 @@ function RulesPage() {
     setForm({
       nombre: rule.nombre || '',
       regionId: rule.regionId || '',
-      umbralPorcentajePerdida: String(rule.umbralPorcentajePerdida || ''),
-      umbralEventosCalor: String(rule.umbralEventosCalor || ''),
+      umbralFwi: rule.umbralFwi != null ? String(rule.umbralFwi) : '',
+      umbralNdmi: rule.umbralNdmi != null ? String(rule.umbralNdmi) : '',
+      umbralNdvi: rule.umbralNdvi != null ? String(rule.umbralNdvi) : '',
+      umbralFirmsCount: rule.umbralFirmsCount != null ? String(rule.umbralFirmsCount) : '',
+      umbralReportesCiudadanos: rule.umbralReportesCiudadanos != null ? String(rule.umbralReportesCiudadanos) : '',
       activa: String(Boolean(rule.activa))
     });
     setValidationErrors({});
@@ -112,8 +127,11 @@ function RulesPage() {
     const payload = {
       nombre: form.nombre.trim(),
       regionId: form.regionId || null,
-      umbralPorcentajePerdida: asNumberOrNull(form.umbralPorcentajePerdida),
-      umbralEventosCalor: asNumberOrNull(form.umbralEventosCalor),
+      umbralFwi: asNumberOrNull(form.umbralFwi),
+      umbralNdmi: asNumberOrNull(form.umbralNdmi),
+      umbralNdvi: asNumberOrNull(form.umbralNdvi),
+      umbralFirmsCount: asNumberOrNull(form.umbralFirmsCount),
+      umbralReportesCiudadanos: asNumberOrNull(form.umbralReportesCiudadanos),
       activa: form.activa === 'true'
     };
 
@@ -176,24 +194,40 @@ function RulesPage() {
         </label>
 
         <label>
-          Umbral porcentaje perdida
-          <input
-            name="umbralPorcentajePerdida"
-            type="number"
-            step="0.01"
-            value={form.umbralPorcentajePerdida}
-            onChange={onInputChange}
-            required
-          />
-          {validationErrors.umbralPorcentajePerdida ? (
-            <small className="field-error">{validationErrors.umbralPorcentajePerdida}</small>
-          ) : null}
+          Umbral FWI <small>(se dispara si el FWI es mayor o igual al valor)</small>
+          <input name="umbralFwi" type="number" step="0.01" value={form.umbralFwi} onChange={onInputChange} />
+          {validationErrors.umbralFwi ? <small className="field-error">{validationErrors.umbralFwi}</small> : null}
         </label>
 
         <label>
-          Umbral eventos calor
-          <input name="umbralEventosCalor" type="number" value={form.umbralEventosCalor} onChange={onInputChange} required />
-          {validationErrors.umbralEventosCalor ? <small className="field-error">{validationErrors.umbralEventosCalor}</small> : null}
+          Umbral NDMI <small>(se dispara si el NDMI cae por debajo o igual al valor, mas seco = mas riesgo)</small>
+          <input name="umbralNdmi" type="number" step="0.01" value={form.umbralNdmi} onChange={onInputChange} />
+          {validationErrors.umbralNdmi ? <small className="field-error">{validationErrors.umbralNdmi}</small> : null}
+        </label>
+
+        <label>
+          Umbral NDVI <small>(se dispara si el NDVI cae por debajo o igual al valor, menos vegetacion = mas riesgo)</small>
+          <input name="umbralNdvi" type="number" step="0.01" value={form.umbralNdvi} onChange={onInputChange} />
+          {validationErrors.umbralNdvi ? <small className="field-error">{validationErrors.umbralNdvi}</small> : null}
+        </label>
+
+        <label>
+          Umbral conteo FIRMS <small>(se dispara si las detecciones son mayor o igual al valor)</small>
+          <input name="umbralFirmsCount" type="number" value={form.umbralFirmsCount} onChange={onInputChange} />
+          {validationErrors.umbralFirmsCount ? <small className="field-error">{validationErrors.umbralFirmsCount}</small> : null}
+        </label>
+
+        <label>
+          Umbral reportes ciudadanos <small>(se dispara si los reportes son mayor o igual al valor)</small>
+          <input
+            name="umbralReportesCiudadanos"
+            type="number"
+            value={form.umbralReportesCiudadanos}
+            onChange={onInputChange}
+          />
+          {validationErrors.umbralReportesCiudadanos ? (
+            <small className="field-error">{validationErrors.umbralReportesCiudadanos}</small>
+          ) : null}
         </label>
 
         <label>

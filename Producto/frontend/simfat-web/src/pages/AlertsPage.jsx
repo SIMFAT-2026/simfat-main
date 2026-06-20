@@ -9,6 +9,7 @@ import FilterBar from '../components/FilterBar';
 import LoadingSpinner from '../components/LoadingSpinner';
 import SectionTitle from '../components/SectionTitle';
 import AlertsOperationalMap from '../features/alerts/components/AlertsOperationalMap';
+import { fetchComunalRiskScores } from '../features/territory/services/territoryApiService';
 import { useFeedback } from '../hooks';
 import { createAlert, deleteAlert, getAlertsMap, getCitizenReports, getRegions, updateAlert } from '../services';
 import { asNumberOrNull } from '../utils/data';
@@ -124,6 +125,7 @@ function AlertsPage() {
   const [regions, setRegions] = useState([]);
   const [alerts, setAlerts] = useState([]);
   const [reports, setReports] = useState([]);
+  const [operationalAlerts, setOperationalAlerts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [form, setForm] = useState(initialForm);
@@ -149,7 +151,7 @@ function AlertsPage() {
     setError(null);
 
     try {
-      const [alertsData, reportData] = await Promise.all([
+      const [alertsData, reportData, comunalScores] = await Promise.all([
         getAlertsMap({
           regionId: filterRegionId || undefined,
           level: filterRiskLevel || undefined,
@@ -158,7 +160,8 @@ function AlertsPage() {
         }),
         getCitizenReports({
           regionId: filterRegionId || undefined
-        })
+        }),
+        fetchComunalRiskScores(filterRegionId || 'biobio')
       ]);
 
       const normalizedReports = (Array.isArray(reportData) ? reportData : []).map(normalizeReport);
@@ -166,6 +169,11 @@ function AlertsPage() {
 
       setAlerts(Array.isArray(alertsData) ? alertsData : []);
       setReports(reportsByDate);
+      setOperationalAlerts(
+        Object.entries(comunalScores || {})
+          .map(([comunaId, data]) => ({ comunaId, ...data }))
+          .filter((item) => item.alertLevel && item.alertLevel !== 'NORMAL')
+      );
     } catch (err) {
       setError(err);
     } finally {
@@ -414,6 +422,29 @@ function AlertsPage() {
           </article>
         </section>
       ) : null}
+
+      <article className="dashboard-card">
+        <h3>Alertas operativas por comuna</h3>
+        <p className="card-subtitle">
+          Comunas que escalaron a nivel ALTO o CRITICO segun el score de riesgo (FWI, NDMI, NDVI, FIRMS, reportes). No incluye
+          detecciones FIRMS crudas — eso esta en la tabla de eventos mas abajo.
+        </p>
+        {operationalAlerts.length === 0 ? (
+          <EmptyState title="Sin comunas en ALTO o CRITICO" description="Ninguna comuna de la region filtrada escalo nivel." />
+        ) : (
+          <ul className="alerts-priority-list">
+            {operationalAlerts.map((item) => (
+              <li key={item.comunaId}>
+                <strong>{item.nombreComuna || item.comunaId}</strong>
+                <span>
+                  <AlertBadge level={item.alertLevel} />
+                </span>
+                <span className="alerts-priority-score">Score: {item.scoreComposite ?? '-'}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </article>
 
       {!loading && !error && (alerts.length > 0 || reports.length > 0) ? (
         <div className="alerts-layout">

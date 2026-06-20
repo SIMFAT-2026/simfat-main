@@ -4,7 +4,6 @@ import com.simfat.backend.dto.AlertsSummaryDTO;
 import com.simfat.backend.dto.CriticalRegionDTO;
 import com.simfat.backend.dto.DashboardSummaryDTO;
 import com.simfat.backend.dto.LossTrendPointDTO;
-import com.simfat.backend.model.AlertRule;
 import com.simfat.backend.model.DashboardRegionSnapshot;
 import com.simfat.backend.model.ForestLossRecord;
 import com.simfat.backend.model.Region;
@@ -14,7 +13,6 @@ import com.simfat.backend.repository.DashboardRegionSnapshotRepository;
 import com.simfat.backend.repository.ForestLossRecordRepository;
 import com.simfat.backend.repository.HeatAlertEventRepository;
 import com.simfat.backend.repository.RegionRepository;
-import com.simfat.backend.service.AlertRuleService;
 import com.simfat.backend.service.DashboardService;
 import java.time.LocalDateTime;
 import java.util.Comparator;
@@ -33,7 +31,6 @@ public class DashboardServiceImpl implements DashboardService {
     private final RegionRepository regionRepository;
     private final DashboardRegionSnapshotRepository snapshotRepository;
     private final ComunaRiskSnapshotRepository comunaRiskSnapshotRepository;
-    private final AlertRuleService alertRuleService;
 
     @Value("${app.alert.default-loss-threshold:1.0}")
     private Double defaultLossThreshold;
@@ -46,15 +43,13 @@ public class DashboardServiceImpl implements DashboardService {
         HeatAlertEventRepository heatAlertRepository,
         RegionRepository regionRepository,
         DashboardRegionSnapshotRepository snapshotRepository,
-        ComunaRiskSnapshotRepository comunaRiskSnapshotRepository,
-        AlertRuleService alertRuleService
+        ComunaRiskSnapshotRepository comunaRiskSnapshotRepository
     ) {
         this.forestLossRepository = forestLossRepository;
         this.heatAlertRepository = heatAlertRepository;
         this.regionRepository = regionRepository;
         this.snapshotRepository = snapshotRepository;
         this.comunaRiskSnapshotRepository = comunaRiskSnapshotRepository;
-        this.alertRuleService = alertRuleService;
     }
 
     @Override
@@ -154,9 +149,8 @@ public class DashboardServiceImpl implements DashboardService {
             now
         ));
 
-        List<AlertRule> activeRules = alertRuleService.getActiveRulesForRegion(region.getId());
-        boolean exceedsLoss = exceedsLossThreshold(currentLoss, activeRules);
-        boolean exceedsHeat = exceedsHeatThreshold(recentHeatEvents, activeRules);
+        boolean exceedsLoss = exceedsLossThreshold(currentLoss);
+        boolean exceedsHeat = exceedsHeatThreshold(recentHeatEvents);
 
         if (!exceedsLoss && !exceedsHeat) {
             return null;
@@ -171,25 +165,15 @@ public class DashboardServiceImpl implements DashboardService {
         return dto;
     }
 
-    private boolean exceedsLossThreshold(Double currentLoss, List<AlertRule> activeRules) {
+    private boolean exceedsLossThreshold(Double currentLoss) {
         if (currentLoss == null) {
             return false;
         }
-        double threshold = activeRules.stream()
-            .map(AlertRule::getUmbralPorcentajePerdida)
-            .filter(value -> value != null && value > 0)
-            .min(Double::compareTo)
-            .orElse(defaultLossThreshold);
-        return currentLoss >= threshold;
+        return currentLoss >= defaultLossThreshold;
     }
 
-    private boolean exceedsHeatThreshold(Long recentHeatEvents, List<AlertRule> activeRules) {
-        int threshold = activeRules.stream()
-            .map(AlertRule::getUmbralEventosCalor)
-            .filter(value -> value != null && value > 0)
-            .min(Integer::compareTo)
-            .orElse(defaultHeatEventsThreshold);
-        return recentHeatEvents >= threshold;
+    private boolean exceedsHeatThreshold(Long recentHeatEvents) {
+        return recentHeatEvents >= defaultHeatEventsThreshold;
     }
 
     private Double resolveCurrentLossPercentage(List<ForestLossRecord> regionRecords) {

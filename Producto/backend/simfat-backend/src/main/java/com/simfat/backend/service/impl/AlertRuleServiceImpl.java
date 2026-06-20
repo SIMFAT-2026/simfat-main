@@ -76,8 +76,11 @@ public class AlertRuleServiceImpl implements AlertRuleService {
     private void applyChanges(AlertRule rule, AlertRuleRequestDTO request) {
         rule.setNombre(request.getNombre());
         rule.setRegionId(request.getRegionId());
-        rule.setUmbralPorcentajePerdida(request.getUmbralPorcentajePerdida());
-        rule.setUmbralEventosCalor(request.getUmbralEventosCalor());
+        rule.setUmbralFwi(request.getUmbralFwi());
+        rule.setUmbralNdmi(request.getUmbralNdmi());
+        rule.setUmbralNdvi(request.getUmbralNdvi());
+        rule.setUmbralFirmsCount(request.getUmbralFirmsCount());
+        rule.setUmbralReportesCiudadanos(request.getUmbralReportesCiudadanos());
         rule.setActiva(request.getActiva());
     }
 
@@ -86,8 +89,11 @@ public class AlertRuleServiceImpl implements AlertRuleService {
         dto.setId(rule.getId());
         dto.setNombre(rule.getNombre());
         dto.setRegionId(rule.getRegionId());
-        dto.setUmbralPorcentajePerdida(rule.getUmbralPorcentajePerdida());
-        dto.setUmbralEventosCalor(rule.getUmbralEventosCalor());
+        dto.setUmbralFwi(rule.getUmbralFwi());
+        dto.setUmbralNdmi(rule.getUmbralNdmi());
+        dto.setUmbralNdvi(rule.getUmbralNdvi());
+        dto.setUmbralFirmsCount(rule.getUmbralFirmsCount());
+        dto.setUmbralReportesCiudadanos(rule.getUmbralReportesCiudadanos());
         dto.setActiva(rule.getActiva());
         return dto;
     }

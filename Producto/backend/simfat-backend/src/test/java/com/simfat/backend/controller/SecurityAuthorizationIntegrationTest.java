@@ -65,8 +65,7 @@ class SecurityAuthorizationIntegrationTest {
         response.setId("rule-1");
         response.setNombre("Regla test");
         response.setRegionId("region-1");
-        response.setUmbralPorcentajePerdida(10.0);
-        response.setUmbralEventosCalor(2);
+        response.setUmbralFwi(25.0);
         response.setActiva(true);
         when(alertRuleService.create(any())).thenReturn(response);
 
@@ -93,8 +92,7 @@ class SecurityAuthorizationIntegrationTest {
             {
               "nombre": "Regla test",
               "regionId": "region-1",
-              "umbralPorcentajePerdida": 10.0,
-              "umbralEventosCalor": 2,
+              "umbralFwi": 25.0,
               "activa": true
             }
             """;

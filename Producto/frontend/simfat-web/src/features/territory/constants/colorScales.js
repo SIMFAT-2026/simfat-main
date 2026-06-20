@@ -3,6 +3,7 @@
 export const ALERT_LEVEL_CONFIG = {
   NORMAL: {
     color: '#1e3a8a',
+    darkUiColor: '#93c5fd',
     bg: '#dbeafe',
     label: 'Normal',
     fill: '#dbeafe',
@@ -12,6 +13,7 @@ export const ALERT_LEVEL_CONFIG = {
   },
   PREVENTIVO: {
     color: '#78350f',
+    darkUiColor: '#fbbf24',
     bg: '#fef3c7',
     label: 'Preventivo',
     fill: '#f59e0b',
@@ -21,6 +23,7 @@ export const ALERT_LEVEL_CONFIG = {
   },
   ALTO: {
     color: '#7c2d12',
+    darkUiColor: '#fb923c',
     bg: '#ffedd5',
     label: 'Alto',
     fill: '#b45309',
@@ -30,6 +33,7 @@ export const ALERT_LEVEL_CONFIG = {
   },
   CRITICO: {
     color: '#3f1d0b',
+    darkUiColor: '#fdba74',
     bg: '#f5e8dc',
     label: 'Crítico',
     fill: '#3f1d0b',
