@@ -4,6 +4,8 @@ import EmptyState from '../../../components/EmptyState';
 import LoadingSpinner from '../../../components/LoadingSpinner';
 import { useCommunityChat } from '../hooks/useCommunityChat';
 
+const FALLBACK_GENERAL_ROOM = { id: 'general', type: 'GENERAL', regionId: '', name: 'Sala general' };
+
 const PRESENCE_STATES = [
   { value: 'CONNECTED', label: 'Conectado' },
   { value: 'AWAY', label: 'Ausente' },
@@ -47,6 +49,14 @@ function CommunityChatPanel() {
     updatePresence,
     moderateMessage
   } = useCommunityChat();
+
+  // Ensure there's always at least a GENERAL room available even when the API
+  // returns an empty list (e.g. no room configured for this region yet).
+  const visibleRooms = useMemo(() => {
+    if (rooms.length === 0) return [FALLBACK_GENERAL_ROOM];
+    const hasGeneral = rooms.some((r) => r.type === 'GENERAL' || r.id === 'general');
+    return hasGeneral ? rooms : [FALLBACK_GENERAL_ROOM, ...rooms];
+  }, [rooms]);
 
   const canModerate = useMemo(() => {
     // user.roles es el enum legacy (solo "ADMIN"/"USER", nunca "ROLE_*"
@@ -118,9 +128,15 @@ function CommunityChatPanel() {
 
           {loadingRooms ? <LoadingSpinner label="Cargando salas..." /> : null}
 
-          {rooms.length > 0 ? (
+          {!loadingRooms && visibleRooms.length === 0 ? (
+            <p className="feedback feedback-info" style={{ margin: '0.5rem 0', fontSize: '0.85rem' }}>
+              No hay salas disponibles. Contacta al administrador.
+            </p>
+          ) : null}
+
+          {visibleRooms.length > 0 ? (
             <div className="community-chat-rooms" role="tablist" aria-label="Salas de chat comunitario">
-              {rooms.map((room) => (
+              {visibleRooms.map((room) => (
                 <button
                   key={room.id}
                   type="button"

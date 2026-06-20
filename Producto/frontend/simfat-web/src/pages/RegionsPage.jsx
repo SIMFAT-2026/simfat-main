@@ -14,7 +14,8 @@ const initialForm = {
   nombre: '',
   codigo: '',
   zona: '',
-  hectareasBosqueReferencia: ''
+  hectareasBosqueReferencia: '',
+  monitoringEnabled: 'true'
 };
 
 function RegionsPage() {
@@ -55,6 +56,11 @@ function RegionsPage() {
         key: 'hectareasBosqueReferencia',
         header: 'Ha Referencia',
         render: (row) => row.hectareasBosqueReferencia ?? '-'
+      },
+      {
+        key: 'monitoringEnabled',
+        header: 'Monitoreo activo',
+        render: (row) => row.monitoringEnabled !== false ? 'Si' : 'No'
       }
     ],
     []
@@ -81,7 +87,8 @@ function RegionsPage() {
       hectareasBosqueReferencia:
         region.hectareasBosqueReferencia !== undefined && region.hectareasBosqueReferencia !== null
           ? String(region.hectareasBosqueReferencia)
-          : ''
+          : '',
+      monitoringEnabled: String(Boolean(region.monitoringEnabled !== false))
     });
     feedback.clear();
     setValidationErrors({});
@@ -97,7 +104,8 @@ function RegionsPage() {
       nombre: form.nombre.trim(),
       codigo: form.codigo.trim(),
       zona: form.zona.trim(),
-      hectareasBosqueReferencia: asNumberOrNull(form.hectareasBosqueReferencia)
+      hectareasBosqueReferencia: asNumberOrNull(form.hectareasBosqueReferencia),
+      monitoringEnabled: form.monitoringEnabled === 'true'
     };
 
     try {
@@ -171,6 +179,17 @@ function RegionsPage() {
           />
           {validationErrors.hectareasBosqueReferencia ? (
             <small className="field-error">{validationErrors.hectareasBosqueReferencia}</small>
+          ) : null}
+        </label>
+
+        <label>
+          Monitoreo activo
+          <select name="monitoringEnabled" value={form.monitoringEnabled} onChange={onInputChange}>
+            <option value="true">Si</option>
+            <option value="false">No</option>
+          </select>
+          {validationErrors.monitoringEnabled ? (
+            <small className="field-error">{validationErrors.monitoringEnabled}</small>
           ) : null}
         </label>
 

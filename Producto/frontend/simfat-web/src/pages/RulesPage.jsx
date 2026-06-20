@@ -21,6 +21,77 @@ const initialForm = {
   activa: 'true'
 };
 
+const THRESHOLD_PRESETS = {
+  umbralFwi: {
+    description: 'Escala 0-100+. Dispara cuando el FWI regional supera el umbral.',
+    presets: [
+      { label: 'Moderado', value: 11 },
+      { label: 'Alto', value: 21 },
+      { label: 'Muy alto', value: 38 },
+      { label: 'Extremo', value: 50 }
+    ]
+  },
+  umbralNdmi: {
+    description: 'Escala -1 a +1. Dispara cuando el NDMI cae por debajo del umbral (mas seco = mas riesgo).',
+    presets: [
+      { label: 'Estres leve', value: 0.1 },
+      { label: 'Estres moderado', value: -0.1 },
+      { label: 'Estres severo', value: -0.3 }
+    ]
+  },
+  umbralNdvi: {
+    description: 'Escala 0 a +1. Dispara cuando el NDVI cae por debajo del umbral (menos vegetacion = mas riesgo).',
+    presets: [
+      { label: 'Vegetacion moderada', value: 0.5 },
+      { label: 'Vegetacion escasa', value: 0.2 },
+      { label: 'Sin vegetacion', value: 0.0 }
+    ]
+  },
+  umbralFirmsCount: {
+    description: 'Numero de detecciones activas FIRMS. Dispara cuando el conteo regional supera el umbral.',
+    presets: [
+      { label: 'Bajo', value: 1 },
+      { label: 'Moderado', value: 5 },
+      { label: 'Alto', value: 15 },
+      { label: 'Critico', value: 30 }
+    ]
+  },
+  umbralReportesCiudadanos: {
+    description: 'Numero de reportes ciudadanos activos. Dispara cuando los reportes superan el umbral.',
+    presets: [
+      { label: 'Bajo', value: 3 },
+      { label: 'Moderado', value: 10 },
+      { label: 'Alto', value: 25 }
+    ]
+  }
+};
+
+function ThresholdHints({ fieldName, onSelect }) {
+  const config = THRESHOLD_PRESETS[fieldName];
+  if (!config) return null;
+
+  return (
+    <div style={{ marginTop: '4px' }}>
+      <small style={{ color: 'var(--color-text-muted, #666)', display: 'block', marginBottom: '4px' }}>
+        {config.description}
+      </small>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+        {config.presets.map((preset) => (
+          <button
+            key={preset.label}
+            type="button"
+            className="btn btn-secondary"
+            style={{ fontSize: '0.72rem', padding: '2px 8px' }}
+            onClick={() => onSelect(fieldName, preset.value)}
+          >
+            {preset.label}: {preset.value}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function summarizeThresholds(rule) {
   const parts = [];
   if (rule.umbralFwi != null) parts.push(`FWI >= ${rule.umbralFwi}`);
@@ -94,6 +165,11 @@ function RulesPage() {
   function onInputChange(event) {
     const { name, value } = event.target;
     setForm((prev) => ({ ...prev, [name]: value }));
+    setValidationErrors((prev) => ({ ...prev, [name]: '' }));
+  }
+
+  function setThreshold(name, value) {
+    setForm((prev) => ({ ...prev, [name]: String(value) }));
     setValidationErrors((prev) => ({ ...prev, [name]: '' }));
   }
 
@@ -196,24 +272,28 @@ function RulesPage() {
         <label>
           Umbral FWI <small>(se dispara si el FWI es mayor o igual al valor)</small>
           <input name="umbralFwi" type="number" step="0.01" value={form.umbralFwi} onChange={onInputChange} />
+          <ThresholdHints fieldName="umbralFwi" onSelect={setThreshold} />
           {validationErrors.umbralFwi ? <small className="field-error">{validationErrors.umbralFwi}</small> : null}
         </label>
 
         <label>
           Umbral NDMI <small>(se dispara si el NDMI cae por debajo o igual al valor, mas seco = mas riesgo)</small>
           <input name="umbralNdmi" type="number" step="0.01" value={form.umbralNdmi} onChange={onInputChange} />
+          <ThresholdHints fieldName="umbralNdmi" onSelect={setThreshold} />
           {validationErrors.umbralNdmi ? <small className="field-error">{validationErrors.umbralNdmi}</small> : null}
         </label>
 
         <label>
           Umbral NDVI <small>(se dispara si el NDVI cae por debajo o igual al valor, menos vegetacion = mas riesgo)</small>
           <input name="umbralNdvi" type="number" step="0.01" value={form.umbralNdvi} onChange={onInputChange} />
+          <ThresholdHints fieldName="umbralNdvi" onSelect={setThreshold} />
           {validationErrors.umbralNdvi ? <small className="field-error">{validationErrors.umbralNdvi}</small> : null}
         </label>
 
         <label>
           Umbral conteo FIRMS <small>(se dispara si las detecciones son mayor o igual al valor)</small>
           <input name="umbralFirmsCount" type="number" value={form.umbralFirmsCount} onChange={onInputChange} />
+          <ThresholdHints fieldName="umbralFirmsCount" onSelect={setThreshold} />
           {validationErrors.umbralFirmsCount ? <small className="field-error">{validationErrors.umbralFirmsCount}</small> : null}
         </label>
 
@@ -225,6 +305,7 @@ function RulesPage() {
             value={form.umbralReportesCiudadanos}
             onChange={onInputChange}
           />
+          <ThresholdHints fieldName="umbralReportesCiudadanos" onSelect={setThreshold} />
           {validationErrors.umbralReportesCiudadanos ? (
             <small className="field-error">{validationErrors.umbralReportesCiudadanos}</small>
           ) : null}
