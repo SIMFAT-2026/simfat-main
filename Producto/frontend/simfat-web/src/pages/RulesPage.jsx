@@ -250,10 +250,10 @@ function RulesPage() {
 
       {feedback.message ? <p className={`feedback feedback-${feedback.type}`}>{feedback.message}</p> : null}
 
-      <form onSubmit={onSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      <form onSubmit={onSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
 
         {/* Fila 1: identificación */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+        <div className="form-grid" style={{ gridTemplateColumns: '1fr 1fr', margin: '18px 0 0' }}>
           <label>
             Nombre
             <input name="nombre" value={form.nombre} onChange={onInputChange} required />
@@ -274,36 +274,34 @@ function RulesPage() {
         </div>
 
         {/* Fila 2: umbrales satelitales */}
-        <div>
-          <p style={{ margin: '0 0 8px', fontSize: '0.78rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-            Umbrales de activacion
-          </p>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, alignItems: 'start' }}>
-            <label>
-              Umbral FWI <small>(FWI &ge; valor)</small>
-              <input name="umbralFwi" type="number" step="0.01" value={form.umbralFwi} onChange={onInputChange} />
-              <ThresholdHints fieldName="umbralFwi" onSelect={setThreshold} />
-              {validationErrors.umbralFwi ? <small className="field-error">{validationErrors.umbralFwi}</small> : null}
-            </label>
+        <p style={{ margin: '14px 0 0', fontSize: '0.75rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+          Umbrales de activacion
+        </p>
+        <div className="form-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)', margin: 0, alignItems: 'start' }}>
+          <label>
+            Umbral FWI <small>(FWI &ge; valor)</small>
+            <input name="umbralFwi" type="number" step="0.01" value={form.umbralFwi} onChange={onInputChange} />
+            <ThresholdHints fieldName="umbralFwi" onSelect={setThreshold} />
+            {validationErrors.umbralFwi ? <small className="field-error">{validationErrors.umbralFwi}</small> : null}
+          </label>
 
-            <label>
-              Umbral NDMI <small>(NDMI &le; valor, mas seco = mas riesgo)</small>
-              <input name="umbralNdmi" type="number" step="0.01" value={form.umbralNdmi} onChange={onInputChange} />
-              <ThresholdHints fieldName="umbralNdmi" onSelect={setThreshold} />
-              {validationErrors.umbralNdmi ? <small className="field-error">{validationErrors.umbralNdmi}</small> : null}
-            </label>
+          <label>
+            Umbral NDMI <small>(NDMI &le; valor, mas seco = mas riesgo)</small>
+            <input name="umbralNdmi" type="number" step="0.01" value={form.umbralNdmi} onChange={onInputChange} />
+            <ThresholdHints fieldName="umbralNdmi" onSelect={setThreshold} />
+            {validationErrors.umbralNdmi ? <small className="field-error">{validationErrors.umbralNdmi}</small> : null}
+          </label>
 
-            <label>
-              Umbral NDVI <small>(NDVI &le; valor, menos vegetacion = mas riesgo)</small>
-              <input name="umbralNdvi" type="number" step="0.01" value={form.umbralNdvi} onChange={onInputChange} />
-              <ThresholdHints fieldName="umbralNdvi" onSelect={setThreshold} />
-              {validationErrors.umbralNdvi ? <small className="field-error">{validationErrors.umbralNdvi}</small> : null}
-            </label>
-          </div>
+          <label>
+            Umbral NDVI <small>(NDVI &le; valor, menos vegetacion = mas riesgo)</small>
+            <input name="umbralNdvi" type="number" step="0.01" value={form.umbralNdvi} onChange={onInputChange} />
+            <ThresholdHints fieldName="umbralNdvi" onSelect={setThreshold} />
+            {validationErrors.umbralNdvi ? <small className="field-error">{validationErrors.umbralNdvi}</small> : null}
+          </label>
         </div>
 
         {/* Fila 3: umbrales de conteo + estado + acciones */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 160px auto', gap: 12, alignItems: 'start' }}>
+        <div className="form-grid" style={{ gridTemplateColumns: '1fr 1fr 140px', margin: '4px 0 0', alignItems: 'start' }}>
           <label>
             Umbral FIRMS <small>(detecciones &ge; valor)</small>
             <input name="umbralFirmsCount" type="number" value={form.umbralFirmsCount} onChange={onInputChange} />
@@ -328,17 +326,17 @@ function RulesPage() {
             </select>
             {validationErrors.activa ? <small className="field-error">{validationErrors.activa}</small> : null}
           </label>
+        </div>
 
-          <div className="form-actions" style={{ paddingTop: 20 }}>
-            <button className="btn" type="submit">
-              {editingId ? 'Actualizar' : 'Crear'}
+        <div className="form-actions">
+          <button className="btn" type="submit">
+            {editingId ? 'Actualizar' : 'Crear'}
+          </button>
+          {editingId ? (
+            <button type="button" className="btn btn-secondary" onClick={resetForm}>
+              Cancelar edicion
             </button>
-            {editingId ? (
-              <button type="button" className="btn btn-secondary" onClick={resetForm}>
-                Cancelar edicion
-              </button>
-            ) : null}
-          </div>
+          ) : null}
         </div>
 
       </form>
