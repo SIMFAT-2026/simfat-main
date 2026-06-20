@@ -327,9 +327,16 @@ export function useTerritoryLayers(options = {}) {
           setDataByRegion((prev) => {
             const current = prev[regionId];
             if (!current) return prev;
+            // normalizeLayerPayload always fills NDVI/NDMI/ALERTS/FIRMS/REPORTS/RISK_SCORE
+            // with empty defaults even when not requested — only pick the indicators
+            // this phase actually asked for, or they'd wipe out phase-1's FIRMS/ALERTS/RISK_SCORE.
+            const secondaryLayers = {};
+            SECONDARY_INDICATORS.forEach((indicator) => {
+              secondaryLayers[indicator] = secondaryData.layers[indicator];
+            });
             const fullData = {
               ...current,
-              layers: { ...current.layers, ...secondaryData.layers }
+              layers: { ...current.layers, ...secondaryLayers }
             };
             cacheByKey.set(key, { data: fullData, expiresAt: Date.now() + CACHE_TTL_MS });
             return { ...prev, [regionId]: fullData };
