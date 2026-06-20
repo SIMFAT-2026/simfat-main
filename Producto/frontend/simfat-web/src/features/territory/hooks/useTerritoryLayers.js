@@ -302,12 +302,12 @@ export function useTerritoryLayers(options = {}) {
   const [visibleIndicators, setVisibleIndicators] = useState(initialVisibleIndicators);
   const [dateRange] = useState(defaultDateRange);
   const [dataByRegion, setDataByRegion] = useState(() => readCacheSnapshot(dateRange));
-  const [loadingRegionId, setLoadingRegionId] = useState('');
+  const [loadingRegions, setLoadingRegions] = useState(() => new Set());
   const [errorByRegion, setErrorByRegion] = useState({});
 
   const loadRegion = useCallback(
     async (regionId, force = false) => {
-      setLoadingRegionId(regionId);
+      setLoadingRegions((prev) => new Set([...prev, regionId]));
       setErrorByRegion((prev) => ({ ...prev, [regionId]: '' }));
 
       try {
@@ -330,7 +330,7 @@ export function useTerritoryLayers(options = {}) {
           [regionId]: message
         }));
       } finally {
-        setLoadingRegionId((current) => (current === regionId ? '' : current));
+        setLoadingRegions((prev) => { const next = new Set(prev); next.delete(regionId); return next; });
       }
     },
     [dateRange.from, dateRange.to]
@@ -408,8 +408,8 @@ export function useTerritoryLayers(options = {}) {
       toggleIndicator,
       selectedRegionData,
       selectedRegionError,
-      loading: loadingRegionId === selectedRegionId && !selectedRegionData,
-      refreshing: loadingRegionId === selectedRegionId && Boolean(selectedRegionData),
+      loading: loadingRegions.has(selectedRegionId) && !selectedRegionData,
+      refreshing: loadingRegions.has(selectedRegionId) && Boolean(selectedRegionData),
       reloadSelectedRegion,
       cacheTtlMs: CACHE_TTL_MS
     }),
@@ -419,7 +419,7 @@ export function useTerritoryLayers(options = {}) {
       selectedRegionId,
       visibleIndicators,
       toggleIndicator,
-      loadingRegionId,
+      loadingRegions,
       reloadSelectedRegion
     ]
   );
