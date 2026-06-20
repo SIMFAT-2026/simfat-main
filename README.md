@@ -28,7 +28,7 @@ simfat-main/
 ├── Gestion/           — identificación del proyecto y del equipo
 ├── Producto/          — código fuente y scripts de base de datos
 │   ├── backend/
-│   │   ├── simfat-backend/     — API principal (Spring Boot, Java 21)
+│   │   ├── simfat-backend/     — API principal (Spring Boot, Java 17)
 │   │   └── openeo-service/     — microservicio satelital (FastAPI, Python)
 │   ├── frontend/
 │   │   └── simfat-web/         — interfaz web (React 18 + Vite)
@@ -53,6 +53,12 @@ simfat-main/
 - [Diagrama de Clases EP3](Documentacion/UML/2026-06-20_diagrama_clases_ep3.md)
 - [MER — Nuevas colecciones MongoDB EP3](Documentacion/MER/2026-06-20_nuevas_colecciones_EP3.md)
 - [Guía de instalación y despliegue](Documentacion/2026-06-20_guia_instalacion_despliegue.md)
+
+### Manuales de Usuario
+- [Manual — Administrador](Documentacion/Manuales/Manual-Usuario-Administrador.md)
+- [Manual — Usuario Comunitario](Documentacion/Manuales/Manual-Usuario-Comunitario.md)
+- [Manual — Analista de Monitoreo / Operador Regional](Documentacion/Manuales/Manual-Usuario-Analista-Operador.md)
+- [Manual — Soporte Técnico](Documentacion/Manuales/Manual-Usuario-Soporte-Tecnico.md)
 
 ---
 
@@ -144,7 +150,7 @@ docker compose up --build -d
 | Capa | Tecnología |
 |---|---|
 | Frontend | React 18 + Vite + JSX |
-| Backend | Java 21 + Spring Boot 3 |
+| Backend | Java 17 + Spring Boot 3 |
 | Servicio satelital | Python 3.11 + FastAPI + OpenEO |
 | BD relacional | PostgreSQL 15 (Supabase) |
 | BD documental | MongoDB Atlas (M0) |
