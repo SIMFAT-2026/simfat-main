@@ -92,7 +92,42 @@ server.port=8080
 
 ---
 
-## 4. Instalación sin Docker (desarrollo local)
+## 4. Desarrollo local con bases de datos remotas (modo híbrido)
+
+Este modo levanta el backend en `localhost:8080` conectado a Supabase y MongoDB Atlas de producción, con el frontend en `localhost:5173` apuntando al backend local. Útil para probar cambios del backend sin afectar el deploy de Railway.
+
+### Prerequisitos
+
+- Java 17+ y Maven instalados (o usar `./mvnw` incluido en el repo)
+- Node.js 20+ y npm
+- Archivo `Producto/backend/simfat-backend/.env.local` con las credenciales del equipo (no se commitea — ver team password manager o pedir a David/Andrés)
+
+### Pasos
+
+```bash
+# Terminal 1 — Backend
+cd Producto/backend/simfat-backend
+bash dev-local-remote-db.sh
+# Esperar: "Started SimfatBackendApplication in X seconds"
+
+# Terminal 2 — Frontend
+echo "VITE_API_URL=http://localhost:8080" > Producto/frontend/simfat-web/.env.local
+cd Producto/frontend/simfat-web
+npm run dev
+# Abrir: http://localhost:5173
+```
+
+Para volver al frontend apuntando al backend remoto (Railway), eliminar o vaciar el `.env.local` del frontend:
+
+```bash
+rm Producto/frontend/simfat-web/.env.local
+```
+
+> **Nota:** `OPENEO_SYNC_ENABLED=false` está seteado en `.env.local` para evitar disparar sincronizaciones satelitales desde local.
+
+---
+
+## 5. Instalación sin Docker (desarrollo local con BDs locales)
 
 ### 4.1 Configurar PostgreSQL
 
@@ -151,7 +186,7 @@ El frontend queda disponible en: **http://localhost:5173**
 
 ---
 
-## 5. Instalación con Docker Compose (referencia)
+## 6. Instalación con Docker Compose (referencia)
 
 > **Estado actual:** este `docker-compose.yml` y los `Dockerfile` que referencia son una configuración de referencia — todavía no existen como archivos en el repositorio. Para levantar el entorno local hoy, usar la sección 4 (instalación sin Docker). Esta sección documenta cómo se containerizaría el stack (bases de datos + backend + frontend) cuando se agreguen los Dockerfile correspondientes.
 
@@ -253,7 +288,7 @@ docker compose down -v
 
 ---
 
-## 6. Despliegue en producción
+## 7. Despliegue en producción
 
 ### 6.1 Frontend
 
@@ -319,7 +354,7 @@ Se recomienda ejecutar el JAR con un servicio `systemd` o bajo un gestor de proc
 
 ---
 
-## 7. Verificación post-instalación
+## 8. Verificación post-instalación
 
 Una vez levantado el sistema, ejecutar las siguientes verificaciones:
 
@@ -333,7 +368,7 @@ Una vez levantado el sistema, ejecutar las siguientes verificaciones:
 
 ---
 
-## 8. Resolución de problemas frecuentes
+## 9. Resolución de problemas frecuentes
 
 | Síntoma | Causa probable | Solución |
 |---|---|---|
