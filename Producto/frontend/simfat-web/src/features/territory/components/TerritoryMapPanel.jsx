@@ -685,12 +685,21 @@ function ReportCard({ report, pos, onClose }) {
   const props = report.properties || {};
   const category = props.category || 'OTRO';
   const color = REPORT_CATEGORY_COLORS[category] || '#64748b';
+  const photoUrl = props.photoUrl || (Array.isArray(props.photoUrls) && props.photoUrls[0]) || null;
   return (
     <div className="report-card" style={{ left: pos.x + 14, top: pos.y - 10 }}>
       <div className="report-card-header">
         <span className="report-card-category" style={{ color }}>{REPORT_CATEGORY_LABELS[category] || category}</span>
         <button type="button" className="panel-close" onClick={onClose} aria-label="Cerrar">×</button>
       </div>
+      {photoUrl && (
+        <img
+          src={photoUrl}
+          alt="Foto del reporte"
+          className="report-card-photo"
+          style={{ width: '100%', maxHeight: '140px', objectFit: 'cover', borderRadius: '4px', marginBottom: '6px' }}
+        />
+      )}
       {props.description && <p className="report-card-desc">{props.description}</p>}
       <div className="report-card-meta">
         {props.status && (
