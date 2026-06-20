@@ -31,5 +31,7 @@ export const API_ENDPOINTS = {
   accountChangePassword: '/api/account/change-password',
   notificationsUnread: '/api/notifications/unread',
   notifications: '/api/notifications',
-  adminAccessPendingReview: '/api/admin/access/users/pending-review'
+  adminAccessPendingReview: '/api/admin/access/users/pending-review',
+  chatRoomPresence: '/api/community/chat/rooms',
+  chatPrivateRooms: '/api/community/chat/private-rooms'
 };

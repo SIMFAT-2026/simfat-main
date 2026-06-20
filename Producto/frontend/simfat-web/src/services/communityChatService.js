@@ -33,3 +33,21 @@ export async function moderateCommunityChatMessage(messageId, { action = 'HIDE',
   const response = await axiosClient.post(`${CHAT_BASE}/messages/${messageId}/moderate`, { action, reason });
   return extractData(response.data);
 }
+
+export async function getChatRoomPresence(roomId) {
+  try {
+    const response = await axiosClient.get(`${CHAT_BASE}/rooms/${roomId}/presence`);
+    return extractData(response.data) || [];
+  } catch {
+    return [];
+  }
+}
+
+export async function createPrivateChatRoom(participantUserId) {
+  try {
+    const response = await axiosClient.post(`${CHAT_BASE}/private-rooms`, { participantUserId });
+    return extractData(response.data);
+  } catch {
+    return null;
+  }
+}
