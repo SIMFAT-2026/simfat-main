@@ -1016,8 +1016,8 @@ La guía completa con Docker Compose, configuración Nginx y resolución de prob
 | 65b9484 | `fix(community): restrict resource library uploads to PDF only` | Restricción de subida de archivos a solo PDF en la biblioteca de recursos |
 | 7842ebd | `feat(alerts): align AlertRule thresholds with WLC risk score variables` | Alineación de umbrales con las variables del score WLC y rangos de ayuda |
 | d2a7f23 | `docs(qa): document CU09/CU15 production QA run` | Documentación del run de QA en producción para CU09 y CU15 |
-| 57314e9 | `refactor(territory): extract colorblind-safe risk color scales` | Extracción de escalas de color colorblind-safe como módulo reutilizable |
-| 7842ebd | `feat(community): add comuna to contacts and revamp contacts agenda UI` | Corrección del payload de contactos con `comunaId` y renovación de la UI de agenda |
+| 5d63df4 | `refactor(territory): extract colorblind-safe risk color scales` | Extracción de escalas de color colorblind-safe como módulo reutilizable |
+| 57314e9 | `feat(community): add comuna to contacts and revamp contacts agenda UI` | Corrección del payload de contactos con `comunaId` y renovación de la UI de agenda |
 
 ---
 

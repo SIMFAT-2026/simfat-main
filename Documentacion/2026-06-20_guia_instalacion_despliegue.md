@@ -40,7 +40,7 @@
 simfat-main/
 ├── Producto/
 │   ├── backend/
-│   │   └── simfat-api/          # API Spring Boot (Java 21)
+│   │   └── simfat-backend/      # API Spring Boot (Java 17)
 │   │       ├── src/
 │   │       ├── pom.xml
 │   │       └── mvnw
@@ -60,7 +60,7 @@ simfat-main/
 El backend Spring Boot lee su configuración desde `application.properties` o desde variables de entorno del sistema (convenio `SPRING_*`). Para desarrollo local, crear o editar el archivo:
 
 ```
-Producto/backend/simfat-api/src/main/resources/application.properties
+Producto/backend/simfat-backend/src/main/resources/application.properties
 ```
 
 ### Configuración mínima
@@ -68,23 +68,25 @@ Producto/backend/simfat-api/src/main/resources/application.properties
 ```properties
 # PostgreSQL — identidad, roles, sesiones
 spring.datasource.url=jdbc:postgresql://localhost:5432/simfat
-spring.datasource.username=simfat_user
+spring.datasource.username=postgres
 spring.datasource.password=CAMBIAR_EN_PRODUCCION
 
 # MongoDB — datos de negocio (territorio, comunidad, alertas)
 spring.data.mongodb.uri=mongodb://localhost:27017/simfat
 
-# JWT — clave secreta para firma de tokens (mínimo 256 bits)
-jwt.secret=CAMBIAR_POR_CADENA_SECRETA_LARGA_Y_ALEATORIA
-jwt.expiration.ms=86400000
+# JWT — clave secreta para firma de tokens (mínimo 32 bytes)
+auth.jwt.secret=CAMBIAR_POR_CADENA_SECRETA_LARGA_Y_ALEATORIA
+auth.jwt.access-ttl-minutes=15
+auth.jwt.refresh-ttl-days=14
 
 # APIs externas
-firms.api.key=TU_CLAVE_NASA_EARTHDATA
-openweathermap.api.key=TU_CLAVE_OPENWEATHERMAP
+firms.api.map-key=TU_CLAVE_NASA_EARTHDATA
 
 # Servidor
 server.port=8080
 ```
+
+> Open-Meteo (FWI meteorológico) no requiere clave de API.
 
 > **Nota de seguridad:** No subir `application.properties` con credenciales reales al repositorio. Usar `.gitignore` o variables de entorno del sistema en producción.
 
@@ -120,7 +122,7 @@ La base de datos `simfat` se crea automáticamente al primer acceso desde la apl
 ### 4.3 Levantar el backend
 
 ```bash
-cd Producto/backend/simfat-api
+cd Producto/backend/simfat-backend
 
 # Opción A: usando el Maven Wrapper incluido en el repositorio
 ./mvnw spring-boot:run
@@ -149,11 +151,11 @@ El frontend queda disponible en: **http://localhost:5173**
 
 ---
 
-## 5. Instalación con Docker Compose (recomendado)
+## 5. Instalación con Docker Compose (referencia)
 
-La siguiente configuración levanta el stack completo (bases de datos + backend + frontend) en contenedores aislados.
+> **Estado actual:** este `docker-compose.yml` y los `Dockerfile` que referencia son una configuración de referencia — todavía no existen como archivos en el repositorio. Para levantar el entorno local hoy, usar la sección 4 (instalación sin Docker). Esta sección documenta cómo se containerizaría el stack (bases de datos + backend + frontend) cuando se agreguen los Dockerfile correspondientes.
 
-### docker-compose.yml
+### docker-compose.yml (propuesto)
 
 ```yaml
 version: '3.9'
@@ -192,19 +194,18 @@ services:
 
   backend:
     build:
-      context: ./Producto/backend/simfat-api
+      context: ./Producto/backend/simfat-backend
       dockerfile: Dockerfile
     container_name: simfat-backend
     ports:
       - "8080:8080"
     environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/simfat
-      SPRING_DATASOURCE_USERNAME: simfat_user
-      SPRING_DATASOURCE_PASSWORD: simfat_password
-      SPRING_DATA_MONGODB_URI: mongodb://mongodb:27017/simfat
-      JWT_SECRET: cambiar_en_produccion_cadena_larga_y_aleatoria
+      POSTGRES_URI: jdbc:postgresql://postgres:5432/simfat
+      POSTGRES_USER: simfat_user
+      POSTGRES_PASSWORD: simfat_password
+      MONGODB_URI: mongodb://mongodb:27017/simfat
+      AUTH_JWT_SECRET: cambiar_en_produccion_cadena_larga_y_aleatoria
       FIRMS_API_KEY: ${FIRMS_API_KEY}
-      OPENWEATHERMAP_API_KEY: ${OPENWEATHERMAP_API_KEY}
     depends_on:
       postgres:
         condition: service_healthy
@@ -232,9 +233,8 @@ volumes:
 
 ```bash
 # Desde la raíz del repositorio
-# Exportar claves de APIs externas antes de iniciar
+# Exportar clave de NASA FIRMS antes de iniciar (Open-Meteo no requiere clave)
 export FIRMS_API_KEY=tu_clave_firms
-export OPENWEATHERMAP_API_KEY=tu_clave_owm
 
 docker compose up --build -d
 ```
@@ -295,25 +295,24 @@ server {
 ### 6.2 Backend
 
 ```bash
-cd Producto/backend/simfat-api
+cd Producto/backend/simfat-backend
 
 # Generar JAR ejecutable (omitiendo tests para despliegue rápido)
 mvn package -DskipTests
 
 # Ejecutar el JAR
-java -jar target/simfat-api-*.jar
+java -jar target/simfat-backend-*.jar
 ```
 
 En producción, las variables de entorno reemplazan las propiedades del `application.properties`:
 
 ```bash
-export SPRING_DATASOURCE_URL=jdbc:postgresql://host-produccion:5432/simfat
-export SPRING_DATASOURCE_USERNAME=simfat_user
-export SPRING_DATASOURCE_PASSWORD=password_produccion
-export SPRING_DATA_MONGODB_URI=mongodb+srv://usuario:password@cluster.mongodb.net/simfat
-export JWT_SECRET=cadena_secreta_produccion_minimo_256_bits
+export POSTGRES_URI=jdbc:postgresql://host-produccion:5432/simfat
+export POSTGRES_USER=simfat_user
+export POSTGRES_PASSWORD=password_produccion
+export MONGODB_URI=mongodb+srv://usuario:password@cluster.mongodb.net/simfat
+export AUTH_JWT_SECRET=cadena_secreta_produccion_minimo_32_bytes
 export FIRMS_API_KEY=clave_firms
-export OPENWEATHERMAP_API_KEY=clave_owm
 ```
 
 Se recomienda ejecutar el JAR con un servicio `systemd` o bajo un gestor de procesos como **PM2** (Node) o **Supervisor** para garantizar reinicio automático.
