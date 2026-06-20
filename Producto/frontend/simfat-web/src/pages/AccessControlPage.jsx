@@ -10,11 +10,13 @@ import {
   getAccessPermissions,
   getAccessRoles,
   getAccessUsers,
+  getAccessUserById,
   getRegions,
   getPendingReview,
   getVerificationEvents,
   updateAccessUserRoles,
   updateCommunityChatAccess,
+  updateCommunityModuleAccess,
   updateVerificationStatus
 } from '../services';
 
@@ -42,6 +44,7 @@ function AccessControlPage() {
   const [regions, setRegions] = useState([]);
   const [draftRolesByUser, setDraftRolesByUser] = useState({});
   const [draftChatAccessByUser, setDraftChatAccessByUser] = useState({});
+  const [draftModuleAccessByUser, setDraftModuleAccessByUser] = useState({});
   const [pendingReview, setPendingReview] = useState([]);
   const [eventsByUser, setEventsByUser] = useState({});
   const [expandedVerifUser, setExpandedVerifUser] = useState('');
@@ -84,6 +87,7 @@ function AccessControlPage() {
 
         const draft = {};
         const chatDraft = {};
+        const moduleDraft = {};
         for (const row of normalizedUsers) {
           draft[row.id] = Array.isArray(row.assignedRoles) ? [...row.assignedRoles] : [];
           chatDraft[row.id] = {
@@ -92,9 +96,13 @@ function AccessControlPage() {
               ? [...row.communityChatAccess.additionalRegionIds]
               : []
           };
+          moduleDraft[row.id] = Array.isArray(row.communityModuleAccess?.regionIds)
+            ? [...row.communityModuleAccess.regionIds]
+            : [];
         }
         setDraftRolesByUser(draft);
         setDraftChatAccessByUser(chatDraft);
+        setDraftModuleAccessByUser(moduleDraft);
       } catch (err) {
         setError(err);
       } finally {
@@ -213,6 +221,37 @@ function AccessControlPage() {
     }
   }
 
+  function toggleModuleRegion(userId, regionId) {
+    setDraftModuleAccessByUser((prev) => {
+      const current = new Set(prev[userId] || []);
+      if (current.has(regionId)) {
+        current.delete(regionId);
+      } else {
+        current.add(regionId);
+      }
+      return { ...prev, [userId]: [...current] };
+    });
+  }
+
+  async function saveModuleAccess(userId) {
+    const nextRegionIds = draftModuleAccessByUser[userId] || [];
+    setSavingUserId(userId);
+    feedback.clear();
+    try {
+      const updatedUser = await updateCommunityModuleAccess(userId, { regionIds: nextRegionIds });
+      if (updatedUser) {
+        setUsers((prev) => prev.map((row) => (row.id === userId ? updatedUser : row)));
+        feedback.showSuccess(`Acceso modulo comunidad actualizado para ${updatedUser.email}`);
+      } else {
+        feedback.showSuccess('Configuracion guardada (pendiente de sincronizacion con backend).');
+      }
+    } catch (err) {
+      feedback.showError(err.message);
+    } finally {
+      setSavingUserId('');
+    }
+  }
+
   async function loadVerificationEvents(userId) {
     if (eventsByUser[userId]) return;
     try {
@@ -238,7 +277,10 @@ function AccessControlPage() {
     setSavingVerifUserId(userId);
     feedback.clear();
     try {
-      const updatedUser = await updateVerificationStatus(userId, verifDraft);
+      const rawUpdated = await updateVerificationStatus(userId, verifDraft);
+      const updatedUser = rawUpdated?.verificationStatus !== undefined
+        ? rawUpdated
+        : await getAccessUserById(userId);
       setUsers((prev) => prev.map((row) => (row.id === userId ? updatedUser : row)));
       setPendingReview((prev) => prev.filter((row) => row.id !== userId));
       setEventsByUser((prev) => ({ ...prev, [userId]: undefined }));
@@ -387,6 +429,35 @@ function AccessControlPage() {
                       onClick={() => saveChatAccess(target.id)}
                     >
                       {savingUserId === target.id ? 'Guardando...' : 'Guardar acceso chat'}
+                    </button>
+                  </div>
+                </details>
+
+                <details className="access-advanced">
+                  <summary>Acceso modulo comunidad (tablero, recursos, contactos)</summary>
+                  <p className="community-source-note">
+                    Los usuarios ROLE_ADMIN ven todas las regiones sin restriccion.
+                  </p>
+                  <div className="access-role-list">
+                    {regions.map((region) => (
+                      <label key={`${target.id}-module-${region.id}`} className="access-role-item">
+                        <input
+                          type="checkbox"
+                          checked={(draftModuleAccessByUser[target.id] || []).includes(region.id)}
+                          onChange={() => toggleModuleRegion(target.id, region.id)}
+                        />
+                        <span>{region.nombre || region.name || region.id}</span>
+                      </label>
+                    ))}
+                  </div>
+                  <div className="form-actions">
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      disabled={savingUserId === target.id}
+                      onClick={() => saveModuleAccess(target.id)}
+                    >
+                      {savingUserId === target.id ? 'Guardando...' : 'Guardar acceso'}
                     </button>
                   </div>
                 </details>
