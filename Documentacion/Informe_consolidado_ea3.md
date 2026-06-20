@@ -1110,9 +1110,53 @@ El único servicio con costo real es Railway, donde se alojan el backend Spring 
 
 ### Anexo A — Evidencias QA (capturas de pantalla)
 
-*Pendiente — Andrés Ibáñez adjuntará capturas de pantalla de las pruebas ejecutadas en producción.*
+*Capturas de pantalla de las pruebas ejecutadas en producción, extraídas del documento de entrega `SIMFAT Entrega Final 3.docx`.*
 
-Las capturas deben incluir: página de login (CU01), mapa territorial con choropleth activo (CU02), panel comunal con score WLC (CU04), formulario de reglas de alerta (CU05), tablero comunitario (CU07), agenda de contactos con comunaId (CU09), panel de accesos RBAC (CU14), y administración de regiones con toggle (CU15).
+**1. Creación de una nueva publicación en el mural comunitario.**
+
+![Creación de publicación en el mural comunitario](assets/anexo-a-evidencias-qa/01-publicacion-mural-comunitario.png)
+
+**2. Validación del proceso de creación de publicaciones en la Biblioteca de Recursos.**
+
+![Validación de creación en la Biblioteca de Recursos](assets/anexo-a-evidencias-qa/02-biblioteca-recursos-creacion.png)
+
+**3. Verificación del comportamiento del sistema al publicar recursos asociados a regiones con comunas no configuradas.**
+
+![Publicación de recursos con comuna no configurada — antes](assets/anexo-a-evidencias-qa/03-biblioteca-recursos-comuna-no-configurada-a.png)
+![Publicación de recursos con comuna no configurada — después](assets/anexo-a-evidencias-qa/04-biblioteca-recursos-comuna-no-configurada-b.png)
+
+**4. Evaluación de la creación de publicaciones sin adjuntar documentación de respaldo.**
+
+![Creación de publicación sin documentación de respaldo](assets/anexo-a-evidencias-qa/05-publicacion-sin-documentacion-respaldo.png)
+
+**5. Validación del proceso de registro y gestión de contactos y protocolos comunitarios.**
+
+![Registro y gestión de contactos — antes](assets/anexo-a-evidencias-qa/06-registro-contactos-protocolos-a.png)
+![Registro y gestión de contactos — después](assets/anexo-a-evidencias-qa/07-registro-contactos-protocolos-b.png)
+
+**6. Verificación de la configuración territorial para la Zona Metropolitana en ausencia de comunas asociadas.**
+
+![Configuración territorial Zona Metropolitana sin comunas](assets/anexo-a-evidencias-qa/08-config-territorial-zona-metropolitana.png)
+
+**7. Evaluación de las restricciones de acceso al Chat Comunitario para usuarios sin identidad verificada.**
+
+![Restricción de acceso al Chat Comunitario](assets/anexo-a-evidencias-qa/09-chat-comunitario-restriccion-acceso.png)
+
+**8. Validación del proceso de generación de reportes ciudadanos sin asignación de comuna.**
+
+![Reporte ciudadano sin comuna asignada](assets/anexo-a-evidencias-qa/10-reporte-ciudadano-sin-comuna.png)
+
+**9. Verificación de controles de validación ante la ausencia de subcategorías en el registro de información.**
+
+![Reporte sin subcategoría](assets/anexo-a-evidencias-qa/11-reporte-sin-subcategoria.png)
+
+**10. Evaluación del comportamiento del sistema cuando no se proporciona información de geolocalización (latitud).**
+
+![Reporte sin geolocalización](assets/anexo-a-evidencias-qa/12-reporte-sin-geolocalizacion.png)
+
+**11. Validación del proceso de creación y gestión de alertas comunitarias.**
+
+![Creación y gestión de alertas comunitarias](assets/anexo-a-evidencias-qa/13-creacion-gestion-alertas-comunitarias.png)
 
 ### Anexo B — Capturas del sistema en producción
 
