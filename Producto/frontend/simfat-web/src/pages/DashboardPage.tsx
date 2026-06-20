@@ -65,6 +65,48 @@ function climateAvg(values: Record<string, unknown>): number | null {
   return nums.length ? nums.reduce((s, n) => s + n, 0) / nums.length : null;
 }
 
+// ─── FIRMS bbox filter ────────────────────────────────────────────────────────
+
+function extractGeoJsonBbox(geoJson: GeoLayer | null): [number, number, number, number] | null {
+  const features = geoJson?.features;
+  if (!features?.length) return null;
+
+  let minLng = Infinity, maxLng = -Infinity;
+  let minLat = Infinity, maxLat = -Infinity;
+
+  function visitCoords(c: unknown): void {
+    if (!Array.isArray(c)) return;
+    if (typeof c[0] === 'number' && typeof c[1] === 'number') {
+      const lng = c[0] as number, lat = c[1] as number;
+      if (lng < minLng) minLng = lng;
+      if (lng > maxLng) maxLng = lng;
+      if (lat < minLat) minLat = lat;
+      if (lat > maxLat) maxLat = lat;
+    } else {
+      (c as unknown[]).forEach(visitCoords);
+    }
+  }
+
+  for (const feat of features) {
+    visitCoords((feat.geometry as { coordinates?: unknown } | null)?.coordinates);
+  }
+
+  return isFinite(minLng) ? [minLng, minLat, maxLng, maxLat] : null;
+}
+
+function filterByBbox(features: GeoFeature[], bbox: [number, number, number, number] | null): GeoFeature[] {
+  if (!bbox) return features;
+  const [minLng, minLat, maxLng, maxLat] = bbox;
+  return features.filter((f) => {
+    const geom = f.geometry as { type?: string; coordinates?: number[] } | null;
+    if (geom?.type !== 'Point' || !Array.isArray(geom.coordinates)) return true;
+    const [lng, lat] = geom.coordinates;
+    return typeof lng === 'number' && typeof lat === 'number'
+      && lng >= minLng && lng <= maxLng
+      && lat >= minLat && lat <= maxLat;
+  });
+}
+
 // ─── Style tokens ─────────────────────────────────────────────────────────────
 
 const panel: React.CSSProperties = {
@@ -318,13 +360,14 @@ function buildReportData(
   regionLabel: string,
   selectedRegionData: Record<string, unknown> | null,
   layers: Record<string, GeoLayer> | null,
+  regionFilteredFirms?: GeoFeature[],
 ): ReportData {
   const rs = selectedRegionData?.riskScore as { scoreComposite?: number; alertLevel?: string } | null ?? null;
   const alertLevel = rs?.alertLevel || 'NORMAL';
   const score = typeof rs?.scoreComposite === 'number' ? Math.round(rs.scoreComposite * 100) : null;
 
   const today = new Date().toISOString().slice(0, 10);
-  const firmsFeatures = layers?.FIRMS?.features || [];
+  const firmsFeatures = regionFilteredFirms ?? layers?.FIRMS?.features ?? [];
   const firms = {
     total: firmsFeatures.length,
     today: firmsFeatures.filter((f) => {
@@ -403,8 +446,15 @@ function DashboardPage({ selectedRegionId }: DashboardPageProps) {
   const regionLabel = regionOptions.find((r) => r.id === regionId)?.label || regionId;
   const isLoading = loading;
 
+  const comunalGeoJson = (selectedRegionData as Record<string, unknown> | null)?.comunalGeoJson as GeoLayer | null;
+  const regionBbox = React.useMemo(() => extractGeoJsonBbox(comunalGeoJson), [comunalGeoJson]);
+  const firmsFeatures = React.useMemo(
+    () => filterByBbox(layers?.FIRMS?.features || [], regionBbox),
+    [layers, regionBbox],
+  );
+
   function handleExport() {
-    const data = buildReportData(regionLabel, selectedRegionData as Record<string, unknown> | null, layers);
+    const data = buildReportData(regionLabel, selectedRegionData as Record<string, unknown> | null, layers, firmsFeatures);
     generateRegionalReport(data);
   }
 
@@ -432,7 +482,7 @@ function DashboardPage({ selectedRegionId }: DashboardPageProps) {
           <><div style={panel}><SkeletonBlock /></div><div style={panel}><SkeletonBlock /></div><div style={panel}><SkeletonBlock /></div></>
         ) : (
           <>
-            <FirmsPanel features={layers?.FIRMS?.features || []} />
+            <FirmsPanel features={firmsFeatures} />
             <AlertsPanel features={layers?.ALERTS?.features || []} />
             <CitizenReportsPanel features={layers?.REPORTS?.features || []} />
           </>
