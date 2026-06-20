@@ -7,9 +7,15 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import java.time.LocalDateTime;
 import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.index.CompoundIndex;
+import org.springframework.data.mongodb.core.index.CompoundIndexes;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 @Document(collection = "heat_alert_events")
+@CompoundIndexes({
+    @CompoundIndex(name = "idx_heat_region_fecha_desc", def = "{'regionId': 1, 'fechaEvento': -1}"),
+    @CompoundIndex(name = "idx_heat_region_fuente_fecha", def = "{'regionId': 1, 'fuente': 1, 'fechaEvento': -1}")
+})
 public class HeatAlertEvent {
 
     @Id
