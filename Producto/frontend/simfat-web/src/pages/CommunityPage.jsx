@@ -367,16 +367,12 @@ function CommunityPage() {
     }
 
     const lowerName = file.name.toLowerCase();
-    const isAllowed =
-      file.type === 'application/pdf' ||
-      file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
-      lowerName.endsWith('.pdf') ||
-      lowerName.endsWith('.docx');
+    const isAllowed = file.type === 'application/pdf' || lowerName.endsWith('.pdf');
 
     if (!isAllowed) {
       event.target.value = '';
       setResourceFile(null);
-      feedback.showError('Solo se permiten recursos en formato PDF o DOCX.');
+      feedback.showError('Solo se permiten recursos en formato PDF.');
       return;
     }
 
@@ -428,7 +424,7 @@ function CommunityPage() {
 
     try {
       if (!resourceFile) {
-        feedback.showError('Adjunta un archivo PDF o DOCX para registrar el recurso.');
+        feedback.showError('Adjunta un archivo PDF para registrar el recurso.');
         return;
       }
 
@@ -678,7 +674,7 @@ function CommunityPage() {
         <div className="community-resource-shell">
           <aside className="community-resource-uploader">
             <h3>Biblioteca de recursos</h3>
-            <p>Sube documentos PDF o DOCX y asocialos a una region y comuna.</p>
+            <p>Sube documentos PDF y asocialos a una region y comuna. Solo PDF soportado.</p>
 
             <form className="community-resource-form" onSubmit={submitResource}>
               <label>
@@ -749,13 +745,13 @@ function CommunityPage() {
                 <input
                   ref={resourceFileInputRef}
                   type="file"
-                  accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                  accept=".pdf,application/pdf"
                   onChange={handleResourceFileChange}
                   required
                 />
                 {resourceFile ? (
                   <div className="community-resource-file-preview">
-                    <span>{resourceFile.name.toLowerCase().endsWith('.pdf') ? 'PDF' : 'DOCX'}</span>
+                    <span>PDF</span>
                     <div>
                       <strong>{resourceFile.name}</strong>
                       <small>{formatFileSize(resourceFile.size)}</small>
@@ -763,7 +759,7 @@ function CommunityPage() {
                     <button type="button" className="btn btn-secondary" onClick={clearResourceFile}>Quitar</button>
                   </div>
                 ) : (
-                  <p>Formatos permitidos: PDF y DOCX.</p>
+                  <p>Formatos permitidos: PDF.</p>
                 )}
               </div>
 

@@ -284,10 +284,9 @@ public class CommunityController {
         String name = file.getOriginalFilename() == null ? "" : file.getOriginalFilename().toLowerCase();
         String contentType = file.getContentType() == null ? "" : file.getContentType().toLowerCase();
         boolean pdf = name.endsWith(".pdf") || contentType.equals("application/pdf");
-        boolean docx = name.endsWith(".docx") || contentType.equals("application/vnd.openxmlformats-officedocument.wordprocessingml.document");
 
-        if (!pdf && !docx) {
-            throw new BadRequestException("Solo se permiten recursos PDF o DOCX");
+        if (!pdf) {
+            throw new BadRequestException("Solo se permiten recursos PDF");
         }
     }
 
