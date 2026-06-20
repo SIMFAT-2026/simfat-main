@@ -1,7 +1,5 @@
 package com.simfat.backend.dto;
 
-import jakarta.validation.constraints.DecimalMin;
-import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -14,13 +12,15 @@ public class AlertRuleRequestDTO {
 
     private String regionId;
 
-    @NotNull(message = "El umbral de porcentaje de perdida es obligatorio")
-    @DecimalMin(value = "0.0", inclusive = true, message = "El umbral de perdida no puede ser negativo")
-    private Double umbralPorcentajePerdida;
+    private Double umbralFwi;
 
-    @NotNull(message = "El umbral de eventos de calor es obligatorio")
-    @Min(value = 0, message = "El umbral de eventos no puede ser negativo")
-    private Integer umbralEventosCalor;
+    private Double umbralNdmi;
+
+    private Double umbralNdvi;
+
+    private Integer umbralFirmsCount;
+
+    private Integer umbralReportesCiudadanos;
 
     @NotNull(message = "El estado de la regla es obligatorio")
     private Boolean activa;
@@ -41,20 +41,44 @@ public class AlertRuleRequestDTO {
         this.regionId = regionId;
     }
 
-    public Double getUmbralPorcentajePerdida() {
-        return umbralPorcentajePerdida;
+    public Double getUmbralFwi() {
+        return umbralFwi;
     }
 
-    public void setUmbralPorcentajePerdida(Double umbralPorcentajePerdida) {
-        this.umbralPorcentajePerdida = umbralPorcentajePerdida;
+    public void setUmbralFwi(Double umbralFwi) {
+        this.umbralFwi = umbralFwi;
     }
 
-    public Integer getUmbralEventosCalor() {
-        return umbralEventosCalor;
+    public Double getUmbralNdmi() {
+        return umbralNdmi;
     }
 
-    public void setUmbralEventosCalor(Integer umbralEventosCalor) {
-        this.umbralEventosCalor = umbralEventosCalor;
+    public void setUmbralNdmi(Double umbralNdmi) {
+        this.umbralNdmi = umbralNdmi;
+    }
+
+    public Double getUmbralNdvi() {
+        return umbralNdvi;
+    }
+
+    public void setUmbralNdvi(Double umbralNdvi) {
+        this.umbralNdvi = umbralNdvi;
+    }
+
+    public Integer getUmbralFirmsCount() {
+        return umbralFirmsCount;
+    }
+
+    public void setUmbralFirmsCount(Integer umbralFirmsCount) {
+        this.umbralFirmsCount = umbralFirmsCount;
+    }
+
+    public Integer getUmbralReportesCiudadanos() {
+        return umbralReportesCiudadanos;
+    }
+
+    public void setUmbralReportesCiudadanos(Integer umbralReportesCiudadanos) {
+        this.umbralReportesCiudadanos = umbralReportesCiudadanos;
     }
 
     public Boolean getActiva() {
@@ -65,4 +89,3 @@ public class AlertRuleRequestDTO {
         this.activa = activa;
     }
 }
-

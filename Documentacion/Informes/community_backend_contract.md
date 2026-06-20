@@ -138,3 +138,115 @@ Body:
 2. Limitar campos de salida para listados (evitar payload excesivo).
 3. Mantener TTL corto (30-120s) para lectura frecuente de mural.
 4. Auditoria minima de creacion/eliminacion (usuario, fecha, m?dulo).
+
+---
+
+# Extension 2026-05-28 - Chat comunitario territorial
+
+## Objetivo
+
+Agregar mensajeria comunitaria interna para coordinacion territorial y prevencion de incendios, sin duplicar identidad ni reemplazar la administracion de accesos existente.
+
+## Endpoints chat
+
+### 10) GET /api/community/chat/rooms
+
+Retorna salas visibles para el usuario autenticado.
+
+Reglas:
+
+- Usuarios comunitarios verificados: sala general + sala regional primaria + grants regionales adicionales.
+- `ROLE_MODERATOR`, `ROLE_ADMIN`, `ROLE_SUPER_ADMIN`: todas las salas.
+
+Response item:
+
+```json
+{
+  "id": "general",
+  "type": "GENERAL",
+  "regionId": null,
+  "name": "Sala general"
+}
+```
+
+### 11) GET /api/community/chat/rooms/{roomId}/messages
+
+Query params:
+
+- `after` opcional, ISO date-time.
+- `limit` opcional, default 50.
+
+Response item:
+
+```json
+{
+  "id": "msg-1",
+  "roomId": "general",
+  "authorUserId": "user-1",
+  "authorName": "Nombre Apellido",
+  "content": "Actualizacion operativa",
+  "status": "ACTIVE",
+  "createdAt": "2026-05-28T09:00:00"
+}
+```
+
+### 12) POST /api/community/chat/rooms/{roomId}/messages
+
+Body:
+
+```json
+{
+  "content": "Mensaje de coordinacion"
+}
+```
+
+Restricciones:
+
+- `content` obligatorio.
+- Largo maximo: 800 caracteres.
+- Autor se toma del JWT/perfil autenticado; no se acepta autor desde frontend.
+
+### 13) PUT /api/community/chat/presence
+
+Body:
+
+```json
+{
+  "roomId": "general",
+  "state": "CONNECTED"
+}
+```
+
+Estados soportados:
+
+- `CONNECTED`
+- `AWAY`
+- `UNAVAILABLE`
+- `OFFLINE`
+
+### 14) POST /api/community/chat/messages/{messageId}/moderate
+
+Disponible para `ROLE_MODERATOR`, `ROLE_ADMIN`, `ROLE_SUPER_ADMIN`.
+
+Body:
+
+```json
+{
+  "action": "HIDE",
+  "reason": "Contenido fuera de protocolo"
+}
+```
+
+## Retencion
+
+| Escenario | Persistencia |
+|---|---|
+| Piloto con menos de 6 regiones | 6 meses |
+| Escala a 6 o mas regiones | 1 mes |
+
+## Frontend consumidor
+
+- `src/services/communityChatService.js`
+- `src/features/community/hooks/useCommunityChat.js`
+- `src/features/community/chat/CommunityChatPanel.jsx`
+- `src/pages/CommunityPage.jsx`

@@ -17,6 +17,7 @@ import com.simfat.backend.repository.OpenEoJobRunRepository;
 import com.simfat.backend.repository.RegionRepository;
 import com.simfat.backend.service.DashboardSnapshotService;
 import com.simfat.backend.service.OpenEoSyncService;
+import com.simfat.backend.service.TerritoryRiskService;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -44,11 +45,16 @@ public class OpenEoSyncServiceImpl implements OpenEoSyncService {
     private static final String STATUS_NO_DATA = "no_data";
     private static final String STATUS_AOI_MISSING = "aoi_missing";
 
+    // Solo NDVI/NDMI provienen de OpenEO. Los indicadores climaticos (WIND, HUMIDITY, AIR_TEMP,
+    // SOIL_TEMP) se persisten via OpenWeatherFwiServiceImpl y NUNCA deben sincronizarse aqui.
+    private static final List<IndicatorType> OPENEO_INDICATORS = List.of(IndicatorType.NDVI, IndicatorType.NDMI);
+
     private final OpenEoServiceClient openEoServiceClient;
     private final RegionRepository regionRepository;
     private final OpenEoJobRunRepository jobRunRepository;
     private final OpenEoIndicatorObservationRepository observationRepository;
     private final DashboardSnapshotService snapshotService;
+    private final TerritoryRiskService territoryRiskService;
     private final DashboardQueryCache dashboardQueryCache;
     private final OpenEoProperties openEoProperties;
 
@@ -66,6 +72,7 @@ public class OpenEoSyncServiceImpl implements OpenEoSyncService {
         OpenEoJobRunRepository jobRunRepository,
         OpenEoIndicatorObservationRepository observationRepository,
         DashboardSnapshotService snapshotService,
+        TerritoryRiskService territoryRiskService,
         DashboardQueryCache dashboardQueryCache,
         OpenEoProperties openEoProperties
     ) {
@@ -74,6 +81,7 @@ public class OpenEoSyncServiceImpl implements OpenEoSyncService {
         this.jobRunRepository = jobRunRepository;
         this.observationRepository = observationRepository;
         this.snapshotService = snapshotService;
+        this.territoryRiskService = territoryRiskService;
         this.dashboardQueryCache = dashboardQueryCache;
         this.openEoProperties = openEoProperties;
     }
@@ -105,7 +113,7 @@ public class OpenEoSyncServiceImpl implements OpenEoSyncService {
         int errorCount = 0;
 
         for (Region region : regions) {
-            for (IndicatorType indicator : IndicatorType.values()) {
+            for (IndicatorType indicator : OPENEO_INDICATORS) {
                 String lockKey = buildLockKey(region.getId(), indicator, dateRange.from(), dateRange.to());
                 long flowStartNs = System.nanoTime();
 
@@ -186,6 +194,7 @@ public class OpenEoSyncServiceImpl implements OpenEoSyncService {
 
                     upsertObservation(region.getId(), indicator, normalizedResponse, bbox);
                     snapshotService.recomputeSnapshot(region.getId());
+                    territoryRiskService.recomputeRiskByRegion(region.getId());
                     invalidateDashboardCacheForRegion(region.getId());
 
                     OpenEoJobRun finishedJobRun = buildFinishedJobRun(region, indicator, dateRange, requestedAt, normalizedResponse);
@@ -540,7 +549,7 @@ public class OpenEoSyncServiceImpl implements OpenEoSyncService {
         if (region.getCodigo() == null || region.getCodigo().isBlank()) {
             return null;
         }
-        return aoiBboxByRegionCode.get(region.getCodigo().trim().toUpperCase());
+        return aoiBboxByRegionCode.get(region.getId().trim().toUpperCase());
     }
 
     private BoundingBox toBoundingBox(List<Double> bbox) {

@@ -9,7 +9,7 @@ const DashboardPage = lazy(() => import('./DashboardPage'));
 const FOCUS_MAP = {
   alerts: ['ALERTS', 'REPORTS'],
   vegetation: ['NDVI', 'NDMI'],
-  loss: ['LOSS', 'ALERTS']
+  loss: ['ALERTS']
 };
 
 function TerritoryPage() {
@@ -27,13 +27,7 @@ function TerritoryPage() {
       <section className="page-container territory-page">
         <SectionTitle
           title="Monitorizacion territorial"
-          subtitle="Mapa principal con capas NDVI, NDMI, perdida forestal, alertas y reportes ciudadanos"
         />
-
-        <p className="territory-page-note">
-          Carga progresiva por region con cache temporal para minimizar consumo de APIs y mantener bajo costo
-          operacional.
-        </p>
 
         <TerritoryMapPanel
           regionOptions={territory.regionOptions}
@@ -51,7 +45,7 @@ function TerritoryPage() {
 
       <div className="territory-dashboard-block">
         <Suspense fallback={<div className="loading-state">Cargando panel analitico...</div>}>
-          <DashboardPage />
+          <DashboardPage selectedRegionId={territory.selectedRegionId} />
         </Suspense>
       </div>
     </>

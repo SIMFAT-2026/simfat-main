@@ -9,8 +9,29 @@ export async function getCommunityBoard({ regionId } = {}) {
   return extractData(response.data);
 }
 
-export async function createCommunityBoardPost(payload) {
-  const response = await axiosClient.post(API_ENDPOINTS.communityBoard, payload);
+export async function createCommunityBoardPost(payload, file) {
+  const {
+    attachmentFile,
+    attachmentPreviewUrl,
+    attachmentName,
+    attachmentContentType,
+    attachmentSize,
+    attachmentImage,
+    ...body
+  } = payload;
+
+  if (file) {
+    const formData = new FormData();
+    formData.append('payload', JSON.stringify(body));
+    formData.append('file', file);
+
+    const response = await axiosClient.post(API_ENDPOINTS.communityBoard, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+    return extractData(response.data);
+  }
+
+  const response = await axiosClient.post(API_ENDPOINTS.communityBoard, body);
   return extractData(response.data);
 }
 
@@ -26,8 +47,21 @@ export async function getCommunityResources({ regionId } = {}) {
   return extractData(response.data);
 }
 
-export async function createCommunityResource(payload) {
-  const response = await axiosClient.post(API_ENDPOINTS.communityResources, payload);
+export async function createCommunityResource(payload, file) {
+  const { file: payloadFile, ...body } = payload;
+
+  if (file || payloadFile) {
+    const formData = new FormData();
+    formData.append('payload', JSON.stringify(body));
+    formData.append('file', file || payloadFile);
+
+    const response = await axiosClient.post(API_ENDPOINTS.communityResources, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+    return extractData(response.data);
+  }
+
+  const response = await axiosClient.post(API_ENDPOINTS.communityResources, body);
   return extractData(response.data);
 }
 

@@ -2,6 +2,7 @@ package com.simfat.backend.service;
 
 public interface NasaFirmsService {
 
-    String fetchLatestHeatAlertsSnapshot();
-}
+    void syncActiveFiresForAllRegions();
 
+    int syncActiveFiresByRegion(String regionId, double west, double south, double east, double north);
+}

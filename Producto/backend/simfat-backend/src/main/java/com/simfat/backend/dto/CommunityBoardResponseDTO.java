@@ -10,6 +10,11 @@ public class CommunityBoardResponseDTO {
     private String priority;
     private String regionId;
     private String author;
+    private String attachmentUrl;
+    private String attachmentName;
+    private String attachmentContentType;
+    private Long attachmentSize;
+    private boolean attachmentImage;
     private LocalDateTime publishedAt;
 
     public String getId() {
@@ -58,6 +63,46 @@ public class CommunityBoardResponseDTO {
 
     public void setAuthor(String author) {
         this.author = author;
+    }
+
+    public String getAttachmentUrl() {
+        return attachmentUrl;
+    }
+
+    public void setAttachmentUrl(String attachmentUrl) {
+        this.attachmentUrl = attachmentUrl;
+    }
+
+    public String getAttachmentName() {
+        return attachmentName;
+    }
+
+    public void setAttachmentName(String attachmentName) {
+        this.attachmentName = attachmentName;
+    }
+
+    public String getAttachmentContentType() {
+        return attachmentContentType;
+    }
+
+    public void setAttachmentContentType(String attachmentContentType) {
+        this.attachmentContentType = attachmentContentType;
+    }
+
+    public Long getAttachmentSize() {
+        return attachmentSize;
+    }
+
+    public void setAttachmentSize(Long attachmentSize) {
+        this.attachmentSize = attachmentSize;
+    }
+
+    public boolean isAttachmentImage() {
+        return attachmentImage;
+    }
+
+    public void setAttachmentImage(boolean attachmentImage) {
+        this.attachmentImage = attachmentImage;
     }
 
     public LocalDateTime getPublishedAt() {

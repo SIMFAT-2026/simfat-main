@@ -48,12 +48,15 @@ ensureCollectionWithValidator("regions", {
 ensureCollectionWithValidator("alert_rules", {
   $jsonSchema: {
     bsonType: "object",
-    required: ["nombre", "umbralPorcentajePerdida", "umbralEventosCalor", "activa"],
+    required: ["nombre", "activa"],
     properties: {
       nombre: { bsonType: "string", maxLength: 120 },
       regionId: { bsonType: ["string", "null"] },
-      umbralPorcentajePerdida: { bsonType: ["double", "int", "long", "decimal"], minimum: 0 },
-      umbralEventosCalor: { bsonType: ["int", "long"], minimum: 0 },
+      umbralFwi: { bsonType: ["double", "int", "long", "decimal", "null"], minimum: 0 },
+      umbralNdmi: { bsonType: ["double", "int", "long", "decimal", "null"] },
+      umbralNdvi: { bsonType: ["double", "int", "long", "decimal", "null"] },
+      umbralFirmsCount: { bsonType: ["int", "long", "null"], minimum: 0 },
+      umbralReportesCiudadanos: { bsonType: ["int", "long", "null"], minimum: 0 },
       activa: { bsonType: "bool" }
     }
   }

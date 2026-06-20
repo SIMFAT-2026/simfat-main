@@ -3,16 +3,13 @@ package com.simfat.backend.service.impl;
 import com.simfat.backend.dto.HeatAlertRequestDTO;
 import com.simfat.backend.dto.HeatAlertResponseDTO;
 import com.simfat.backend.exception.ResourceNotFoundException;
-import com.simfat.backend.model.AlertRule;
 import com.simfat.backend.model.HeatAlertEvent;
 import com.simfat.backend.model.RiskLevel;
 import com.simfat.backend.repository.HeatAlertEventRepository;
 import com.simfat.backend.repository.RegionRepository;
-import com.simfat.backend.service.AlertRuleService;
 import com.simfat.backend.service.HeatAlertService;
 import java.time.LocalDateTime;
 import java.util.List;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -20,19 +17,13 @@ public class HeatAlertServiceImpl implements HeatAlertService {
 
     private final HeatAlertEventRepository heatAlertRepository;
     private final RegionRepository regionRepository;
-    private final AlertRuleService alertRuleService;
-
-    @Value("${app.alert.default-heat-events-threshold:5}")
-    private Integer defaultHeatEventsThreshold;
 
     public HeatAlertServiceImpl(
         HeatAlertEventRepository heatAlertRepository,
-        RegionRepository regionRepository,
-        AlertRuleService alertRuleService
+        RegionRepository regionRepository
     ) {
         this.heatAlertRepository = heatAlertRepository;
         this.regionRepository = regionRepository;
-        this.alertRuleService = alertRuleService;
     }
 
     @Override
@@ -102,31 +93,7 @@ public class HeatAlertServiceImpl implements HeatAlertService {
         event.setLongitud(request.getLongitud());
         event.setFuente(request.getFuente());
         event.setDescripcion(request.getDescripcion());
-        event.setNivelRiesgo(request.getNivelRiesgo() != null ? request.getNivelRiesgo() : classifyRiskLevel(request.getRegionId()));
-    }
-
-    private RiskLevel classifyRiskLevel(String regionId) {
-        LocalDateTime now = LocalDateTime.now();
-        Long recentEvents = heatAlertRepository.countByRegionIdAndFechaEventoBetween(regionId, now.minusHours(24), now);
-        int eventsWithIncoming = recentEvents.intValue() + 1;
-
-        List<AlertRule> rules = alertRuleService.getActiveRulesForRegion(regionId);
-        int threshold = rules.stream()
-            .map(AlertRule::getUmbralEventosCalor)
-            .filter(value -> value != null && value > 0)
-            .min(Integer::compareTo)
-            .orElse(defaultHeatEventsThreshold);
-
-        if (eventsWithIncoming >= threshold * 2) {
-            return RiskLevel.CRITICO;
-        }
-        if (eventsWithIncoming >= threshold) {
-            return RiskLevel.ALTO;
-        }
-        if (eventsWithIncoming >= Math.max(1, threshold / 2)) {
-            return RiskLevel.MEDIO;
-        }
-        return RiskLevel.BAJO;
+        event.setNivelRiesgo(request.getNivelRiesgo() != null ? request.getNivelRiesgo() : RiskLevel.BAJO);
     }
 
     private HeatAlertResponseDTO toResponse(HeatAlertEvent event) {

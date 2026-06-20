@@ -5,14 +5,15 @@ import PublicOnlyRoute from '../auth/PublicOnlyRoute';
 
 const MainLayout = lazy(() => import('../layouts/MainLayout'));
 const HomePage = lazy(() => import('../pages/HomePage'));
+const DashboardPage = lazy(() => import('../pages/DashboardPage'));
 const TerritoryPage = lazy(() => import('../pages/TerritoryPage'));
 const CommunityPage = lazy(() => import('../pages/CommunityPage'));
 const CitizenReportsPage = lazy(() => import('../pages/CitizenReportsPage'));
 const RegionsPage = lazy(() => import('../pages/RegionsPage'));
-const ForestLossPage = lazy(() => import('../pages/ForestLossPage'));
 const AlertsPage = lazy(() => import('../pages/AlertsPage'));
 const RulesPage = lazy(() => import('../pages/RulesPage'));
 const AccessControlPage = lazy(() => import('../pages/AccessControlPage'));
+const AccountPage = lazy(() => import('../pages/AccountPage'));
 const NotFoundPage = lazy(() => import('../pages/NotFoundPage'));
 const LoginPage = lazy(() => import('../pages/auth/LoginPage'));
 const RegisterPage = lazy(() => import('../pages/auth/RegisterPage'));
@@ -59,14 +60,14 @@ function AppRouter() {
         <Route path="/alertas" element={withSuspense(<AlertsPage />)} />
 
         <Route path="/admin/regions" element={withSuspense(<RegionsPage />)} />
-        <Route path="/admin/forest-loss" element={withSuspense(<ForestLossPage />)} />
         <Route path="/admin/rules" element={withSuspense(<RulesPage />)} />
         <Route path="/admin/access-control" element={withSuspense(<AccessControlPage />)} />
 
-        <Route path="/dashboard" element={<Navigate to="/territorio" replace />} />
+        <Route path="/account" element={withSuspense(<AccountPage />)} />
+
+        <Route path="/dashboard" element={withSuspense(<DashboardPage />)} />
         <Route path="/alerts" element={<Navigate to="/alertas" replace />} />
         <Route path="/regions" element={<Navigate to="/admin/regions" replace />} />
-        <Route path="/forest-loss" element={<Navigate to="/admin/forest-loss" replace />} />
         <Route path="/rules" element={<Navigate to="/admin/rules" replace />} />
       </Route>
 

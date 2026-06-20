@@ -4,7 +4,10 @@ import com.simfat.backend.dto.admin.AccessPermissionDTO;
 import com.simfat.backend.dto.admin.AccessRoleDTO;
 import com.simfat.backend.dto.admin.AccessUserDTO;
 import com.simfat.backend.dto.admin.CommunityChatAccessDTO;
+import com.simfat.backend.dto.admin.PendingReviewUserDTO;
 import com.simfat.backend.dto.admin.UpdateCommunityChatAccessRequestDTO;
+import com.simfat.backend.dto.admin.UpdateVerificationStatusRequestDTO;
+import com.simfat.backend.dto.admin.VerificationEventDTO;
 import com.simfat.backend.exception.BadRequestException;
 import com.simfat.backend.exception.ResourceNotFoundException;
 import com.simfat.backend.model.AppPermission;
@@ -16,6 +19,8 @@ import com.simfat.backend.model.UserRole;
 import com.simfat.backend.model.UserRoleAssignment;
 import com.simfat.backend.model.UserRoleAssignmentId;
 import com.simfat.backend.model.UserVerification;
+import com.simfat.backend.model.VerificationEvent;
+import com.simfat.backend.model.VerificationStatus;
 import com.simfat.backend.repository.AppPermissionRepository;
 import com.simfat.backend.repository.AppRoleRepository;
 import com.simfat.backend.repository.AppUserRepository;
@@ -23,6 +28,7 @@ import com.simfat.backend.repository.CommunityChatRoomAccessRepository;
 import com.simfat.backend.repository.UserCommunityProfileRepository;
 import com.simfat.backend.repository.UserRoleAssignmentRepository;
 import com.simfat.backend.repository.UserVerificationRepository;
+import com.simfat.backend.repository.VerificationEventRepository;
 import com.simfat.backend.service.AccessAdminService;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -47,6 +53,7 @@ public class AccessAdminServiceImpl implements AccessAdminService {
     private final UserVerificationRepository userVerificationRepository;
     private final UserCommunityProfileRepository userCommunityProfileRepository;
     private final CommunityChatRoomAccessRepository communityChatRoomAccessRepository;
+    private final VerificationEventRepository verificationEventRepository;
 
     public AccessAdminServiceImpl(
         AppUserRepository appUserRepository,
@@ -55,7 +62,8 @@ public class AccessAdminServiceImpl implements AccessAdminService {
         UserRoleAssignmentRepository userRoleAssignmentRepository,
         UserVerificationRepository userVerificationRepository,
         UserCommunityProfileRepository userCommunityProfileRepository,
-        CommunityChatRoomAccessRepository communityChatRoomAccessRepository
+        CommunityChatRoomAccessRepository communityChatRoomAccessRepository,
+        VerificationEventRepository verificationEventRepository
     ) {
         this.appUserRepository = appUserRepository;
         this.appRoleRepository = appRoleRepository;
@@ -64,6 +72,7 @@ public class AccessAdminServiceImpl implements AccessAdminService {
         this.userVerificationRepository = userVerificationRepository;
         this.userCommunityProfileRepository = userCommunityProfileRepository;
         this.communityChatRoomAccessRepository = communityChatRoomAccessRepository;
+        this.verificationEventRepository = verificationEventRepository;
     }
 
     @Override
@@ -203,6 +212,94 @@ public class AccessAdminServiceImpl implements AccessAdminService {
         );
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public List<VerificationEventDTO> getVerificationEvents(String userId) {
+        appUserRepository.findById(userId)
+            .orElseThrow(() -> new ResourceNotFoundException("Usuario no encontrado"));
+        return verificationEventRepository.findByUserIdOrderByCreatedAtDesc(userId).stream()
+            .map(this::toVerificationEventDTO)
+            .toList();
+    }
+
+    @Override
+    @Transactional
+    public AccessUserDTO updateVerificationStatus(String targetUserId, UpdateVerificationStatusRequestDTO request, String actorUserId) {
+        AppUser user = appUserRepository.findById(targetUserId)
+            .orElseThrow(() -> new ResourceNotFoundException("Usuario no encontrado"));
+
+        VerificationStatus newStatus;
+        try {
+            newStatus = VerificationStatus.valueOf(request.newStatus());
+        } catch (IllegalArgumentException ex) {
+            throw new BadRequestException("Estado de verificacion invalido: " + request.newStatus());
+        }
+
+        UserVerification verification = userVerificationRepository.findById(targetUserId)
+            .orElseGet(() -> {
+                UserVerification v = new UserVerification();
+                v.setUserId(targetUserId);
+                return v;
+            });
+
+        VerificationStatus oldStatus = verification.getStatus();
+        verification.setStatus(newStatus);
+        userVerificationRepository.save(verification);
+
+        VerificationEvent event = new VerificationEvent();
+        event.setUserId(targetUserId);
+        event.setEventType("ADMIN_STATUS_CHANGE");
+        event.setOldStatus(oldStatus);
+        event.setNewStatus(newStatus);
+        event.setReviewedBy(actorUserId);
+        event.setNotes(request.notes());
+        verificationEventRepository.save(event);
+
+        return toAccessUserDTO(
+            user,
+            resolveAssignedRoleCodesByUser(List.of(user)).getOrDefault(user.getId(), Set.of()),
+            verification,
+            userCommunityProfileRepository.findById(user.getId()).orElse(null),
+            resolveAdditionalRegions(user.getId())
+        );
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<PendingReviewUserDTO> getPendingReview() {
+        List<VerificationEvent> pendingEvents = verificationEventRepository.findPendingIdentityResets();
+        return pendingEvents.stream()
+            .map(event -> {
+                AppUser user = appUserRepository.findById(event.getUserId()).orElse(null);
+                if (user == null) return null;
+                UserVerification verification = userVerificationRepository.findById(event.getUserId()).orElse(null);
+                String currentStatus = verification != null && verification.getStatus() != null
+                    ? verification.getStatus().name()
+                    : "UNVERIFIED";
+                return new PendingReviewUserDTO(
+                    user.getId(),
+                    user.getEmail(),
+                    user.getFullName(),
+                    currentStatus,
+                    toVerificationEventDTO(event)
+                );
+            })
+            .filter(dto -> dto != null)
+            .toList();
+    }
+
+    private VerificationEventDTO toVerificationEventDTO(VerificationEvent event) {
+        return new VerificationEventDTO(
+            event.getId(),
+            event.getEventType(),
+            event.getOldStatus() != null ? event.getOldStatus().name() : null,
+            event.getNewStatus() != null ? event.getNewStatus().name() : null,
+            event.getReviewedBy(),
+            event.getNotes(),
+            event.getCreatedAt()
+        );
+    }
+
     private Map<String, Set<String>> resolveAssignedRoleCodesByUser(List<AppUser> users) {
         Set<String> userIds = users.stream().map(AppUser::getId).collect(Collectors.toSet());
         if (userIds.isEmpty()) {
@@ -281,6 +378,8 @@ public class AccessAdminServiceImpl implements AccessAdminService {
             ? "UNVERIFIED"
             : verification.getStatus().name();
 
+        String organizationName = verification != null ? verification.getOrganizationName() : null;
+
         return new AccessUserDTO(
             user.getId(),
             user.getEmail(),
@@ -293,7 +392,11 @@ public class AccessAdminServiceImpl implements AccessAdminService {
             new CommunityChatAccessDTO(
                 profile == null ? "" : profile.getPrimaryRegionId(),
                 additionalRegionIds == null ? Set.of() : additionalRegionIds
-            )
+            ),
+            user.getPhone(),
+            user.getRegionCode(),
+            user.getComunaCode(),
+            organizationName
         );
     }
 

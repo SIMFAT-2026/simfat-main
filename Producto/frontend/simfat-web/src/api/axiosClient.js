@@ -8,9 +8,12 @@ import {
   updateSessionTokens
 } from '../auth/tokenStorage';
 
+// Capas territoriales (NDVI/NDMI) dependen del sync con Copernicus/CDSE, que puede
+// tardar 130-220s en AOIs grandes (ver informe de sprint clima/viento). 15s causaba
+// timeout y caida silenciosa a datos mock (createMockLayers) en useTerritoryLayers.
 const axiosClient = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 15000,
+  timeout: 240000,
   headers: {
     'Content-Type': 'application/json'
   },

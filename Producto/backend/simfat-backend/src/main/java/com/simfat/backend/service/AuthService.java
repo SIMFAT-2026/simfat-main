@@ -27,5 +27,7 @@ public interface AuthService {
     void resetPassword(ResetPasswordRequestDTO request);
 
     SeedUsersResponseDTO seedUsers(int count);
+
+    void revokeAllTokens(String userId);
 }
 

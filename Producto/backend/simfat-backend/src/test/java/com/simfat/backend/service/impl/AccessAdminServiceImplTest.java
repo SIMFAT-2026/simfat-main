@@ -19,6 +19,7 @@ import com.simfat.backend.repository.CommunityChatRoomAccessRepository;
 import com.simfat.backend.repository.UserCommunityProfileRepository;
 import com.simfat.backend.repository.UserRoleAssignmentRepository;
 import com.simfat.backend.repository.UserVerificationRepository;
+import com.simfat.backend.repository.VerificationEventRepository;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -45,6 +46,8 @@ class AccessAdminServiceImplTest {
     private UserCommunityProfileRepository userCommunityProfileRepository;
     @Mock
     private CommunityChatRoomAccessRepository communityChatRoomAccessRepository;
+    @Mock
+    private VerificationEventRepository verificationEventRepository;
 
     private AccessAdminServiceImpl service;
 
@@ -57,7 +60,8 @@ class AccessAdminServiceImplTest {
             userRoleAssignmentRepository,
             userVerificationRepository,
             userCommunityProfileRepository,
-            communityChatRoomAccessRepository
+            communityChatRoomAccessRepository,
+            verificationEventRepository
         );
     }
 
