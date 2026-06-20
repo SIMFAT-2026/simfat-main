@@ -507,7 +507,10 @@ function CommunityPage() {
     if (!dragState) return;
     const moved = Math.abs(event.clientX - dragState.startedAt.x) + Math.abs(event.clientY - dragState.startedAt.y);
     setDragState(null);
-    if (moved < 6) setSelectedPost(post);
+    if (moved < 6) {
+      feedback.clear();
+      setSelectedPost(post);
+    }
   }
 
   async function confirmDelete() {
