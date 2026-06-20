@@ -10,9 +10,14 @@ import {
   getAccessPermissions,
   getAccessRoles,
   getAccessUsers,
+  getAccessUserById,
   getRegions,
+  getPendingReview,
+  getVerificationEvents,
   updateAccessUserRoles,
-  updateCommunityChatAccess
+  updateCommunityChatAccess,
+  updateCommunityModuleAccess,
+  updateVerificationStatus
 } from '../services';
 
 const PROFILE_OPTIONS = [
@@ -39,10 +44,18 @@ function AccessControlPage() {
   const [regions, setRegions] = useState([]);
   const [draftRolesByUser, setDraftRolesByUser] = useState({});
   const [draftChatAccessByUser, setDraftChatAccessByUser] = useState({});
+  const [draftModuleAccessByUser, setDraftModuleAccessByUser] = useState({});
+  const [pendingReview, setPendingReview] = useState([]);
+  const [eventsByUser, setEventsByUser] = useState({});
+  const [expandedVerifUser, setExpandedVerifUser] = useState('');
+  const [verifDraft, setVerifDraft] = useState({ newStatus: '', notes: '' });
+  const [savingVerifUserId, setSavingVerifUserId] = useState('');
 
   const canManageAccess = useMemo(() => {
-    const roleSet = new Set(user?.roles || []);
-    return roleSet.has('ROLE_ADMIN') || roleSet.has('ROLE_SUPER_ADMIN') || roleSet.has('ADMIN');
+    // roleCodes es el RBAC real (/api/auth/me); user.roles es el enum legacy
+    // (solo "ADMIN"/"USER") y nunca tendra "ROLE_SUPER_ADMIN".
+    const roleSet = new Set(user?.roleCodes || []);
+    return roleSet.has('ROLE_ADMIN') || roleSet.has('ROLE_SUPER_ADMIN');
   }, [user]);
 
   useEffect(() => {
@@ -55,11 +68,12 @@ function AccessControlPage() {
       setLoading(true);
       setError(null);
       try {
-        const [usersData, rolesData, permissionsData, regionsData] = await Promise.all([
+        const [usersData, rolesData, permissionsData, regionsData, pendingData] = await Promise.all([
           getAccessUsers(),
           getAccessRoles(),
           getAccessPermissions(),
-          getRegions()
+          getRegions(),
+          getPendingReview()
         ]);
 
         const normalizedUsers = Array.isArray(usersData) ? usersData : [];
@@ -69,9 +83,11 @@ function AccessControlPage() {
         setRoles(normalizedRoles);
         setPermissions(Array.isArray(permissionsData) ? permissionsData : []);
         setRegions(normalizedRegions);
+        setPendingReview(Array.isArray(pendingData) ? pendingData : []);
 
         const draft = {};
         const chatDraft = {};
+        const moduleDraft = {};
         for (const row of normalizedUsers) {
           draft[row.id] = Array.isArray(row.assignedRoles) ? [...row.assignedRoles] : [];
           chatDraft[row.id] = {
@@ -80,9 +96,13 @@ function AccessControlPage() {
               ? [...row.communityChatAccess.additionalRegionIds]
               : []
           };
+          moduleDraft[row.id] = Array.isArray(row.communityModuleAccess?.regionIds)
+            ? [...row.communityModuleAccess.regionIds]
+            : [];
         }
         setDraftRolesByUser(draft);
         setDraftChatAccessByUser(chatDraft);
+        setDraftModuleAccessByUser(moduleDraft);
       } catch (err) {
         setError(err);
       } finally {
@@ -200,6 +220,86 @@ function AccessControlPage() {
       setSavingUserId('');
     }
   }
+
+  function toggleModuleRegion(userId, regionId) {
+    setDraftModuleAccessByUser((prev) => {
+      const current = new Set(prev[userId] || []);
+      if (current.has(regionId)) {
+        current.delete(regionId);
+      } else {
+        current.add(regionId);
+      }
+      return { ...prev, [userId]: [...current] };
+    });
+  }
+
+  async function saveModuleAccess(userId) {
+    const nextRegionIds = draftModuleAccessByUser[userId] || [];
+    setSavingUserId(userId);
+    feedback.clear();
+    try {
+      const updatedUser = await updateCommunityModuleAccess(userId, { regionIds: nextRegionIds });
+      if (updatedUser) {
+        setUsers((prev) => prev.map((row) => (row.id === userId ? updatedUser : row)));
+        feedback.showSuccess(`Acceso modulo comunidad actualizado para ${updatedUser.email}`);
+      } else {
+        feedback.showSuccess('Configuracion guardada (pendiente de sincronizacion con backend).');
+      }
+    } catch (err) {
+      feedback.showError(err.message);
+    } finally {
+      setSavingUserId('');
+    }
+  }
+
+  async function loadVerificationEvents(userId) {
+    if (eventsByUser[userId]) return;
+    try {
+      const events = await getVerificationEvents(userId);
+      setEventsByUser((prev) => ({ ...prev, [userId]: Array.isArray(events) ? events : [] }));
+    } catch {
+      setEventsByUser((prev) => ({ ...prev, [userId]: [] }));
+    }
+  }
+
+  function toggleVerifExpand(userId) {
+    const next = expandedVerifUser === userId ? '' : userId;
+    setExpandedVerifUser(next);
+    setVerifDraft({ newStatus: '', notes: '' });
+    if (next) loadVerificationEvents(next);
+  }
+
+  async function saveVerificationStatus(userId) {
+    if (!verifDraft.newStatus || !verifDraft.notes.trim()) {
+      feedback.showError('El estado y las notas son obligatorios');
+      return;
+    }
+    setSavingVerifUserId(userId);
+    feedback.clear();
+    try {
+      const rawUpdated = await updateVerificationStatus(userId, verifDraft);
+      const updatedUser = rawUpdated?.verificationStatus !== undefined
+        ? rawUpdated
+        : await getAccessUserById(userId);
+      setUsers((prev) => prev.map((row) => (row.id === userId ? updatedUser : row)));
+      setPendingReview((prev) => prev.filter((row) => row.id !== userId));
+      setEventsByUser((prev) => ({ ...prev, [userId]: undefined }));
+      setExpandedVerifUser('');
+      feedback.showSuccess(`Estado de verificacion actualizado para ${updatedUser.email}`);
+    } catch (err) {
+      feedback.showError(err.message);
+    } finally {
+      setSavingVerifUserId('');
+    }
+  }
+
+  const VERIFICATION_STATUSES = [
+    'EMAIL_VERIFIED',
+    'PHONE_VERIFIED',
+    'IDENTITY_VERIFIED',
+    'FULLY_VERIFIED',
+    'SUSPENDED'
+  ];
 
   const columns = [
     { key: 'email', header: 'Email' },
@@ -333,6 +433,35 @@ function AccessControlPage() {
                   </div>
                 </details>
 
+                <details className="access-advanced">
+                  <summary>Acceso modulo comunidad (tablero, recursos, contactos)</summary>
+                  <p className="community-source-note">
+                    Los usuarios ROLE_ADMIN ven todas las regiones sin restriccion.
+                  </p>
+                  <div className="access-role-list">
+                    {regions.map((region) => (
+                      <label key={`${target.id}-module-${region.id}`} className="access-role-item">
+                        <input
+                          type="checkbox"
+                          checked={(draftModuleAccessByUser[target.id] || []).includes(region.id)}
+                          onChange={() => toggleModuleRegion(target.id, region.id)}
+                        />
+                        <span>{region.nombre || region.name || region.id}</span>
+                      </label>
+                    ))}
+                  </div>
+                  <div className="form-actions">
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      disabled={savingUserId === target.id}
+                      onClick={() => saveModuleAccess(target.id)}
+                    >
+                      {savingUserId === target.id ? 'Guardando...' : 'Guardar acceso'}
+                    </button>
+                  </div>
+                </details>
+
                 <div className="form-actions">
                   <button
                     type="button"
@@ -346,6 +475,112 @@ function AccessControlPage() {
               </article>
             ))}
           </div>
+
+          <h3 style={{ marginTop: '2rem' }}>Verificaciones pendientes de revision</h3>
+          {pendingReview.length === 0 ? (
+            <p style={{ color: 'var(--color-text-muted, #888)', fontSize: '0.9rem' }}>
+              Sin usuarios pendientes de revision de identidad.
+            </p>
+          ) : (
+            <div className="access-grid">
+              {pendingReview.map((row) => (
+                <article key={row.id} className="access-user-card">
+                  <div className="access-user-header">
+                    <h3>{row.fullName || row.email}</h3>
+                    <p>{row.email}</p>
+                    <p>
+                      Estado actual:{' '}
+                      <strong>{row.currentStatus}</strong>
+                    </p>
+                    {row.lastEvent && (
+                      <p style={{ fontSize: '0.8rem', color: 'var(--color-text-muted, #888)' }}>
+                        Cambio de identidad:{' '}
+                        {row.lastEvent.createdAt
+                          ? new Date(row.lastEvent.createdAt).toLocaleString('es-CL')
+                          : '-'}
+                      </p>
+                    )}
+                  </div>
+
+                  <details
+                    open={expandedVerifUser === row.id}
+                    onToggle={(e) => {
+                      if (e.target.open) toggleVerifExpand(row.id);
+                      else setExpandedVerifUser('');
+                    }}
+                  >
+                    <summary>Historial de verificacion</summary>
+                    {eventsByUser[row.id] === undefined ? (
+                      <p>Cargando...</p>
+                    ) : eventsByUser[row.id].length === 0 ? (
+                      <p>Sin eventos registrados.</p>
+                    ) : (
+                      <table style={{ width: '100%', fontSize: '0.8rem', borderCollapse: 'collapse', marginTop: '0.5rem' }}>
+                        <thead>
+                          <tr>
+                            <th style={{ textAlign: 'left', padding: '4px 8px' }}>Tipo</th>
+                            <th style={{ textAlign: 'left', padding: '4px 8px' }}>Estado anterior</th>
+                            <th style={{ textAlign: 'left', padding: '4px 8px' }}>Estado nuevo</th>
+                            <th style={{ textAlign: 'left', padding: '4px 8px' }}>Notas</th>
+                            <th style={{ textAlign: 'left', padding: '4px 8px' }}>Fecha</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {eventsByUser[row.id].map((ev) => (
+                            <tr key={ev.id}>
+                              <td style={{ padding: '4px 8px' }}>{ev.eventType}</td>
+                              <td style={{ padding: '4px 8px' }}>{ev.oldStatus || '-'}</td>
+                              <td style={{ padding: '4px 8px' }}>{ev.newStatus}</td>
+                              <td style={{ padding: '4px 8px' }}>{ev.notes || '-'}</td>
+                              <td style={{ padding: '4px 8px' }}>
+                                {ev.createdAt ? new Date(ev.createdAt).toLocaleString('es-CL') : '-'}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    )}
+                  </details>
+
+                  <div style={{ marginTop: '0.75rem' }}>
+                    <label style={{ display: 'block', marginBottom: '0.4rem' }}>
+                      <span>Nuevo estado</span>
+                      <select
+                        value={expandedVerifUser === row.id ? verifDraft.newStatus : ''}
+                        onChange={(e) => setVerifDraft((prev) => ({ ...prev, newStatus: e.target.value }))}
+                        style={{ display: 'block', width: '100%', marginTop: '0.25rem' }}
+                      >
+                        <option value="">Seleccionar estado...</option>
+                        {VERIFICATION_STATUSES.map((s) => (
+                          <option key={s} value={s}>{s}</option>
+                        ))}
+                      </select>
+                    </label>
+
+                    <label style={{ display: 'block', marginBottom: '0.75rem' }}>
+                      <span>Notas de revision (obligatorio)</span>
+                      <textarea
+                        rows={2}
+                        value={expandedVerifUser === row.id ? verifDraft.notes : ''}
+                        onChange={(e) => setVerifDraft((prev) => ({ ...prev, notes: e.target.value }))}
+                        placeholder="Descripcion de la decision..."
+                        style={{ display: 'block', width: '100%', marginTop: '0.25rem', resize: 'vertical' }}
+                      />
+                    </label>
+
+                    <button
+                      type="button"
+                      className="btn"
+                      disabled={savingVerifUserId === row.id}
+                      onClick={() => saveVerificationStatus(row.id)}
+                    >
+                      {savingVerifUserId === row.id ? 'Guardando...' : 'Guardar estado'}
+                    </button>
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
 
           <h3 style={{ marginTop: '1.5rem' }}>Catalogo de permisos</h3>
           <DataTable

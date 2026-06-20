@@ -10,6 +10,7 @@ public class CommunityContactResponseDTO {
     private String phone;
     private String email;
     private String regionId;
+    private String comunaId;
     private String protocol;
     private LocalDateTime createdAt;
 
@@ -59,6 +60,14 @@ public class CommunityContactResponseDTO {
 
     public void setRegionId(String regionId) {
         this.regionId = regionId;
+    }
+
+    public String getComunaId() {
+        return comunaId;
+    }
+
+    public void setComunaId(String comunaId) {
+        this.comunaId = comunaId;
     }
 
     public String getProtocol() {

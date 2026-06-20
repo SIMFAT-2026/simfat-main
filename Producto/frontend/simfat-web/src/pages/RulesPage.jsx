@@ -13,10 +13,94 @@ import { mapValidationErrors } from '../utils/errors';
 const initialForm = {
   nombre: '',
   regionId: '',
-  umbralPorcentajePerdida: '',
-  umbralEventosCalor: '',
+  umbralFwi: '',
+  umbralNdmi: '',
+  umbralNdvi: '',
+  umbralFirmsCount: '',
+  umbralReportesCiudadanos: '',
   activa: 'true'
 };
+
+const THRESHOLD_PRESETS = {
+  umbralFwi: {
+    description: 'Escala 0-100+. Dispara cuando el FWI regional supera el umbral.',
+    presets: [
+      { label: 'Moderado', value: 11 },
+      { label: 'Alto', value: 21 },
+      { label: 'Muy alto', value: 38 },
+      { label: 'Extremo', value: 50 }
+    ]
+  },
+  umbralNdmi: {
+    description: 'Escala -1 a +1. Dispara cuando el NDMI cae por debajo del umbral (mas seco = mas riesgo).',
+    presets: [
+      { label: 'Estres leve', value: 0.1 },
+      { label: 'Estres moderado', value: -0.1 },
+      { label: 'Estres severo', value: -0.3 }
+    ]
+  },
+  umbralNdvi: {
+    description: 'Escala 0 a +1. Dispara cuando el NDVI cae por debajo del umbral (menos vegetacion = mas riesgo).',
+    presets: [
+      { label: 'Vegetacion moderada', value: 0.5 },
+      { label: 'Vegetacion escasa', value: 0.2 },
+      { label: 'Sin vegetacion', value: 0.0 }
+    ]
+  },
+  umbralFirmsCount: {
+    description: 'Numero de detecciones activas FIRMS. Dispara cuando el conteo regional supera el umbral.',
+    presets: [
+      { label: 'Bajo', value: 1 },
+      { label: 'Moderado', value: 5 },
+      { label: 'Alto', value: 15 },
+      { label: 'Critico', value: 30 }
+    ]
+  },
+  umbralReportesCiudadanos: {
+    description: 'Numero de reportes ciudadanos activos. Dispara cuando los reportes superan el umbral.',
+    presets: [
+      { label: 'Bajo', value: 3 },
+      { label: 'Moderado', value: 10 },
+      { label: 'Alto', value: 25 }
+    ]
+  }
+};
+
+function ThresholdHints({ fieldName, onSelect }) {
+  const config = THRESHOLD_PRESETS[fieldName];
+  if (!config) return null;
+
+  return (
+    <div style={{ marginTop: '4px' }}>
+      <small style={{ color: 'var(--color-text-muted, #666)', display: 'block', marginBottom: '4px' }}>
+        {config.description}
+      </small>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+        {config.presets.map((preset) => (
+          <button
+            key={preset.label}
+            type="button"
+            className="btn btn-secondary"
+            style={{ fontSize: '0.72rem', padding: '2px 8px' }}
+            onClick={() => onSelect(fieldName, preset.value)}
+          >
+            {preset.label}: {preset.value}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function summarizeThresholds(rule) {
+  const parts = [];
+  if (rule.umbralFwi != null) parts.push(`FWI >= ${rule.umbralFwi}`);
+  if (rule.umbralNdmi != null) parts.push(`NDMI <= ${rule.umbralNdmi}`);
+  if (rule.umbralNdvi != null) parts.push(`NDVI <= ${rule.umbralNdvi}`);
+  if (rule.umbralFirmsCount != null) parts.push(`FIRMS >= ${rule.umbralFirmsCount}`);
+  if (rule.umbralReportesCiudadanos != null) parts.push(`Reportes >= ${rule.umbralReportesCiudadanos}`);
+  return parts.length > 0 ? parts.join(' · ') : 'Sin umbrales configurados';
+}
 
 function RulesPage() {
   const [regions, setRegions] = useState([]);
@@ -72,8 +156,7 @@ function RulesPage() {
     () => [
       { key: 'nombre', header: 'Nombre' },
       { key: 'regionId', header: 'Region', render: (row) => (row.regionId ? regionMap[row.regionId] || row.regionId : 'Global') },
-      { key: 'umbralPorcentajePerdida', header: 'Umbral % perdida' },
-      { key: 'umbralEventosCalor', header: 'Umbral eventos calor' },
+      { key: 'umbrales', header: 'Umbrales configurados', render: (row) => summarizeThresholds(row) },
       { key: 'activa', header: 'Activa', render: (row) => (row.activa ? 'Si' : 'No') }
     ],
     [regionMap]
@@ -82,6 +165,11 @@ function RulesPage() {
   function onInputChange(event) {
     const { name, value } = event.target;
     setForm((prev) => ({ ...prev, [name]: value }));
+    setValidationErrors((prev) => ({ ...prev, [name]: '' }));
+  }
+
+  function setThreshold(name, value) {
+    setForm((prev) => ({ ...prev, [name]: String(value) }));
     setValidationErrors((prev) => ({ ...prev, [name]: '' }));
   }
 
@@ -96,8 +184,11 @@ function RulesPage() {
     setForm({
       nombre: rule.nombre || '',
       regionId: rule.regionId || '',
-      umbralPorcentajePerdida: String(rule.umbralPorcentajePerdida || ''),
-      umbralEventosCalor: String(rule.umbralEventosCalor || ''),
+      umbralFwi: rule.umbralFwi != null ? String(rule.umbralFwi) : '',
+      umbralNdmi: rule.umbralNdmi != null ? String(rule.umbralNdmi) : '',
+      umbralNdvi: rule.umbralNdvi != null ? String(rule.umbralNdvi) : '',
+      umbralFirmsCount: rule.umbralFirmsCount != null ? String(rule.umbralFirmsCount) : '',
+      umbralReportesCiudadanos: rule.umbralReportesCiudadanos != null ? String(rule.umbralReportesCiudadanos) : '',
       activa: String(Boolean(rule.activa))
     });
     setValidationErrors({});
@@ -112,8 +203,11 @@ function RulesPage() {
     const payload = {
       nombre: form.nombre.trim(),
       regionId: form.regionId || null,
-      umbralPorcentajePerdida: asNumberOrNull(form.umbralPorcentajePerdida),
-      umbralEventosCalor: asNumberOrNull(form.umbralEventosCalor),
+      umbralFwi: asNumberOrNull(form.umbralFwi),
+      umbralNdmi: asNumberOrNull(form.umbralNdmi),
+      umbralNdvi: asNumberOrNull(form.umbralNdvi),
+      umbralFirmsCount: asNumberOrNull(form.umbralFirmsCount),
+      umbralReportesCiudadanos: asNumberOrNull(form.umbralReportesCiudadanos),
       activa: form.activa === 'true'
     };
 
@@ -156,54 +250,83 @@ function RulesPage() {
 
       {feedback.message ? <p className={`feedback feedback-${feedback.type}`}>{feedback.message}</p> : null}
 
-      <form className="form-grid" onSubmit={onSubmit}>
-        <label>
-          Nombre
-          <input name="nombre" value={form.nombre} onChange={onInputChange} required />
-          {validationErrors.nombre ? <small className="field-error">{validationErrors.nombre}</small> : null}
-        </label>
+      <form onSubmit={onSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
 
-        <label>
-          Region (opcional)
-          <select name="regionId" value={form.regionId} onChange={onInputChange}>
-            <option value="">Global</option>
-            {regions.map((region) => (
-              <option key={region.id} value={region.id}>
-                {region.nombre}
-              </option>
-            ))}
-          </select>
-        </label>
+        {/* Fila 1: identificación */}
+        <div className="form-grid" style={{ gridTemplateColumns: '1fr 1fr', margin: '18px 0 0' }}>
+          <label>
+            Nombre
+            <input name="nombre" value={form.nombre} onChange={onInputChange} required />
+            {validationErrors.nombre ? <small className="field-error">{validationErrors.nombre}</small> : null}
+          </label>
 
-        <label>
-          Umbral porcentaje perdida
-          <input
-            name="umbralPorcentajePerdida"
-            type="number"
-            step="0.01"
-            value={form.umbralPorcentajePerdida}
-            onChange={onInputChange}
-            required
-          />
-          {validationErrors.umbralPorcentajePerdida ? (
-            <small className="field-error">{validationErrors.umbralPorcentajePerdida}</small>
-          ) : null}
-        </label>
+          <label>
+            Region (opcional)
+            <select name="regionId" value={form.regionId} onChange={onInputChange}>
+              <option value="">Global</option>
+              {regions.map((region) => (
+                <option key={region.id} value={region.id}>
+                  {region.nombre}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
 
-        <label>
-          Umbral eventos calor
-          <input name="umbralEventosCalor" type="number" value={form.umbralEventosCalor} onChange={onInputChange} required />
-          {validationErrors.umbralEventosCalor ? <small className="field-error">{validationErrors.umbralEventosCalor}</small> : null}
-        </label>
+        {/* Fila 2: umbrales satelitales */}
+        <p style={{ margin: '14px 0 0', fontSize: '0.75rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+          Umbrales de activacion
+        </p>
+        <div className="form-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)', margin: 0, alignItems: 'start' }}>
+          <label>
+            Umbral FWI <small>(FWI &ge; valor)</small>
+            <input name="umbralFwi" type="number" step="0.01" value={form.umbralFwi} onChange={onInputChange} />
+            <ThresholdHints fieldName="umbralFwi" onSelect={setThreshold} />
+            {validationErrors.umbralFwi ? <small className="field-error">{validationErrors.umbralFwi}</small> : null}
+          </label>
 
-        <label>
-          Activa
-          <select name="activa" value={form.activa} onChange={onInputChange}>
-            <option value="true">Si</option>
-            <option value="false">No</option>
-          </select>
-          {validationErrors.activa ? <small className="field-error">{validationErrors.activa}</small> : null}
-        </label>
+          <label>
+            Umbral NDMI <small>(NDMI &le; valor, mas seco = mas riesgo)</small>
+            <input name="umbralNdmi" type="number" step="0.01" value={form.umbralNdmi} onChange={onInputChange} />
+            <ThresholdHints fieldName="umbralNdmi" onSelect={setThreshold} />
+            {validationErrors.umbralNdmi ? <small className="field-error">{validationErrors.umbralNdmi}</small> : null}
+          </label>
+
+          <label>
+            Umbral NDVI <small>(NDVI &le; valor, menos vegetacion = mas riesgo)</small>
+            <input name="umbralNdvi" type="number" step="0.01" value={form.umbralNdvi} onChange={onInputChange} />
+            <ThresholdHints fieldName="umbralNdvi" onSelect={setThreshold} />
+            {validationErrors.umbralNdvi ? <small className="field-error">{validationErrors.umbralNdvi}</small> : null}
+          </label>
+        </div>
+
+        {/* Fila 3: umbrales de conteo + estado + acciones */}
+        <div className="form-grid" style={{ gridTemplateColumns: '1fr 1fr 140px', margin: '4px 0 0', alignItems: 'start' }}>
+          <label>
+            Umbral FIRMS <small>(detecciones &ge; valor)</small>
+            <input name="umbralFirmsCount" type="number" value={form.umbralFirmsCount} onChange={onInputChange} />
+            <ThresholdHints fieldName="umbralFirmsCount" onSelect={setThreshold} />
+            {validationErrors.umbralFirmsCount ? <small className="field-error">{validationErrors.umbralFirmsCount}</small> : null}
+          </label>
+
+          <label>
+            Umbral reportes ciudadanos <small>(reportes &ge; valor)</small>
+            <input name="umbralReportesCiudadanos" type="number" value={form.umbralReportesCiudadanos} onChange={onInputChange} />
+            <ThresholdHints fieldName="umbralReportesCiudadanos" onSelect={setThreshold} />
+            {validationErrors.umbralReportesCiudadanos ? (
+              <small className="field-error">{validationErrors.umbralReportesCiudadanos}</small>
+            ) : null}
+          </label>
+
+          <label>
+            Activa
+            <select name="activa" value={form.activa} onChange={onInputChange}>
+              <option value="true">Si</option>
+              <option value="false">No</option>
+            </select>
+            {validationErrors.activa ? <small className="field-error">{validationErrors.activa}</small> : null}
+          </label>
+        </div>
 
         <div className="form-actions">
           <button className="btn" type="submit">
@@ -215,6 +338,7 @@ function RulesPage() {
             </button>
           ) : null}
         </div>
+
       </form>
 
       {loading ? <LoadingSpinner label="Cargando reglas..." /> : null}

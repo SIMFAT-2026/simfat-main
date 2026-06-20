@@ -151,8 +151,8 @@ public class ExamSqlImportConfig {
             AlertRule globalRule = new AlertRule();
             globalRule.setNombre("Regla Global SIMFAT");
             globalRule.setRegionId(null);
-            globalRule.setUmbralPorcentajePerdida(0.5);
-            globalRule.setUmbralEventosCalor(3);
+            globalRule.setUmbralFwi(25.0);
+            globalRule.setUmbralFirmsCount(3);
             globalRule.setActiva(true);
             alertRuleRepository.save(globalRule);
 

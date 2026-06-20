@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useAuth } from '../../../auth/AuthContext';
 import {
   createCommunityBoardPost,
   createCommunityContact,
@@ -44,6 +45,7 @@ const MOCK_RESOURCES = [
     category: 'PROTOCOLO',
     url: 'https://example.com/protocolo-respuesta',
     regionId: 'biobio',
+    comunaId: 'CHL.8.1.1_1',
     description: 'Flujo recomendado para coordinacion durante las primeras 2 horas.'
   },
   {
@@ -52,6 +54,7 @@ const MOCK_RESOURCES = [
     category: 'GUIA',
     url: 'https://example.com/guia-prevencion',
     regionId: 'araucania',
+    comunaId: 'CHL.9.1.1_1',
     description: 'Checklist comunitario previo a temporada de alto riesgo.'
   }
 ];
@@ -64,6 +67,7 @@ const MOCK_CONTACTS = [
     phone: '+56 9 5555 1111',
     email: 'emergencias@simfat.cl',
     regionId: 'biobio',
+    comunaId: 'CHL.8.1.1_1',
     protocol: 'Escalamiento inmediato ante humo persistente > 20 minutos.'
   },
   {
@@ -73,6 +77,7 @@ const MOCK_CONTACTS = [
     phone: '+56 9 5555 2222',
     email: 'brigadas@simfat.cl',
     regionId: 'araucania',
+    comunaId: 'CHL.9.1.1_1',
     protocol: 'Activacion con prioridad alta ante alerta critica confirmada.'
   }
 ];
@@ -99,7 +104,12 @@ function normalizeBoard(items = []) {
     priority: String(item.priority || item.prioridad || 'MEDIA').toUpperCase(),
     regionId: String(item.regionId || item.region_id || ''),
     publishedAt: item.publishedAt || item.fechaPublicacion || new Date().toISOString(),
-    author: item.author || item.autor || 'Equipo comunitario'
+    author: item.author || item.autor || 'Equipo comunitario',
+    attachmentUrl: item.attachmentUrl || '',
+    attachmentName: item.attachmentName || '',
+    attachmentContentType: item.attachmentContentType || '',
+    attachmentSize: item.attachmentSize || null,
+    attachmentImage: Boolean(item.attachmentImage)
   }));
 }
 
@@ -110,7 +120,12 @@ function normalizeResources(items = []) {
     category: String(item.category || item.categoria || 'GUIA').toUpperCase(),
     url: item.url || item.enlace || '',
     regionId: String(item.regionId || item.region_id || ''),
-    description: item.description || item.descripcion || ''
+    comunaId: String(item.comunaId || item.comuna_id || ''),
+    description: item.description || item.descripcion || '',
+    fileUrl: item.fileUrl || item.url || '',
+    fileName: item.fileName || '',
+    fileContentType: item.fileContentType || '',
+    fileSize: item.fileSize || null
   }));
 }
 
@@ -122,11 +137,13 @@ function normalizeContacts(items = []) {
     phone: item.phone || item.telefono || '-',
     email: item.email || item.correo || '-',
     regionId: String(item.regionId || item.region_id || ''),
+    comunaId: String(item.comunaId || item.comuna_id || ''),
     protocol: item.protocol || item.protocolo || ''
   }));
 }
 
 export function useCommunityData() {
+  const { user } = useAuth();
   const [regions, setRegions] = useState([]);
   const [board, setBoard] = useState([]);
   const [resources, setResources] = useState([]);
@@ -134,6 +151,17 @@ export function useCommunityData() {
   const [source, setSource] = useState('backend');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+
+  const isAdmin = Boolean(
+    user?.roleCodes?.includes('ROLE_ADMIN') || user?.roleCodes?.includes('ROLE_SUPER_ADMIN')
+  );
+  const accessibleRegions = isAdmin ? null : (user?.communityModuleAccess?.regionIds ?? undefined);
+
+  function filterByAccess(items) {
+    if (!accessibleRegions) return items;
+    if (accessibleRegions.length === 0) return [];
+    return items.filter((item) => accessibleRegions.includes(item.regionId));
+  }
 
   const loadAll = useCallback(async () => {
     setLoading(true);
@@ -148,21 +176,22 @@ export function useCommunityData() {
       ]);
 
       setRegions(normalizeRegions(Array.isArray(regionsData) ? regionsData : []));
-      setBoard(normalizeBoard(Array.isArray(boardData) ? boardData : []));
-      setResources(normalizeResources(Array.isArray(resourcesData) ? resourcesData : []));
-      setContacts(normalizeContacts(Array.isArray(contactsData) ? contactsData : []));
+      setBoard(filterByAccess(normalizeBoard(Array.isArray(boardData) ? boardData : [])));
+      setResources(filterByAccess(normalizeResources(Array.isArray(resourcesData) ? resourcesData : [])));
+      setContacts(filterByAccess(normalizeContacts(Array.isArray(contactsData) ? contactsData : [])));
       setSource('backend');
     } catch {
       setRegions(fallbackRegions());
-      setBoard(normalizeBoard(MOCK_BOARD));
-      setResources(normalizeResources(MOCK_RESOURCES));
-      setContacts(normalizeContacts(MOCK_CONTACTS));
+      setBoard(filterByAccess(normalizeBoard(MOCK_BOARD)));
+      setResources(filterByAccess(normalizeResources(MOCK_RESOURCES)));
+      setContacts(filterByAccess(normalizeContacts(MOCK_CONTACTS)));
       setSource('fallback');
       setError('Backend comunitario no disponible. Se muestran datos locales de prueba.');
     } finally {
       setLoading(false);
     }
-  }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAdmin, accessibleRegions]);
 
   useEffect(() => {
     loadAll();
@@ -172,10 +201,10 @@ export function useCommunityData() {
     async (payload) => {
       if (source === 'backend') {
         try {
-          const created = await createCommunityBoardPost(payload);
+          const created = await createCommunityBoardPost(payload, payload.attachmentFile);
           const normalized = normalizeBoard([created])[0];
           setBoard((prev) => [normalized, ...prev]);
-          return;
+          return normalized;
         } catch {
           // fallback local controlado
         }
@@ -188,9 +217,15 @@ export function useCommunityData() {
         priority: payload.priority,
         regionId: payload.regionId,
         publishedAt: new Date().toISOString(),
-        author: payload.author || 'Equipo comunitario'
+        author: payload.author || 'Equipo comunitario',
+        attachmentUrl: payload.attachmentPreviewUrl || '',
+        attachmentName: payload.attachmentName || '',
+        attachmentContentType: payload.attachmentContentType || '',
+        attachmentSize: payload.attachmentSize || null,
+        attachmentImage: Boolean(payload.attachmentImage)
       };
       setBoard((prev) => [createdLocal, ...prev]);
+      return createdLocal;
     },
     [source]
   );
@@ -202,21 +237,28 @@ export function useCommunityData() {
           const created = await createCommunityResource(payload);
           const normalized = normalizeResources([created])[0];
           setResources((prev) => [normalized, ...prev]);
-          return;
+          return normalized;
         } catch {
           // fallback local controlado
         }
       }
 
+      const localFileUrl = payload.file ? URL.createObjectURL(payload.file) : payload.url;
       const createdLocal = {
         id: createId('resource'),
         title: payload.title,
         category: payload.category,
-        url: payload.url,
+        url: localFileUrl,
         regionId: payload.regionId,
-        description: payload.description
+        comunaId: payload.comunaId,
+        description: payload.description,
+        fileUrl: localFileUrl,
+        fileName: payload.file?.name || '',
+        fileContentType: payload.file?.type || '',
+        fileSize: payload.file?.size || null
       };
       setResources((prev) => [createdLocal, ...prev]);
+      return createdLocal;
     },
     [source]
   );
@@ -224,14 +266,10 @@ export function useCommunityData() {
   const createContact = useCallback(
     async (payload) => {
       if (source === 'backend') {
-        try {
-          const created = await createCommunityContact(payload);
-          const normalized = normalizeContacts([created])[0];
-          setContacts((prev) => [normalized, ...prev]);
-          return;
-        } catch {
-          // fallback local controlado
-        }
+        const created = await createCommunityContact(payload);
+        const normalized = normalizeContacts([created])[0];
+        setContacts((prev) => [normalized, ...prev]);
+        return;
       }
 
       const createdLocal = {
@@ -241,6 +279,7 @@ export function useCommunityData() {
         phone: payload.phone,
         email: payload.email,
         regionId: payload.regionId,
+        comunaId: payload.comunaId,
         protocol: payload.protocol
       };
       setContacts((prev) => [createdLocal, ...prev]);

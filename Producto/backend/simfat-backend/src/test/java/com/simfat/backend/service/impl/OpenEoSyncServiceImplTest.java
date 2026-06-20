@@ -19,6 +19,7 @@ import com.simfat.backend.repository.OpenEoIndicatorObservationRepository;
 import com.simfat.backend.repository.OpenEoJobRunRepository;
 import com.simfat.backend.repository.RegionRepository;
 import com.simfat.backend.service.DashboardSnapshotService;
+import com.simfat.backend.service.TerritoryRiskService;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -41,6 +42,8 @@ class OpenEoSyncServiceImplTest {
     @Mock
     private DashboardSnapshotService snapshotService;
     @Mock
+    private TerritoryRiskService territoryRiskService;
+    @Mock
     private DashboardQueryCache dashboardQueryCache;
 
     private OpenEoSyncServiceImpl syncService;
@@ -54,6 +57,7 @@ class OpenEoSyncServiceImplTest {
             jobRunRepository,
             observationRepository,
             snapshotService,
+            territoryRiskService,
             dashboardQueryCache,
             properties
         );
@@ -84,6 +88,7 @@ class OpenEoSyncServiceImplTest {
         verify(jobRunRepository, times(2)).save(any());
         verify(observationRepository, times(2)).save(any(OpenEoIndicatorObservation.class));
         verify(snapshotService, times(2)).recomputeSnapshot(eq("region-1"));
+        verify(territoryRiskService, times(2)).recomputeRiskByRegion(eq("region-1"));
     }
 
     @Test
@@ -100,5 +105,6 @@ class OpenEoSyncServiceImplTest {
         verify(openEoServiceClient, never()).fetchLatestIndicator(any(), any());
         verify(observationRepository, never()).save(any());
         verify(snapshotService, never()).recomputeSnapshot(any());
+        verify(territoryRiskService, never()).recomputeRiskByRegion(any());
     }
 }

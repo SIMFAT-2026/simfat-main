@@ -47,3 +47,37 @@ flowchart TB
 3. El backend resuelve roles/permisos efectivos desde BD.
 4. `@PreAuthorize` aplica minimo privilegio en endpoints criticos.
 5. Acciones privilegiadas mutantes se registran en auditoria.
+
+---
+
+# Actualizacion 2026-05-28 - Arquitectura chat comunitario
+
+```mermaid
+flowchart TB
+  subgraph UI[Frontend React/Vite]
+    CommunityPage[CommunityPage]
+    ChatPanel[CommunityChatPanel]
+    AccessUI[AccessControlPage]
+  end
+
+  subgraph API[Backend Spring Boot]
+    ChatController[CommunityChatController]
+    ChatService[CommunityChatService]
+    AccessService[AccessAdminService]
+    Security[Spring Security + JWT + RBAC]
+  end
+
+  subgraph DATA[Persistencia]
+    PG[(PostgreSQL/Supabase RBAC + grants)]
+    MDB[(MongoDB chat + presencia)]
+  end
+
+  CommunityPage --> ChatPanel --> ChatController
+  AccessUI --> AccessService
+  ChatController --> Security --> ChatService
+  AccessService --> PG
+  ChatService --> PG
+  ChatService --> MDB
+```
+
+El chat se mantiene en el modulo comunitario. Territorio/region opera como contexto de sala y control de acceso, no como ownership del modulo.

@@ -60,6 +60,25 @@ public class AuthorizationResolverService {
         return new AuthorizationSnapshot(roleCodes, permissionCodes, authorities);
     }
 
+    private static final Set<String> MODERATION_ROLE_CODES = Set.of(
+        "ROLE_MODERATOR",
+        "ROLE_ADMIN",
+        "ROLE_SUPER_ADMIN"
+    );
+
+    public boolean hasModerationCapability(AppUser user) {
+        AuthorizationSnapshot snapshot = resolveForUser(user);
+        if (snapshot.getPermissionCodes().contains("PERM_REPORT_MODERATE")) {
+            return true;
+        }
+        return snapshot.getRoleCodes().stream().anyMatch(MODERATION_ROLE_CODES::contains);
+    }
+
+    public boolean hasGlobalAdminCapability(AppUser user) {
+        AuthorizationSnapshot snapshot = resolveForUser(user);
+        return snapshot.getRoleCodes().contains("ROLE_ADMIN") || snapshot.getRoleCodes().contains("ROLE_SUPER_ADMIN");
+    }
+
     private Set<String> resolveRoleCodesFromRbacTables(String userId) {
         List<UserRoleAssignment> assignments = userRoleAssignmentRepository.findByIdUserId(userId);
         if (assignments.isEmpty()) {

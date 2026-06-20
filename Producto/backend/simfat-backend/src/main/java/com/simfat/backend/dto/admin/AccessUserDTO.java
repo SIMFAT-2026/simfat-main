@@ -10,6 +10,11 @@ public record AccessUserDTO(
     Set<String> legacyRoles,
     Set<String> assignedRoles,
     Set<String> effectiveRoles,
-    String verificationStatus
+    String verificationStatus,
+    CommunityChatAccessDTO communityChatAccess,
+    String phone,
+    String regionCode,
+    String comunaCode,
+    String organizationName
 ) {
 }

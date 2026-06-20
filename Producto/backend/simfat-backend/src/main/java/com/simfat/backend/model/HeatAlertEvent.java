@@ -41,6 +41,11 @@ public class HeatAlertEvent {
     @Size(max = 500, message = "La descripcion no puede exceder 500 caracteres")
     private String descripcion;
 
+    private String firmsConfidence;
+    private Double firmsFrp;
+    private String firmsSatellite;
+    private String firmsSource;
+
     public String getId() {
         return id;
     }
@@ -104,5 +109,17 @@ public class HeatAlertEvent {
     public void setDescripcion(String descripcion) {
         this.descripcion = descripcion;
     }
+
+    public String getFirmsConfidence() { return firmsConfidence; }
+    public void setFirmsConfidence(String firmsConfidence) { this.firmsConfidence = firmsConfidence; }
+
+    public Double getFirmsFrp() { return firmsFrp; }
+    public void setFirmsFrp(Double firmsFrp) { this.firmsFrp = firmsFrp; }
+
+    public String getFirmsSatellite() { return firmsSatellite; }
+    public void setFirmsSatellite(String firmsSatellite) { this.firmsSatellite = firmsSatellite; }
+
+    public String getFirmsSource() { return firmsSource; }
+    public void setFirmsSource(String firmsSource) { this.firmsSource = firmsSource; }
 }
 

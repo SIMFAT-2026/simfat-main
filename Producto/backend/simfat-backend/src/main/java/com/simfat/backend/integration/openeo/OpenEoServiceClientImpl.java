@@ -17,6 +17,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestClientResponseException;
 
 @Component
@@ -183,6 +184,21 @@ public class OpenEoServiceClientImpl implements OpenEoServiceClient {
                 );
                 sleep(backoffMs);
                 backoffMs = backoffMs * 2;
+            } catch (RestClientException ex) {
+                // Covers deserialization failures (e.g. unexpected Content-Type: application/octet-stream).
+                // Not retryable — the response was received but cannot be decoded as JSON.
+                LOGGER.warn(
+                    "openeo_client status=decode_error operation={} attempt={} error={}",
+                    operation,
+                    attempt,
+                    ex.getMessage()
+                );
+                throw new OpenEoClientException(
+                    "Respuesta inesperada del openeo-service en " + operation + ": " + ex.getMessage(),
+                    null,
+                    false,
+                    ex
+                );
             }
         }
     }

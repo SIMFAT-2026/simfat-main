@@ -13,4 +13,7 @@ public interface HeatAlertEventRepository extends MongoRepository<HeatAlertEvent
     Long countByRegionIdAndFechaEventoBetween(String regionId, LocalDateTime start, LocalDateTime end);
 
     Long countByNivelRiesgo(RiskLevel nivelRiesgo);
+
+    boolean existsByRegionIdAndLatitudAndLongitudAndFechaEventoAndFuente(
+        String regionId, Double latitud, Double longitud, LocalDateTime fechaEvento, String fuente);
 }

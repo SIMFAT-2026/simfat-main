@@ -8,15 +8,68 @@ import LoadingSpinner from '../components/LoadingSpinner';
 import SectionTitle from '../components/SectionTitle';
 import { useFeedback } from '../hooks';
 import { useCitizenReportsData } from '../features/reports/hooks/useCitizenReportsData';
+import { getComunasByRegion, getLabelForComuna } from '../data/territorioChile';
 
-const REPORT_CATEGORIES = ['HUMO', 'FOCO', 'QUEMA', 'INFRAESTRUCTURA', 'OTRO'];
+const REPORT_CATEGORIES = [
+  'HUMO',
+  'FOCO',
+  'QUEMA',
+  'INFRAESTRUCTURA',
+  'IGNICION_POTENCIAL',
+  'INFRAESTRUCTURA_ELECTRICA',
+  'COMBUSTIBLE_VEGETAL',
+  'OTRO'
+];
+
+// Catalogo cerrado de subcategorias por categoria. Espejo manual de
+// SUBCATEGORIES_BY_CATEGORY en CitizenReportController.java - si Pablo trae
+// una lista nueva, hay que actualizar ambos lados.
+const REPORT_SUBCATEGORIES = {
+  IGNICION_POTENCIAL: [
+    'Quemas agrícolas',
+    'Fogatas en zonas no habilitadas',
+    'Parrillas o cocinillas en áreas vegetadas',
+    'Quema de basura',
+    'Quema de residuos forestales',
+    'Uso de maquinaria que genera chispas',
+    'Faenas de soldadura al aire libre',
+    'Trabajos con esmeriles o galleteras',
+    'Vehículos estacionados sobre pastizales secos',
+    'Colillas de cigarro / personas fumando',
+    'Fuegos artificiales',
+    'Actividades recreativas con fuego',
+    'Actos intencionales o sospecha de incendio provocado'
+  ],
+  INFRAESTRUCTURA_ELECTRICA: [
+    'Cables eléctricos caídos',
+    'Cables en contacto con vegetación',
+    'Postes en mal estado',
+    'Chispas provenientes de tendidos eléctricos',
+    'Transformadores defectuosos',
+    'Árboles con riesgo de caer sobre líneas eléctricas'
+  ],
+  COMBUSTIBLE_VEGETAL: [
+    'Pastizales secos sin manejo',
+    'Acumulación de ramas y residuos forestales',
+    'Microbasurales con material combustible',
+    'Sitios eriazos abandonados',
+    'Plantaciones con exceso de material seco',
+    'Matorrales densos cercanos a viviendas',
+    'Ausencia de cortafuegos',
+    'Cortafuegos deteriorados o interrumpidos',
+    'Regeneración de especies exóticas creciendo sin control'
+  ]
+};
+
 const REPORT_STATUSES = ['RECIBIDO', 'VALIDADO', 'DERIVADO', 'DESCARTADO'];
 const MAX_FILES = 4;
 const MAX_FILE_BYTES = 5 * 1024 * 1024;
 
 const initialForm = {
   regionId: '',
+  comunaId: '',
   category: 'HUMO',
+  subCategory: '',
   description: '',
   latitude: '',
   longitude: ''
@@ -35,6 +88,16 @@ function statusBadgeClass(status) {
   if (status === 'DERIVADO') return 'badge badge-medium';
   if (status === 'DESCARTADO') return 'badge badge-critical';
   return 'badge badge-high';
+}
+
+function statusLabel(row) {
+  if (row.status === 'DESCARTADO' && row.discardReason === 'VENCIDO') {
+    return 'DESCARTADO (vencido)';
+  }
+  if (row.status === 'RECIBIDO' && row.staleCount > 0) {
+    return 'RECIBIDO (vencido)';
+  }
+  return row.status;
 }
 
 function CitizenReportsPage() {
@@ -59,6 +122,8 @@ function CitizenReportsPage() {
     [regions]
   );
 
+  const formComunas = useMemo(() => getComunasByRegion(form.regionId), [form.regionId]);
+
   const filteredReports = useMemo(() => {
     return reports.filter((report) => {
       const byRegion = !filters.regionId || report.regionId === filters.regionId;
@@ -72,11 +137,16 @@ function CitizenReportsPage() {
     () => [
       { key: 'createdAt', header: 'Creado', render: (row) => formatDate(row.createdAt) },
       { key: 'regionId', header: 'Region', render: (row) => regionMap[row.regionId] || row.regionId || '-' },
-      { key: 'category', header: 'Categoria' },
+      { key: 'comunaId', header: 'Comuna', render: (row) => getLabelForComuna(row.comunaId) || row.comunaId || '-' },
+      {
+        key: 'category',
+        header: 'Categoria',
+        render: (row) => (row.subCategory ? `${row.category} — ${row.subCategory}` : row.category)
+      },
       {
         key: 'status',
         header: 'Estado',
-        render: (row) => <span className={statusBadgeClass(row.status)}>{row.status}</span>
+        render: (row) => <span className={statusBadgeClass(row.status)}>{statusLabel(row)}</span>
       },
       { key: 'latitude', header: 'Latitud', render: (row) => Number(row.latitude).toFixed(5) },
       { key: 'longitude', header: 'Longitud', render: (row) => Number(row.longitude).toFixed(5) },
@@ -106,6 +176,14 @@ function CitizenReportsPage() {
 
   function onInputChange(event) {
     const { name, value } = event.target;
+    if (name === 'category') {
+      setForm((prev) => ({ ...prev, category: value, subCategory: '' }));
+      return;
+    }
+    if (name === 'regionId') {
+      setForm((prev) => ({ ...prev, regionId: value, comunaId: '' }));
+      return;
+    }
     setForm((prev) => ({ ...prev, [name]: value }));
   }
 
@@ -159,8 +237,17 @@ function CitizenReportsPage() {
         throw new Error('Selecciona una region.');
       }
 
+      if (!form.comunaId) {
+        throw new Error('Selecciona una comuna.');
+      }
+
       if (!form.latitude || !form.longitude) {
         throw new Error('Debes indicar latitud y longitud.');
+      }
+
+      const subCategoryOptions = REPORT_SUBCATEGORIES[form.category];
+      if (subCategoryOptions && !form.subCategory) {
+        throw new Error('Selecciona una subcategoria.');
       }
 
       if (selectedFiles.length > MAX_FILES) {
@@ -175,7 +262,9 @@ function CitizenReportsPage() {
       await createReport({
         payload: {
           regionId: form.regionId,
+          comunaId: form.comunaId,
           category: form.category,
+          subCategory: subCategoryOptions ? form.subCategory : '',
           description: form.description.trim(),
           latitude: Number(form.latitude),
           longitude: Number(form.longitude)
@@ -295,6 +384,18 @@ function CitizenReportsPage() {
           </label>
 
           <label>
+            Comuna
+            <select name="comunaId" value={form.comunaId} onChange={onInputChange} required disabled={!form.regionId}>
+              <option value="">{form.regionId ? 'Seleccione comuna' : 'Seleccione una region primero'}</option>
+              {formComunas.map((comuna) => (
+                <option key={comuna.value} value={comuna.value}>
+                  {comuna.label}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label>
             Categoria
             <select name="category" value={form.category} onChange={onInputChange}>
               {REPORT_CATEGORIES.map((category) => (
@@ -304,6 +405,20 @@ function CitizenReportsPage() {
               ))}
             </select>
           </label>
+
+          {REPORT_SUBCATEGORIES[form.category] ? (
+            <label>
+              Subcategoria
+              <select name="subCategory" value={form.subCategory} onChange={onInputChange} required>
+                <option value="">Seleccione subcategoria</option>
+                {REPORT_SUBCATEGORIES[form.category].map((subCategory) => (
+                  <option key={subCategory} value={subCategory}>
+                    {subCategory}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
 
           <label>
             Latitud

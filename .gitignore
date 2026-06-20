@@ -13,3 +13,6 @@ Producto/frontend/simfat-web/*.log
 
 # Node local
 **/node_modules/
+
+# Agent local registry
+.atl/

@@ -8,3 +8,5 @@ export * from './communityService';
 export * from './communityChatService';
 export * from './citizenReportsService';
 export * from './accessAdminService';
+export * from './accountService';
+export * from './notificationsService';

@@ -13,7 +13,9 @@ public class CitizenReport {
     private String id;
 
     private String regionId;
+    private String comunaId;
     private String category;
+    private String subCategory;
     private String description;
     private Double latitude;
     private Double longitude;
@@ -21,6 +23,15 @@ public class CitizenReport {
     private List<String> photos = new ArrayList<>();
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+
+    // Vencimiento de validacion: validatedAt se setea al pasar a VALIDADO.
+    // staleCount: 0 = nunca vencido, 1 = ya volvio una vez a RECIBIDO por
+    // vencimiento, 2 = descartado automaticamente. staleSince marca el inicio
+    // de la cuenta de la segunda etapa (RECIBIDO vencido -> DESCARTADO).
+    private LocalDateTime validatedAt;
+    private int staleCount;
+    private LocalDateTime staleSince;
+    private String discardReason;
 
     public String getId() {
         return id;
@@ -38,12 +49,28 @@ public class CitizenReport {
         this.regionId = regionId;
     }
 
+    public String getComunaId() {
+        return comunaId;
+    }
+
+    public void setComunaId(String comunaId) {
+        this.comunaId = comunaId;
+    }
+
     public String getCategory() {
         return category;
     }
 
     public void setCategory(String category) {
         this.category = category;
+    }
+
+    public String getSubCategory() {
+        return subCategory;
+    }
+
+    public void setSubCategory(String subCategory) {
+        this.subCategory = subCategory;
     }
 
     public String getDescription() {
@@ -100,5 +127,37 @@ public class CitizenReport {
 
     public void setUpdatedAt(LocalDateTime updatedAt) {
         this.updatedAt = updatedAt;
+    }
+
+    public LocalDateTime getValidatedAt() {
+        return validatedAt;
+    }
+
+    public void setValidatedAt(LocalDateTime validatedAt) {
+        this.validatedAt = validatedAt;
+    }
+
+    public int getStaleCount() {
+        return staleCount;
+    }
+
+    public void setStaleCount(int staleCount) {
+        this.staleCount = staleCount;
+    }
+
+    public LocalDateTime getStaleSince() {
+        return staleSince;
+    }
+
+    public void setStaleSince(LocalDateTime staleSince) {
+        this.staleSince = staleSince;
+    }
+
+    public String getDiscardReason() {
+        return discardReason;
+    }
+
+    public void setDiscardReason(String discardReason) {
+        this.discardReason = discardReason;
     }
 }

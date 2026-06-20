@@ -3,6 +3,9 @@ import { useAuth } from '../../../auth/AuthContext';
 import EmptyState from '../../../components/EmptyState';
 import LoadingSpinner from '../../../components/LoadingSpinner';
 import { useCommunityChat } from '../hooks/useCommunityChat';
+import ChatUserPanel from './ChatUserPanel';
+
+const FALLBACK_GENERAL_ROOM = { id: 'general', type: 'GENERAL', regionId: '', name: 'Sala general' };
 
 const PRESENCE_STATES = [
   { value: 'CONNECTED', label: 'Conectado' },
@@ -25,6 +28,12 @@ function roomLabel(room) {
   return room.name || room.regionId || 'Sala regional';
 }
 
+function tabLabel(room) {
+  if (!room) return 'Sala';
+  if (room.type === 'PRIVATE') return `@ ${room.name}`;
+  return roomLabel(room);
+}
+
 function CommunityChatPanel() {
   const { user } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
@@ -39,18 +48,32 @@ function CommunityChatPanel() {
     activeRoomId,
     messages,
     presenceState,
+    presenceUsers,
     loadingRooms,
     loadingMessages,
     error,
     changeRoom,
     sendMessage,
     updatePresence,
-    moderateMessage
+    moderateMessage,
+    createPrivateRoom
   } = useCommunityChat();
 
+  const currentUserId = user?.id || user?.userId || '';
+
+  // Ensure there's always at least a GENERAL room available even when the API
+  // returns an empty list (e.g. no room configured for this region yet).
+  const visibleRooms = useMemo(() => {
+    if (rooms.length === 0) return [FALLBACK_GENERAL_ROOM];
+    const hasGeneral = rooms.some((r) => r.type === 'GENERAL' || r.id === 'general');
+    return hasGeneral ? rooms : [FALLBACK_GENERAL_ROOM, ...rooms];
+  }, [rooms]);
+
   const canModerate = useMemo(() => {
-    const roles = user?.roles || [];
-    return roles.some((role) => MODERATION_ROLES.has(role));
+    // user.roles es el enum legacy (solo "ADMIN"/"USER", nunca "ROLE_*"
+    // ni SUPER_ADMIN) — roleCodes es el RBAC real expuesto por /api/auth/me.
+    const roleCodes = user?.roleCodes || [];
+    return roleCodes.some((role) => MODERATION_ROLES.has(role));
   }, [user]);
 
   async function handleSubmit(event) {
@@ -114,75 +137,90 @@ function CommunityChatPanel() {
             </label>
           </div>
 
-          {loadingRooms ? <LoadingSpinner label="Cargando salas..." /> : null}
-
-          {rooms.length > 0 ? (
-            <div className="community-chat-rooms" role="tablist" aria-label="Salas de chat comunitario">
-              {rooms.map((room) => (
-                <button
-                  key={room.id}
-                  type="button"
-                  className={room.id === activeRoomId ? 'active' : ''}
-                  onClick={() => changeRoom(room.id)}
-                >
-                  {roomLabel(room)}
-                </button>
-              ))}
-            </div>
-          ) : null}
-
-          {error || localError ? <p className="feedback feedback-error">{localError || error}</p> : null}
-
-          <div className="community-chat-messages">
-            {loadingMessages && messages.length === 0 ? <LoadingSpinner label="Cargando mensajes..." /> : null}
-            {!loadingMessages && messages.length === 0 ? (
-              <EmptyState title="Sin mensajes" description="Inicia la coordinacion en esta sala." />
-            ) : null}
-
-            {messages.map((message) => (
-              <article key={message.id} className={`community-chat-message ${message.status !== 'ACTIVE' ? 'moderated' : ''}`}>
-                <header>
-                  <strong>{message.authorName}</strong>
-                  <span>{formatMessageTime(message.createdAt)}</span>
-                </header>
-                <p>{message.status === 'ACTIVE' ? message.content : 'Mensaje moderado.'}</p>
-                {canModerate && message.status === 'ACTIVE' ? (
-                  <button type="button" className="btn btn-secondary" onClick={() => handleModerate(message.id)}>
-                    Moderar
-                  </button>
-                ) : null}
-              </article>
-            ))}
-          </div>
-
-          {canModerate ? (
-            <label className="community-chat-moderation-reason">
-              Motivo de moderacion
-              <input
-                value={moderationReason}
-                onChange={(event) => setModerationReason(event.target.value)}
-                placeholder="Opcional"
-              />
-            </label>
-          ) : null}
-
-          <form className="community-chat-form" onSubmit={handleSubmit}>
-            <label className="sr-only" htmlFor="community-chat-message">
-              Mensaje
-            </label>
-            <textarea
-              id="community-chat-message"
-              rows={2}
-              maxLength={800}
-              value={draft}
-              onChange={(event) => setDraft(event.target.value)}
-              placeholder="Escribe una actualizacion operativa..."
-              disabled={!activeRoomId || sending}
+          <div className="community-chat-body" style={{ display: 'flex', gap: 0 }}>
+            <ChatUserPanel
+              presenceUsers={presenceUsers}
+              onOpenPrivateRoom={createPrivateRoom}
+              currentUserId={currentUserId}
             />
-            <button type="submit" className="btn" disabled={!activeRoomId || sending || !draft.trim()}>
-              {sending ? 'Enviando...' : 'Enviar'}
-            </button>
-          </form>
+            <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+              {loadingRooms ? <LoadingSpinner label="Cargando salas..." /> : null}
+
+              {!loadingRooms && visibleRooms.length === 0 ? (
+                <p className="feedback feedback-info" style={{ margin: '0.5rem 0', fontSize: '0.85rem' }}>
+                  No hay salas disponibles. Contacta al administrador.
+                </p>
+              ) : null}
+
+              {visibleRooms.length > 0 ? (
+                <div className="community-chat-rooms" role="tablist" aria-label="Salas de chat comunitario">
+                  {visibleRooms.map((room) => (
+                    <button
+                      key={room.id}
+                      type="button"
+                      className={room.id === activeRoomId ? 'active' : ''}
+                      onClick={() => changeRoom(room.id)}
+                    >
+                      {tabLabel(room)}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+
+              {error || localError ? <p className="feedback feedback-error">{localError || error}</p> : null}
+
+              <div className="community-chat-messages">
+                {loadingMessages && messages.length === 0 ? <LoadingSpinner label="Cargando mensajes..." /> : null}
+                {!loadingMessages && messages.length === 0 ? (
+                  <EmptyState title="Sin mensajes" description="Inicia la coordinacion en esta sala." />
+                ) : null}
+
+                {messages.map((message) => (
+                  <article key={message.id} className={`community-chat-message ${message.status !== 'ACTIVE' ? 'moderated' : ''}`}>
+                    <header>
+                      <strong>{message.authorName}</strong>
+                      <span>{formatMessageTime(message.createdAt)}</span>
+                    </header>
+                    <p>{message.status === 'ACTIVE' ? message.content : 'Mensaje moderado.'}</p>
+                    {canModerate && message.status === 'ACTIVE' ? (
+                      <button type="button" className="btn btn-secondary" onClick={() => handleModerate(message.id)}>
+                        Moderar
+                      </button>
+                    ) : null}
+                  </article>
+                ))}
+              </div>
+
+              {canModerate ? (
+                <label className="community-chat-moderation-reason">
+                  Motivo de moderacion
+                  <input
+                    value={moderationReason}
+                    onChange={(event) => setModerationReason(event.target.value)}
+                    placeholder="Opcional"
+                  />
+                </label>
+              ) : null}
+
+              <form className="community-chat-form" onSubmit={handleSubmit}>
+                <label className="sr-only" htmlFor="community-chat-message">
+                  Mensaje
+                </label>
+                <textarea
+                  id="community-chat-message"
+                  rows={2}
+                  maxLength={800}
+                  value={draft}
+                  onChange={(event) => setDraft(event.target.value)}
+                  placeholder="Escribe una actualizacion operativa..."
+                  disabled={!activeRoomId || sending}
+                />
+                <button type="submit" className="btn" disabled={!activeRoomId || sending || !draft.trim()}>
+                  {sending ? 'Enviando...' : 'Enviar'}
+                </button>
+              </form>
+            </div>
+          </div>
         </div>
       ) : null}
     </aside>

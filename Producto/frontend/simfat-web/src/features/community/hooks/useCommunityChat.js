@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  createPrivateChatRoom,
+  getChatRoomPresence,
   getCommunityChatMessages,
   getCommunityChatRooms,
   moderateCommunityChatMessage,
@@ -36,11 +38,14 @@ function mergeMessages(current, incoming) {
   return Array.from(byId.values()).sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
 }
 
+const PRESENCE_POLLING_MS = 30000;
+
 export function useCommunityChat() {
   const [rooms, setRooms] = useState([]);
   const [activeRoomId, setActiveRoomId] = useState('');
   const [messages, setMessages] = useState([]);
   const [presenceState, setPresenceState] = useState('CONNECTED');
+  const [presenceUsers, setPresenceUsers] = useState([]);
   const [loadingRooms, setLoadingRooms] = useState(false);
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [error, setError] = useState('');
@@ -105,6 +110,34 @@ export function useCommunityChat() {
     setMessages((current) => mergeMessages(current, [updated]));
   }, []);
 
+  const loadPresence = useCallback(async (roomId) => {
+    if (!roomId) return;
+    try {
+      const data = await getChatRoomPresence(roomId);
+      setPresenceUsers(
+        (Array.isArray(data) ? data : []).map((item) => ({
+          userId: item.userId || '',
+          fullName: item.fullName || item.name || 'Usuario',
+          state: item.state || 'OFFLINE',
+          lastSeen: item.lastSeen || ''
+        }))
+      );
+    } catch {
+      setPresenceUsers([]);
+    }
+  }, []);
+
+  const createPrivateRoom = useCallback(async (participantUserId) => {
+    const room = await createPrivateChatRoom(participantUserId);
+    if (!room) return;
+    const normalized = normalizeRooms([room])[0];
+    setRooms((current) => {
+      if (current.some((r) => r.id === normalized.id)) return current;
+      return [...current, normalized];
+    });
+    changeRoom(normalized.id);
+  }, [changeRoom]);
+
   useEffect(() => {
     loadRooms();
   }, [loadRooms]);
@@ -113,14 +146,22 @@ export function useCommunityChat() {
     if (!activeRoomId) return undefined;
 
     loadMessages(activeRoomId);
+    loadPresence(activeRoomId);
     updateCommunityChatPresence(activeRoomId, presenceState).catch(() => {});
 
     const pollingId = window.setInterval(() => {
       loadMessages(activeRoomId, { append: true });
     }, POLLING_MS);
 
-    return () => window.clearInterval(pollingId);
-  }, [activeRoomId, loadMessages, presenceState]);
+    const presencePollingId = window.setInterval(() => {
+      loadPresence(activeRoomId);
+    }, PRESENCE_POLLING_MS);
+
+    return () => {
+      window.clearInterval(pollingId);
+      window.clearInterval(presencePollingId);
+    };
+  }, [activeRoomId, loadMessages, loadPresence, presenceState]);
 
   return {
     rooms,
@@ -128,6 +169,7 @@ export function useCommunityChat() {
     activeRoomId,
     messages,
     presenceState,
+    presenceUsers,
     loadingRooms,
     loadingMessages,
     error,
@@ -136,6 +178,8 @@ export function useCommunityChat() {
     loadMessages,
     sendMessage,
     updatePresence,
-    moderateMessage
+    moderateMessage,
+    loadPresence,
+    createPrivateRoom
   };
 }
