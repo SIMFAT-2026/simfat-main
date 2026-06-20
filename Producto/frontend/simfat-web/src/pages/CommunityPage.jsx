@@ -6,6 +6,7 @@ import FilterBar from '../components/FilterBar';
 import LoadingSpinner from '../components/LoadingSpinner';
 import SectionTitle from '../components/SectionTitle';
 import CommunityChatPanel from '../features/community/chat/CommunityChatPanel';
+import { useAuth } from '../auth/AuthContext';
 import { useFeedback } from '../hooks';
 import { useCommunityData } from '../features/community/hooks/useCommunityData';
 import { getComunasByRegion, getLabelForComuna, getLabelForRegion } from '../data/territorioChile';
@@ -134,6 +135,7 @@ function resolveRegionCode(regionId = '', regionName = '') {
 }
 
 function CommunityPage() {
+  const { user } = useAuth();
   const {
     regions,
     board,
@@ -150,6 +152,12 @@ function CommunityPage() {
     removeResource,
     removeContact
   } = useCommunityData();
+
+  const isAdmin = Boolean(
+    user?.roleCodes?.includes('ROLE_ADMIN') || user?.roleCodes?.includes('ROLE_SUPER_ADMIN')
+  );
+  const hasNoModuleAccess =
+    !isAdmin && Array.isArray(user?.communityModuleAccess?.regionIds) && user.communityModuleAccess.regionIds.length === 0;
 
   const feedback = useFeedback();
   const boardRef = useRef(null);
@@ -535,6 +543,13 @@ function CommunityPage() {
       <p className="community-source-note">
         Origen de datos: {source === 'backend' ? 'backend comunitario' : 'fallback local de continuidad operativa'}.
       </p>
+
+      {hasNoModuleAccess ? (
+        <div className="feedback feedback-info" style={{ marginBottom: 16 }}>
+          Tu cuenta no tiene regiones asignadas en el modulo comunitario.
+          Contacta al administrador para que configure tu acceso.
+        </div>
+      ) : null}
 
       {feedback.message ? <p className={`feedback feedback-${feedback.type}`}>{feedback.message}</p> : null}
       {error ? <p className="feedback feedback-error">{error}</p> : null}
