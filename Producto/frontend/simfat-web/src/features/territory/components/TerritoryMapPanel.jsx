@@ -1022,6 +1022,9 @@ function TerritoryMapPanel({
             {refreshing ? 'Actualizando...' : 'Actualizar capas'}
           </button>
           <WeatherSyncButton regionId={selectedRegionId} />
+          <small style={{ color: '#94a3b8', fontSize: '0.68rem', marginTop: 2 }}>
+            ⓘ La sincronización puede tardar aprox. 2–3 min
+          </small>
         </div>
 
         {visibleIndicators.includes('WIND') && windHourlyTimestamps.length > 0 && (
