@@ -29,6 +29,15 @@ public class AppUser {
     @Column(name = "password_hash", nullable = false, length = 100)
     private String passwordHash;
 
+    @Column(name = "phone", length = 20)
+    private String phone;
+
+    @Column(name = "region_code", length = 20)
+    private String regionCode;
+
+    @Column(name = "comuna_code", length = 20)
+    private String comunaCode;
+
     @Column(name = "enabled", nullable = false)
     private boolean enabled;
 
@@ -120,5 +129,29 @@ public class AppUser {
 
     public void setUpdatedAt(Instant updatedAt) {
         this.updatedAt = updatedAt;
+    }
+
+    public String getPhone() {
+        return phone;
+    }
+
+    public void setPhone(String phone) {
+        this.phone = phone;
+    }
+
+    public String getRegionCode() {
+        return regionCode;
+    }
+
+    public void setRegionCode(String regionCode) {
+        this.regionCode = regionCode;
+    }
+
+    public String getComunaCode() {
+        return comunaCode;
+    }
+
+    public void setComunaCode(String comunaCode) {
+        this.comunaCode = comunaCode;
     }
 }

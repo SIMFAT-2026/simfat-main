@@ -2,7 +2,12 @@ import axiosClient from '../../../api/axiosClient';
 
 const TERRITORY_ENDPOINTS = {
   layers: '/api/territory/layers',
-  bounds: '/api/territory/bounds'
+  bounds: '/api/territory/bounds',
+  riskScore: (regionId) => `/api/territory/risk-score/${regionId}`,
+  geojson: (regionId) => `/api/territory/geojson/${regionId}`,
+  comunalScores: (regionId) => `/api/territory/risk-score/comunas/${regionId}`,
+  comunaHistory: (gadmGid, days) => `/api/territory/risk-score/comunas/${gadmGid}/history?days=${days}`,
+  copernicusSync: (comunaId) => `/api/territory/risk-score/comunas/${comunaId}/copernicus-sync`
 };
 
 function isFeatureCollection(value) {
@@ -63,20 +68,47 @@ function extractResponseData(payload) {
   return payload;
 }
 
+// Climate indicators are exposed as comuna-keyed value maps:
+// { indicator, unit, values: { comunaId: { value, unit, observedAt } } }
+// instead of GeoJSON FeatureCollections — they are joined onto the
+// comunal GeoJSON client-side (see TerritoryMapPanel ClimateChoropleth).
+const CLIMATE_INDICATORS = ['WIND', 'HUMIDITY', 'AIR_TEMP', 'SOIL_TEMP'];
+
+function isValueMap(value) {
+  return Boolean(value) && typeof value === 'object' && value.values && typeof value.values === 'object';
+}
+
+function toValueMap(value) {
+  if (isValueMap(value)) {
+    return value;
+  }
+  return null;
+}
+
 function normalizeLayerPayload(payload, regionId) {
   const source = extractResponseData(payload) || {};
   const layers = source.layers || {};
 
+  const normalizedLayers = {
+    NDVI: toFeatureCollection(layers.NDVI),
+    NDMI: toFeatureCollection(layers.NDMI),
+    ALERTS: toFeatureCollection(layers.ALERTS),
+    FIRMS: toFeatureCollection(layers.FIRMS),
+    REPORTS: toFeatureCollection(layers.REPORTS),
+    RISK_SCORE: toFeatureCollection(layers.RISK_SCORE)
+  };
+
+  CLIMATE_INDICATORS.forEach((indicator) => {
+    const valueMap = toValueMap(layers[indicator]);
+    if (valueMap) {
+      normalizedLayers[indicator] = valueMap;
+    }
+  });
+
   return {
     regionId: source.regionId || regionId,
     generatedAt: source.generatedAt || new Date().toISOString(),
-    layers: {
-      NDVI: toFeatureCollection(layers.NDVI),
-      NDMI: toFeatureCollection(layers.NDMI),
-      LOSS: toFeatureCollection(layers.LOSS),
-      ALERTS: toFeatureCollection(layers.ALERTS),
-      REPORTS: toFeatureCollection(layers.REPORTS)
-    }
+    layers: normalizedLayers
   };
 }
 
@@ -109,4 +141,44 @@ export async function fetchTerritoryBounds(regionId, fallback) {
     params: { regionId }
   });
   return normalizeBoundsPayload(response.data, fallback);
+}
+
+export async function fetchTerritoryGeoJson(regionId) {
+  // Served as static asset by Spring Boot — no auth needed, cached 24h
+  const response = await axiosClient.get(`/geojson/comunas-${regionId.toLowerCase()}.geojson`);
+  return response.data;
+}
+
+export async function fetchComunalRiskScores(regionId) {
+  const response = await axiosClient.get(TERRITORY_ENDPOINTS.comunalScores(regionId));
+  const source = (response.data && response.data.data) || response.data || {};
+  return source;
+}
+
+export async function fetchComunaHistory(gadmGid, days = 7) {
+  const response = await axiosClient.get(TERRITORY_ENDPOINTS.comunaHistory(gadmGid, days));
+  const source = (response.data && response.data.data) || response.data || {};
+  return source;
+}
+
+export async function syncComunaCopernicus(comunaId) {
+  const response = await axiosClient.post(TERRITORY_ENDPOINTS.copernicusSync(comunaId));
+  const source = (response.data && response.data.data) || response.data || {};
+  return source;
+}
+
+export async function fetchTerritoryRiskScore(regionId) {
+  const response = await axiosClient.get(TERRITORY_ENDPOINTS.riskScore(regionId));
+  const source = (response.data && response.data.data) || response.data || {};
+  return {
+    regionId: source.regionId || regionId,
+    scoreComposite: source.scoreComposite ?? null,
+    alertLevel: source.alertLevel || 'NORMAL',
+    qualityFlag: source.qualityFlag || 'NO_DATA',
+    computedAt: source.computedAt || null,
+    components: source.components || null,
+    fwiInputs: source.fwiInputs || null,
+    ndviRaw: source.components?.ndvi?.rawValue ?? null,
+    ndmiRaw: source.components?.ndmi?.rawValue ?? null
+  };
 }

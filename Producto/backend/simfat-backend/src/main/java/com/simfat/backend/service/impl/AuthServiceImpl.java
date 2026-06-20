@@ -22,6 +22,7 @@ import com.simfat.backend.repository.AppUserRepository;
 import com.simfat.backend.repository.PasswordResetTokenRepository;
 import com.simfat.backend.repository.RefreshTokenRepository;
 import com.simfat.backend.security.AuthProperties;
+import com.simfat.backend.security.AuthorizationResolverService;
 import com.simfat.backend.security.JwtService;
 import com.simfat.backend.security.TokenPair;
 import com.simfat.backend.service.AuthService;
@@ -66,6 +67,7 @@ public class AuthServiceImpl implements AuthService {
     private final TurnstileService turnstileService;
     private final AuthProperties authProperties;
     private final Environment environment;
+    private final AuthorizationResolverService authorizationResolverService;
 
     public AuthServiceImpl(
         AppUserRepository appUserRepository,
@@ -76,7 +78,8 @@ public class AuthServiceImpl implements AuthService {
         RateLimiterService rateLimiterService,
         TurnstileService turnstileService,
         AuthProperties authProperties,
-        Environment environment
+        Environment environment,
+        AuthorizationResolverService authorizationResolverService
     ) {
         this.appUserRepository = appUserRepository;
         this.refreshTokenRepository = refreshTokenRepository;
@@ -87,6 +90,7 @@ public class AuthServiceImpl implements AuthService {
         this.turnstileService = turnstileService;
         this.authProperties = authProperties;
         this.environment = environment;
+        this.authorizationResolverService = authorizationResolverService;
     }
 
     @Override
@@ -273,6 +277,11 @@ public class AuthServiceImpl implements AuthService {
         refreshTokenRepository.save(record);
     }
 
+    @Override
+    public void revokeAllTokens(String userId) {
+        revokeAllUserRefreshTokens(userId);
+    }
+
     private void revokeAllUserRefreshTokens(String userId) {
         List<RefreshTokenRecord> activeTokens = refreshTokenRepository.findByUserIdAndRevokedAtIsNull(userId);
         Instant now = Instant.now();
@@ -305,11 +314,14 @@ public class AuthServiceImpl implements AuthService {
     }
 
     private AuthUserDTO toUserDto(AppUser user) {
+        var snapshot = authorizationResolverService.resolveForUser(user);
         return new AuthUserDTO(
             user.getId(),
             user.getEmail(),
             user.getFullName(),
-            user.getRoles().stream().map(Enum::name).collect(Collectors.toSet())
+            user.getRoles().stream().map(Enum::name).collect(Collectors.toSet()),
+            snapshot.getRoleCodes(),
+            snapshot.getPermissionCodes()
         );
     }
 

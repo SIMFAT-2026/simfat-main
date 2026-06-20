@@ -11,9 +11,15 @@ public class CitizenReportPayloadDTO {
     @NotBlank(message = "La region es obligatoria")
     private String regionId;
 
+    @NotBlank(message = "La comuna es obligatoria")
+    private String comunaId;
+
     @NotBlank(message = "La categoria es obligatoria")
     @Size(max = 40, message = "La categoria no puede exceder 40 caracteres")
     private String category;
+
+    @Size(max = 120, message = "La subcategoria no puede exceder 120 caracteres")
+    private String subCategory;
 
     @NotBlank(message = "La descripcion es obligatoria")
     @Size(max = 600, message = "La descripcion no puede exceder 600 caracteres")
@@ -37,12 +43,28 @@ public class CitizenReportPayloadDTO {
         this.regionId = regionId;
     }
 
+    public String getComunaId() {
+        return comunaId;
+    }
+
+    public void setComunaId(String comunaId) {
+        this.comunaId = comunaId;
+    }
+
     public String getCategory() {
         return category;
     }
 
     public void setCategory(String category) {
         this.category = category;
+    }
+
+    public String getSubCategory() {
+        return subCategory;
+    }
+
+    public void setSubCategory(String subCategory) {
+        this.subCategory = subCategory;
     }
 
     public String getDescription() {

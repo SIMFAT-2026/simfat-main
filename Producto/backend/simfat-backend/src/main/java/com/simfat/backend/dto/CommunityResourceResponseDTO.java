@@ -9,7 +9,12 @@ public class CommunityResourceResponseDTO {
     private String category;
     private String url;
     private String regionId;
+    private String comunaId;
     private String description;
+    private String fileUrl;
+    private String fileName;
+    private String fileContentType;
+    private Long fileSize;
     private LocalDateTime createdAt;
 
     public String getId() {
@@ -52,12 +57,52 @@ public class CommunityResourceResponseDTO {
         this.regionId = regionId;
     }
 
+    public String getComunaId() {
+        return comunaId;
+    }
+
+    public void setComunaId(String comunaId) {
+        this.comunaId = comunaId;
+    }
+
     public String getDescription() {
         return description;
     }
 
     public void setDescription(String description) {
         this.description = description;
+    }
+
+    public String getFileUrl() {
+        return fileUrl;
+    }
+
+    public void setFileUrl(String fileUrl) {
+        this.fileUrl = fileUrl;
+    }
+
+    public String getFileName() {
+        return fileName;
+    }
+
+    public void setFileName(String fileName) {
+        this.fileName = fileName;
+    }
+
+    public String getFileContentType() {
+        return fileContentType;
+    }
+
+    public void setFileContentType(String fileContentType) {
+        this.fileContentType = fileContentType;
+    }
+
+    public Long getFileSize() {
+        return fileSize;
+    }
+
+    public void setFileSize(Long fileSize) {
+        this.fileSize = fileSize;
     }
 
     public LocalDateTime getCreatedAt() {

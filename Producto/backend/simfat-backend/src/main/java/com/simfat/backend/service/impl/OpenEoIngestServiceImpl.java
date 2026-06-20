@@ -12,6 +12,7 @@ import com.simfat.backend.repository.OpenEoJobRunRepository;
 import com.simfat.backend.repository.RegionRepository;
 import com.simfat.backend.service.DashboardSnapshotService;
 import com.simfat.backend.service.OpenEoIngestService;
+import com.simfat.backend.service.TerritoryRiskService;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
@@ -29,17 +30,20 @@ public class OpenEoIngestServiceImpl implements OpenEoIngestService {
     private final OpenEoJobRunRepository jobRunRepository;
     private final RegionRepository regionRepository;
     private final DashboardSnapshotService snapshotService;
+    private final TerritoryRiskService territoryRiskService;
 
     public OpenEoIngestServiceImpl(
         OpenEoIndicatorObservationRepository observationRepository,
         OpenEoJobRunRepository jobRunRepository,
         RegionRepository regionRepository,
-        DashboardSnapshotService snapshotService
+        DashboardSnapshotService snapshotService,
+        TerritoryRiskService territoryRiskService
     ) {
         this.observationRepository = observationRepository;
         this.jobRunRepository = jobRunRepository;
         this.regionRepository = regionRepository;
         this.snapshotService = snapshotService;
+        this.territoryRiskService = territoryRiskService;
     }
 
     @Override
@@ -79,6 +83,7 @@ public class OpenEoIngestServiceImpl implements OpenEoIngestService {
             observationRepository.save(observation);
 
             snapshotService.recomputeSnapshot(request.getRegionId());
+            territoryRiskService.recomputeRiskByRegion(request.getRegionId());
             observationPersisted = true;
         }
 

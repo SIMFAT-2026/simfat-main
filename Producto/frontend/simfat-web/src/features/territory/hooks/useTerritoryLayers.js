@@ -1,36 +1,48 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { fetchTerritoryBounds, fetchTerritoryLayers } from '../services/territoryApiService';
+import { fetchTerritoryBounds, fetchTerritoryGeoJson, fetchTerritoryLayers, fetchTerritoryRiskScore, fetchComunalRiskScores } from '../services/territoryApiService';
 
 const CACHE_TTL_MS = 120_000;
 const pendingByKey = new Map();
 const cacheByKey = new Map();
 
 const REGION_CONFIG = {
+  nuble: {
+    id: 'nuble',
+    label: 'Ñuble',
+    center: [-36.6, -71.9],
+    bounds: [
+      [-37.4, -72.8],
+      [-35.8, -71.0]
+    ],
+    zoom: 9
+  },
   biobio: {
     id: 'biobio',
-    label: 'Biobio',
+    label: 'Biobío',
     center: [-37.5, -72.5],
     bounds: [
       [-38.9, -74.1],
       [-36.3, -71.0]
     ],
-    zoom: 8
+    zoom: 9
   },
   araucania: {
     id: 'araucania',
-    label: 'La Araucania',
+    label: 'La Araucanía',
     center: [-38.7, -72.4],
     bounds: [
       [-39.8, -73.9],
       [-37.8, -71.2]
     ],
-    zoom: 8
+    zoom: 9
   }
 };
 
 const REGION_OPTIONS = Object.values(REGION_CONFIG);
-const DEFAULT_INDICATORS = ['NDVI', 'NDMI', 'LOSS', 'ALERTS', 'REPORTS'];
-const DEFAULT_VISIBLE_INDICATORS = ['NDVI', 'ALERTS', 'REPORTS'];
+const DEFAULT_INDICATORS = ['NDVI', 'NDMI', 'ALERTS', 'FIRMS', 'REPORTS', 'RISK_SCORE', 'WIND', 'HUMIDITY', 'AIR_TEMP', 'SOIL_TEMP'];
+// WIND/HUMIDITY/AIR_TEMP/SOIL_TEMP are opt-in climate layers: fetched alongside
+// the rest but not shown until the user toggles them on (DEC-B).
+const DEFAULT_VISIBLE_INDICATORS = ['RISK_SCORE', 'FIRMS', 'ALERTS', 'REPORTS'];
 const REGION_IDS = new Set(REGION_OPTIONS.map((region) => region.id));
 
 function createPointFeature(id, lng, lat, properties) {
@@ -46,6 +58,45 @@ function createPointFeature(id, lng, lat, properties) {
 }
 
 function createMockLayers(regionId) {
+  if (regionId === 'nuble') {
+    return {
+      NDVI: {
+        type: 'FeatureCollection',
+        features: [
+          createPointFeature('nu-ndvi-1', -72.12, -36.61, { label: 'Chillan', indicator: 'NDVI', value: 0.52 }),
+          createPointFeature('nu-ndvi-2', -71.65, -36.42, { label: 'San Carlos', indicator: 'NDVI', value: 0.47 })
+        ]
+      },
+      NDMI: {
+        type: 'FeatureCollection',
+        features: [
+          createPointFeature('nu-ndmi-1', -72.10, -36.60, { label: 'Chillan', indicator: 'NDMI', value: 0.30 }),
+          createPointFeature('nu-ndmi-2', -71.96, -36.78, { label: 'Yungay', indicator: 'NDMI', value: 0.26 })
+        ]
+      },
+      ALERTS: {
+        type: 'FeatureCollection',
+        features: [
+          createPointFeature('nu-alert-1', -72.08, -36.62, { label: 'Alerta preventiva', indicator: 'ALERTS', level: 'PREVENTIVO' })
+        ]
+      },
+      REPORTS: {
+        type: 'FeatureCollection',
+        features: [
+          createPointFeature('nu-report-1', -72.11, -36.59, { label: 'Humo reportado', indicator: 'REPORTS', category: 'HUMO' })
+        ]
+      },
+      FIRMS: { type: 'FeatureCollection', features: [] },
+      RISK_SCORE: {
+        type: 'FeatureCollection',
+        features: [
+          createPointFeature('nu-risk', -71.9, -36.6, { label: 'Nuble', indicator: 'RISK_SCORE', score: 0.0, alertLevel: 'NORMAL' })
+        ]
+      },
+      ...createMockClimateLayers()
+    };
+  }
+
   if (regionId === 'araucania') {
     return {
       NDVI: {
@@ -60,13 +111,6 @@ function createMockLayers(regionId) {
         features: [
           createPointFeature('ar-ndmi-1', -72.62, -38.73, { label: 'Temuco', indicator: 'NDMI', value: 0.31 }),
           createPointFeature('ar-ndmi-2', -71.95, -38.68, { label: 'Curacautin', indicator: 'NDMI', value: 0.28 })
-        ]
-      },
-      LOSS: {
-        type: 'FeatureCollection',
-        features: [
-          createPointFeature('ar-loss-1', -72.75, -38.98, { label: 'Nueva Imperial', indicator: 'LOSS', hectares: 11 }),
-          createPointFeature('ar-loss-2', -72.05, -38.95, { label: 'Padre Las Casas', indicator: 'LOSS', hectares: 8 })
         ]
       },
       ALERTS: {
@@ -86,7 +130,15 @@ function createMockLayers(regionId) {
             category: 'QUEMA'
           })
         ]
-      }
+      },
+      FIRMS: { type: 'FeatureCollection', features: [] },
+      RISK_SCORE: {
+        type: 'FeatureCollection',
+        features: [
+          createPointFeature('ar-risk', -72.4, -38.7, { label: 'La Araucania', indicator: 'RISK_SCORE', score: 0.0, alertLevel: 'NORMAL' })
+        ]
+      },
+      ...createMockClimateLayers()
     };
   }
 
@@ -105,13 +157,6 @@ function createMockLayers(regionId) {
         createPointFeature('bb-ndmi-2', -72.93, -37.08, { label: 'Florida', indicator: 'NDMI', value: 0.29 })
       ]
     },
-    LOSS: {
-      type: 'FeatureCollection',
-      features: [
-        createPointFeature('bb-loss-1', -72.9, -37.05, { label: 'Coronel', indicator: 'LOSS', hectares: 9 }),
-        createPointFeature('bb-loss-2', -72.42, -37.38, { label: 'Nacimiento', indicator: 'LOSS', hectares: 7 })
-      ]
-    },
     ALERTS: {
       type: 'FeatureCollection',
       features: [
@@ -125,7 +170,27 @@ function createMockLayers(regionId) {
         createPointFeature('bb-report-1', -73.01, -36.79, { label: 'Foco de humo', indicator: 'REPORTS', category: 'HUMO' }),
         createPointFeature('bb-report-2', -72.66, -37.42, { label: 'Fuego en ladera', indicator: 'REPORTS', category: 'FOCO' })
       ]
-    }
+    },
+    FIRMS: { type: 'FeatureCollection', features: [] },
+    RISK_SCORE: {
+      type: 'FeatureCollection',
+      features: [
+        createPointFeature('bb-risk', -72.5, -37.5, { label: 'Biobio', indicator: 'RISK_SCORE', score: 0.0, alertLevel: 'NORMAL' })
+      ]
+    },
+    ...createMockClimateLayers()
+  };
+}
+
+// Empty value-maps for the opt-in climate layers — keeps the mock-data shape
+// consistent with the backend's value-map contract so rendering code can
+// rely on `layers[indicator].values` always being an object.
+function createMockClimateLayers() {
+  return {
+    WIND: { indicator: 'WIND', unit: 'km/h', values: {} },
+    HUMIDITY: { indicator: 'HUMIDITY', unit: '%', values: {} },
+    AIR_TEMP: { indicator: 'AIR_TEMP', unit: '°C', values: {} },
+    SOIL_TEMP: { indicator: 'SOIL_TEMP', unit: '°C', values: {} }
   };
 }
 
@@ -147,6 +212,18 @@ function cacheKey(regionId, indicators, from, to) {
   return `${regionId}|${indicators.join(',')}|${from}|${to}`;
 }
 
+function readCacheSnapshot(dateRange) {
+  const snapshot = {};
+  for (const region of REGION_OPTIONS) {
+    const key = cacheKey(region.id, DEFAULT_INDICATORS, dateRange.from, dateRange.to);
+    const entry = cacheByKey.get(key);
+    if (entry && Date.now() < entry.expiresAt) {
+      snapshot[region.id] = entry.data;
+    }
+  }
+  return snapshot;
+}
+
 async function loadRegionData({ regionId, indicators, from, to, force = false }) {
   const key = cacheKey(regionId, indicators, from, to);
   const cached = cacheByKey.get(key);
@@ -163,9 +240,12 @@ async function loadRegionData({ regionId, indicators, from, to, force = false })
   const regionFallback = REGION_CONFIG[regionId] || REGION_CONFIG.biobio;
   const requestPromise = (async () => {
     try {
-      const [boundsData, layerData] = await Promise.all([
+      const [boundsData, layerData, riskScoreData, comunalGeoJson, comunalScores] = await Promise.all([
         fetchTerritoryBounds(regionId, regionFallback),
-        fetchTerritoryLayers({ regionId, indicators, from, to })
+        fetchTerritoryLayers({ regionId, indicators, from, to }),
+        fetchTerritoryRiskScore(regionId).catch(() => null),
+        fetchTerritoryGeoJson(regionId).catch(() => null),
+        fetchComunalRiskScores(regionId).catch(() => null)
       ]);
 
       return {
@@ -176,7 +256,10 @@ async function loadRegionData({ regionId, indicators, from, to, force = false })
         generatedAt: layerData.generatedAt,
         source: 'backend',
         requestedRange: { from, to },
-        layers: layerData.layers
+        layers: layerData.layers,
+        riskScore: riskScoreData,
+        comunalGeoJson,
+        comunalScores
       };
     } catch {
       return createMockRegionData(regionId, from, to);
@@ -187,9 +270,10 @@ async function loadRegionData({ regionId, indicators, from, to, force = false })
 
   try {
     const data = await requestPromise;
+    const ttl = data.source === 'mock' ? 8_000 : CACHE_TTL_MS;
     cacheByKey.set(key, {
       data,
-      expiresAt: Date.now() + CACHE_TTL_MS
+      expiresAt: Date.now() + ttl
     });
     return data;
   } finally {
@@ -217,7 +301,7 @@ export function useTerritoryLayers(options = {}) {
   const [selectedRegionId, setSelectedRegionId] = useState(initialRegionId);
   const [visibleIndicators, setVisibleIndicators] = useState(initialVisibleIndicators);
   const [dateRange] = useState(defaultDateRange);
-  const [dataByRegion, setDataByRegion] = useState({});
+  const [dataByRegion, setDataByRegion] = useState(() => readCacheSnapshot(dateRange));
   const [loadingRegionId, setLoadingRegionId] = useState('');
   const [errorByRegion, setErrorByRegion] = useState({});
 
@@ -273,15 +357,28 @@ export function useTerritoryLayers(options = {}) {
     async function bootstrap() {
       await loadRegion(selectedRegionId, false);
       const remaining = REGION_OPTIONS.filter((region) => region.id !== selectedRegionId);
-      for (const region of remaining) {
-        if (!mounted) {
-          break;
-        }
-        await loadRegion(region.id, false);
-      }
+      await Promise.all(remaining.map((region) => loadRegion(region.id, false)));
     }
 
-    bootstrap();
+    async function bootstrapWithRetry() {
+      await bootstrap();
+      if (!mounted) return;
+      // Only schedule a retry if the initial region came back as mock or with
+      // missing comunalScores (backend cold-start / partial success). Skip the
+      // 10-second wait entirely when data loaded correctly.
+      setDataByRegion((current) => {
+        const regionEntry = current[selectedRegionId];
+        const needsRetry = regionEntry?.source === 'mock' || regionEntry?.comunalScores == null;
+        if (needsRetry) {
+          setTimeout(() => {
+            if (mounted) loadRegion(selectedRegionId, true);
+          }, 10_000);
+        }
+        return current;
+      });
+    }
+
+    bootstrapWithRetry();
 
     return () => {
       mounted = false;

@@ -27,6 +27,8 @@ class OpenEOClient:
         refresh_token: str = "",
         refresh_client_id: str = "",
         refresh_client_secret: str = "",
+        username: str = "",
+        password: str = "",
     ) -> None:
         self.base_url = base_url.rstrip("/")
         self.client_id = client_id
@@ -35,6 +37,8 @@ class OpenEOClient:
         self.refresh_token = refresh_token.strip()
         self.refresh_client_id = refresh_client_id.strip()
         self.refresh_client_secret = refresh_client_secret.strip()
+        self.username = username.strip()
+        self.password = password.strip()
         self.identity_token_url = (
             "https://identity.dataspace.copernicus.eu/auth/realms/CDSE/protocol/openid-connect/token"
         )
@@ -150,7 +154,7 @@ class OpenEOClient:
         )
 
         try:
-            with httpx.Client(timeout=60) as client:
+            with httpx.Client(timeout=200) as client:
                 response = self._request_with_retry(
                     client=client,
                     method="POST",
@@ -270,6 +274,10 @@ class OpenEOClient:
             raise ExternalServiceError(f"Identity connectivity error while refreshing token: {exc}") from exc
 
         if response.status_code >= 400:
+            body = response.text
+            is_expired = "invalid_grant" in body or "Token is not active" in body
+            if is_expired and self.username and self.password:
+                return self._request_token_by_password()
             detail = self._extract_openeo_error(response)
             raise ExternalServiceError(
                 f"Identity refresh token request failed with status {response.status_code}: {detail}",
@@ -286,10 +294,56 @@ class OpenEOClient:
         self._token_cache["processing_access_token"] = access_token
         self._token_cache["processing_expires_at"] = datetime.now(timezone.utc) + timedelta(seconds=safe_ttl)
 
-        # If the provider rotates refresh tokens, keep it in memory for this process.
         rotated_refresh_token = payload.get("refresh_token")
         if isinstance(rotated_refresh_token, str) and rotated_refresh_token.strip():
             self.refresh_token = rotated_refresh_token.strip()
+
+        return access_token
+
+    def _request_token_by_password(self) -> str:
+        client_id = self.refresh_client_id or self.client_id
+        data = {
+            "grant_type": "password",
+            "client_id": client_id,
+            "username": self.username,
+            "password": self.password,
+            "scope": "openid offline_access",
+        }
+        if self.refresh_client_secret:
+            data["client_secret"] = self.refresh_client_secret
+
+        try:
+            with httpx.Client(timeout=self.timeout_seconds) as client:
+                response = self._request_with_retry(
+                    client=client,
+                    method="POST",
+                    url=self.identity_token_url,
+                    data=data,
+                )
+        except httpx.HTTPError as exc:
+            raise ExternalServiceError(f"Identity connectivity error during password auth: {exc}") from exc
+
+        if response.status_code >= 400:
+            detail = self._extract_openeo_error(response)
+            raise ExternalServiceError(
+                f"Identity password auth failed with status {response.status_code}: {detail}",
+                status_code=response.status_code,
+            )
+
+        payload = response.json()
+        access_token = payload.get("access_token")
+        if not access_token:
+            raise ExternalServiceError("Identity password auth response did not include access_token")
+
+        expires_in = int(payload.get("expires_in", 1800))
+        safe_ttl = max(expires_in - 60, 60)
+        self._token_cache["processing_access_token"] = access_token
+        self._token_cache["processing_expires_at"] = datetime.now(timezone.utc) + timedelta(seconds=safe_ttl)
+
+        # Store the new refresh token so future calls use it instead of re-doing password auth
+        new_refresh_token = payload.get("refresh_token")
+        if isinstance(new_refresh_token, str) and new_refresh_token.strip():
+            self.refresh_token = new_refresh_token.strip()
 
         return access_token
 
@@ -353,6 +407,7 @@ class OpenEOClient:
             nir_band = "B08"
             red_band = "B04"
         else:
+            # NDMI: B08 (10m) and B11 (20m) — mixed resolution requires resampling
             nir_band = "B08"
             red_band = "B11"
 
@@ -365,7 +420,8 @@ class OpenEOClient:
                 }
             }
         }
-        return {
+
+        graph: dict[str, Any] = {
             "load_collection": {
                 "process_id": "load_collection",
                 "arguments": {
@@ -375,39 +431,55 @@ class OpenEOClient:
                     "bands": [red_band, nir_band],
                 },
             },
-            "index": {
-                "process_id": "ndvi",
+        }
+
+        # B11 is 20m vs B08/B04 at 10m. Without explicit resampling CDSE returns
+        # application/octet-stream binary raster instead of JSON for mixed-resolution graphs.
+        index_input_node = "load_collection"
+        if indicator_type != IndicatorType.NDVI:
+            graph["resample"] = {
+                "process_id": "resample_spatial",
                 "arguments": {
                     "data": {"from_node": "load_collection"},
-                    "nir": nir_band,
-                    "red": red_band,
+                    "resolution": 10,
+                    "method": "bilinear",
                 },
-            },
-            "reduce_time": {
-                "process_id": "reduce_dimension",
-                "arguments": {
-                    "data": {"from_node": "index"},
-                    "dimension": "t",
-                    "reducer": mean_reducer,
-                },
-            },
-            "aggregate_spatial": {
-                "process_id": "aggregate_spatial",
-                "arguments": {
-                    "data": {"from_node": "reduce_time"},
-                    "geometries": polygon,
-                    "reducer": mean_reducer,
-                },
-            },
-            "save": {
-                "process_id": "save_result",
-                "arguments": {
-                    "data": {"from_node": "aggregate_spatial"},
-                    "format": "JSON",
-                },
-                "result": True,
+            }
+            index_input_node = "resample"
+
+        graph["index"] = {
+            "process_id": "ndvi",
+            "arguments": {
+                "data": {"from_node": index_input_node},
+                "nir": nir_band,
+                "red": red_band,
             },
         }
+        graph["reduce_time"] = {
+            "process_id": "reduce_dimension",
+            "arguments": {
+                "data": {"from_node": "index"},
+                "dimension": "t",
+                "reducer": mean_reducer,
+            },
+        }
+        graph["aggregate_spatial"] = {
+            "process_id": "aggregate_spatial",
+            "arguments": {
+                "data": {"from_node": "reduce_time"},
+                "geometries": polygon,
+                "reducer": mean_reducer,
+            },
+        }
+        graph["save"] = {
+            "process_id": "save_result",
+            "arguments": {
+                "data": {"from_node": "aggregate_spatial"},
+                "format": "JSON",
+            },
+            "result": True,
+        }
+        return graph
 
     def _extract_openeo_error(self, response: httpx.Response) -> str:
         try:
@@ -428,7 +500,8 @@ class OpenEOClient:
     def _extract_first_numeric(self, response: httpx.Response) -> float | None:
         try:
             payload = response.json()
-        except ValueError:
+        except (ValueError, UnicodeDecodeError):
+            # CDSE can return application/octet-stream (binary GeoTIFF) for some queries
             return None
 
         value = self._extract_numeric_recursive(payload)

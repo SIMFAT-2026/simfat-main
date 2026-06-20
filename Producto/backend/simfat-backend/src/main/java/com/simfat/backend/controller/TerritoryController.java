@@ -3,26 +3,47 @@ package com.simfat.backend.controller;
 import com.simfat.backend.dto.ApiResponse;
 import com.simfat.backend.dto.TerritoryBoundsResponseDTO;
 import com.simfat.backend.dto.TerritoryLayersResponseDTO;
+import com.simfat.backend.model.ComunaRiskSnapshot;
+import com.simfat.backend.service.ComunaRiskService;
 import com.simfat.backend.model.CitizenReport;
 import com.simfat.backend.model.ForestLossRecord;
 import com.simfat.backend.model.HeatAlertEvent;
 import com.simfat.backend.model.IndicatorType;
 import com.simfat.backend.model.OpenEoIndicatorObservation;
+import com.simfat.backend.model.TerritoryRiskSnapshot;
+import com.simfat.backend.model.TerritoryWeatherObservation;
+import com.simfat.backend.model.ComunaInfo;
 import com.simfat.backend.repository.CitizenReportRepository;
+import com.simfat.backend.repository.ComunaInfoRepository;
 import com.simfat.backend.repository.ForestLossRecordRepository;
 import com.simfat.backend.repository.HeatAlertEventRepository;
 import com.simfat.backend.repository.OpenEoIndicatorObservationRepository;
+import com.simfat.backend.repository.RegionRepository;
+import com.simfat.backend.repository.TerritoryWeatherObservationRepository;
+import com.simfat.backend.service.NasaFirmsService;
+import com.simfat.backend.service.OpenWeatherFwiService;
+import com.simfat.backend.service.TerritoryRiskService;
 import java.time.LocalDate;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+import org.springframework.core.io.ClassPathResource;
+import org.springframework.http.MediaType;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -31,21 +52,46 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/territory")
 public class TerritoryController {
 
+    private static final List<String> VALID_INDICATORS =
+        List.of("NDVI", "NDMI", "LOSS", "ALERTS", "REPORTS", "FIRMS", "RISK_SCORE",
+            "WIND", "HUMIDITY", "AIR_TEMP", "SOIL_TEMP");
+
     private final HeatAlertEventRepository heatAlertRepository;
     private final CitizenReportRepository citizenReportRepository;
     private final ForestLossRecordRepository forestLossRepository;
     private final OpenEoIndicatorObservationRepository observationRepository;
+    private final RegionRepository regionRepository;
+    private final TerritoryRiskService territoryRiskService;
+    private final NasaFirmsService nasaFirmsService;
+    private final OpenWeatherFwiService openWeatherFwiService;
+    private final ComunaRiskService comunaRiskService;
+    private final ComunaInfoRepository comunaInfoRepository;
+    private final TerritoryWeatherObservationRepository weatherObservationRepository;
 
     public TerritoryController(
         HeatAlertEventRepository heatAlertRepository,
         CitizenReportRepository citizenReportRepository,
         ForestLossRecordRepository forestLossRepository,
-        OpenEoIndicatorObservationRepository observationRepository
+        OpenEoIndicatorObservationRepository observationRepository,
+        RegionRepository regionRepository,
+        TerritoryRiskService territoryRiskService,
+        NasaFirmsService nasaFirmsService,
+        OpenWeatherFwiService openWeatherFwiService,
+        ComunaRiskService comunaRiskService,
+        ComunaInfoRepository comunaInfoRepository,
+        TerritoryWeatherObservationRepository weatherObservationRepository
     ) {
         this.heatAlertRepository = heatAlertRepository;
         this.citizenReportRepository = citizenReportRepository;
         this.forestLossRepository = forestLossRepository;
         this.observationRepository = observationRepository;
+        this.regionRepository = regionRepository;
+        this.territoryRiskService = territoryRiskService;
+        this.nasaFirmsService = nasaFirmsService;
+        this.openWeatherFwiService = openWeatherFwiService;
+        this.comunaRiskService = comunaRiskService;
+        this.comunaInfoRepository = comunaInfoRepository;
+        this.weatherObservationRepository = weatherObservationRepository;
     }
 
     @GetMapping("/bounds")
@@ -88,10 +134,38 @@ public class TerritoryController {
             layers.put("LOSS", lossLayer(regionId, geometry));
         }
         if (requestedIndicators.contains("ALERTS")) {
-            layers.put("ALERTS", alertsLayer(fromDate, toDate));
+            layers.put("ALERTS", alertsLayer(regionId, fromDate, toDate));
+        }
+        if (requestedIndicators.contains("FIRMS")) {
+            layers.put("FIRMS", firmsLayer(regionId, fromDate, toDate));
         }
         if (requestedIndicators.contains("REPORTS")) {
             layers.put("REPORTS", reportsLayer(fromDate, toDate));
+        }
+        if (requestedIndicators.contains("RISK_SCORE")) {
+            layers.put("RISK_SCORE", riskScoreLayer(regionId, geometry));
+        }
+        boolean needsClimateLayers = requestedIndicators.contains("WIND")
+            || requestedIndicators.contains("HUMIDITY")
+            || requestedIndicators.contains("AIR_TEMP")
+            || requestedIndicators.contains("SOIL_TEMP");
+
+        if (needsClimateLayers) {
+            List<ComunaInfo> comunas = comunaInfoRepository.findByRegionId(regionId);
+            Map<String, TerritoryWeatherObservation> latestByComuna = latestWeatherByComuna(comunas);
+
+            if (requestedIndicators.contains("WIND")) {
+                layers.put("WIND", windValueMap(comunas, latestByComuna));
+            }
+            if (requestedIndicators.contains("HUMIDITY")) {
+                layers.put("HUMIDITY", climateValueMap(comunas, latestByComuna, "HUMIDITY", "%", TerritoryWeatherObservation::getHumidityMin));
+            }
+            if (requestedIndicators.contains("AIR_TEMP")) {
+                layers.put("AIR_TEMP", climateValueMap(comunas, latestByComuna, "AIR_TEMP", "°C", TerritoryWeatherObservation::getTempMax));
+            }
+            if (requestedIndicators.contains("SOIL_TEMP")) {
+                layers.put("SOIL_TEMP", climateValueMap(comunas, latestByComuna, "SOIL_TEMP", "°C", TerritoryWeatherObservation::getSoilTemp));
+            }
         }
 
         TerritoryLayersResponseDTO dto = new TerritoryLayersResponseDTO();
@@ -184,9 +258,12 @@ public class TerritoryController {
         return featureCollection(features);
     }
 
-    private Map<String, Object> alertsLayer(LocalDateTime from, LocalDateTime to) {
-        List<Map<String, Object>> features = heatAlertRepository.findAll()
+    private Map<String, Object> alertsLayer(String regionId, LocalDateTime from, LocalDateTime to) {
+        // Exclude NASA_FIRMS events — those are already shown in the FIRMS layer.
+        // ALERTS shows non-satellite sources (CONAF, manual, temperature alerts, etc.).
+        List<Map<String, Object>> features = heatAlertRepository.findByRegionId(regionId)
             .stream()
+            .filter(alert -> !"NASA_FIRMS".equals(alert.getFuente()))
             .filter(alert -> alert.getFechaEvento() != null && !alert.getFechaEvento().isBefore(from) && !alert.getFechaEvento().isAfter(to))
             .map(this::toAlertFeature)
             .toList();
@@ -220,17 +297,348 @@ public class TerritoryController {
         ));
     }
 
+    @GetMapping("/risk-score/{regionId}")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> getRiskScore(@PathVariable String regionId) {
+        TerritoryRiskSnapshot snapshot = territoryRiskService.getLatestSnapshot(regionId);
+        if (snapshot == null) {
+            return ResponseEntity.ok(ApiResponse.ok("Sin snapshot disponible para " + regionId, Map.of(
+                "regionId", regionId,
+                "alertLevel", "NORMAL",
+                "scoreComposite", 0.0,
+                "qualityFlag", "NO_DATA"
+            )));
+        }
+
+        Map<String, Object> components = new LinkedHashMap<>();
+        components.put("fwi", Map.of("score", nullSafe(snapshot.getComponentFwi()), "rawValue", nullSafe(snapshot.getFwiRaw()), "weight", 0.38));
+        components.put("ndmi", Map.of("score", nullSafe(snapshot.getComponentNdmi()), "rawValue", nullSafe(snapshot.getNdmiRaw()), "weight", 0.22));
+        components.put("firms", Map.of("score", nullSafe(snapshot.getComponentFirms()), "focosCount", nullSafe(snapshot.getFirmsCount()), "frpMean", nullSafe(snapshot.getFirmsFrpMean()), "weight", 0.18));
+        components.put("ndvi", Map.of("score", nullSafe(snapshot.getComponentNdvi()), "rawValue", nullSafe(snapshot.getNdviRaw()), "weight", 0.08));
+        components.put("reports", Map.of("score", nullSafe(snapshot.getComponentReports()), "count", nullSafe(snapshot.getReportsCount()), "weight", 0.04));
+
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("regionId", snapshot.getRegionId());
+        data.put("computedAt", snapshot.getComputedAt());
+        data.put("scoreComposite", snapshot.getScoreComposite());
+        data.put("alertLevel", snapshot.getAlertLevel());
+        data.put("qualityFlag", snapshot.getQualityFlag());
+        data.put("components", components);
+        data.put("fwiInputs", buildFwiInputs(regionId));
+
+        return ResponseEntity.ok(ApiResponse.ok("Score de riesgo territorial obtenido correctamente", data));
+    }
+
+    @GetMapping(value = "/geojson/{regionId}", produces = MediaType.APPLICATION_JSON_VALUE)
+    public org.springframework.http.ResponseEntity<String> getComunasGeoJson(@PathVariable String regionId) {
+        String path = "geojson/comunas-" + regionId.toLowerCase(Locale.ROOT) + ".geojson";
+        try {
+            ClassPathResource resource = new ClassPathResource(path);
+            if (!resource.exists()) {
+                return org.springframework.http.ResponseEntity.notFound().build();
+            }
+            try (InputStream is = resource.getInputStream()) {
+                String json = new String(is.readAllBytes(), StandardCharsets.UTF_8);
+                return org.springframework.http.ResponseEntity.ok()
+                    .header("Cache-Control", "max-age=86400")
+                    .body(json);
+            }
+        } catch (Exception ex) {
+            return org.springframework.http.ResponseEntity.internalServerError().build();
+        }
+    }
+
+    @GetMapping("/risk-score/comunas/{regionId}")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> getComunalRiskScores(@PathVariable String regionId) {
+        Map<String, ComunaRiskSnapshot> snapshots = comunaRiskService.getLatestSnapshotsByRegion(regionId);
+
+        // Pre-fetch all weather observations in a single query to avoid N+1.
+        List<String> comunaIds = new ArrayList<>(snapshots.keySet());
+        Map<String, TerritoryWeatherObservation> weatherByComuna = new LinkedHashMap<>();
+        for (TerritoryWeatherObservation obs : weatherObservationRepository.findByRegionIdInOrderByObservedAtDesc(comunaIds)) {
+            weatherByComuna.putIfAbsent(obs.getRegionId(), obs);
+        }
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        snapshots.forEach((comunaId, s) -> {
+            Map<String, Object> data = new LinkedHashMap<>();
+            data.put("alertLevel", s.getAlertLevel());
+            data.put("scoreComposite", s.getScoreComposite());
+            data.put("mode", s.getMode());
+            data.put("qualityFlag", s.getQualityFlag());
+            data.put("nombreComuna", s.getNombreComuna());
+            data.put("computedAt", s.getComputedAt());
+            data.put("fwiRaw", s.getFwiRaw());
+            data.put("firmsCount", s.getFirmsCount());
+            data.put("firmsFrpMean", s.getFirmsFrpMean());
+            data.put("ndmiRaw", s.getNdmiRaw());
+            data.put("ndviRaw", s.getNdviRaw());
+            Map<String, Object> components = new LinkedHashMap<>();
+            components.put("fwi", s.getComponentFwi());
+            components.put("firms", s.getComponentFirms());
+            components.put("reports", s.getComponentReports());
+            components.put("ndmi", s.getComponentNdmi());
+            components.put("ndvi", s.getComponentNdvi());
+            data.put("components", components);
+            data.put("fwiInputs", buildFwiInputs(weatherByComuna.get(comunaId)));
+            result.put(comunaId, data);
+        });
+        return ResponseEntity.ok(ApiResponse.ok("Scores comunales para " + regionId, result));
+    }
+
+    @GetMapping("/risk-score/comunas/{gadmGid}/history")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> getComunaHistory(
+        @PathVariable String gadmGid,
+        @RequestParam(defaultValue = "7") int days
+    ) {
+        List<ComunaRiskSnapshot> history = comunaRiskService.getSnapshotHistory(gadmGid, days);
+        List<Map<String, Object>> snapshots = history.stream().map(s -> {
+            Map<String, Object> entry = new LinkedHashMap<>();
+            entry.put("computedAt", s.getComputedAt());
+            entry.put("scoreComposite", s.getScoreComposite());
+            entry.put("alertLevel", s.getAlertLevel());
+            entry.put("mode", s.getMode());
+            return entry;
+        }).toList();
+        String nombre = history.isEmpty() ? gadmGid : history.get(0).getNombreComuna();
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("gadmGid", gadmGid);
+        result.put("comunaNombre", nombre);
+        result.put("snapshots", snapshots);
+        return ResponseEntity.ok(ApiResponse.ok("Historial de riesgo para " + gadmGid, result));
+    }
+
+    @PostMapping("/risk-score/comunas/{comunaId}/copernicus-sync")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> syncCopernicusForComuna(@PathVariable String comunaId) {
+        new Thread(() -> {
+            try {
+                comunaRiskService.syncCopernicusAndRecompute(comunaId);
+            } catch (Exception ex) {
+                // logged inside syncCopernicusAndRecompute
+            }
+        }, "copernicus-sync-" + comunaId).start();
+
+        return ResponseEntity.accepted().body(ApiResponse.ok(
+            "Sync Copernicus iniciado para " + comunaId,
+            Map.of("comunaId", comunaId, "status", "accepted", "estimatedSeconds", 70)
+        ));
+    }
+
+    @PostMapping("/sync")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_SUPER_ADMIN')")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> triggerSync(@RequestParam String regionId) {
+        // Buscar bbox de la región para FIRMS y FWI
+        regionRepository.findById(regionId).ifPresent(region -> {
+            java.util.List<Double> bbox = region.getAoiBbox();
+            if (bbox != null && bbox.size() == 4) {
+                nasaFirmsService.syncActiveFiresByRegion(regionId, bbox.get(0), bbox.get(1), bbox.get(2), bbox.get(3));
+                double centerLat = (bbox.get(1) + bbox.get(3)) / 2.0;
+                double centerLon = (bbox.get(0) + bbox.get(2)) / 2.0;
+                openWeatherFwiService.syncFwiByRegion(regionId, centerLat, centerLon);
+            }
+        });
+
+        TerritoryRiskSnapshot snapshot = territoryRiskService.recomputeRiskByRegion(regionId);
+
+        // Recalcula scores comunales en background (no bloquea la respuesta)
+        new Thread(comunaRiskService::recomputeAllComunas).start();
+
+        return ResponseEntity.ok(ApiResponse.ok("Sync completo para " + regionId,
+            Map.of("regionId", regionId, "alertLevel", snapshot.getAlertLevel(),
+                   "scoreComposite", snapshot.getScoreComposite(), "qualityFlag", snapshot.getQualityFlag(),
+                   "comunalSyncTriggered", true)));
+    }
+
+    // Cap prevents Leaflet from rendering thousands of markers and covering the
+    // choropleth. Sorted by FRP descending so the most intense fires are kept.
+    private static final int FIRMS_LAYER_MAX_FEATURES = 300;
+
+    private Map<String, Object> firmsLayer(String regionId, LocalDateTime from, LocalDateTime to) {
+        List<Map<String, Object>> features = heatAlertRepository.findByRegionId(regionId)
+            .stream()
+            .filter(e -> "NASA_FIRMS".equals(e.getFuente()))
+            .filter(e -> e.getFechaEvento() != null && !e.getFechaEvento().isBefore(from) && !e.getFechaEvento().isAfter(to))
+            .filter(e -> e.getFirmsConfidence() != null && !"l".equals(e.getFirmsConfidence()))
+            .sorted(java.util.Comparator.comparingDouble(
+                (com.simfat.backend.model.HeatAlertEvent e) -> e.getFirmsFrp() == null ? 0.0 : e.getFirmsFrp()
+            ).reversed())
+            .limit(FIRMS_LAYER_MAX_FEATURES)
+            .map(e -> {
+                Map<String, Object> props = new LinkedHashMap<>();
+                props.put("label", "Foco activo VIIRS");
+                props.put("indicator", "FIRMS");
+                props.put("confidence", e.getFirmsConfidence());
+                props.put("frp", e.getFirmsFrp() == null ? 0.0 : e.getFirmsFrp());
+                props.put("satellite", e.getFirmsSatellite());
+                props.put("acquiredAt", e.getFechaEvento());
+                return pointFeature(e.getId(), e.getLongitud(), e.getLatitud(), props);
+            })
+            .toList();
+
+        return featureCollection(features);
+    }
+
+    private Map<String, Object> riskScoreLayer(String regionId, RegionGeometry geometry) {
+        TerritoryRiskSnapshot snapshot = territoryRiskService.getLatestSnapshot(regionId);
+        double score = snapshot != null && snapshot.getScoreComposite() != null ? snapshot.getScoreComposite() : 0.0;
+        String alertLevel = snapshot != null && snapshot.getAlertLevel() != null ? snapshot.getAlertLevel() : "NORMAL";
+        String computedAt = snapshot != null && snapshot.getComputedAt() != null ? snapshot.getComputedAt().toString() : null;
+
+        Map<String, Object> props = new LinkedHashMap<>();
+        props.put("label", geometry.label);
+        props.put("indicator", "RISK_SCORE");
+        props.put("score", score);
+        props.put("alertLevel", alertLevel);
+        props.put("computedAt", computedAt);
+
+        return featureCollection(List.of(pointFeature("risk-" + regionId, geometry.centerLng, geometry.centerLat, props)));
+    }
+
+    /**
+     * Resuelve la ultima observacion meteorologica de cada comuna en una unica consulta
+     * (en vez de una consulta por comuna), para evitar el patron N+1 al construir las
+     * capas climaticas (WIND/HUMIDITY/AIR_TEMP/SOIL_TEMP) de /layers.
+     */
+    private Map<String, TerritoryWeatherObservation> latestWeatherByComuna(List<ComunaInfo> comunas) {
+        List<String> comunaIds = comunas.stream().map(ComunaInfo::getId).collect(Collectors.toList());
+        Map<String, TerritoryWeatherObservation> latestByComuna = new LinkedHashMap<>();
+
+        for (TerritoryWeatherObservation obs : weatherObservationRepository.findByRegionIdInOrderByObservedAtDesc(comunaIds)) {
+            latestByComuna.putIfAbsent(obs.getRegionId(), obs);
+        }
+
+        return latestByComuna;
+    }
+
+    /**
+     * Construye un mapa de valores por comuna {comunaId: {value, unit, observedAt}} para una capa
+     * climatica (WIND/HUMIDITY/AIR_TEMP/SOIL_TEMP), a partir de la ultima observacion meteorologica
+     * persistida por comuna. Comunas sin observacion se omiten (no error) por requisito de spec.
+     */
+    private Map<String, Object> climateValueMap(
+        List<ComunaInfo> comunas,
+        Map<String, TerritoryWeatherObservation> latestByComuna,
+        String indicator,
+        String unit,
+        Function<TerritoryWeatherObservation, Double> valueExtractor
+    ) {
+        Map<String, Object> values = new LinkedHashMap<>();
+
+        for (ComunaInfo comuna : comunas) {
+            TerritoryWeatherObservation obs = latestByComuna.get(comuna.getId());
+            if (obs == null) {
+                continue;
+            }
+            Double value = valueExtractor.apply(obs);
+            if (value == null) {
+                continue;
+            }
+            Map<String, Object> entry = new LinkedHashMap<>();
+            entry.put("value", value);
+            entry.put("unit", unit);
+            entry.put("observedAt", obs.getObservedAt());
+            values.put(comuna.getId(), entry);
+        }
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("indicator", indicator);
+        result.put("unit", unit);
+        result.put("values", values);
+        return result;
+    }
+
+    /**
+     * Variante de climateValueMap para WIND: agrega direccion dominante y la
+     * serie horaria (timestamp/speed/direction) por comuna, usada por el slider
+     * horario del overlay de flechas de viento (spec: wind-arrow-overlay).
+     */
+    private Map<String, Object> windValueMap(
+        List<ComunaInfo> comunas,
+        Map<String, TerritoryWeatherObservation> latestByComuna
+    ) {
+        Map<String, Object> values = new LinkedHashMap<>();
+
+        for (ComunaInfo comuna : comunas) {
+            TerritoryWeatherObservation obs = latestByComuna.get(comuna.getId());
+            if (obs == null || obs.getWindMax() == null) {
+                continue;
+            }
+
+            Map<String, Object> entry = new LinkedHashMap<>();
+            entry.put("value", obs.getWindMax());
+            entry.put("unit", "km/h");
+            entry.put("direction", obs.getWindDirection());
+            entry.put("observedAt", obs.getObservedAt());
+            entry.put("hourly", buildHourlyWindSeries(obs));
+            values.put(comuna.getId(), entry);
+        }
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("indicator", "WIND");
+        result.put("unit", "km/h");
+        result.put("values", values);
+        return result;
+    }
+
+    private List<Map<String, Object>> buildHourlyWindSeries(TerritoryWeatherObservation obs) {
+        List<LocalDateTime> timestamps = obs.getHourlyTimestamps();
+        List<Double> speeds = obs.getHourlyWindSpeed();
+        List<Double> directions = obs.getHourlyWindDirection();
+
+        if (timestamps == null || speeds == null || directions == null) {
+            return List.of();
+        }
+
+        List<Map<String, Object>> series = new ArrayList<>();
+        int size = Math.min(timestamps.size(), Math.min(speeds.size(), directions.size()));
+        for (int i = 0; i < size; i++) {
+            Map<String, Object> point = new LinkedHashMap<>();
+            point.put("timestamp", timestamps.get(i));
+            point.put("speed", speeds.get(i));
+            point.put("direction", directions.get(i));
+            series.add(point);
+        }
+        return series;
+    }
+
+    /**
+     * Expone los componentes Open-Meteo que alimentan el proxy FWI para un comuna/region,
+     * a partir de la ultima observacion meteorologica persistida. Componentes faltantes
+     * se exponen como null sin fallar el request.
+     */
+    private Map<String, Object> buildFwiInputs(String regionOrComunaId) {
+        Optional<TerritoryWeatherObservation> latest = weatherObservationRepository
+            .findTopByRegionIdOrderByObservedAtDesc(regionOrComunaId);
+        return buildFwiInputs(latest.orElse(null));
+    }
+
+    private Map<String, Object> buildFwiInputs(TerritoryWeatherObservation obs) {
+        Map<String, Object> inputs = new LinkedHashMap<>();
+        inputs.put("tempMax",     obs != null ? obs.getTempMax()     : null);
+        inputs.put("tempMin",     obs != null ? obs.getTempMin()     : null);
+        inputs.put("humidityMin", obs != null ? obs.getHumidityMin() : null);
+        inputs.put("windMax",     obs != null ? obs.getWindMax()     : null);
+        inputs.put("precip",      obs != null ? obs.getPrecip()      : null);
+        inputs.put("soilTemp",    obs != null ? obs.getSoilTemp()    : null);
+        inputs.put("weatherCode", obs != null ? obs.getWeatherCode() : null);
+        return inputs;
+    }
+
     private List<String> parseIndicators(String rawIndicators) {
         if (rawIndicators == null || rawIndicators.isBlank()) {
-            return List.of("NDVI", "NDMI", "LOSS", "ALERTS", "REPORTS");
+            return List.of("NDVI", "NDMI", "LOSS", "ALERTS", "FIRMS", "REPORTS", "RISK_SCORE");
         }
 
         return List.of(rawIndicators.split(","))
             .stream()
             .map(item -> item == null ? "" : item.trim().toUpperCase(Locale.ROOT))
-            .filter(item -> List.of("NDVI", "NDMI", "LOSS", "ALERTS", "REPORTS").contains(item))
+            .filter(VALID_INDICATORS::contains)
             .distinct()
             .toList();
+    }
+
+    private Object nullSafe(Object value) {
+        return value == null ? 0 : value;
     }
 
     private Map<String, Object> featureCollection(List<Map<String, Object>> features) {
@@ -256,9 +664,12 @@ public class TerritoryController {
         static RegionGeometry fromRegion(String regionId) {
             String normalized = regionId == null ? "" : regionId.trim().toLowerCase(Locale.ROOT);
             if ("araucania".equals(normalized)) {
-                return new RegionGeometry("araucania", "La Araucania", -38.7, -72.4, -39.8, -73.9, -37.8, -71.2, 8);
+                return new RegionGeometry("araucania", "La Araucania", -38.7, -72.4, -39.8, -73.9, -37.8, -71.2, 9);
             }
-            return new RegionGeometry("biobio", "Biobio", -37.5, -72.5, -38.9, -74.1, -36.3, -71.0, 8);
+            if ("nuble".equals(normalized)) {
+                return new RegionGeometry("nuble", "Ñuble", -36.6, -71.9, -37.4, -72.8, -35.8, -71.0, 9);
+            }
+            return new RegionGeometry("biobio", "Biobio", -37.5, -72.5, -38.9, -74.1, -36.3, -71.0, 9);
         }
     }
 }

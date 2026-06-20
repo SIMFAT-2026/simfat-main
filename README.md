@@ -1,98 +1,158 @@
-﻿# SIMFAT
+# SIMFAT
 
-## Sistema Inteligente de Monitorización Forestal y Alerta Temprana
+## Sistema Integrado de Monitoreo y Alerta Temprana Forestal
 
-SIMFAT es un proyecto académico-profesional orientado al monitoreo territorial, análisis de indicadores ambientales y soporte a la toma de decisiones para prevención y alerta temprana en contexto forestal.
+SIMFAT es una plataforma web para el monitoreo territorial, análisis de riesgo de incendio forestal y coordinación comunitaria, desarrollada como proyecto de titulación de TPY1101 – Taller Aplicado de Programación, Duoc UC.
 
-El repositorio está organizado como **monorepo**, alineado con la pauta académica de TPY1101.
+**Cliente:** AIFBN – Agrupación de Ingenieros Forestales por el Bosque Nativo
 
-## Estructura General
+**Integrantes:** Andrés Ibáñez · David Vásquez
 
-- `Gestion/`: antecedentes de identificación del proyecto y del equipo.
-- `Producto/`: código fuente, scripts de base de datos y dependencias técnicas.
-- `Documentacion/`: diseño técnico/visual, planificación, informes y evidencias QA.
+---
 
-## Arquitectura técnica
+## Producción
 
-### Backend principal
-- Ruta: `Producto/backend/simfat-backend`
-- Tecnología: Spring Boot
-- Propósito: autenticación, reglas de negocio y APIs principales.
+| Servicio | URL |
+|---|---|
+| Frontend | https://simfat-web-stg.vercel.app/ |
+| Backend API | https://simfat-backend-production.up.railway.app |
+| Swagger UI | https://simfat-backend-production.up.railway.app/swagger-ui/index.html |
+| Servicio OpenEO | https://openeo-service-production-production.up.railway.app |
 
-### Microservicio OpenEO
-- Ruta: `Producto/backend/openeo-service`
-- Tecnología: FastAPI
-- Propósito: integración OpenEO/Copernicus para consulta e ingesta de indicadores.
+---
 
-### Frontend web
-- Ruta: `Producto/frontend/simfat-web`
-- Tecnología: React + Vite
-- Propósito: interfaz de usuario y visualización de datos.
+## Estructura del repositorio
 
-## Documentación (con accesos directos)
+```
+simfat-main/
+├── Gestion/           — identificación del proyecto y del equipo
+├── Producto/          — código fuente y scripts de base de datos
+│   ├── backend/
+│   │   ├── simfat-backend/     — API principal (Spring Boot, Java 17)
+│   │   └── openeo-service/     — microservicio satelital (FastAPI, Python)
+│   ├── frontend/
+│   │   └── simfat-web/         — interfaz web (React 18 + Vite)
+│   └── database/
+│       ├── sql/                — esquema y seed PostgreSQL
+│       └── nosql/              — inicialización MongoDB
+└── Documentacion/     — toda la documentación académica y técnica
+```
+
+---
+
+## Documentación EP3 (Entrega Final)
+
+### Informe consolidado
+- [Informe Consolidado EP3](Documentacion/Informe_consolidado_ea3.md) — informe completo de entrega final (EP1 + EP2 + EP3)
+
+### Plan de pruebas y QA
+- [Plan de Pruebas EP3 — 34 casos](Documentacion/Evidencias/2026-06-20_plan_pruebas_EP3.md)
+- [Mejoras Implementadas EP3 — 9 mejoras con trazabilidad](Documentacion/Evidencias/2026-06-20_mejoras_EP3.md)
+
+### Diseño técnico EP3
+- [Diagrama de Clases EP3](Documentacion/UML/2026-06-20_diagrama_clases_ep3.md)
+- [MER — Nuevas colecciones MongoDB EP3](Documentacion/MER/2026-06-20_nuevas_colecciones_EP3.md)
+- [Guía de instalación y despliegue](Documentacion/2026-06-20_guia_instalacion_despliegue.md)
+
+### Manuales de Usuario
+- [Manual — Administrador](Documentacion/Manuales/Manual-Usuario-Administrador.md)
+- [Manual — Usuario Comunitario](Documentacion/Manuales/Manual-Usuario-Comunitario.md)
+- [Manual — Analista de Monitoreo / Operador Regional](Documentacion/Manuales/Manual-Usuario-Analista-Operador.md)
+- [Manual — Soporte Técnico](Documentacion/Manuales/Manual-Usuario-Soporte-Tecnico.md)
+
+---
+
+## Documentación EP2 (Semana 10)
+
+### Informes de avance
+- [Informe Estado de Avance 2 — Semana 10](Documentacion/Informes/Informe-Estado-Avance-2-Semana10-TPY1101.md)
+- [Cumplimiento rúbrica — Semana 10](Documentacion/Informes/Entrega-Semana10-Cumplimiento-Rubrica-DUOC.md)
+- [Matriz de casos de uso con roles](Documentacion/Informes/Matriz-Casos-de-Uso-Semana10-Roles-Actualizados.md)
+
+### Arquitectura y seguridad
+- [Contrato arquitectura RBAC/JWT](Documentacion/Informes/2026-05-14_fase0_rbac_jwt_contrato_arquitectura_v1.md)
+- [UML arquitectura integrada](Documentacion/UML/Arquitectura-Integrada-Sistema-Semana10.md)
+- [MER integrado RBAC](Documentacion/MER/MER-Integrado-RBAC-Semana10.md)
+- [Configuración servidores cloud](Documentacion/Informes/Configuracion-Servidores-Cloud-y-Despliegue.md)
+
+### QA y evidencias
+- [Plan de pruebas — Semana 10](Documentacion/Evidencias/Plan-de-Pruebas-Semana10-DUOC.md)
+- [Checklist QA — Semana 10](Documentacion/Evidencias/Checklist-QA-Semana10-DUOC.md)
+- [Evidencias QA E2E y Swagger](Documentacion/Evidencias/Evidencias-QA-E2E-y-Swagger-Semana10.md)
+
+---
+
+## Documentación EP1
 
 ### Gestión
-- [Documento 1.1.2 de definición e identificación](Gestion/1.1.2%20Documento%20de%20registro%20de%20definicion%20e%20identificacion%20del%20proyecto.docx)
-- [Integrantes](Gestion/Integrantes.txt)
-
-### Informes de avance y control
-- [Matriz de casos de uso - Semana 10](Documentacion/Informes/matriz-casos-uso-semana10-2026-05-11.md)
-- [Auditoría de entrega - Semana 10](Documentacion/Informes/auditoria-entrega-semana10.md)
-- [Estado de avance integrado](Documentacion/Informes/estado-avance-integrado-simfat-2026-04-14.md)
-
-### QA y pruebas
-- [Plan de pruebas alineado a CU01-CU15](Documentacion/Evidencias/plan-pruebas-cu01-cu15.md)
-- [Checklist QA alineado a CU01-CU15](Documentacion/Evidencias/checklist-qa-cu01-cu15.md)
-- [Evidencias QA backend](Documentacion/Evidencias/qa-evidencias-iteracion-backend-2026-04-21.md)
-- [Evidencias QA frontend](Documentacion/Evidencias/qa-evidencias-iteracion-frontend-2026-04-22.md)
-
-### Diseño técnico y visual
-- [UML / Arquitectura](Documentacion/UML/)
-- [MER / Modelo lógico](Documentacion/MER/)
-- [Wireframes funcionales](Documentacion/Wireframes/wireframes-funcionales-cu-prioritarios.md)
-- [Análisis de problemas / roadmap](Documentacion/Analisis-Problemas/roadmap_frontend_backend_simfat.md)
+- [Documento de identificación del proyecto](Gestion/1.1.2%20Documento%20de%20registro%20de%20definicion%20e%20identificacion%20del%20proyecto.docx)
+- [Integrantes del equipo](Gestion/Integrantes.txt)
 
 ### Planificación
-- [Planificación semana 10 a 12 (alineada a CU)](Documentacion/Gantt/planificacion-semana10-a-semana12-cu.md)
+- [Carta Gantt — Semana 10](Documentacion/Gantt/Carta-Gantt-Actualizada-Semana10.md)
+- [Carta Gantt — Semana 14](Documentacion/Gantt/Carta-Gantt-Actualizada-Semana14.md)
+- [Planificación semanas 10-12](Documentacion/Gantt/planificacion-semana10-a-semana12-cu.md)
 
-## Producto técnico
+---
 
-### Código fuente
-- [Backend principal](Producto/backend/simfat-backend/)
-- [Microservicio OpenEO](Producto/backend/openeo-service/)
-- [Frontend web](Producto/frontend/simfat-web/)
+## Documentación técnica del sistema
 
-### Base de datos
-- [Esquema PostgreSQL](Producto/database/sql/init-postgres-schema.sql)
-- [Datos de prueba PostgreSQL](Producto/database/sql/seed-postgres-test-data.sql)
-- [Funciones/procedimientos PostgreSQL](Producto/database/plsql/postgresql_auth_helpers.sql)
-- [Esquema MongoDB](Producto/database/nosql/init-mongodb-schema.js)
+### Contratos de API
+- [Contrato API completo v2](Documentacion/Informes/2026-06-02_contrato_api_completo_v2.md)
+- [Contrato backend territorial](Documentacion/Informes/territory_backend_contract.md)
+- [Contrato backend comunitario](Documentacion/Informes/community_backend_contract.md)
 
-### Dependencias
-- [Registro consolidado de dependencias](Producto/dependencias/registro-dependencias-consolidado.md)
-- [Registro dependencias backend](Producto/dependencias/registro-dependencias-backend.md)
-- Manifiestos por módulo:
-  - `Producto/backend/simfat-backend/pom.xml`
-  - `Producto/backend/openeo-service/requirements.txt`
-  - `Producto/frontend/simfat-web/package.json`
+### Índice completo de documentación
+- [Documentacion/README.md](Documentacion/README.md)
 
-## Ejecución local (rápida)
+---
 
-### Backend principal
+## Ejecución local
+
+### Backend (Spring Boot)
 ```bash
 cd Producto/backend/simfat-backend
 mvn spring-boot:run
 ```
 
-### Microservicio OpenEO
+### Servicio OpenEO (FastAPI)
 ```bash
 cd Producto/backend/openeo-service
 uvicorn app.main:app --reload --port 8000
 ```
 
-### Frontend
+### Frontend (React + Vite)
 ```bash
 cd Producto/frontend/simfat-web
 npm install
 npm run dev
 ```
+
+### Stack completo (Docker Compose)
+```bash
+docker compose up --build -d
+```
+
+---
+
+## Base de datos
+
+| Script | Descripción |
+|---|---|
+| `Producto/database/sql/init-postgres-schema.sql` | Esquema PostgreSQL (Flyway lo aplica automáticamente) |
+| `Producto/database/sql/seed-postgres-test-data.sql` | Datos de prueba PostgreSQL |
+| `Producto/database/nosql/init-mongodb-schema.js` | Inicialización de colecciones MongoDB |
+
+---
+
+## Stack tecnológico
+
+| Capa | Tecnología |
+|---|---|
+| Frontend | React 18 + Vite + JSX |
+| Backend | Java 17 + Spring Boot 3 |
+| Servicio satelital | Python 3.11 + FastAPI + OpenEO |
+| BD relacional | PostgreSQL 15 (Supabase) |
+| BD documental | MongoDB Atlas (M0) |
+| Despliegue frontend | Vercel |
+| Despliegue backend | Railway |

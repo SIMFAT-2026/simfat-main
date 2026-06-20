@@ -12,11 +12,13 @@ public class CommunityResourceRequestDTO {
     @NotBlank(message = "La categoria es obligatoria")
     private String category;
 
-    @NotBlank(message = "La URL es obligatoria")
     private String url;
 
     @NotBlank(message = "La region es obligatoria")
     private String regionId;
+
+    @NotBlank(message = "La comuna es obligatoria")
+    private String comunaId;
 
     @NotBlank(message = "La descripcion es obligatoria")
     @Size(max = 600, message = "La descripcion no puede exceder 600 caracteres")
@@ -52,6 +54,14 @@ public class CommunityResourceRequestDTO {
 
     public void setRegionId(String regionId) {
         this.regionId = regionId;
+    }
+
+    public String getComunaId() {
+        return comunaId;
+    }
+
+    public void setComunaId(String comunaId) {
+        this.comunaId = comunaId;
     }
 
     public String getDescription() {

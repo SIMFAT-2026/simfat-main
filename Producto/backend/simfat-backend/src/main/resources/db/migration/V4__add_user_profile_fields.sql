@@ -1,0 +1,4 @@
+ALTER TABLE app_users
+    ADD COLUMN IF NOT EXISTS phone       VARCHAR(20),
+    ADD COLUMN IF NOT EXISTS region_code VARCHAR(10),
+    ADD COLUMN IF NOT EXISTS comuna_code VARCHAR(10);

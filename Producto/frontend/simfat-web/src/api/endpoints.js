@@ -1,5 +1,5 @@
 export const API_BASE_URL =
-  import.meta.env.NEXT_PUBLIC_API_BASE_URL || import.meta.env.VITE_API_URL || 'http://localhost:8080';
+  import.meta.env.VITE_API_URL || 'http://localhost:8080';
 
 export const API_ENDPOINTS = {
   authLogin: '/api/auth/login',
@@ -22,8 +22,17 @@ export const API_ENDPOINTS = {
   communityBoard: '/api/community/board',
   communityResources: '/api/community/resources',
   communityContacts: '/api/community/contacts',
+  communityChat: '/api/community/chat',
   dashboardSummary: '/api/dashboard/summary',
   dashboardCriticalRegions: '/api/dashboard/critical-regions',
   dashboardLossTrend: '/api/dashboard/loss-trend',
-  dashboardAlertsSummary: '/api/dashboard/alerts-summary'
+  dashboardAlertsSummary: '/api/dashboard/alerts-summary',
+  accountMe: '/api/account/me',
+  accountChangePassword: '/api/account/change-password',
+  notificationsUnread: '/api/notifications/unread',
+  notifications: '/api/notifications',
+  adminAccessPendingReview: '/api/admin/access/users/pending-review',
+  communityModuleAccess: '/api/admin/access/users',
+  chatRoomPresence: '/api/community/chat/rooms',
+  chatPrivateRooms: '/api/community/chat/private-rooms'
 };
