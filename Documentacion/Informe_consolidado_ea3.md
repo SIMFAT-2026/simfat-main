@@ -45,8 +45,9 @@ Duoc UC
    - 7.2 Modelo de base de datos (MER)
      - 7.2.1 PostgreSQL – Identidad y acceso (RBAC)
      - 7.2.2 MongoDB – Colecciones de negocio (nuevas en EP3)
-   - 7.3 Guía de instalación y despliegue
-   - 7.4 Control de versiones
+   - 7.3 Copias de configuración y evidencias de despliegue
+   - 7.4 Guía de instalación y despliegue
+   - 7.5 Control de versiones
 8. Estado MVP en Producción
 9. Costos y Sostenibilidad
 10. Conclusiones
@@ -421,6 +422,42 @@ El plan de pruebas de EP3 cubre las funcionalidades implementadas hasta el cierr
 - **Base de datos de pruebas:** MongoDB Atlas (colección `simfat`) + PostgreSQL Supabase
 - **Usuarios de prueba con rol ADMIN:** jennifer@aifbn.cl, pablo@aifbn.cl
 - **Herramientas de apoyo:** Swagger UI (contratos API en `https://simfat-backend-production.up.railway.app/swagger-ui/index.html`), Chrome DevTools (red/consola), Postman (validación de endpoints)
+
+### 4.2 Base de datos de pruebas
+
+Las pruebas de EP3 se ejecutaron sobre instancias de producción reales (no ambientes simulados), utilizando el siguiente conjunto de datos de prueba:
+
+#### PostgreSQL — datos de identidad y acceso (Supabase)
+
+| Elemento | Detalle |
+|---|---|
+| Base de datos | `simfat` (PostgreSQL 15, Supabase) |
+| Esquema inicial | Flyway aplica las migraciones automáticamente al iniciar el backend |
+| Script de seed | `Producto/database/sql/seed-postgres-test-data.sql` |
+| Usuarios de prueba | `jennifer@aifbn.cl` (ROLE_ADMIN), `pablo@aifbn.cl` (ROLE_ADMIN), `david@aifbn.cl` (ROLE_SUPER_ADMIN) |
+| Roles sembrados | ROLE_SUPER_ADMIN, ROLE_ADMIN, ROLE_MODERATOR, ROLE_VERIFIED_USER, ROLE_COMMUNITY_USER |
+
+Las contraseñas de los usuarios de prueba están hasheadas con BCrypt y se gestionan mediante el sistema de autenticación JWT del backend. No se almacenan en texto plano en el repositorio.
+
+#### MongoDB Atlas — datos de dominio de negocio
+
+| Elemento | Detalle |
+|---|---|
+| Base de datos | `simfat` (MongoDB Atlas M0, 512 MB) |
+| Colecciones con datos de prueba | `regions`, `comunaRiskScores`, `regionalRiskScores`, `alertRules`, `communityPosts`, `communityContacts`, `citizenReports`, `firmsDetections`, `weatherReadings` |
+| Script de inicialización | `Producto/database/nosql/init-mongodb-schema.js` |
+| Regiones sembradas | Araucanía, Ñuble, Los Ríos, Los Lagos (con `monitoringEnabled: true`) |
+| Datos satelitales | Generados por sincronización real con NASA FIRMS y Open-Meteo en producción |
+
+Los datos de `comunaRiskScores` y `regionalRiskScores` se actualizan automáticamente cada 12 horas mediante los cron jobs del backend. Los datos presentes durante la ejecución del plan de pruebas corresponden a datos reales de monitoreo forestal, no a datos sintéticos.
+
+#### Configuración de base de datos en el repositorio
+
+Los scripts completos de creación de esquema e inserción de datos de prueba están documentados en:
+- `Producto/database/sql/init-postgres-schema.sql` — esquema PostgreSQL (tablas, índices, relaciones)
+- `Producto/database/sql/seed-postgres-test-data.sql` — datos iniciales de prueba PostgreSQL
+- `Producto/database/nosql/init-mongodb-schema.js` — inicialización de colecciones MongoDB
+- `Documentacion/Informes/scripts-creacion-tablas-e-insercion-datos-prueba.md` — documentación consolidada de scripts
 
 ---
 
@@ -888,7 +925,32 @@ El `scoreComposite` se calcula como `Σ(component.score × component.weight)`.
 | `firmsDetections` | Existente | Focos activos sincronizados desde NASA FIRMS |
 | `weatherReadings` | Existente | Lecturas meteorológicas (FWI, viento, humedad) |
 
-### 7.3 Guía de instalación y despliegue
+### 7.3 Copias de configuración y evidencias de despliegue
+
+Las copias de configuración y evidencias de infraestructura requeridas en EP1 y EP2 se encuentran documentadas en los siguientes artefactos del repositorio:
+
+| Artefacto | Ruta | Descripción |
+|---|---|---|
+| Contrato de arquitectura RBAC/JWT | `Documentacion/Informes/2026-05-14_fase0_rbac_jwt_contrato_arquitectura_v1.md` | Diseño de seguridad EP2: tablas PostgreSQL, flujo JWT, permisos |
+| Configuración de servidores cloud | `Documentacion/Informes/Configuracion-Servidores-Cloud-y-Despliegue.md` | Variables de entorno, Railway, Vercel, Supabase — EP2 |
+| Checklist QA de seguridad RBAC | `Documentacion/Evidencias/2026-05-14_checklist_qa_fase0_rbac_v1.md` | Verificación de configuración de seguridad — EP2 |
+| Evidencias QA backend | `Documentacion/Evidencias/qa-evidencias-iteracion-backend-2026-04-21.md` | Evidencias de pruebas de integración — EP1 |
+| Evidencias QA E2E y Swagger | `Documentacion/Evidencias/Evidencias-QA-E2E-y-Swagger-Semana10.md` | Evidencias de pruebas E2E semana 10 — EP2 |
+| Guía de instalación y despliegue EP3 | `Documentacion/2026-06-20_guia_instalacion_despliegue.md` | Guía completa con Docker Compose, variables y verificación |
+
+**Variables de entorno de producción (resumen ejecutivo):**
+
+| Variable | Descripción | Dónde se configura |
+|---|---|---|
+| `SPRING_DATASOURCE_URL` | URL JDBC de PostgreSQL Supabase | Railway → Variables |
+| `SPRING_DATA_MONGODB_URI` | URI de conexión a MongoDB Atlas | Railway → Variables |
+| `JWT_SECRET` | Clave secreta para firma JWT (256+ bits) | Railway → Variables |
+| `FIRMS_API_KEY` | Clave NASA Earthdata para FIRMS | Railway → Variables |
+| `VITE_API_URL` | URL del backend desde el frontend | Vercel → Environment Variables |
+
+La configuración completa de variables de entorno por ambiente (local, staging, producción) está documentada en `Documentacion/Informes/Configuracion-Servidores-Cloud-y-Despliegue.md`. Ninguna credencial real se almacena en el repositorio.
+
+### 7.4 Guía de instalación y despliegue
 
 La guía completa con Docker Compose, configuración Nginx y resolución de problemas frecuentes se encuentra en `Documentacion/2026-06-20_guia_instalacion_despliegue.md`.
 
@@ -941,7 +1003,7 @@ La guía completa con Docker Compose, configuración Nginx y resolución de prob
 
 **Instalación con Docker Compose:** disponible en el repositorio con el archivo `docker-compose.yml` en la raíz del proyecto. Levanta el stack completo (PostgreSQL, MongoDB, backend, frontend) con un único comando `docker compose up --build -d`.
 
-### 7.4 Control de versiones
+### 7.5 Control de versiones
 
 - **Repositorio:** GitHub (organización SIMFAT-2026)
 - **Rama principal:** `main`
