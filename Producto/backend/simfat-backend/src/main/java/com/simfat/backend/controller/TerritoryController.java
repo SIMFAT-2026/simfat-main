@@ -140,7 +140,7 @@ public class TerritoryController {
             layers.put("FIRMS", firmsLayer(regionId, fromDate, toDate));
         }
         if (requestedIndicators.contains("REPORTS")) {
-            layers.put("REPORTS", reportsLayer(fromDate, toDate));
+            layers.put("REPORTS", reportsLayer(regionId, fromDate, toDate));
         }
         if (requestedIndicators.contains("RISK_SCORE")) {
             layers.put("RISK_SCORE", riskScoreLayer(regionId, geometry));
@@ -271,8 +271,8 @@ public class TerritoryController {
         return featureCollection(features);
     }
 
-    private Map<String, Object> reportsLayer(LocalDateTime from, LocalDateTime to) {
-        List<Map<String, Object>> features = citizenReportRepository.findAll()
+    private Map<String, Object> reportsLayer(String regionId, LocalDateTime from, LocalDateTime to) {
+        List<Map<String, Object>> features = citizenReportRepository.findByRegionId(regionId)
             .stream()
             .filter(item -> item.getCreatedAt() != null && !item.getCreatedAt().isBefore(from) && !item.getCreatedAt().isAfter(to))
             .map(this::toReportFeature)

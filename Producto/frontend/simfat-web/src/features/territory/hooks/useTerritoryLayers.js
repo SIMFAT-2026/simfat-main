@@ -355,9 +355,7 @@ export function useTerritoryLayers(options = {}) {
     let mounted = true;
 
     async function bootstrap() {
-      await loadRegion(selectedRegionId, false);
-      const remaining = REGION_OPTIONS.filter((region) => region.id !== selectedRegionId);
-      await Promise.all(remaining.map((region) => loadRegion(region.id, false)));
+      await Promise.all(REGION_OPTIONS.map((region) => loadRegion(region.id, false)));
     }
 
     async function bootstrapWithRetry() {
