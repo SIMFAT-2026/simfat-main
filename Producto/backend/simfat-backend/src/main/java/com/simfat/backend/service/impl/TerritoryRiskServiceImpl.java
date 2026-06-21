@@ -14,7 +14,10 @@ import com.simfat.backend.repository.RegionRepository;
 import com.simfat.backend.repository.TerritoryRiskSnapshotRepository;
 import com.simfat.backend.repository.TerritoryWeatherObservationRepository;
 import com.simfat.backend.service.TerritoryRiskService;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
 import org.slf4j.Logger;
@@ -51,6 +54,14 @@ public class TerritoryRiskServiceImpl implements TerritoryRiskService {
     private static final double FWI_PREVENTIVO = 20.0;
     private static final double FWI_ALTO = 30.0;
     private static final double FWI_CRITICO = 45.0;
+    // A single low-intensity FIRMS detection should not by itself force CRITICO — it
+    // already feeds the weighted score via firmsNorm. Only escalate directly when
+    // detections cluster or one is genuinely intense (see resolveAlertLevel).
+    private static final int FIRMS_COUNT_CRITICO = 8;
+    private static final double FIRMS_FRP_CRITICO = 75.0;
+    // Matches the frontend's "today" vs "recent" FIRMS bucket (TerritoryMapPanel.jsx
+    // santiagoDateKey) so the alert override and the map legend agree.
+    private static final ZoneId SANTIAGO_ZONE = ZoneId.of("America/Santiago");
 
     private final RegionRepository regionRepository;
     private final OpenEoIndicatorObservationRepository observationRepository;
@@ -143,6 +154,7 @@ public class TerritoryRiskServiceImpl implements TerritoryRiskService {
             .toList();
 
         int firmsCountFiltered = firmsEvents.size();
+        boolean hasTodayFirms = firmsEvents.stream().anyMatch(e -> isToday(e.getFechaEvento()));
         double firmsFrpMean = firmsEvents.stream()
             .filter(e -> e.getFirmsFrp() != null)
             .mapToDouble(HeatAlertEvent::getFirmsFrp)
@@ -178,7 +190,7 @@ public class TerritoryRiskServiceImpl implements TerritoryRiskService {
         score = Math.min(1.0, Math.max(0.0, score));
 
         String qualityFlag = availableComponents >= 4 ? "OK" : availableComponents >= 2 ? "PARTIAL" : "MINIMAL";
-        String alertLevel = resolveAlertLevel(score, fwiRaw, firmsCountFiltered);
+        String alertLevel = resolveAlertLevel(score, fwiRaw, firmsCountFiltered, firmsFrpMean, hasTodayFirms);
 
         TerritoryRiskSnapshot snapshot = new TerritoryRiskSnapshot();
         snapshot.setRegionId(regionId);
@@ -215,9 +227,15 @@ public class TerritoryRiskServiceImpl implements TerritoryRiskService {
         return snapshotRepository.findTopByRegionIdOrderByComputedAtDesc(regionId).orElse(null);
     }
 
-    private String resolveAlertLevel(double score, Double fwiRaw, int firmsHighConfidenceCount) {
-        // CRITICO: por fuego activo de alta confianza o FWI extremo o score
-        if (firmsHighConfidenceCount > 0 || (fwiRaw != null && fwiRaw >= FWI_CRITICO) || score >= SCORE_CRITICO) {
+    private String resolveAlertLevel(double score, Double fwiRaw, int firmsHighConfidenceCount, double firmsFrpMean, boolean hasTodayFirms) {
+        // CRITICO: fuego activo HOY (detectado en la fecha calendario actual, zona Santiago),
+        // FWI extremo, o score. Una deteccion de hoy es un incendio ocurriendo ahora mismo.
+        if (hasTodayFirms || (fwiRaw != null && fwiRaw >= FWI_CRITICO) || score >= SCORE_CRITICO) {
+            return "CRITICO";
+        }
+        // Detecciones solo "recientes" (no de hoy) escalan a CRITICO si se agrupan o son
+        // individualmente intensas; de lo contrario solo alimentan el score via firmsNorm.
+        if (firmsHighConfidenceCount >= FIRMS_COUNT_CRITICO || firmsFrpMean >= FIRMS_FRP_CRITICO) {
             return "CRITICO";
         }
         if ((fwiRaw != null && fwiRaw >= FWI_ALTO) || score >= SCORE_ALTO) {
@@ -227,6 +245,15 @@ public class TerritoryRiskServiceImpl implements TerritoryRiskService {
             return "PREVENTIVO";
         }
         return "NORMAL";
+    }
+
+    private boolean isToday(LocalDateTime fechaEventoUtc) {
+        if (fechaEventoUtc == null) {
+            return false;
+        }
+        LocalDate eventDate = fechaEventoUtc.atZone(ZoneOffset.UTC).withZoneSameInstant(SANTIAGO_ZONE).toLocalDate();
+        LocalDate todaySantiago = LocalDateTime.now(SANTIAGO_ZONE).toLocalDate();
+        return eventDate.equals(todaySantiago);
     }
 
     private double normalize(double value, double min, double max) {
