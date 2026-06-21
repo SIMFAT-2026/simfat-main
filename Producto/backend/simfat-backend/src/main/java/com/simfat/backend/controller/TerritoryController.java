@@ -350,10 +350,12 @@ public class TerritoryController {
     public ResponseEntity<ApiResponse<Map<String, Object>>> getComunalRiskScores(@PathVariable String regionId) {
         Map<String, ComunaRiskSnapshot> snapshots = comunaRiskService.getLatestSnapshotsByRegion(regionId);
 
-        // Pre-fetch all weather observations in a single query to avoid N+1.
+        // Pre-fetch the latest weather observation per comuna via aggregation —
+        // avoids transferring full observation history over the wire just to
+        // discard everything but the most recent record per comuna.
         List<String> comunaIds = new ArrayList<>(snapshots.keySet());
         Map<String, TerritoryWeatherObservation> weatherByComuna = new LinkedHashMap<>();
-        for (TerritoryWeatherObservation obs : weatherObservationRepository.findByRegionIdInOrderByObservedAtDesc(comunaIds)) {
+        for (TerritoryWeatherObservation obs : weatherObservationRepository.findLatestPerRegionId(comunaIds)) {
             weatherByComuna.putIfAbsent(obs.getRegionId(), obs);
         }
 

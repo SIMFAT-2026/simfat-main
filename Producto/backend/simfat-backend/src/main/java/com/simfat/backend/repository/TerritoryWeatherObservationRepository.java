@@ -15,8 +15,6 @@ public interface TerritoryWeatherObservationRepository extends MongoRepository<T
         String regionId, LocalDateTime from, LocalDateTime to
     );
 
-    List<TerritoryWeatherObservation> findByRegionIdInOrderByObservedAtDesc(List<String> regionIds);
-
     // Returns exactly one (the latest) observation per regionId — avoids loading full history.
     @Aggregation(pipeline = {
         "{ '$match': { 'regionId': { '$in': ?0 } } }",
