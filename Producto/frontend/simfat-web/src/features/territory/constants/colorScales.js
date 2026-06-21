@@ -1,11 +1,14 @@
 // Colorblind-safe risk ramp: low risk stays pale/cool, while severity increases through
 // warmer and darker values so the map remains distinguishable by luminance plus stroke pattern.
 export const ALERT_LEVEL_CONFIG = {
+  // `range` mirrors the SCORE_* thresholds in ComunaRiskServiceImpl/TerritoryRiskServiceImpl
+  // (score is 0-1 there, shown as /100 here) — keep these in sync if those constants change.
   NORMAL: {
     color: '#1e3a8a',
     darkUiColor: '#93c5fd',
     bg: '#dbeafe',
     label: 'Normal',
+    range: '0-49',
     fill: '#dbeafe',
     dashArray: null,
     weight: 0.8,
@@ -16,6 +19,7 @@ export const ALERT_LEVEL_CONFIG = {
     darkUiColor: '#fbbf24',
     bg: '#fef3c7',
     label: 'Preventivo',
+    range: '50-69',
     fill: '#f59e0b',
     dashArray: '4 3',
     weight: 1.1,
@@ -26,6 +30,7 @@ export const ALERT_LEVEL_CONFIG = {
     darkUiColor: '#fb923c',
     bg: '#ffedd5',
     label: 'Alto',
+    range: '70-84',
     fill: '#b45309',
     dashArray: '8 4',
     weight: 1.4,
@@ -36,6 +41,8 @@ export const ALERT_LEVEL_CONFIG = {
     darkUiColor: '#fdba74',
     bg: '#f5e8dc',
     label: 'Crítico',
+    range: '85-100',
+    note: 'también se activa con un foco FIRMS detectado hoy, sin importar el score',
     fill: '#3f1d0b',
     dashArray: '2 3',
     weight: 1.8,
@@ -46,6 +53,8 @@ export const ALERT_LEVEL_CONFIG = {
 export const RISK_SCORE_LEGEND = Object.values(ALERT_LEVEL_CONFIG).map((item) => ({
   color: item.fill,
   label: item.label,
+  range: item.range,
+  note: item.note,
   dashArray: item.dashArray,
   borderColor: item.color,
   patternLabel: item.patternLabel

@@ -1221,13 +1221,13 @@ function TerritoryMapPanel({
                   <h5>Riesgo comunal</h5>
                   <ul>
                     {RISK_SCORE_LEGEND.map((item) => (
-                      <li key={item.label}>
+                      <li key={item.label} title={item.note}>
                         <span
                           className="territory-color-dot territory-risk-swatch"
                           style={{ backgroundColor: item.color, borderColor: item.borderColor, color: item.borderColor }}
                           aria-hidden="true"
                         />
-                        <span>{item.label}</span>
+                        <span>{item.label} ({item.range})</span>
                       </li>
                     ))}
                   </ul>
