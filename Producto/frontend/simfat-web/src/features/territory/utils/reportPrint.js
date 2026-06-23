@@ -249,7 +249,10 @@ export function generateComunalReport({ score, comunaId, regionLabel, generatedA
   // Raw indicator values from top-level fields (set by backend after WLC computation)
   const ndvi = score.ndviRaw ?? null;
   const ndmi = score.ndmiRaw ?? null;
-  const fwiRaw = score.fwiInputs?.fwi ?? score.fwiInputs?.dailyFwi ?? null;
+  const fwiRaw = score.fwiRaw ?? null;
+  const firmsCount = score.firmsCount ?? null;
+  const firmsFrpMean = score.firmsFrpMean ?? null;
+  const reportsCount = score.reportsCount ?? null;
 
   const meta = WLC_META[mode] || WLC_META.STANDARD;
 
@@ -263,6 +266,11 @@ export function generateComunalReport({ score, comunaId, regionLabel, generatedA
     if (r.key === 'ndvi' && ndvi != null) observedValue = fmt(ndvi, 3);
     else if (r.key === 'ndmi' && ndmi != null) observedValue = fmt(ndmi, 3);
     else if (r.key === 'fwi' && fwiRaw != null) observedValue = `${fmt(fwiRaw, 1)} (${fwiLabel(fwiRaw)})`;
+    else if (r.key === 'firms' && firmsCount != null) {
+      observedValue = `${firmsCount} foco${firmsCount === 1 ? '' : 's'}`;
+      if (firmsFrpMean) observedValue += ` (FRP ${fmt(firmsFrpMean, 1)} MW)`;
+    }
+    else if (r.key === 'reports' && reportsCount != null) observedValue = `${reportsCount} reporte${reportsCount === 1 ? '' : 's'}`;
 
     const barHtml = `<div class="bar-wrap"><div class="bar-fill" style="width:${fillPct}%"></div></div>`;
     return `<tr>

@@ -373,6 +373,7 @@ public class TerritoryController {
             data.put("firmsFrpMean", s.getFirmsFrpMean());
             data.put("ndmiRaw", s.getNdmiRaw());
             data.put("ndviRaw", s.getNdviRaw());
+            data.put("reportsCount", s.getReportsCount());
             Map<String, Object> components = new LinkedHashMap<>();
             components.put("fwi", s.getComponentFwi());
             components.put("firms", s.getComponentFirms());
