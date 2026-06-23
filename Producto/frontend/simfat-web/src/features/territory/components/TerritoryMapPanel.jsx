@@ -461,7 +461,7 @@ const COMPONENT_LABELS = {
 
 const INDICATOR_LABELS = {
   RISK_SCORE: 'Riesgo',
-  FIRMS: 'FIRMS',
+  FIRMS: 'Focos activos',
   NDVI: 'Índice veg.',
   NDMI: 'Humedad veg.',
   ALERTS: 'Alertas',
