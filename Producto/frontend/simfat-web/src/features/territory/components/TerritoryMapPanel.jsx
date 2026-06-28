@@ -48,8 +48,6 @@ const INDICATOR_COLORS = {
 const CLIMATE_INDICATORS = ['WIND', 'HUMIDITY', 'AIR_TEMP', 'SOIL_TEMP'];
 const INDEX_CHOROPLETH_INDICATORS = ['NDVI', 'NDMI'];
 const NEUTRAL_FILL = '#cbd5e1';
-const POINT_LAYER_RENDERER = L.svg({ pane: 'territory-points-pane' });
-const REPORT_LAYER_RENDERER = L.svg({ pane: 'territory-report-pane' });
 
 const FIRMS_RECENCY_STYLES = {
   today: {
@@ -456,7 +454,6 @@ function toPointStyle(indicator, feature) {
     radius = frp ? Math.min(4 + Math.sqrt(Number(frp)) / 4, 8) : 5;
     return {
       pane: 'territory-points-pane',
-      renderer: POINT_LAYER_RENDERER,
       radius: radius + recencyStyle.radiusOffset,
       fillColor: recencyStyle.fillColor,
       color: recencyStyle.color,
@@ -469,7 +466,6 @@ function toPointStyle(indicator, feature) {
 
   return {
     pane: indicator === 'REPORTS' ? 'territory-report-pane' : 'territory-points-pane',
-    renderer: indicator === 'REPORTS' ? REPORT_LAYER_RENDERER : POINT_LAYER_RENDERER,
     radius,
     fillColor: INDICATOR_COLORS[indicator] || '#64748b',
     color: '#0f172a',
