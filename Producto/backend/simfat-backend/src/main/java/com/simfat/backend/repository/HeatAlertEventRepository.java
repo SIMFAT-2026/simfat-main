@@ -14,10 +14,12 @@ public interface HeatAlertEventRepository extends MongoRepository<HeatAlertEvent
 
     List<HeatAlertEvent> findByRegionIdAndFechaEventoBetween(String regionId, LocalDateTime from, LocalDateTime to);
 
-    // Returns the top N most intense NASA_FIRMS hotspots for the given period, sorted by FRP descending.
+    // Returns the most recent NASA_FIRMS hotspots for the given period, sorted by date descending.
+    // Sorting by recency (instead of FRP) ensures active detections from large/noisy regions
+    // are never pushed out of the page by older, higher-FRP hotspots elsewhere in the bbox.
     // The sort+limit is evaluated server-side to avoid transferring the full result set.
     @Query(value = "{ 'regionId': ?0, 'fuente': 'NASA_FIRMS', 'firmsConfidence': { '$ne': 'l' }, 'fechaEvento': { '$gte': ?1, '$lte': ?2 } }",
-           sort  = "{ 'firmsFrp': -1 }")
+           sort  = "{ 'fechaEvento': -1 }")
     List<HeatAlertEvent> findTopFirmsEvents(String regionId, LocalDateTime from, LocalDateTime to, Pageable pageable);
 
     // Returns non-satellite alerts (CONAF, manual, temperature) for the given period.
