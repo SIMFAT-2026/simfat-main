@@ -109,6 +109,14 @@ function comunaBaseStyle(score) {
 }
 
 const ComunaChoropleth = memo(function ComunaChoropleth({ geoJson, comunalScores, onComunaHover, onComunaHoverEnd, onComunaClick }) {
+  // react-leaflet only rebuilds the underlying L.geoJSON layer when `data` (the
+  // polygons) changes — onEachFeature's handlers are bound once at that point
+  // and would otherwise close over a stale `comunalScores` forever (e.g. after
+  // a Copernicus sync updates scores without touching the polygons). Reading
+  // through a ref keeps the handlers seeing the latest scores on every hover.
+  const scoresRef = useRef(comunalScores);
+  scoresRef.current = comunalScores;
+
   if (!geoJson || !geoJson.features) return null;
 
   return (
@@ -117,25 +125,27 @@ const ComunaChoropleth = memo(function ComunaChoropleth({ geoJson, comunalScores
       pane="comuna-risk-pane"
       data={geoJson}
       style={(feature) => {
-        const score = comunalScores?.[feature?.properties?.comunaId];
+        const score = scoresRef.current?.[feature?.properties?.comunaId];
         return comunaBaseStyle(score);
       }}
       onEachFeature={(feature, layer) => {
         const comunaId = feature?.properties?.comunaId;
         const nombre = feature?.properties?.nombre || comunaId;
-        const score = comunalScores?.[comunaId];
 
         layer.on('mouseover', (e) => {
+          const score = scoresRef.current?.[comunaId];
           layer.setStyle({ fillOpacity: 0.68, weight: 1.4, color: '#475569' });
           onComunaHover?.(comunaId, nombre, score, e.containerPoint);
         });
 
         layer.on('mouseout', () => {
+          const score = scoresRef.current?.[comunaId];
           layer.setStyle(comunaBaseStyle(score));
           onComunaHoverEnd?.();
         });
 
         layer.on('click', () => {
+          const score = scoresRef.current?.[comunaId];
           onComunaClick?.(comunaId, nombre, score);
         });
       }}
@@ -148,9 +158,14 @@ const ComunaChoropleth = memo(function ComunaChoropleth({ geoJson, comunalScores
 // GeoJSON polygons (mirrors ComunaChoropleth's join with comunalScores).
 // Comunas without data render with a neutral fill instead of breaking.
 const ClimateChoropleth = memo(function ClimateChoropleth({ geoJson, indicator, valueMap }) {
+  // Same stale-closure issue as ComunaChoropleth/VegetationChoropleth: onEachFeature
+  // binds once when the polygons are first drawn, so bindTooltip's content would
+  // otherwise be frozen at that weather value forever once regionData refreshes.
+  const valueMapRef = useRef(valueMap);
+  valueMapRef.current = valueMap;
+
   if (!geoJson || !geoJson.features) return null;
 
-  const values = valueMap?.values || {};
   const unit = valueMap?.unit || CLIMATE_SCALES[indicator]?.unit || '';
 
   return (
@@ -160,7 +175,7 @@ const ClimateChoropleth = memo(function ClimateChoropleth({ geoJson, indicator, 
       data={geoJson}
       style={(feature) => {
         const comunaId = feature?.properties?.comunaId;
-        const entry = values[comunaId];
+        const entry = valueMapRef.current?.values?.[comunaId];
         return {
           fillColor: climateColorForValue(indicator, entry?.value),
           fillOpacity: entry ? 0.55 : 0.12,
@@ -172,17 +187,27 @@ const ClimateChoropleth = memo(function ClimateChoropleth({ geoJson, indicator, 
       onEachFeature={(feature, layer) => {
         const comunaId = feature?.properties?.comunaId;
         const nombre = feature?.properties?.nombre || comunaId;
-        const entry = values[comunaId];
-        const valueLabel = entry?.value !== undefined && entry?.value !== null
-          ? `${Number(entry.value).toFixed(1)} ${entry.unit || unit}`
-          : 'Sin datos';
-        layer.bindTooltip(`${nombre}: ${valueLabel}`, { sticky: true });
+        layer.bindTooltip('', { sticky: true });
+        layer.on('mouseover', () => {
+          const entry = valueMapRef.current?.values?.[comunaId];
+          const entryUnit = valueMapRef.current?.unit || unit;
+          const valueLabel = entry?.value !== undefined && entry?.value !== null
+            ? `${Number(entry.value).toFixed(1)} ${entry.unit || entryUnit}`
+            : 'Sin datos';
+          layer.setTooltipContent(`${nombre}: ${valueLabel}`);
+        });
       }}
     />
   );
 });
 
 const VegetationChoropleth = memo(function VegetationChoropleth({ geoJson, indicator, comunalScores }) {
+  // Same stale-closure issue as ComunaChoropleth: onEachFeature binds once when
+  // the polygons are first drawn, so bindTooltip's content would otherwise be
+  // frozen at that NDVI/NDMI value forever (e.g. after a Copernicus sync).
+  const scoresRef = useRef(comunalScores);
+  scoresRef.current = comunalScores;
+
   if (!geoJson || !geoJson.features) return null;
 
   const scale = VEGETATION_SCALES[indicator];
@@ -195,7 +220,7 @@ const VegetationChoropleth = memo(function VegetationChoropleth({ geoJson, indic
       data={geoJson}
       style={(feature) => {
         const comunaId = feature?.properties?.comunaId;
-        const value = comunalScores?.[comunaId]?.[scale.valueKey];
+        const value = scoresRef.current?.[comunaId]?.[scale.valueKey];
         return {
           fillColor: vegetationColorForValue(indicator, value),
           fillOpacity: value != null ? 0.55 : 0.12,
@@ -207,9 +232,12 @@ const VegetationChoropleth = memo(function VegetationChoropleth({ geoJson, indic
       onEachFeature={(feature, layer) => {
         const comunaId = feature?.properties?.comunaId;
         const nombre = feature?.properties?.nombre || comunaId;
-        const value = comunalScores?.[comunaId]?.[scale.valueKey];
-        const valueLabel = value !== undefined && value !== null ? Number(value).toFixed(3) : 'Sin datos';
-        layer.bindTooltip(`${nombre}: ${scale.label} ${valueLabel}`, { sticky: true });
+        layer.bindTooltip('', { sticky: true });
+        layer.on('mouseover', () => {
+          const value = scoresRef.current?.[comunaId]?.[scale.valueKey];
+          const valueLabel = value !== undefined && value !== null ? Number(value).toFixed(3) : 'Sin datos';
+          layer.setTooltipContent(`${nombre}: ${scale.label} ${valueLabel}`);
+        });
       }}
     />
   );
