@@ -33,6 +33,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.springframework.core.io.ClassPathResource;
@@ -67,6 +69,11 @@ public class TerritoryController {
     private final ComunaRiskService comunaRiskService;
     private final ComunaInfoRepository comunaInfoRepository;
     private final TerritoryWeatherObservationRepository weatherObservationRepository;
+
+    // Comunas con un sync de Copernicus en curso. El endpoint es fire-and-forget
+    // (~2 min de duración real) y sin esto un segundo POST para la misma comuna
+    // dispara un INSERT concurrente que choca con el índice único en Mongo.
+    private final Set<String> copernicusSyncInFlight = ConcurrentHashMap.newKeySet();
 
     public TerritoryController(
         HeatAlertEventRepository heatAlertRepository,
@@ -412,17 +419,28 @@ public class TerritoryController {
     @PostMapping("/risk-score/comunas/{comunaId}/copernicus-sync")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<Map<String, Object>>> syncCopernicusForComuna(@PathVariable String comunaId) {
+        if (!copernicusSyncInFlight.add(comunaId)) {
+            ApiResponse<Map<String, Object>> conflict = ApiResponse.ok(
+                "Ya hay un sync Copernicus en curso para " + comunaId,
+                Map.of("comunaId", comunaId, "status", "in_progress")
+            );
+            conflict.setSuccess(false);
+            return ResponseEntity.status(409).body(conflict);
+        }
+
         new Thread(() -> {
             try {
                 comunaRiskService.syncCopernicusAndRecompute(comunaId);
             } catch (Exception ex) {
                 // logged inside syncCopernicusAndRecompute
+            } finally {
+                copernicusSyncInFlight.remove(comunaId);
             }
         }, "copernicus-sync-" + comunaId).start();
 
         return ResponseEntity.accepted().body(ApiResponse.ok(
             "Sync Copernicus iniciado para " + comunaId,
-            Map.of("comunaId", comunaId, "status", "accepted", "estimatedSeconds", 70)
+            Map.of("comunaId", comunaId, "status", "accepted", "estimatedSeconds", 130)
         ));
     }
 

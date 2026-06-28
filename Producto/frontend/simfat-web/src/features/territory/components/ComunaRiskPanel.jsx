@@ -185,43 +185,51 @@ function IndexInfo({ info, label }) {
   );
 }
 
-const COPERNICUS_WAIT_S = 75;
-const COPERNICUS_RETRY_WAIT_S = 35;
+// Real measured sync duration (NDVI + NDMI sequential, ~113-124s) plus margin —
+// poll repeatedly instead of guessing a fixed wait, so we never give up on a
+// sync that's still legitimately running in the backend's fire-and-forget thread.
+const COPERNICUS_POLL_INTERVAL_S = 5;
+const COPERNICUS_POLL_TIMEOUT_S = 150;
 
 export default function ComunaRiskPanel({ comunaId, score, regionId, onClose, canSync, onSync, onScoreUpdated }) {
-  const [syncState, setSyncState] = useState({ phase: 'idle', countdown: 0, error: null, result: null, retries: 0 });
+  const [syncState, setSyncState] = useState({ phase: 'idle', elapsed: 0, error: null, result: null });
 
   useEffect(() => {
-    if (syncState.phase !== 'waiting') return;
-    if (syncState.countdown <= 0) {
-      setSyncState((s) => ({ ...s, phase: 'fetching' }));
+    if (syncState.phase !== 'polling') return undefined;
+
+    const interval = window.setInterval(() => {
       fetchComunalRiskScores(regionId)
         .then((scores) => {
           const updated = scores[comunaId];
           const isEnhanced = updated?.mode === 'ENHANCED' && Number.isFinite(updated?.scoreComposite);
-          if (isEnhanced) {
-            setSyncState({ phase: 'done', countdown: 0, error: null, result: updated, retries: 0 });
-            onScoreUpdated?.(updated);
-          } else {
-            setSyncState((s) => {
-              if (s.retries < 1) {
-                return { phase: 'waiting', countdown: COPERNICUS_RETRY_WAIT_S, error: null, result: null, retries: s.retries + 1 };
-              }
+          setSyncState((s) => {
+            if (s.phase !== 'polling') return s;
+            if (isEnhanced) {
+              onScoreUpdated?.(updated);
+              return { phase: 'done', elapsed: s.elapsed, error: null, result: updated };
+            }
+            const nextElapsed = s.elapsed + COPERNICUS_POLL_INTERVAL_S;
+            if (nextElapsed >= COPERNICUS_POLL_TIMEOUT_S) {
               const noData = 'Copernicus no devolvió datos de vegetación para esta área (posible nubosidad o sin cobertura reciente).';
-              return { phase: 'done', countdown: 0, error: noData, result: null, retries: 0 };
-            });
-          }
+              return { phase: 'done', elapsed: nextElapsed, error: noData, result: null };
+            }
+            return { ...s, elapsed: nextElapsed };
+          });
         })
         .catch(() => {
-          setSyncState({ phase: 'done', countdown: 0, error: 'Error al obtener el score actualizado', result: null, retries: 0 });
+          setSyncState((s) => {
+            if (s.phase !== 'polling') return s;
+            const nextElapsed = s.elapsed + COPERNICUS_POLL_INTERVAL_S;
+            if (nextElapsed >= COPERNICUS_POLL_TIMEOUT_S) {
+              return { phase: 'done', elapsed: nextElapsed, error: 'Error al obtener el score actualizado', result: null };
+            }
+            return { ...s, elapsed: nextElapsed };
+          });
         });
-      return;
-    }
-    const timer = setTimeout(() => {
-      setSyncState((s) => s.phase === 'waiting' ? { ...s, countdown: s.countdown - 1 } : s);
-    }, 1000);
-    return () => clearTimeout(timer);
-  }, [syncState.phase, syncState.countdown, comunaId, regionId]);
+    }, COPERNICUS_POLL_INTERVAL_S * 1000);
+
+    return () => window.clearInterval(interval);
+  }, [syncState.phase, comunaId, regionId, onScoreUpdated]);
 
   if (!comunaId || !score) return null;
 
@@ -242,21 +250,19 @@ export default function ComunaRiskPanel({ comunaId, score, regionId, onClose, ca
   }
 
   async function handleCopernicusSync() {
-    setSyncState({ phase: 'requesting', countdown: 0, error: null, result: null, retries: 0 });
+    setSyncState({ phase: 'requesting', elapsed: 0, error: null, result: null });
     try {
       await syncComunaCopernicus(comunaId);
-      setSyncState({ phase: 'waiting', countdown: COPERNICUS_WAIT_S, error: null, result: null, retries: 0 });
+      setSyncState({ phase: 'polling', elapsed: 0, error: null, result: null });
     } catch (err) {
       const msg = err?.response?.data?.message || err?.message || 'Error al conectar con Copernicus';
-      setSyncState({ phase: 'done', countdown: 0, error: msg, result: null, retries: 0 });
+      setSyncState({ phase: 'done', elapsed: 0, error: msg, result: null });
     }
   }
 
-  const isLoading = syncState.phase === 'requesting' || syncState.phase === 'waiting' || syncState.phase === 'fetching';
+  const isLoading = syncState.phase === 'requesting' || syncState.phase === 'polling';
   const btnLabel = syncState.phase === 'requesting' ? 'Iniciando…'
-    : syncState.phase === 'waiting' && syncState.retries === 0 ? `Copernicus procesando… ${syncState.countdown}s`
-    : syncState.phase === 'waiting' && syncState.retries > 0 ? `Verificando resultado… ${syncState.countdown}s`
-    : syncState.phase === 'fetching' ? 'Obteniendo resultado…'
+    : syncState.phase === 'polling' ? `Sincronizando… ${syncState.elapsed}s`
     : 'Confirmar con Copernicus';
 
   return (
