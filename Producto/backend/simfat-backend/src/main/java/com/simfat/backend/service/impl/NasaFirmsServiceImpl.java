@@ -199,8 +199,12 @@ public class NasaFirmsServiceImpl implements NasaFirmsService {
 
     private LocalDateTime parseAcqDateTime(String acqDate, String acqTime) {
         try {
-            int hour = Integer.parseInt(acqTime.substring(0, 2));
-            int minute = Integer.parseInt(acqTime.substring(2, 4));
+            // NASA's area CSV does not always zero-pad acq_time (e.g. "5" for 00:05),
+            // so substring(0,2)/substring(2,4) on the raw value can throw for early
+            // UTC hours. Pad to HHMM before slicing.
+            String paddedTime = String.format("%04d", Integer.parseInt(acqTime.trim()));
+            int hour = Integer.parseInt(paddedTime.substring(0, 2));
+            int minute = Integer.parseInt(paddedTime.substring(2, 4));
             String[] parts = acqDate.split("-");
             return LocalDateTime.of(
                 Integer.parseInt(parts[0]),
@@ -209,6 +213,7 @@ public class NasaFirmsServiceImpl implements NasaFirmsService {
                 hour, minute
             );
         } catch (Exception ex) {
+            LOGGER.warn("firms_api status=acq_datetime_parse_failed acqDate={} acqTime={} error={}", acqDate, acqTime, ex.getMessage());
             return LocalDateTime.now();
         }
     }
