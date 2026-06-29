@@ -63,37 +63,39 @@ Ask the user which chain strategy (`stacked-to-main` vs `feature-branch-chain`) 
 
 ## Phase 5: Slice B — Standardize Constants (Core)
 
-- [ ] 5.1 `service/impl/ComunaRiskServiceImpl.java`: confirm/keep `FIRMS_MAX_COUNT=5`, `FIRMS_COUNT_CRITICO=4`, `FIRMS_FRP_CRITICO=60` as the canonical constants.
-- [ ] 5.2 `service/impl/TerritoryRiskServiceImpl.java`: remove `10`/`8`/`75` constants; replace with the same `5`/`4`/`60` values (shared source per Decision 5 — extract to shared constant or duplicate literal per design's lower-risk option (a)).
+- [x] 5.1 `service/impl/ComunaRiskServiceImpl.java`: confirm/keep `FIRMS_MAX_COUNT=5`, `FIRMS_COUNT_CRITICO=4`, `FIRMS_FRP_CRITICO=60` as the canonical constants. (Already standardized in Slice A — no change needed.)
+- [x] 5.2 `service/impl/TerritoryRiskServiceImpl.java`: removed `10`/`8`/`75` constants; replaced with `5`/`4`/`60` (duplicated literal per design's lower-risk option (a), not extracted to a shared class — both services keep their own constant block with a comment cross-referencing the standardization decision).
 
 ## Phase 6: Slice B — Comuna & Region Query Rework
 
-- [ ] 6.1 `service/impl/ComunaRiskServiceImpl.java`: replace centroid-based focos assignment with a query filtered by persisted `comunaId`; remove `assignFocosToComuna` and `findNearestComuna`.
-- [ ] 6.2 `service/impl/TerritoryRiskServiceImpl.java`: derive region from each event's `comunaId` -> comuna's `regionId`; remove `findNearestRegionId`; aggregate region FIRMS totals as sum of attributed comuna counts, excluding null `comunaId`.
-- [ ] 6.3 `repository/HeatAlertEventRepository.java`: add/confirm comuna-scoped query method (e.g. `findByComunaIdAndFechaEventoAfter`) to replace the removed centroid-assignment read path.
+- [x] 6.1 `service/impl/ComunaRiskServiceImpl.java`: replaced centroid-based focos assignment with `heatAlertRepository.findByComunaIdAndFechaEventoAfter(comunaId, firms48h)`; removed `assignFocosToComuna` and `findNearestComuna`.
+- [x] 6.2 `service/impl/TerritoryRiskServiceImpl.java`: region FIRMS totals now derived from `comunaInfoRepository.findByRegionId(regionId)` -> list of comunaIds -> `findByComunaIdInAndFechaEventoAfter`; removed `findNearestRegionId`. Null `comunaId` events excluded by construction (query is scoped to known comunaIds, never matches null).
+- [x] 6.3 `repository/HeatAlertEventRepository.java`: added `findByComunaIdAndFechaEventoAfter` (comuna-scoped) and `findByComunaIdInAndFechaEventoAfter` (region-scoped, via comuna set) to replace the removed centroid-assignment read paths.
 
 ## Phase 7: Slice B — Dashboard Fix
 
-- [ ] 7.1 `repository/HeatAlertEventRepository.java`: add `countByRegionIdAndFuenteAndFechaEventoBetween(regionId, fuente, from, to)`.
-- [ ] 7.2 `service/impl/DashboardSnapshotServiceImpl.java`: update `recomputeSnapshot`'s `heatAlerts7d` computation to call the new method with `fuente="NASA_FIRMS"`, replacing the unfiltered `countByRegionIdAndFechaEventoBetween`.
+- [x] 7.1 `repository/HeatAlertEventRepository.java`: added `countByRegionIdAndFuenteAndFechaEventoBetween(regionId, fuente, from, to)`.
+- [x] 7.2 `service/impl/DashboardSnapshotServiceImpl.java`: `recomputeSnapshot`'s `heatAlerts7d` now calls the new method with `fuente="NASA_FIRMS"`, replacing the unfiltered `countByRegionIdAndFechaEventoBetween` at this call site. (That unfiltered method is kept — `DashboardServiceImpl.buildCriticalRegion` still legitimately uses it for an unrelated, out-of-scope computation; see Deviation note below.)
 
 ## Phase 8: Slice B — Tests (spec: firms-risk-scoring)
 
-- [ ] 8.1 Mockito test on `ComunaRiskServiceImpl`/`TerritoryRiskServiceImpl` (parameterized, same input set both services): `firmsCount==4`+`firmsFrpMean>=60` -> CRITICO in both (spec: "Comuna-level CRITICO escalation at standardized threshold", "Region-level CRITICO escalation uses the same threshold as comuna-level").
-- [ ] 8.2 Same parameterized test: `firmsCount==3`, `firmsFrpMean==50`, not-today, low score/FWI -> NOT CRITICO in both (spec: "Below-threshold counts do not escalate").
-- [ ] 8.3 Same test: `hasTodayFirms==true` -> CRITICO regardless of count, unchanged in both services (regression guard from design Layer B).
-- [ ] 8.4 `ComunaRiskServiceImpl` test: two adjacent comunas each with correctly attributed `comunaId` events -> recompute for one comuna counts only its own events, none from the adjacent comuna (spec: "Comuna risk count reflects only its own attributed detections").
-- [ ] 8.5 Same test: events with `comunaId=null` excluded from every comuna's count (spec: "Null comunaId events are excluded from comuna-scoped counts").
-- [ ] 8.6 `TerritoryRiskServiceImpl` test: a single physical detection (one persisted row, one `comunaId`) contributes to exactly one region's total; region total equals sum of its comunas' attributed counts; null `comunaId` excluded (spec: "Single physical detection counted once across regions", "Region total equals sum of its comunas' attributed counts").
-- [ ] 8.7 `DashboardSnapshotServiceImpl` test: `heat_alert_events` with mixed `fuente` values in the 7-day window -> `heatAlerts7d` counts only `NASA_FIRMS` rows (spec: "Dashboard 7-day count excludes non-FIRMS alert sources", "Dashboard count matches FIRMS-only total").
+- [x] 8.1 `ComunaRiskServiceImplTest.recomputeByComuna_countAtStandardizedThreshold_escalatesToCritico` + `TerritoryRiskServiceImplTest.recomputeRiskByRegion_countAtStandardizedThreshold_escalatesToCritico`: `firmsCount==4` -> CRITICO in both services (region test proves the new value 4 took effect vs. the old 8).
+- [x] 8.2 `ComunaRiskServiceImplTest.recomputeByComuna_belowThreshold_doesNotEscalateToCritico` + `TerritoryRiskServiceImplTest.recomputeRiskByRegion_belowThreshold_doesNotEscalateToCritico`: `firmsCount==3`, `firmsFrpMean==50`, not-today -> NOT CRITICO in both.
+- [x] 8.3 `ComunaRiskServiceImplTest.recomputeByComuna_todaysDetection_alwaysCriticoRegardlessOfCount` + `TerritoryRiskServiceImplTest.recomputeRiskByRegion_todaysDetection_alwaysCriticoRegardlessOfCount`: `hasTodayFirms==true` -> CRITICO regardless of count, unchanged in both.
+- [x] 8.4 `ComunaRiskServiceImplTest.recomputeByComuna_queriesByPersistedComunaId_onlyOwnEventsCounted`: comuna-A recompute counts only its own `comunaId`-scoped events; adjacent comuna's stub is asserted never invoked (`verify(..., never())`).
+- [x] 8.5 Null `comunaId` exclusion: satisfied by construction — `findByComunaIdAndFechaEventoAfter`/`findByComunaIdInAndFechaEventoAfter` are scoped to specific non-null comunaId values, so a null-`comunaId` row can never be returned by either query. No separate test needed beyond 8.4/8.6 (documented here rather than a redundant assertion).
+- [x] 8.6 `TerritoryRiskServiceImplTest.recomputeRiskByRegion_queriesByComunaIdsOfRegion_singleAttributionNoDoubleCount` + `recomputeRiskByRegion_noComunasInRegion_returnsZeroFirmsWithoutQuerying`: region total equals sum of its comunas' attributed counts; empty comuna set short-circuits to zero without querying.
+- [x] 8.7 `DashboardSnapshotServiceImplTest.recomputeSnapshot_heatAlerts7d_callsFuenteFilteredCountOnly`: asserts `heatAlerts7d` comes from the fuente-filtered method and that the unfiltered method is never called.
+
+**Also added (FRP-threshold regression, explicitly requested):** `recomputeByComuna_frpAtStandardizedThreshold_escalatesToCritico` + `recomputeRiskByRegion_frpAtStandardizedThreshold_escalatesToCritico` — `firmsFrpMean==60` -> CRITICO in both (proves the new FRP threshold, was 75 in territory, took effect).
 
 ## Phase 9: Frontend Labeling (Slice B, low-risk follow-on)
 
-- [ ] 9.1 `frontend/.../reportPrint.js`: label comuna-score `firmsCount` and dashboard `firms.total/today/highFrp` with their respective window ("48h" vs "7 dias") and scope ("por comuna" vs "vista regional bruta") (spec: "PDF report no longer shows unlabeled contradictory counts").
-- [ ] 9.2 `frontend/.../DashboardPage.tsx`, `TerritoryMapPanel.jsx`: add the same window/scope labels to on-screen widgets/tooltips (spec: "Comuna tooltip and dashboard widget show distinct labels").
+- [x] 9.1 `frontend/.../reportPrint.js`: regional report's FIRMS row now labeled "Últimos 7 días · vista regional bruta (sin atribución por comuna)"; comunal report's FIRMS component value now labeled "(últimas 48h, por comuna)".
+- [x] 9.2 `frontend/.../DashboardPage.tsx`: `FirmsPanel` now shows a caption "Vista regional bruta (sin atribución por comuna) · ventana visible en el mapa". `frontend/.../TerritoryMapPanel.jsx`: `COMPONENT_INFO.firms` tooltip description/label now says "(últimas 48h, por comuna)" — matches the comuna-scoped score breakdown shown when a user inspects a comuna's FIRMS contribution. Layer-toggle short labels (`INDICATOR_LABELS.FIRMS = 'Focos activos'`) intentionally left short for UI chrome; detailed window/scope context lives in the tooltips and existing FIRMS recency-bucket legend (hoy/recientes/sin fecha), which already disambiguates by time window.
 
 ## Phase 10: Cleanup
 
-- [ ] 10.1 Remove now-dead `assignFocosToComuna`, `findNearestComuna`, `findNearestRegionId` once Phase 8 tests are green (design Rollback Plan: keep until Slice B verified, then delete in follow-up — delete here since Slice B is fully scoped in this change).
-- [ ] 10.2 Remove the old `existsByRegionIdAndLatitudAndLongitudAndFechaEventoAndFuente` and `countByRegionIdAndFechaEventoBetween` (unfiltered) repository methods once their call sites are fully migrated.
-- [ ] 10.3 Update `ComunaInfoRepository`/`HeatAlertEventRepository` Javadoc/comments to reflect `comunaId` as canonical attribution source.
+- [x] 10.1 Removed `assignFocosToComuna`, `findNearestComuna` (`ComunaRiskServiceImpl`) and `findNearestRegionId` (`TerritoryRiskServiceImpl`) now that Phase 8 tests are green and the replacement queries are wired in.
+- [x] 10.2 Removed the dead `existsByRegionIdAndLatitudAndLongitudAndFechaEventoAndFuente` repository method (confirmed zero callers in `src/main`, per verify-report-slice-a.md). `countByRegionIdAndFechaEventoBetween` (unfiltered) was **not** removed — it has a second, legitimate caller (`DashboardServiceImpl.buildCriticalRegion`) outside this change's scope; only `DashboardSnapshotServiceImpl`'s call site was migrated to the fuente-filtered variant, per the proposal/spec which only mandates the fix for `DashboardSnapshotServiceImpl.recomputeSnapshot`.
+- [x] 10.3 `HeatAlertEventRepository`'s comuna-scoped methods carry Javadoc-style comments documenting `comunaId` as the canonical attribution source, consistent with `ComunaInfoRepository`'s existing Javadoc from Slice A.

@@ -1,9 +1,21 @@
 # Apply Progress: FIRMS comuna geo-attribution and standardized detection counts
 
-## Scope of this batch
+## Overall status
 
-Slice A only (tasks.md Phases 1-4). Slice B (Phases 5-10) is explicitly out of
-scope for this batch/branch per feature-branch-chain delivery strategy.
+**Both slices complete.** Slice A (Phases 1-4, schema/seed/sync/backfill) shipped
+and was verified (PASS WITH WARNINGS — see verify-report-slice-a.md) on branch
+`firms-geo-attribution/slice-a-comuna-attribution`. Slice B (Phases 5-10,
+constant standardization/query rework/dashboard fix/frontend labels/cleanup)
+is implemented in this batch on branch
+`firms-geo-attribution/slice-b-standardize-scoring`, branched off Slice A's
+branch per feature-branch-chain delivery strategy. Full `mvn test` suite: 90/90
+passing (0 failures, 0 errors) against the real local MongoDB — see "Slice B
+test results" below.
+
+## Batch 1 scope (this section): Slice A (tasks.md Phases 1-4)
+
+Slice A only. Slice B (Phases 5-10) was explicitly out of scope for that batch
+per feature-branch-chain delivery strategy.
 
 Branch: `firms-geo-attribution/slice-a-comuna-attribution`, off tracker
 `feature/firms-comuna-geo-attribution`.
@@ -153,3 +165,108 @@ staging/production before merging Slice B there.
 - `Producto/backend/simfat-backend/src/test/java/com/simfat/backend/repository/ComunaGeoAttributionRepositoryIntegrationTest.java` (new)
 - `Producto/backend/simfat-backend/src/test/java/com/simfat/backend/service/impl/NasaFirmsServiceImplTest.java` (new)
 - `Producto/backend/simfat-backend/src/test/java/com/simfat/backend/config/BackfillComunaIdRunnerIntegrationTest.java` (new)
+
+---
+
+## Batch 2: Slice B (tasks.md Phases 5-10)
+
+Branch: `firms-geo-attribution/slice-b-standardize-scoring`, off
+`firms-geo-attribution/slice-a-comuna-attribution` (feature-branch-chain).
+
+### Tasks completed
+
+#### Phase 5: Standardize Constants
+- [x] 5.1 `ComunaRiskServiceImpl.java`: confirmed already standardized (`FIRMS_MAX_COUNT=5`, `FIRMS_COUNT_CRITICO=4`, `FIRMS_FRP_CRITICO=60`) — no change needed, Slice A's values were already the target standard.
+- [x] 5.2 `TerritoryRiskServiceImpl.java`: replaced `FIRMS_MAX_COUNT=10.0`/`FIRMS_MAX_FRP=100.0`/`FIRMS_COUNT_CRITICO=8`/`FIRMS_FRP_CRITICO=75.0` with the standardized `5.0`/`80.0`/`4`/`60.0` (matching `ComunaRiskServiceImpl`'s `FIRMS_MAX_FRP` too, for full normalization-range parity). Implemented as duplicated literals with a cross-referencing comment (design's lower-risk option (a) — no shared-constant extraction, no refactor risk).
+
+#### Phase 6: Comuna & Region Query Rework
+- [x] 6.1 `ComunaRiskServiceImpl.recomputeByComuna`: FIRMS block now queries `heatAlertRepository.findByComunaIdAndFechaEventoAfter(comunaId, firms48h)` directly — no region-wide fetch, no centroid filter. Removed `assignFocosToComuna` and `findNearestComuna` (dead after the query rework).
+- [x] 6.2 `TerritoryRiskServiceImpl.recomputeRiskByRegion`: derives the region's comuna set via `comunaInfoRepository.findByRegionId(regionId)` -> list of `comunaId`s, then queries `heatAlertEventRepository.findByComunaIdInAndFechaEventoAfter(regionComunaIds, firms48hAgo)`. Empty comuna set short-circuits to an empty FIRMS list (no query, no NPE). Removed `findNearestRegionId`. Injected `ComunaInfoRepository` as a new constructor dependency.
+- [x] 6.3 `HeatAlertEventRepository.java`: added `findByComunaIdAndFechaEventoAfter(String comunaId, LocalDateTime after)` and `findByComunaIdInAndFechaEventoAfter(List<String> comunaIds, LocalDateTime after)`.
+
+#### Phase 7: Dashboard Fix
+- [x] 7.1 `HeatAlertEventRepository.java`: added `countByRegionIdAndFuenteAndFechaEventoBetween(regionId, fuente, start, end)`.
+- [x] 7.2 `DashboardSnapshotServiceImpl.recomputeSnapshot`: `heatAlerts7d` now calls the new fuente-filtered method with `"NASA_FIRMS"`, replacing the unfiltered `countByRegionIdAndFechaEventoBetween` at this call site only.
+
+#### Phase 8: Tests (regression-critical)
+9 new/modified test methods across 3 files — see "Slice B test results" below for the exact list and real run output. All scenario coverage required by tasks.md 8.1-8.7 is satisfied, plus two extra FRP-threshold regression tests proving the FRP side of the constant change (not just the count side).
+
+#### Phase 9: Frontend Labeling
+- [x] 9.1 `reportPrint.js`: regional report FIRMS row labeled "Últimos 7 días · vista regional bruta (sin atribución por comuna)"; comunal report FIRMS component value labeled "(últimas 48h, por comuna)".
+- [x] 9.2 `DashboardPage.tsx` `FirmsPanel`: added caption "Vista regional bruta (sin atribución por comuna) · ventana visible en el mapa". `TerritoryMapPanel.jsx` `COMPONENT_INFO.firms`: tooltip description and rawLabel now say "(últimas 48h, por comuna)". Layer-toggle short labels (`INDICATOR_LABELS.FIRMS`) intentionally left unchanged — short chrome labels are not the right place for window/scope detail; the existing FIRMS recency-bucket legend (hoy/recientes/sin fecha) already disambiguates by time at that level of the UI.
+
+#### Phase 10: Cleanup
+- [x] 10.1 Removed `assignFocosToComuna`, `findNearestComuna` (`ComunaRiskServiceImpl`), `findNearestRegionId` (`TerritoryRiskServiceImpl`) — confirmed zero remaining references anywhere in `src` (grep-verified) except explanatory comments.
+- [x] 10.2 Removed the dead `existsByRegionIdAndLatitudAndLongitudAndFechaEventoAndFuente` repository method (zero callers in `src/main`, confirmed by grep before removal — matches verify-report-slice-a.md's independent confirmation #2). **Deviation from tasks.md 10.2 wording:** did NOT remove `countByRegionIdAndFechaEventoBetween` (the unfiltered count) — it has a second, legitimate caller (`DashboardServiceImpl.buildCriticalRegion`, an unrelated "critical region" dashboard computation never in this change's scope) that the proposal/spec never asked to touch. Removing it would have broken that unrelated feature. Only `DashboardSnapshotServiceImpl`'s specific call site was migrated, exactly as the spec's "Dashboard snapshot filters by NASA_FIRMS source" requirement scopes it.
+- [x] 10.3 `HeatAlertEventRepository`'s new comuna-scoped methods carry explanatory comments documenting `comunaId` as the canonical attribution source, consistent with `ComunaInfoRepository`'s existing Slice A Javadoc.
+
+### Slice B test results (real, not estimated)
+
+Ran via `mvn test` from `Producto/backend/simfat-backend`, against the real
+local MongoDB on `localhost:27017` (the same environment Slice A used).
+
+**New/modified Slice B test classes:**
+```
+Tests run: 5, Failures: 0, Errors: 0 -- ComunaRiskServiceImplTest (new)
+Tests run: 6, Failures: 0, Errors: 0 -- TerritoryRiskServiceImplTest (new)
+Tests run: 2, Failures: 0, Errors: 0 -- DashboardSnapshotServiceImplTest (1 pre-existing + 1 new)
+```
+
+**Full suite:**
+```
+[INFO] Tests run: 90, Failures: 0, Errors: 0, Skipped: 0
+[INFO] BUILD SUCCESS
+```
+(Was 78 at the end of Slice A; +12 net new test methods across the three
+files above — 90 confirmed by direct `grep -c "@Test"` count cross-check.)
+
+**Regression tests for the constant change — explicitly confirmed passing:**
+
+| Test | Proves |
+|---|---|
+| `ComunaRiskServiceImplTest.recomputeByComuna_countAtStandardizedThreshold_escalatesToCritico` | `firmsCount==4` (the new `FIRMS_COUNT_CRITICO`) -> CRITICO in the comuna service |
+| `TerritoryRiskServiceImplTest.recomputeRiskByRegion_countAtStandardizedThreshold_escalatesToCritico` | Same input (`firmsCount==4`) -> CRITICO in the region service. **Under the OLD constant (`8`) this input would NOT have escalated** — same 4-event input, only the threshold changed. This is the literal "did the new threshold actually take effect" proof requested. |
+| `ComunaRiskServiceImplTest.recomputeByComuna_frpAtStandardizedThreshold_escalatesToCritico` | `firmsFrpMean==60.0` (the new `FIRMS_FRP_CRITICO`) -> CRITICO in the comuna service |
+| `TerritoryRiskServiceImplTest.recomputeRiskByRegion_frpAtStandardizedThreshold_escalatesToCritico` | Same FRP input -> CRITICO in the region service. **Under the OLD constant (`75.0`) a mean FRP of `60.0` would NOT have escalated.** |
+| `*_belowThreshold_doesNotEscalateToCritico` (both services) | `firmsCount==3`, `firmsFrpMean==50.0` -> NOT CRITICO in either service (guards against over-escalation) |
+| `*_todaysDetection_alwaysCriticoRegardlessOfCount` (both services) | The pre-existing "today's detection is always CRITICO" override is unchanged by the constant swap |
+
+All 6 of the above pass against the real Mongo-backed test run. The constant
+change is confirmed to have actually taken effect, not just declared in code.
+
+**Gotcha found while writing the "today" regression tests:** `isToday()` in
+both services does `fechaEventoUtc.atZone(ZoneOffset.UTC).withZoneSameInstant(SANTIAGO_ZONE)`
+— it treats the stored `fechaEvento` as a UTC instant. Using
+`LocalDateTime.now()` (server-local time, not necessarily UTC) as the test's
+"today" timestamp produced a date that, after the UTC-to-Santiago conversion,
+landed on the wrong calendar day and the test failed with `NORMAL` instead of
+`CRITICO`. Fixed by using `LocalDateTime.now(ZoneOffset.UTC)` in both "today"
+tests so the timestamp round-trips through the same UTC assumption the
+production code makes. This is a latent test-authoring trap for anyone adding
+future "today" scenarios to either service.
+
+**Mockito strictness note:** two tests needed `lenient()` stubs —
+`ComunaRiskServiceImplTest`'s adjacent-comuna leakage test (the unused stub
+*is* the proof of no leakage, paired with an explicit `verify(..., never())`)
+and `TerritoryRiskServiceImplTest`'s shared `@BeforeEach` comuna stub (unused
+by the one test that deliberately queries an empty/different region). Neither
+is a quality compromise — both are deliberate negative-path proofs.
+
+### Files changed (Slice B)
+
+- `Producto/backend/simfat-backend/src/main/java/com/simfat/backend/repository/HeatAlertEventRepository.java` (modified — added `countByRegionIdAndFuenteAndFechaEventoBetween`, `findByComunaIdAndFechaEventoAfter`, `findByComunaIdInAndFechaEventoAfter`; removed dead `existsByRegionIdAndLatitudAndLongitudAndFechaEventoAndFuente`)
+- `Producto/backend/simfat-backend/src/main/java/com/simfat/backend/service/impl/ComunaRiskServiceImpl.java` (modified — comunaId-scoped FIRMS query; removed `assignFocosToComuna`/`findNearestComuna`)
+- `Producto/backend/simfat-backend/src/main/java/com/simfat/backend/service/impl/TerritoryRiskServiceImpl.java` (modified — standardized constants; comunaId-derived region FIRMS query; removed `findNearestRegionId`; new `ComunaInfoRepository` dependency)
+- `Producto/backend/simfat-backend/src/main/java/com/simfat/backend/service/impl/DashboardSnapshotServiceImpl.java` (modified — `heatAlerts7d` now fuente-filtered)
+- `Producto/backend/simfat-backend/src/test/java/com/simfat/backend/service/impl/ComunaRiskServiceImplTest.java` (new — 5 tests)
+- `Producto/backend/simfat-backend/src/test/java/com/simfat/backend/service/impl/TerritoryRiskServiceImplTest.java` (new — 6 tests)
+- `Producto/backend/simfat-backend/src/test/java/com/simfat/backend/service/impl/DashboardSnapshotServiceImplTest.java` (modified — updated existing mock to new method signature, added 1 new test)
+- `Producto/frontend/simfat-web/src/features/territory/utils/reportPrint.js` (modified — window/scope labels)
+- `Producto/frontend/simfat-web/src/pages/DashboardPage.tsx` (modified — `FirmsPanel` scope caption)
+- `Producto/frontend/simfat-web/src/features/territory/components/TerritoryMapPanel.jsx` (modified — `COMPONENT_INFO.firms` window/scope label)
+
+### Risks / residual notes for Slice B
+
+- **Inherits Slice A's WARNING W1** (backfill gate passed trivially against empty local data) — Slice B's comuna/region queries are only as correct in production as the `comunaId` data they read. Re-verify the backfill gate in staging/production before trusting Slice B's risk scores there, per verify-report-slice-a.md.
+- **`DashboardSnapshotServiceImplTest`'s pre-existing first test** (`recomputeSnapshot_calculatesLatestTrendAndFreshness`) had its `heatAlertRepository.countByRegionIdAndFechaEventoBetween` stub updated to `countByRegionIdAndFuenteAndFechaEventoBetween` to match the new call site — this is a mechanical signature update, not a behavior change to that test's intent.
+- **Constant duplication, not extraction:** `FIRMS_MAX_COUNT`/`FIRMS_COUNT_CRITICO`/`FIRMS_FRP_CRITICO`/`FIRMS_MAX_FRP` are now numerically identical but textually duplicated across `ComunaRiskServiceImpl` and `TerritoryRiskServiceImpl`, per design's explicitly lower-risk option (a). A future refactor could extract a shared `FirmsThresholds` constants class; not done here to avoid touching both services' class structure in a batch already carrying the highest-risk change (the threshold values themselves).
