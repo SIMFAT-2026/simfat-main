@@ -1,0 +1,36 @@
+schema: spec-driven
+
+context: |
+  Monorepo: Producto/backend (Java 17, Spring Boot 3.3.4, Maven) + Producto/frontend (React 18 + Vite, JS/JSX with some TSX).
+  Backend persistence: MongoDB (Spring Data Mongo) + PostgreSQL via JPA/Flyway (dual datastore, not Mongo-only).
+  Backend has rich JUnit 5 test suite: unit + Spring integration tests, embedded Mongo, H2, MockWebServer, Spring Security test.
+  Frontend has no test runner, no test framework dependency, no test files, no tsconfig (TSX files exist but TS is not configured).
+  Auth: dual RBAC (legacy + modern), JWT (jjwt).
+
+strict_tdd: false # see testing-capabilities artifact: backend-capable, frontend has zero test infra
+
+rules:
+  proposal:
+    - Include rollback plan for risky changes
+    - Note which side(s) (backend/frontend) are affected
+  specs:
+    - Use Given/When/Then for scenarios
+    - Use RFC 2119 keywords (MUST, SHALL, SHOULD, MAY)
+  design:
+    - Include sequence diagrams for complex flows
+    - Document architecture decisions with rationale
+    - Call out Mongo vs Postgres/JPA data ownership explicitly when relevant
+  tasks:
+    - Group by phase, use hierarchical numbering
+    - Keep tasks completable in one session
+    - Backend tasks should include JUnit tests; frontend tasks cannot assume a test runner exists
+  apply:
+    - Follow existing code patterns
+    tdd: false # no project-wide test runner; backend alone could opt into RED-GREEN-REFACTOR per change
+    test_command: "cd Producto/backend/simfat-backend && mvn test"
+  verify:
+    test_command: "cd Producto/backend/simfat-backend && mvn test"
+    build_command: "cd Producto/frontend/simfat-web && npm run build"
+    coverage_threshold: 0
+  archive:
+    - Warn before merging destructive deltas
