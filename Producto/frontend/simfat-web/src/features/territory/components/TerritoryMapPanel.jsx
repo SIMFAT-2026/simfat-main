@@ -583,8 +583,8 @@ const COMPONENT_INFO = {
     scale: 'Escala raw -1 a 1:\n• >0.1: Vegetación húmeda, bajo riesgo\n• -0.1 a 0.1: Estrés hídrico leve\n• <-0.1: Estrés hídrico severo'
   },
   firms: {
-    description: 'Detecciones satelitales recientes de anomalías térmicas NASA FIRMS.',
-    rawLabel: 'Detecciones FIRMS',
+    description: 'Detecciones satelitales recientes de anomalías térmicas NASA FIRMS (últimas 48h, por comuna).',
+    rawLabel: 'Detecciones FIRMS (48h, por comuna)',
     rawValue: (component) => component?.focosCount,
     scale: 'A mayor cantidad de focos y FRP, mayor riesgo inmediato.'
   },

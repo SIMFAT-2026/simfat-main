@@ -1,6 +1,7 @@
 package com.simfat.backend.service.impl;
 
 import com.simfat.backend.model.CitizenReport;
+import com.simfat.backend.model.ComunaInfo;
 import com.simfat.backend.model.HeatAlertEvent;
 import com.simfat.backend.model.IndicatorType;
 import com.simfat.backend.model.OpenEoIndicatorObservation;
@@ -8,6 +9,7 @@ import com.simfat.backend.model.Region;
 import com.simfat.backend.model.TerritoryRiskSnapshot;
 import com.simfat.backend.model.TerritoryWeatherObservation;
 import com.simfat.backend.repository.CitizenReportRepository;
+import com.simfat.backend.repository.ComunaInfoRepository;
 import com.simfat.backend.repository.HeatAlertEventRepository;
 import com.simfat.backend.repository.OpenEoIndicatorObservationRepository;
 import com.simfat.backend.repository.RegionRepository;
@@ -43,8 +45,12 @@ public class TerritoryRiskServiceImpl implements TerritoryRiskService {
     private static final double NDMI_WET = 0.4;
     private static final double NDVI_MIN = 0.1;
     private static final double NDVI_MAX = 0.8;
-    private static final double FIRMS_MAX_COUNT = 10.0;
-    private static final double FIRMS_MAX_FRP = 100.0;
+    // Standardized with ComunaRiskServiceImpl — see design.md "Standardized escalation
+    // constants". Both services MUST share the same FIRMS_MAX_COUNT/FRP normalization
+    // range and escalation thresholds; divergent values were an artifact of the
+    // now-removed cross-region double-counting workaround, not deliberate calibration.
+    private static final double FIRMS_MAX_COUNT = 5.0;
+    private static final double FIRMS_MAX_FRP = 80.0;
     private static final double REPORTS_MAX = 5.0;
 
     // Umbrales de alerta (SDD v1)
@@ -57,13 +63,18 @@ public class TerritoryRiskServiceImpl implements TerritoryRiskService {
     // A single low-intensity FIRMS detection should not by itself force CRITICO — it
     // already feeds the weighted score via firmsNorm. Only escalate directly when
     // detections cluster or one is genuinely intense (see resolveAlertLevel).
-    private static final int FIRMS_COUNT_CRITICO = 8;
-    private static final double FIRMS_FRP_CRITICO = 75.0;
+    // Standardized with ComunaRiskServiceImpl (design.md "Standardized escalation
+    // constants") — was 8/75.0; the looser region-level thresholds were an artifact
+    // of the now-removed per-region double-counting workaround, not deliberate
+    // calibration, and would under-escalate once detections are counted exactly once.
+    private static final int FIRMS_COUNT_CRITICO = 4;
+    private static final double FIRMS_FRP_CRITICO = 60.0;
     // Matches the frontend's "today" vs "recent" FIRMS bucket (TerritoryMapPanel.jsx
     // santiagoDateKey) so the alert override and the map legend agree.
     private static final ZoneId SANTIAGO_ZONE = ZoneId.of("America/Santiago");
 
     private final RegionRepository regionRepository;
+    private final ComunaInfoRepository comunaInfoRepository;
     private final OpenEoIndicatorObservationRepository observationRepository;
     private final TerritoryWeatherObservationRepository weatherRepository;
     private final HeatAlertEventRepository heatAlertEventRepository;
@@ -72,6 +83,7 @@ public class TerritoryRiskServiceImpl implements TerritoryRiskService {
 
     public TerritoryRiskServiceImpl(
         RegionRepository regionRepository,
+        ComunaInfoRepository comunaInfoRepository,
         OpenEoIndicatorObservationRepository observationRepository,
         TerritoryWeatherObservationRepository weatherRepository,
         HeatAlertEventRepository heatAlertEventRepository,
@@ -79,6 +91,7 @@ public class TerritoryRiskServiceImpl implements TerritoryRiskService {
         TerritoryRiskSnapshotRepository snapshotRepository
     ) {
         this.regionRepository = regionRepository;
+        this.comunaInfoRepository = comunaInfoRepository;
         this.observationRepository = observationRepository;
         this.weatherRepository = weatherRepository;
         this.heatAlertEventRepository = heatAlertEventRepository;
@@ -138,20 +151,22 @@ public class TerritoryRiskServiceImpl implements TerritoryRiskService {
             availableComponents++;
         }
 
-        // FIRMS (focos activos ultimas 48h)
+        // FIRMS (focos activos ultimas 48h, atribuidos via comunaId persistido en sync)
         LocalDateTime firms48hAgo = now.minusHours(48);
-        List<Region> allRegions = regionRepository.findAll();
-        // Reasigna por centroide mas cercano: los aoiBbox de regiones vecinas (ej. Biobio-Nuble,
-        // Biobio-Araucania) se superponen, por lo que el mismo foco puede haberse persistido bajo
-        // mas de un regionId durante el sync. Sin este filtro Biobio queda inflado por ser la unica
-        // region monitoreada con vecinos en ambos lados.
-        List<HeatAlertEvent> firmsEvents = heatAlertEventRepository.findByRegionId(regionId).stream()
-            .filter(e -> e.getFechaEvento() != null && e.getFechaEvento().isAfter(firms48hAgo))
-            .filter(e -> "NASA_FIRMS".equals(e.getFuente()))
-            .filter(e -> e.getFirmsConfidence() != null && !"l".equals(e.getFirmsConfidence()))
-            .filter(e -> e.getLatitud() != null && e.getLongitud() != null)
-            .filter(e -> regionId.equals(findNearestRegionId(e.getLatitud(), e.getLongitud(), allRegions)))
+        // Region total = suma de los conteos de sus comunas atribuidas. comunaId es la
+        // fuente de verdad geometrica (point-in-polygon en sync); ya no se reasigna por
+        // centroide de region — eso es exactamente el doble conteo entre regiones vecinas
+        // (ej. Biobio-Nuble, Biobio-Araucania) que este cambio elimina.
+        List<String> regionComunaIds = comunaInfoRepository.findByRegionId(regionId).stream()
+            .map(ComunaInfo::getId)
             .toList();
+        List<HeatAlertEvent> firmsEvents = regionComunaIds.isEmpty()
+            ? List.of()
+            : heatAlertEventRepository.findByComunaIdInAndFechaEventoAfter(regionComunaIds, firms48hAgo).stream()
+                .filter(e -> "NASA_FIRMS".equals(e.getFuente()))
+                .filter(e -> e.getFirmsConfidence() != null && !"l".equals(e.getFirmsConfidence()))
+                .filter(e -> e.getLatitud() != null && e.getLongitud() != null)
+                .toList();
 
         int firmsCountFiltered = firmsEvents.size();
         boolean hasTodayFirms = firmsEvents.stream().anyMatch(e -> isToday(e.getFechaEvento()));
@@ -265,24 +280,5 @@ public class TerritoryRiskServiceImpl implements TerritoryRiskService {
 
     private double round4(double value) {
         return Math.round(value * 10000.0) / 10000.0;
-    }
-
-    private String findNearestRegionId(double lat, double lon, List<Region> regions) {
-        String nearest = null;
-        double minDist = Double.MAX_VALUE;
-        for (Region region : regions) {
-            List<Double> bbox = region.getAoiBbox();
-            if (bbox == null || bbox.size() != 4) {
-                continue;
-            }
-            double centerLat = (bbox.get(1) + bbox.get(3)) / 2;
-            double centerLon = (bbox.get(0) + bbox.get(2)) / 2;
-            double dist = Math.pow(lat - centerLat, 2) + Math.pow(lon - centerLon, 2);
-            if (dist < minDist) {
-                minDist = dist;
-                nearest = region.getId();
-            }
-        }
-        return nearest;
     }
 }

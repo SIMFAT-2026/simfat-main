@@ -186,7 +186,7 @@ export function generateRegionalReport({
     <thead><tr><th>Indicador</th><th>Total</th><th>Detalle</th></tr></thead>
     <tbody>
       <tr>
-        <td>Focos activos (FIRMS / NASA)</td>
+        <td>Focos activos (FIRMS / NASA)<br><span style="font-size:9px;color:#888;font-weight:400;">Últimos 7 días · vista regional bruta (sin atribución por comuna)</span></td>
         <td><strong>${firms.total}</strong></td>
         <td>Detectados hoy: ${firms.today} · Alta intensidad (FRP &gt; 50 MW): ${firms.highFrp}</td>
       </tr>
@@ -267,7 +267,7 @@ export function generateComunalReport({ score, comunaId, regionLabel, generatedA
     else if (r.key === 'ndmi' && ndmi != null) observedValue = fmt(ndmi, 3);
     else if (r.key === 'fwi' && fwiRaw != null) observedValue = `${fmt(fwiRaw, 1)} (${fwiLabel(fwiRaw)})`;
     else if (r.key === 'firms' && firmsCount != null) {
-      observedValue = `${firmsCount} foco${firmsCount === 1 ? '' : 's'}`;
+      observedValue = `${firmsCount} foco${firmsCount === 1 ? '' : 's'} <span style="font-size:9px;color:#888;">(últimas 48h, por comuna)</span>`;
       if (firmsFrpMean) observedValue += ` (FRP ${fmt(firmsFrpMean, 1)} MW)`;
     }
     else if (r.key === 'reports' && reportsCount != null) observedValue = `${reportsCount} reporte${reportsCount === 1 ? '' : 's'}`;
