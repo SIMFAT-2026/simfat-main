@@ -152,16 +152,13 @@ public class ComunaRiskServiceImpl implements ComunaRiskService {
             fwiNorm = normalize(fwiRaw, 0.0, FWI_MAX);
         }
 
-        // --- FIRMS (distancia al centroide) ---
-        List<HeatAlertEvent> regionFocos = heatAlertRepository.findByRegionId(comuna.getRegionId())
+        // --- FIRMS (atribuido via comunaId persistido en sync, ya no por centroide) ---
+        List<HeatAlertEvent> comunaFocos = heatAlertRepository.findByComunaIdAndFechaEventoAfter(comunaId, firms48h)
             .stream()
             .filter(e -> "NASA_FIRMS".equals(e.getFuente()))
-            .filter(e -> e.getFechaEvento() != null && e.getFechaEvento().isAfter(firms48h))
             .filter(e -> e.getFirmsConfidence() != null && !"l".equals(e.getFirmsConfidence()))
             .filter(e -> e.getLatitud() != null && e.getLongitud() != null)
             .collect(Collectors.toList());
-
-        List<HeatAlertEvent> comunaFocos = assignFocosToComuna(regionFocos, comunaId, comunaRepository.findByRegionId(comuna.getRegionId()));
         int firmsCount = comunaFocos.size();
         boolean hasTodayFoco = comunaFocos.stream().anyMatch(e -> isToday(e.getFechaEvento()));
         double firmsFrpMean = comunaFocos.stream()
@@ -339,33 +336,6 @@ public class ComunaRiskServiceImpl implements ComunaRiskService {
         }
 
         return recomputeByComuna(comunaId);
-    }
-
-    private List<HeatAlertEvent> assignFocosToComuna(
-        List<HeatAlertEvent> regionFocos,
-        String targetComunaId,
-        List<ComunaInfo> allComunas
-    ) {
-        return regionFocos.stream()
-            .filter(foco -> {
-                String nearest = findNearestComuna(foco.getLatitud(), foco.getLongitud(), allComunas);
-                return targetComunaId.equals(nearest);
-            })
-            .collect(Collectors.toList());
-    }
-
-    private String findNearestComuna(double lat, double lon, List<ComunaInfo> comunas) {
-        String nearest = null;
-        double minDist = Double.MAX_VALUE;
-        for (ComunaInfo c : comunas) {
-            if (c.getCenterLat() == null || c.getCenterLon() == null) continue;
-            double dist = Math.pow(lat - c.getCenterLat(), 2) + Math.pow(lon - c.getCenterLon(), 2);
-            if (dist < minDist) {
-                minDist = dist;
-                nearest = c.getId();
-            }
-        }
-        return nearest;
     }
 
     private String resolveAlertLevel(double score, Double fwiRaw, int firmsCount, double firmsFrpMean, boolean hasTodayFirms) {

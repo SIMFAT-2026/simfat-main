@@ -30,15 +30,20 @@ public interface HeatAlertEventRepository extends MongoRepository<HeatAlertEvent
 
     Long countByRegionIdAndFechaEventoBetween(String regionId, LocalDateTime start, LocalDateTime end);
 
+    // Standardized FIRMS-only count for the dashboard 7-day widget — without this
+    // filter, heatAlerts7d silently counted every alert source, not just NASA_FIRMS.
+    Long countByRegionIdAndFuenteAndFechaEventoBetween(String regionId, String fuente, LocalDateTime start, LocalDateTime end);
+
     Long countByNivelRiesgo(RiskLevel nivelRiesgo);
 
-    // Legacy dedup key (includes regionId). Kept until NasaFirmsServiceImpl fully
-    // migrates to the region-independent key below; the same physical detection
-    // fetched by two overlapping region bboxes passes this check separately per
-    // region, which is the cross-region double-count this change eliminates.
-    // Removed once parseCsvResponse no longer references it (Phase 2 / Phase 10).
-    boolean existsByRegionIdAndLatitudAndLongitudAndFechaEventoAndFuente(
-        String regionId, Double latitud, Double longitud, LocalDateTime fechaEvento, String fuente);
+    // Comuna-scoped query against the persisted, geometrically-correct comunaId —
+    // replaces on-read nearest-centroid assignment (ComunaRiskServiceImpl.assignFocosToComuna).
+    List<HeatAlertEvent> findByComunaIdAndFechaEventoAfter(String comunaId, LocalDateTime after);
+
+    // Region-scoped query against persisted comunaId set, used to derive region totals
+    // as the sum of attributed comuna counts (TerritoryRiskServiceImpl) — replaces
+    // on-read nearest-region-centroid reassignment (findNearestRegionId).
+    List<HeatAlertEvent> findByComunaIdInAndFechaEventoAfter(List<String> comunaIds, LocalDateTime after);
 
     // Region-independent dedup key: a FIRMS detection's true identity is
     // (lat, lon, acq datetime, source), regardless of which region's bbox
