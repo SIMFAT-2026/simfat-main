@@ -15,9 +15,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.core.io.ClassPathResource;
-import org.springframework.data.mongodb.core.geo.GeoJsonMultiPolygon;
-import org.springframework.data.mongodb.core.geo.GeoJsonPolygon;
-import org.springframework.data.geo.Point;
 import org.springframework.stereotype.Component;
 
 /**
@@ -127,94 +124,11 @@ public class MonitoredComunasConfig {
                 comuna.setCenterLat(props.path("centerLat").asDouble());
                 comuna.setCenterLon(props.path("centerLon").asDouble());
 
-                GeoJsonMultiPolygon geometry = null;
-                try {
-                    geometry = parseMultiPolygon(feature.path("geometry"));
-                    validateRings(geometry);
-                } catch (Exception ex) {
-                    LOGGER.warn("monitored_comunas status=invalid_geometry comunaId={} error={}",
-                        comunaId, ex.getMessage());
-                    geometry = null;
-                }
-                comuna.setGeometry(geometry);
-
                 toSave.add(comuna);
             }
 
             comunaRepository.saveAll(toSave);
             return toSave.size();
         }
-    }
-
-    /**
-     * Converts a GeoJSON {@code geometry} node of type MultiPolygon into Spring
-     * Data Mongo's {@link GeoJsonMultiPolygon}. Throws on missing/wrong type or
-     * malformed coordinate structure so the caller's try/catch can log + skip
-     * that single comuna without aborting startup (Decision 3).
-     */
-    private GeoJsonMultiPolygon parseMultiPolygon(JsonNode geometryNode) {
-        if (geometryNode.isMissingNode() || geometryNode.isNull()) {
-            throw new IllegalArgumentException("missing geometry node");
-        }
-        String type = geometryNode.path("type").asText();
-        if (!"MultiPolygon".equals(type)) {
-            throw new IllegalArgumentException("unexpected geometry type: " + type);
-        }
-
-        JsonNode polygonsNode = geometryNode.path("coordinates");
-        if (!polygonsNode.isArray() || polygonsNode.isEmpty()) {
-            throw new IllegalArgumentException("empty MultiPolygon coordinates");
-        }
-
-        List<GeoJsonPolygon> polygons = new ArrayList<>();
-        for (JsonNode polygonNode : polygonsNode) {
-            polygons.add(parsePolygon(polygonNode));
-        }
-        return new GeoJsonMultiPolygon(polygons);
-    }
-
-    private GeoJsonPolygon parsePolygon(JsonNode polygonNode) {
-        if (!polygonNode.isArray() || polygonNode.isEmpty()) {
-            throw new IllegalArgumentException("polygon has no rings");
-        }
-        // GeoJsonPolygon's constructor takes the outer ring as a varargs Point list;
-        // GADM source polygons here are simple (no documented interior holes in the
-        // pilot dataset), so only the first ring (the exterior) is mapped.
-        JsonNode outerRing = polygonNode.get(0);
-        List<Point> points = new ArrayList<>();
-        for (JsonNode position : outerRing) {
-            if (!position.isArray() || position.size() < 2) {
-                throw new IllegalArgumentException("malformed coordinate position");
-            }
-            double lon = position.get(0).asDouble();
-            double lat = position.get(1).asDouble();
-            points.add(new Point(lon, lat));
-        }
-        return new GeoJsonPolygon(points);
-    }
-
-    /**
-     * Structural sanity check, not a full topological self-intersection test
-     * (that is left to MongoDB's 2dsphere indexer, which will reject/skip a
-     * self-intersecting polygon per-document without crashing startup thanks
-     * to the sparse-by-nullable geometry field). Checks ring closure and a
-     * minimum vertex count for every ring of every polygon.
-     */
-    private void validateRings(GeoJsonMultiPolygon geometry) {
-        for (GeoJsonPolygon polygon : geometry.getCoordinates()) {
-            List<Point> ring = polygon.getCoordinates().get(0).getCoordinates();
-            if (ring.size() < 4) {
-                throw new IllegalArgumentException("ring has fewer than 4 positions");
-            }
-            Point first = ring.get(0);
-            Point last = ring.get(ring.size() - 1);
-            if (!isSamePoint(first, last)) {
-                throw new IllegalArgumentException("ring is not closed (first != last)");
-            }
-        }
-    }
-
-    private boolean isSamePoint(Point a, Point b) {
-        return Double.compare(a.getX(), b.getX()) == 0 && Double.compare(a.getY(), b.getY()) == 0;
     }
 }

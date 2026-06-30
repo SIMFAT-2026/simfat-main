@@ -1,9 +1,6 @@
 package com.simfat.backend.model;
 
 import org.springframework.data.annotation.Id;
-import org.springframework.data.mongodb.core.geo.GeoJsonMultiPolygon;
-import org.springframework.data.mongodb.core.index.GeoSpatialIndexType;
-import org.springframework.data.mongodb.core.index.GeoSpatialIndexed;
 import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
@@ -24,17 +21,6 @@ public class ComunaInfo {
 
     private Double centerLat;
     private Double centerLon;
-
-    /**
-     * Comuna polygon used for sync-time point-in-polygon attribution of FIRMS
-     * detections ($geoIntersects). Nullable: a comuna whose source GeoJSON
-     * feature fails structural validation at seed time is persisted without
-     * geometry rather than aborting startup (see MonitoredComunasConfig).
-     * The 2dsphere index is sparse by virtue of the field being nullable —
-     * comunas without geometry are simply absent from the index.
-     */
-    @GeoSpatialIndexed(type = GeoSpatialIndexType.GEO_2DSPHERE)
-    private GeoJsonMultiPolygon geometry;
 
     public String getId() { return id; }
     public void setId(String id) { this.id = id; }
@@ -59,7 +45,4 @@ public class ComunaInfo {
 
     public Double getCenterLon() { return centerLon; }
     public void setCenterLon(Double centerLon) { this.centerLon = centerLon; }
-
-    public GeoJsonMultiPolygon getGeometry() { return geometry; }
-    public void setGeometry(GeoJsonMultiPolygon geometry) { this.geometry = geometry; }
 }

@@ -4,7 +4,6 @@ import com.simfat.backend.model.HeatAlertEvent;
 import com.simfat.backend.model.RiskLevel;
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.stream.Stream;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.data.mongodb.repository.Query;
@@ -30,30 +29,8 @@ public interface HeatAlertEventRepository extends MongoRepository<HeatAlertEvent
 
     Long countByRegionIdAndFechaEventoBetween(String regionId, LocalDateTime start, LocalDateTime end);
 
-    // Standardized FIRMS-only count for the dashboard 7-day widget — without this
-    // filter, heatAlerts7d silently counted every alert source, not just NASA_FIRMS.
-    Long countByRegionIdAndFuenteAndFechaEventoBetween(String regionId, String fuente, LocalDateTime start, LocalDateTime end);
-
     Long countByNivelRiesgo(RiskLevel nivelRiesgo);
 
-    // Comuna-scoped query against the persisted, geometrically-correct comunaId —
-    // replaces on-read nearest-centroid assignment (ComunaRiskServiceImpl.assignFocosToComuna).
-    List<HeatAlertEvent> findByComunaIdAndFechaEventoAfter(String comunaId, LocalDateTime after);
-
-    // Region-scoped query against persisted comunaId set, used to derive region totals
-    // as the sum of attributed comuna counts (TerritoryRiskServiceImpl) — replaces
-    // on-read nearest-region-centroid reassignment (findNearestRegionId).
-    List<HeatAlertEvent> findByComunaIdInAndFechaEventoAfter(List<String> comunaIds, LocalDateTime after);
-
-    // Region-independent dedup key: a FIRMS detection's true identity is
-    // (lat, lon, acq datetime, source), regardless of which region's bbox
-    // fetched it. Two overlapping regions fetching the same physical pixel
-    // collapse to one persisted row.
-    boolean existsByLatitudAndLongitudAndFechaEventoAndFuente(
-        Double latitud, Double longitud, LocalDateTime fechaEvento, String fuente);
-
-    // Used by the startup backfill (BackfillComunaIdRunner) to find rows
-    // attributed before comunaId existed. Stream avoids loading the full
-    // result set into memory; callers must close the stream (try-with-resources).
-    Stream<HeatAlertEvent> streamByFuenteAndComunaIdIsNull(String fuente);
+    boolean existsByRegionIdAndLatitudAndLongitudAndFechaEventoAndFuente(
+        String regionId, Double latitud, Double longitud, LocalDateTime fechaEvento, String fuente);
 }

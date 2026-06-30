@@ -170,9 +170,6 @@ function FirmsPanel({ features }: { features: GeoFeature[] }) {
   return (
     <div style={panel}>
       <h3 style={panelTitle}>Focos FIRMS (NASA)</h3>
-      <p style={{ fontSize: 11, color: '#888', margin: '0 0 8px' }}>
-        Vista regional bruta (sin atribución por comuna) · ventana visible en el mapa
-      </p>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
         {[
           { lbl: 'TOTAL ACTIVOS',   val: features.length, color: undefined },

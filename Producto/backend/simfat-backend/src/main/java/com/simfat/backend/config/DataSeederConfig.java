@@ -71,9 +71,9 @@ public class DataSeederConfig {
             ));
 
             heatAlertRepository.saveAll(List.of(
-                buildHeatAlert(centro.getId(), -35.44, -71.66, RiskLevel.MEDIO, "NASA_FIRMS", "Foco de calor cercano a area de interfaz"),
-                buildHeatAlert(sur.getId(), -39.81, -73.24, RiskLevel.ALTO, "NASA_FIRMS", "Multiples focos en ventana de 24h"),
-                buildHeatAlert(norte.getId(), -27.37, -70.33, RiskLevel.CRITICO, "NASA_FIRMS", "Evento persistente con viento fuerte")
+                buildHeatAlert(centro.getId(), -35.44, -71.66, RiskLevel.MEDIO, "NASA FIRMS", "Foco de calor cercano a area de interfaz"),
+                buildHeatAlert(sur.getId(), -39.81, -73.24, RiskLevel.ALTO, "NASA FIRMS", "Multiples focos en ventana de 24h"),
+                buildHeatAlert(norte.getId(), -27.37, -70.33, RiskLevel.CRITICO, "NASA FIRMS", "Evento persistente con viento fuerte")
             ));
 
             if (alertRuleRepository.count() == 0) {

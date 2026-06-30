@@ -4,8 +4,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.simfat.backend.model.DashboardRegionSnapshot;
@@ -80,7 +78,7 @@ class DashboardSnapshotServiceImplTest {
             .thenReturn(List.of(ndviOld, ndviLatest));
         when(observationRepository.findByRegionIdAndIndicatorAndObservedAtBetweenOrderByObservedAtAsc(eq(regionId), eq(IndicatorType.NDMI), any(), any()))
             .thenReturn(List.of(ndmiOld, ndmiLatest));
-        when(heatAlertRepository.countByRegionIdAndFuenteAndFechaEventoBetween(eq(regionId), eq("NASA_FIRMS"), any(), any())).thenReturn(3L);
+        when(heatAlertRepository.countByRegionIdAndFechaEventoBetween(eq(regionId), any(), any())).thenReturn(3L);
         when(forestLossRepository.findByRegionId(regionId)).thenReturn(List.of(record));
         when(snapshotRepository.findByRegionId(regionId)).thenReturn(Optional.empty());
         when(snapshotRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
@@ -94,32 +92,5 @@ class DashboardSnapshotServiceImplTest {
         assertEquals(0.04, snapshot.getNdmiTrend30d());
         assertEquals("LOW", snapshot.getCriticality());
         assertNotNull(snapshot.getDataFreshnessSeconds());
-    }
-
-    @Test
-    void recomputeSnapshot_heatAlerts7d_callsFuenteFilteredCountOnly() {
-        String regionId = "region-fuente-check";
-
-        when(observationRepository.findTopByRegionIdAndIndicatorOrderByObservedAtDesc(regionId, IndicatorType.NDVI))
-            .thenReturn(Optional.empty());
-        when(observationRepository.findTopByRegionIdAndIndicatorOrderByObservedAtDesc(regionId, IndicatorType.NDMI))
-            .thenReturn(Optional.empty());
-        when(observationRepository.findByRegionIdAndIndicatorAndObservedAtBetweenOrderByObservedAtAsc(eq(regionId), eq(IndicatorType.NDVI), any(), any()))
-            .thenReturn(List.of());
-        when(observationRepository.findByRegionIdAndIndicatorAndObservedAtBetweenOrderByObservedAtAsc(eq(regionId), eq(IndicatorType.NDMI), any(), any()))
-            .thenReturn(List.of());
-        // Only the FIRMS-only count is stubbed. heatAlerts7d MUST come from the
-        // fuente-filtered method, never from the unfiltered countByRegionIdAndFechaEventoBetween
-        // — that was the bug: it silently counted every alert source, not just NASA_FIRMS.
-        when(heatAlertRepository.countByRegionIdAndFuenteAndFechaEventoBetween(eq(regionId), eq("NASA_FIRMS"), any(), any()))
-            .thenReturn(2L);
-        when(forestLossRepository.findByRegionId(regionId)).thenReturn(List.of());
-        when(snapshotRepository.findByRegionId(regionId)).thenReturn(Optional.empty());
-        when(snapshotRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
-
-        DashboardRegionSnapshot snapshot = snapshotService.recomputeSnapshot(regionId);
-
-        assertEquals(2L, snapshot.getHeatAlerts7d());
-        verify(heatAlertRepository, never()).countByRegionIdAndFechaEventoBetween(any(), any(), any());
     }
 }
