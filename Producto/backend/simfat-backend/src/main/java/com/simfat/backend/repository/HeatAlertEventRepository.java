@@ -4,6 +4,7 @@ import com.simfat.backend.model.HeatAlertEvent;
 import com.simfat.backend.model.RiskLevel;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.stream.Stream;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.data.mongodb.repository.Query;
@@ -31,6 +32,23 @@ public interface HeatAlertEventRepository extends MongoRepository<HeatAlertEvent
 
     Long countByNivelRiesgo(RiskLevel nivelRiesgo);
 
+    // Legacy dedup key (includes regionId). Kept until NasaFirmsServiceImpl fully
+    // migrates to the region-independent key below; the same physical detection
+    // fetched by two overlapping region bboxes passes this check separately per
+    // region, which is the cross-region double-count this change eliminates.
+    // Removed once parseCsvResponse no longer references it (Phase 2 / Phase 10).
     boolean existsByRegionIdAndLatitudAndLongitudAndFechaEventoAndFuente(
         String regionId, Double latitud, Double longitud, LocalDateTime fechaEvento, String fuente);
+
+    // Region-independent dedup key: a FIRMS detection's true identity is
+    // (lat, lon, acq datetime, source), regardless of which region's bbox
+    // fetched it. Two overlapping regions fetching the same physical pixel
+    // collapse to one persisted row.
+    boolean existsByLatitudAndLongitudAndFechaEventoAndFuente(
+        Double latitud, Double longitud, LocalDateTime fechaEvento, String fuente);
+
+    // Used by the startup backfill (BackfillComunaIdRunner) to find rows
+    // attributed before comunaId existed. Stream avoids loading the full
+    // result set into memory; callers must close the stream (try-with-resources).
+    Stream<HeatAlertEvent> streamByFuenteAndComunaIdIsNull(String fuente);
 }
