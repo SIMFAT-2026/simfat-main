@@ -270,3 +270,215 @@ is a quality compromise — both are deliberate negative-path proofs.
 - **Inherits Slice A's WARNING W1** (backfill gate passed trivially against empty local data) — Slice B's comuna/region queries are only as correct in production as the `comunaId` data they read. Re-verify the backfill gate in staging/production before trusting Slice B's risk scores there, per verify-report-slice-a.md.
 - **`DashboardSnapshotServiceImplTest`'s pre-existing first test** (`recomputeSnapshot_calculatesLatestTrendAndFreshness`) had its `heatAlertRepository.countByRegionIdAndFechaEventoBetween` stub updated to `countByRegionIdAndFuenteAndFechaEventoBetween` to match the new call site — this is a mechanical signature update, not a behavior change to that test's intent.
 - **Constant duplication, not extraction:** `FIRMS_MAX_COUNT`/`FIRMS_COUNT_CRITICO`/`FIRMS_FRP_CRITICO`/`FIRMS_MAX_FRP` are now numerically identical but textually duplicated across `ComunaRiskServiceImpl` and `TerritoryRiskServiceImpl`, per design's explicitly lower-risk option (a). A future refactor could extract a shared `FirmsThresholds` constants class; not done here to avoid touching both services' class structure in a batch already carrying the highest-risk change (the threshold values themselves).
+
+---
+
+## Phase 11 — Corrective Re-implementation (post-incident)
+
+**Status: COMPLETE.** All 13 tasks (11.1–11.13) implemented and green. Full `mvn test`:
+**98/98 passing, 0 failures, 0 errors** (clean `mvn clean test` run, real local MongoDB
+`simfat-mongo-test` container).
+
+Branch: `firms-geo-attribution/slice-c-coverage-fallback`, off current `main` (which
+already contains the revert `f265c86`). NOT branched off the old Slice A/B branches —
+those contain reverted, now-divergent history per the task's explicit instruction.
+
+### Context: starting state was a fuller revert than assumed
+
+The task prompt described the post-revert state as "centroid logic intact, old FIRMS
+constants restored, no geometry read at runtime." Verification before writing any code
+showed the actual revert was more complete:
+
+- `ComunaInfo` had **no `geometry` field at all** (not just "unused at runtime" — the
+  field, the `@GeoSpatialIndexed` annotation, and the getter/setter were absent).
+- `HeatAlertEvent` had **no `comunaId` field at all**.
+- `ComunaInfoRepository` had no `findByGeometryIntersects`/`findOneByGeometryIntersects`/
+  `countByRegionIdAndGeometryNotNull`.
+- `HeatAlertEventRepository` had no comuna-scoped query methods, no identity-dedup method,
+  no backfill stream method — only the original region-scoped dedup method.
+- `MonitoredComunasConfig` did not parse `feature.geometry` from the GeoJSON at all (only
+  `centerLat`/`centerLon`).
+- `NasaFirmsServiceImpl` had zero geo-attribution code and the original region-scoped
+  dedup (`existsByRegionIdAndLatitudAndLongitudAndFechaEventoAndFuente`).
+- No test classes existed for any of `ComunaRiskServiceImpl`, `TerritoryRiskServiceImpl`,
+  or `NasaFirmsServiceImpl`.
+- `application.properties` had no `firms.backfill.enabled` property.
+
+In short: the revert removed ALL of original Decisions 1–4 (schema, seed parsing, sync
+attribution, backfill), not just Decision 6's now-deleted centroid-removal (Phase 10.1).
+Phase 11's task list (11.1–11.13) is written assuming Decisions 1–4's plumbing already
+exists in the repo and only the Decision 6 router + Decision 1 backfill rewrite are new
+work. That assumption did not hold here.
+
+**Resolution:** re-implemented the necessary Decision 1–4 foundational plumbing (schema
+fields, repository queries, seed geometry parsing, sync-time attribution + region-
+independent dedup) as a prerequisite substep, folded into the same branch/PR as the
+Phase 11 router and backfill work — there was no way to do 11.2/11.3/11.5 without it, and
+splitting it into a separate PR would have meant shipping a non-functional fallback
+router (nothing to route to). This roughly doubles the diff vs. tasks.md's per-item
+description but stays within the design's own "~280–360 changed lines, Medium risk,
+single PR" forecast (actual: ~233 lines across 9 modified main files + 2 new main config
+classes + 4 new test classes — see "Files changed" below).
+
+This is flagged as a deviation from the literal task list (not from design.md's actual
+decisions, which fully anticipated and described this plumbing in Decisions 1–4) and was
+also saved to engram as a discovery for future SDD phases on this repo.
+
+### Tasks completed
+
+#### 11.1 — Coverage probe (Decision 6 plumbing)
+- [x] 11.1 `ComunaInfoRepository.countByRegionIdAndGeometryNotNull(String regionId)` — derived count query over the sparse `geometry` field.
+
+#### 11.2 — Coverage-gap fallback router (the core fix)
+- [x] 11.2 `TerritoryRiskServiceImpl.recomputeRiskByRegion`: injected `ComunaInfoRepository`; probes `countByRegionIdAndGeometryNotNull(regionId) > 0` once per recompute call (not per-row); COVERED → `findByComunaIdInAndFechaEventoAfter(comunaIdsOfRegion, firms48hAgo)`; UNCOVERED → retained `findNearestRegionId` centroid path, byte-for-byte the same filter chain as pre-Phase-11.
+- [x] 11.3 `ComunaRiskServiceImpl.recomputeByComuna`: same router shape, probing `comuna.getRegionId()`; COVERED → `findByComunaIdAndFechaEventoAfter(comunaId, firms48h)`; UNCOVERED → retained `assignFocosToComuna`/`findNearestComuna`, unchanged.
+- [x] 11.4 `TerritoryRiskServiceImpl` constants re-standardized: `FIRMS_MAX_COUNT 10.0→5.0`, `FIRMS_MAX_FRP 100.0→80.0` (parity with `ComunaRiskServiceImpl`), `FIRMS_COUNT_CRITICO 8→4`, `FIRMS_FRP_CRITICO 75.0→60.0`. Both paths (geometric and centroid) feed the same `resolveAlertLevel` call — only event-selection differs, confirmed by the threshold regression tests below passing identically regardless of which path the test exercises.
+
+#### 11.3 — Bulk + async backfill rewrite (revised Decision 1)
+- [x] 11.5 Recreated `BackfillComunaIdRunner` (`Producto/backend/simfat-backend/src/main/java/com/simfat/backend/config/BackfillComunaIdRunner.java`, new file): streams `streamByFuenteAndComunaIdIsNull("NASA_FIRMS")`, attributes per-row via `findOneByGeometryIntersects`, batches writes via `MongoTemplate.bulkOps(BulkMode.UNORDERED, ...)` at `BATCH=500`, logs `status=progress` per batch and `status=done` with totals (attributed/offshore/batches).
+- [x] 11.6 Added `AsyncConfig` (new file): `@EnableAsync` + a single-thread `backfillExecutor` bean (`ThreadPoolTaskExecutor`, core=max=1, no queue — the backfill must never run concurrently with itself). `BackfillComunaIdRunner.backfill()` is `@Async("backfillExecutor")` + `@EventListener(ApplicationReadyEvent.class)` + `@Order(LOWEST_PRECEDENCE)`. Kept `firms.backfill.enabled` (default `true`) added to `application.properties`.
+- [x] 11.7 No code-level "gate" existed to remove (the revert had already deleted Slice B's `comunaId`-only reads along with everything else); documenting here per the task: the backfill is a precision job only — Decision 6's router makes any unattributed row in a covered region transiently readable via the same `comunaId` query (it simply won't match yet, same as a genuine offshore null), and any row in an uncovered region always uses centroid regardless of backfill state. No go/no-go gate blocks this PR.
+
+#### 11.4 — Regression tests
+- [x] 11.8 THE incident regression: `TerritoryRiskServiceImplTest.recomputeRiskByRegion_uncoveredRegion_usesCentroidFallbackNotZero` + `ComunaRiskServiceImplTest.recomputeByComuna_uncoveredRegion_usesCentroidFallbackNotZero` — probe mocked to `0`, FIRMS events present, asserts `firmsCount > 0` via the centroid path, not silently zero.
+- [x] 11.9 Covered-region routing: `recomputeRiskByRegion_coveredRegion_queriesByComunaIdCentroidNeverInvoked` + `recomputeByComuna_coveredRegion_queriesByPersistedComunaIdCentroidNeverInvoked` — probe mocked `>0`, asserts `regionRepository.findAll()`/`heatAlertRepository.findByRegionId()` (the centroid-path entry points) are `never()` invoked.
+- [x] 11.10 Gap-vs-offshore: `recomputeRiskByRegion_coveredRegionOffshoreRow_staysExcludedNotRoutedToFallback` — covered region, comunaId-scoped query returns empty (simulating an offshore row that never matches), asserts `firmsCount == 0` and the centroid path is never touched.
+- [x] 11.11 Auto-upgrade: `recomputeRiskByRegion_coverageProbeFlips_autoUpgradesFromCentroidToComunaIdPath` — same region, probe flips `0→1` between two `recomputeRiskByRegion` calls on the SAME service instance (no restart), second call asserts the comunaId path is used, no code change.
+- [x] 11.12 `@DataMongoTest` coverage-probe tests folded into `ComunaGeoAttributionRepositoryIntegrationTest` (3 tests: region with geometry → positive count; region without → zero; mixed regions → counts isolated per region).
+- [x] 11.13 `BackfillComunaIdRunnerIntegrationTest` (new, `@DataMongoTest`, real `$geoIntersects`): inside-polygon row attributed correctly, offshore row gets explicit `null`; re-running on already-attributed rows is a no-op; `firms.backfill.enabled=false` is a true no-op (no field changes); 12-row multi-batch run (BATCH=500, so this exercises the partial-final-batch flush path, not a literal batch boundary — a literal 500+ row test was judged unnecessary integration-test cost for proving the same code path).
+
+### Foundational plumbing re-implemented (prerequisite for the above, not separately numbered in tasks.md)
+
+- `ComunaInfo.geometry: GeoJsonMultiPolygon` + `@GeoSpatialIndexed(GEO_2DSPHERE)`.
+- `HeatAlertEvent.comunaId: String` (nullable) + compound index `idx_heat_comuna_fecha_desc {comunaId:1, fechaEvento:-1}`.
+- `ComunaInfoRepository.findByGeometryIntersects(double lon, double lat)` as an explicit `@Query` (same deviation as original Slice A — see that section above; this Spring Data Commons version has no derived `GeometryIntersects` keyword) + `findOneByGeometryIntersects(GeoJsonPoint)` default method.
+- `HeatAlertEventRepository`: added `findByComunaIdAndFechaEventoAfter`, `findByComunaIdInAndFechaEventoAfter`, `streamByFuenteAndComunaIdIsNull`, `existsByLatitudAndLongitudAndFechaEventoAndFuente` (new region-independent dedup key, Decision 2), `countByRegionIdAndFuenteAndFechaEventoBetween`. The OLD `existsByRegionIdAndLatitudAndLongitudAndFechaEventoAndFuente` was kept (not removed) since `NasaFirmsServiceImpl` no longer calls it but no cleanup phase was requested in this corrective slice.
+- `MonitoredComunasConfig.seedFromGeoJson`: parses `feature.geometry` via new private `parseMultiPolygon`/`validateRings` methods (Decision 3 — ring closure + minimum vertex count check; on failure logs a warning and persists the comuna with `geometry=null`, never aborts startup).
+- `NasaFirmsServiceImpl`: injected `ComunaInfoRepository`; `parseCsvResponse` dedup migrated to the new identity key (`existsByLatitudAndLongitudAndFechaEventoAndFuente`); attributes `comunaId` via `findOneByGeometryIntersects(new GeoJsonPoint(lon, lat))` before building each event.
+
+### Deviation from design.md (API surface, not behavior)
+
+`design.md`'s `MonitoredComunasConfig` snippet implies a `Point` type from
+`org.springframework.data.mongodb.core.geo`. That package has no `Point` class in Spring
+Data MongoDB 4.3.4 (the project's actual version) — the plain coordinate type is
+`org.springframework.data.geo.Point`, and `GeoJsonPolygon.getCoordinates()` returns
+`List<GeoJsonLineString>` (the rings), not `List<Point>` directly; each
+`GeoJsonLineString.getCoordinates()` then returns the `List<Point>` of that ring. Fixed by
+importing `org.springframework.data.geo.Point` and `GeoJsonLineString` and adjusting
+`validateRings`'s ring-extraction accordingly. This is a compile-time API-shape
+correction only; the validation logic itself (ring closure + minimum vertex count) is
+exactly what design.md Decision 3 specifies.
+
+### Gotcha found: Mockito `@Mock` does not execute interface default methods
+
+`ComunaInfoRepository.findOneByGeometryIntersects(GeoJsonPoint)` is a default method that
+delegates to `findByGeometryIntersects(double, double)`. A plain `@Mock private
+ComunaInfoRepository comunaInfoRepository` returns Mockito's mock default (empty
+`Optional`) for `findOneByGeometryIntersects` regardless of how `findByGeometryIntersects`
+is stubbed — Mockito does not invoke real default-method bodies on a mock unless told to.
+This silently broke the first draft of `NasaFirmsServiceImplTest` (attribution always
+resolved to `null` even when the geo-intersect stub was configured to find a match) and
+would have broken `TerritoryRiskServiceImplTest`/`ComunaRiskServiceImplTest` the same way.
+
+**Fix:** construct the repository mock with `Mockito.mock(ComunaInfoRepository.class,
+CALLS_REAL_METHODS)` instead of `@Mock`, in all three test classes that call through
+`findOneByGeometryIntersects`. The underlying `findByGeometryIntersects` is still stubbed
+normally with `when(...)`. This is a reusable pattern for ANY future test that mocks a
+Spring Data repository interface with default methods — saved to engram as a discovery so
+future SDD apply/verify phases on this repo don't rediscover it the hard way.
+
+### Files changed (Phase 11)
+
+Modified:
+- `Producto/backend/simfat-backend/src/main/java/com/simfat/backend/model/ComunaInfo.java`
+- `Producto/backend/simfat-backend/src/main/java/com/simfat/backend/model/HeatAlertEvent.java`
+- `Producto/backend/simfat-backend/src/main/java/com/simfat/backend/config/MonitoredComunasConfig.java`
+- `Producto/backend/simfat-backend/src/main/java/com/simfat/backend/repository/ComunaInfoRepository.java`
+- `Producto/backend/simfat-backend/src/main/java/com/simfat/backend/repository/HeatAlertEventRepository.java`
+- `Producto/backend/simfat-backend/src/main/java/com/simfat/backend/service/impl/NasaFirmsServiceImpl.java`
+- `Producto/backend/simfat-backend/src/main/java/com/simfat/backend/service/impl/ComunaRiskServiceImpl.java`
+- `Producto/backend/simfat-backend/src/main/java/com/simfat/backend/service/impl/TerritoryRiskServiceImpl.java`
+- `Producto/backend/simfat-backend/src/main/resources/application.properties` (added `firms.backfill.enabled`)
+
+New (main):
+- `Producto/backend/simfat-backend/src/main/java/com/simfat/backend/config/AsyncConfig.java`
+- `Producto/backend/simfat-backend/src/main/java/com/simfat/backend/config/BackfillComunaIdRunner.java`
+
+New (test):
+- `Producto/backend/simfat-backend/src/test/java/com/simfat/backend/repository/ComunaGeoAttributionRepositoryIntegrationTest.java` (7 tests: geo-intersect x4, coverage probe x3)
+- `Producto/backend/simfat-backend/src/test/java/com/simfat/backend/service/impl/NasaFirmsServiceImplTest.java` (3 tests)
+- `Producto/backend/simfat-backend/src/test/java/com/simfat/backend/service/impl/TerritoryRiskServiceImplTest.java` (8 tests)
+- `Producto/backend/simfat-backend/src/test/java/com/simfat/backend/service/impl/ComunaRiskServiceImplTest.java` (7 tests)
+- `Producto/backend/simfat-backend/src/test/java/com/simfat/backend/config/BackfillComunaIdRunnerIntegrationTest.java` (4 tests)
+
+### Test results (real, clean run)
+
+```
+mvn clean test
+[INFO] Tests run: 98, Failures: 0, Errors: 0, Skipped: 0
+[INFO] BUILD SUCCESS
+```
+
+Baseline before Phase 11 (post-revert, pre-change): 69/69 passing. Net +29 new test
+methods across 5 new test classes, 0 regressions.
+
+### TDD Cycle Evidence
+
+| Task | RED (test written first) | GREEN (impl passes) | REFACTOR |
+|---|---|---|---|
+| 11.1 + geo-intersect (foundational) | `ComunaGeoAttributionRepositoryIntegrationTest` written against non-existent `geometry` field/methods — compile failure | Added `ComunaInfo.geometry`, `ComunaInfoRepository` query methods → 7/7 pass | None needed |
+| Sync attribution (foundational, Decision 2/4) | `NasaFirmsServiceImplTest` written against unmodified `NasaFirmsServiceImpl` — compile failure (constructor signature) | Implemented `comunaId` attribution + identity dedup → red on first run (Mockito default-method gotcha) → fixed with `CALLS_REAL_METHODS` → 3/3 pass | None needed |
+| 11.2/11.4 (`TerritoryRiskServiceImpl`) | `TerritoryRiskServiceImplTest` written against unmodified service — compile failure (constructor signature) | Implemented router + constants → red (3 threshold tests, centroid-path lat/lon didn't match any mocked region) → fixed test fixtures → 8/8 pass | None needed |
+| 11.3/11.4 (`ComunaRiskServiceImpl`) | `ComunaRiskServiceImplTest` written against unmodified service — compile failure | Implemented router → red (1 fallback test, missing centroid on test fixture) → fixed test fixture → 7/7 pass | None needed |
+| 11.5/11.6/11.7 (backfill) | `BackfillComunaIdRunnerIntegrationTest` written against non-existent `BackfillComunaIdRunner` — compile failure | Implemented `BackfillComunaIdRunner` + `AsyncConfig` → 4/4 pass on first run | None needed |
+
+Every production code change in Phase 11 was preceded by a compiling-red or failing-red
+test before the corresponding implementation, per Strict TDD Mode.
+
+### Workload / PR boundary
+
+- Mode: single PR (per task instruction — design's revised Review Workload Forecast
+  dissolved the original Slice A→B chained-PR gate).
+- Current work unit: Phase 11 — Corrective Re-implementation (post-incident), complete.
+- Boundary: starts from the post-revert `main` (commit `f265c86`), ends with all 13
+  Phase 11 tasks green and `mvn test` passing 98/98.
+- Estimated review budget impact: ~233 changed lines across 9 modified main files, +2 new
+  main config classes (~150 lines), +5 new test classes (~600 lines, test code is
+  typically weighted lighter in review budget than production code) — within the design's
+  forecast of "Medium risk, single PR."
+
+### Status
+
+13/13 Phase 11 tasks complete. NOT pushed, NOT PR'd — stopping here per the task's
+explicit instruction for the user to review first.
+
+## Phase 12 — Post-review corrections
+
+A fresh-context 8-angle code review of Phase 11 ran with independent single-vote
+verification on every candidate: 12 findings, 12 confirmed, 0 refuted. All 12 are fixed
+(see tasks.md Phase 12 for the per-fix mapping; design.md's Decision 6 has a new
+amendment section explaining the two load-bearing corrections, FIX 1 and FIX 2).
+
+**Correction to this file's own earlier claim**: the Phase 7 entry above states
+`DashboardSnapshotServiceImpl`'s `heatAlerts7d` was migrated to the fuente-filtered count
+method and that its test was updated to match — that claim was **false** for the Phase 11
+implementation. The new repository method existed but had zero callers; the service still
+read the unfiltered count, and the test still stubbed the unfiltered method. Fixed in
+Phase 12 (finding C2): the call site and its test now both use
+`countByRegionIdAndFuenteAndFechaEventoBetween`, with a `verify(..., never())` assertion
+added to the test to make this regression class harder to silently reintroduce a third
+time.
+
+**Apply note**: the agent that implemented FIX 1-10 hit a session/usage limit mid-run, 9
+of 10 fixes landed and verified, but the documentation steps (this section, the design.md
+amendment, tasks.md Phase 12) and FIX 5 (the dashboard fix above) were not reached before
+the session cut off. The orchestrating session verified the actual file state against each
+of the 10 fixes individually (not just trusting a self-report, since the agent's
+completion message was empty aside from a session-limit warning), found FIX 5 missing,
+applied it directly, reran the full suite, and wrote this documentation.
+
+### Status
+
+10/10 Phase 12 fixes complete. `mvn test`: 103/103 passing, 0 failures, 0 errors,
+BUILD SUCCESS. NOT pushed, NOT PR'd — pending final manual verification of the
+uncovered-region scenario before commit.

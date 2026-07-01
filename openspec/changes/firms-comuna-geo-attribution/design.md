@@ -2,16 +2,26 @@
 
 ## Status
 
-Design complete. Resolves all five open decisions from the proposal with concrete, implementable choices. The two prior judgment calls are settled facts here:
+**Design REVISED (post-incident).** The original design (Decisions 1-5) was implemented across Slices A+B, merged (PR #12/#13/#14), deployed, and then **reverted from production** after a real incident. This revision keeps everything that was correct and surgically corrects the two root causes the original design did not anticipate. It adds **Decision 6 (coverage-gap fallback)**, rewrites **Decision 1 (backfill mechanism)**, and corrects **Architectural Invariant 3**. Decisions 2, 3, 4, 5 stand unchanged in substance (Decision 5 gains one new regression scenario).
+
+### Production incident that drove this revision (the WHY)
+
+1. **16 of 19 monitored regions went silently blind.** The system monitors NASA FIRMS across **19 regions nationally** (confirmed via `regionRepository.findAll()` and active cron logs). But comuna GeoJSON polygons — the input that seeds `ComunaInfo.geometry` for the `$geoIntersects` attribution — exist for **only 3 regions**: Araucanía, Biobío, Ñuble (the only files under `src/main/resources/static/geojson/`). The original Invariant 3 ("region is DERIVED from `comunaId`, never re-guessed by centroid") and Phase 10.1 (which DELETED `assignFocosToComuna`/`findNearestComuna`/`findNearestRegionId`) assumed nationwide polygon coverage. For the 16 uncovered regions every `comunaId` is permanently `null` (no polygon ever intersects), and once Slice B made the risk services read **exclusively** by `comunaId`, those regions' FIRMS component went permanently to **zero detections** — a real regression vs. the old centroid behavior, which was imprecise but functional in all 19 regions.
+
+2. **The startup backfill could not complete at real-world scale.** `BackfillComunaIdRunner` (original Decision 1) was a sequential loop — one `$geoIntersects` + one `.save()` per row — running on the main thread via `ApplicationReadyEvent`. Against production MongoDB Atlas (~400 ms round-trip per query), competing with the FIRMS cron and stuck OpenEO retries, it ran **9+ hours without finishing half of ~2,000 rows** and never logged `status=done`. The original "Slice B readers MUST NOT run until backfill completes" gate is therefore unworkable at Atlas latency under concurrent load.
+
+The two prior judgment calls are still settled facts here:
 
 - **Constant reconciliation (SETTLED):** `ComunaRiskServiceImpl`'s stricter `FIRMS_MAX_COUNT=5`, `FIRMS_COUNT_CRITICO=4`, `FIRMS_FRP_CRITICO=60` become the single standard. `TerritoryRiskServiceImpl`'s `10`/`8`/`75` are deleted as an artifact of the now-removed double-counting workaround.
-- **Offshore / no-polygon match (SETTLED):** `HeatAlertEvent.comunaId` stays `null`. No synthetic nearest-comuna fallback.
+- **Offshore / no-polygon match (SETTLED):** `HeatAlertEvent.comunaId` stays `null`. No synthetic nearest-comuna fallback at attribution time. **This is NOT the same as the coverage-gap case** — see Decision 6, which distinguishes "no geometry loaded for this region" (use centroid fallback) from "geometry loaded, point genuinely offshore" (`comunaId` stays null).
 
 ## Architecture Approach
 
 **Pattern: persist-at-the-root, single source of truth.** Geometric comuna attribution is computed exactly once — at FIRMS ingest time, inside `NasaFirmsServiceImpl.parseCsvResponse`, via a MongoDB `$geoIntersects` point-in-polygon query against persisted comuna geometry. The resulting `comunaId` (or `null`) is written onto the `HeatAlertEvent` document. All five downstream surfaces then *read* that persisted field instead of each re-deriving attribution by nearest-centroid distance.
 
-This collapses two independent nearest-centroid implementations (`ComunaRiskServiceImpl.findNearestComuna`, `TerritoryRiskServiceImpl.findNearestRegionId`) into one indexed geometric lookup whose result is durable and auditable. The region is no longer an independent input; it is *derived* from the matched comuna's `regionId`, which structurally eliminates cross-region double-counting at the data layer rather than patching it per-reader.
+This collapses the two independent nearest-centroid implementations (`ComunaRiskServiceImpl.findNearestComuna`, `TerritoryRiskServiceImpl.findNearestRegionId`) into one indexed geometric lookup whose result is durable and auditable, **for every region that has comuna geometry loaded**. Where geometry exists, the region is *derived* from the matched comuna's `regionId`, which structurally eliminates cross-region double-counting at the data layer rather than patching it per-reader.
+
+**Coverage-gap fallback (Decision 6 — added post-incident).** Geometry only exists for 3 of 19 monitored regions today. The two centroid methods are therefore **retained as a permanent secondary attribution path**, not deleted. At read time each risk service first asks "does this region currently have comuna geometry coverage?" (a cheap `countByRegionIdAndGeometryNotNull` check). If yes → query by persisted `comunaId` (the geometric source of truth). If no → fall back to the old centroid logic, so the region's FIRMS component stays *functional* (imprecise) instead of going *blind* (always zero). The system auto-upgrades region-by-region as more GeoJSON is loaded — **no code change** required to light up a new region, only a new GeoJSON file and a re-seed. This is the single most important correction in this revision.
 
 **Layering / boundaries unchanged.** No new module, job, controller, or endpoint. The seed extension rides the existing `MonitoredComunasConfig` `@EventListener(ApplicationReadyEvent.class)` loop; attribution rides the existing `@Scheduled` FIRMS sync; backfill rides the same startup listener (see Decision 1). The change is additive at the schema level (two nullable fields + one index) and substitutive at the service level (swap centroid methods for `comunaId` queries).
 
@@ -32,13 +42,17 @@ This collapses two independent nearest-centroid implementations (`ComunaRiskServ
   ┌──────────────────── heat_alert_events { ..., comunaId (nullable) } ────────────────────┐
   │                                                                                          │
   SYNC (@Scheduled)                                READ surfaces (Slice B)                   │
-  NasaFirms.parseCsvResponse                       ComunaRiskServiceImpl  ── by comunaId     │
-    │ per row: $geoIntersects(lat,lon)             TerritoryRiskServiceImpl ─ by region of   │
-    │ resolve comunaId (or null)                                              matched comuna │
-    │ dedup by (lat,lon,fecha,fuente) (Decision 2) DashboardSnapshotServiceImpl ─ + fuente   │
-    ▼                                                                          filter        │
-  insert HeatAlertEvent{comunaId}                  TerritoryController.firmsLayer ─ raw bbox │
-                                                     view, labeled (unchanged scope)         │
+  NasaFirms.parseCsvResponse                       ComunaRiskServiceImpl ─┐                  │
+    │ per row: $geoIntersects(lat,lon)               region has geometry? ─┤ yes: by comunaId│
+    │ resolve comunaId (or null)                                          └ no:  centroid     │
+    │ dedup by (lat,lon,fecha,fuente) (Decision 2)                              fallback (D6) │
+    ▼                                              TerritoryRiskServiceImpl ┐                  │
+  insert HeatAlertEvent{comunaId}                   region has geometry? ──┤ yes: by comunaId│
+                                                                          └ no:  centroid     │
+                                                    DashboardSnapshotServiceImpl ─ + fuente   │
+                                                                               filter         │
+                                                    TerritoryController.firmsLayer ─ raw bbox │
+                                                      view, labeled (unchanged scope)         │
   └──────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -48,68 +62,94 @@ This collapses two independent nearest-centroid implementations (`ComunaRiskServ
 |---|---|
 | `ComunaInfo` ↔ Mongo `comunas` | New `geometry: GeoJsonMultiPolygon` + `@GeoSpatialIndexed(type = GEO_2DSPHERE)` |
 | `HeatAlertEvent` ↔ Mongo `heat_alert_events` | New nullable `comunaId: String`; new compound index `{comunaId:1, fechaEvento:-1}` |
-| `ComunaInfoRepository` | New `findByGeometryIntersects(Point)` derived query (Decision 4) |
+| `ComunaInfoRepository` | New `findByGeometryIntersects(Point)` derived query (Decision 4); new `countByRegionIdAndGeometryNotNull(String)` coverage probe (Decision 6) |
 | `NasaFirmsServiceImpl` | Inject `ComunaInfoRepository`; per-row attribution; new dedup key (Decision 2) |
+| `ComunaRiskServiceImpl` / `TerritoryRiskServiceImpl` | Coverage-gap router: `comunaId` query when covered, retained centroid methods when not (Decision 6) |
 | `MonitoredComunasConfig` | Parse `feature.geometry`; validate before save |
-| Startup backfill | New `ApplicationRunner`/listener component, ordered after seed (Decision 1) |
+| Startup backfill | New bulk-write `ApplicationRunner`, async, ordered after seed; no longer gates reads (Decision 1) |
 
 ---
 
-## Decision 1 — Backfill execution mechanism
+## Decision 1 — Backfill execution mechanism (REVISED post-incident)
 
-**Decision: one-time, idempotent, startup-gated backfill that runs inside the application's `ApplicationReadyEvent` lifecycle, AFTER `MonitoredComunasConfig` has seeded geometry, in the same JVM. Implement it as a dedicated `@Component` ordered to run after the seed, NOT inline in `MonitoredComunasConfig` and NOT as an admin endpoint or external `railway run` script.**
+**Decision: a one-time, idempotent backfill implemented as a dedicated `@Component` that (a) writes in BULK via `BulkOperations`/`bulkWrite` batches instead of one `.save()` per row, and (b) runs ASYNCHRONOUSLY (off the `ApplicationReadyEvent` thread, on a dedicated single executor), no longer blocking startup and no longer gating Slice B reads. The fallback from Decision 6 — not the backfill — is what guarantees correctness for any not-yet-attributed row. The backfill is now a precision-improvement job, not a correctness prerequisite.**
 
-### Rationale
+### Why this changed (the incident)
 
-The codebase already has exactly this idiom: `MonitoredComunasConfig` does an idempotent upsert-on-startup keyed by a stable id. The backfill is the same shape — idempotent (it only ever sets `comunaId` where it is currently `null` or recomputes deterministically), re-runnable (re-running on already-attributed data is a no-op or an identical write), and it has a hard ordering dependency on the geometry seed that the startup lifecycle expresses naturally.
+The original Decision 1 made two assumptions that real production falsified:
+
+1. *"Backfill always wins the race within a single boot."* True only for trivial row counts against low-latency Mongo. Against MongoDB Atlas (~400 ms per round-trip), a sequential one-`save()`-per-row loop over ~2,000 rows — competing with the FIRMS cron and stuck OpenEO retries — ran **9+ hours and never reached `status=done`**. The startup thread was effectively hung.
+2. *"Slice B readers MUST NOT run until backfill completes."* With the original design this gate was a hard correctness requirement: an unattributed row read by `comunaId` simply vanished from counts. That gate is unenforceable when the backfill never completes. **Decision 6 dissolves the gate**: a region with no geometry (or a row not yet attributed) falls back to centroid attribution, so a *late* or *incomplete* backfill is no longer a correctness risk — only a transient precision-staleness one (the row is counted via the imprecise centroid path until the backfill upgrades it to the precise geometric `comunaId`).
+
+So both root causes get addressed: **bulk writes** make the job finish in minutes instead of hours, and **async + fallback** removes the boot-blocking and the unenforceable gate.
+
+### Rationale (what stays)
+
+The job is still idempotent (filter is `comunaId IS NULL`, re-running is a no-op or an identical write) and still has a hard ordering dependency on the geometry seed. It stays a **separate** `@Component` (not inline in `MonitoredComunasConfig`) so its success/failure is independently observable in logs and its bulk-batch progress is logged per batch.
 
 Rejected alternatives:
 
-- **Inline in `MonitoredComunasConfig.ensureMonitoredComunas`** — rejected. It would couple comuna seeding (a config concern over ~85 small documents) with a data migration over ~2k event rows, and the existing per-region `try/catch` that swallows seed failures would also swallow backfill failures silently. Keep them as separate components so the backfill's success/failure and ordering are explicit and independently observable in logs.
-- **Admin-triggered endpoint** — rejected. Introduces a new controller + RBAC surface for a one-shot operation, and creates a window where the app is up and Slice B readers can run *before* the operator remembers to hit the endpoint. That is precisely the "readers filter `comunaId` before backfill runs" risk the proposal flags. Startup gating removes the window entirely.
-- **Standalone script via `railway run` mongosh** — rejected as the primary mechanism. The team has Railway CLI access and used `mongosh` cleanup manually this session, but a hand-run script (a) cannot reuse the Java `$geoIntersects` + `GeoJsonMultiPolygon` mapping, forcing the point-in-polygon logic to be re-expressed in raw mongosh and risking divergence from the production attribution path, and (b) is not guaranteed to run before the first deploy of Slice B. The whole point is that attribution logic exists in exactly one place. `railway run` stays available as a manual re-trigger / disaster recovery path only (the backfill component can be invoked through a feature-flagged profile if ever needed), not as the source of truth.
+- **Keep it synchronous on `ApplicationReadyEvent` (original choice)** — rejected by the incident. Blocking the boot thread for hours against Atlas latency is operationally unacceptable; health checks and the scheduler start late, and a deploy can appear hung. Async on a dedicated executor lets the app become ready immediately while the backfill proceeds in the background; the fallback covers reads in the meantime.
+- **Inline in `MonitoredComunasConfig.ensureMonitoredComunas`** — still rejected. It couples a config concern (~85 small documents) with a data migration (~2k+ event rows), and the seed's per-region `try/catch` would silently swallow backfill failures.
+- **Admin-triggered endpoint** — *re-evaluated and now ACCEPTABLE as a complementary re-trigger, still not the sole mechanism.* The original rejection was "it creates a window where Slice B readers run before the operator hits the endpoint." **That objection no longer holds**: with Decision 6's fallback, a reader hitting an unattributed region degrades to centroid attribution rather than to zero — there is no correctness window to protect anymore. The async startup runner remains the default (zero operator action, runs every boot), and an admin/feature-flagged manual trigger is the disaster-recovery / re-run path. This is the key judgment reversal this revision makes.
+- **Standalone `railway run` mongosh script** — still rejected as primary: it re-expresses the `$geoIntersects` + `GeoJsonMultiPolygon` logic in raw mongosh, risking divergence from the production attribution path. Available as manual DR only.
 
-### Implementation shape
+### Implementation shape (bulk + async)
 
 ```java
 @Component
-@Order(Ordered.LOWEST_PRECEDENCE)         // runs after MonitoredComunasConfig seed
 public class BackfillComunaIdRunner {
 
+    private static final int BATCH = 500;               // tune against Atlas; 500 keeps each bulkWrite well under the 16MB op limit
+
+    @Async("backfillExecutor")                          // dedicated single-thread executor; does NOT block boot
     @EventListener(ApplicationReadyEvent.class)
-    @Order(Ordered.LOWEST_PRECEDENCE)
+    @Order(Ordered.LOWEST_PRECEDENCE)                   // still fires after the seed listener
     public void backfill() {
-        if (!backfillEnabled) { return; }            // firms.backfill.enabled, default true
-        // Stream only rows that still need attribution.
+        if (!backfillEnabled) { return; }               // firms.backfill.enabled, default true
+        long attributed = 0, offshore = 0, batches = 0;
         try (Stream<HeatAlertEvent> rows =
                  repo.streamByFuenteAndComunaIdIsNull("NASA_FIRMS")) {
-            rows.forEach(ev -> {
-                if (ev.getLatitud() == null || ev.getLongitud() == null) return;
-                Point p = new GeoJsonPoint(ev.getLongitud(), ev.getLatitud()); // lon, lat order
-                comunaRepo.findOneByGeometryIntersects(p)
-                          .ifPresentOrElse(
-                              c -> ev.setComunaId(c.getId()),
-                              () -> ev.setComunaId(null));   // explicit offshore
-                repo.save(ev);
-            });
+            BulkOperations bulk = mongoTemplate.bulkOps(BulkMode.UNORDERED, HeatAlertEvent.class);
+            int inBatch = 0;
+            for (Iterator<HeatAlertEvent> it = rows.iterator(); it.hasNext(); ) {
+                HeatAlertEvent ev = it.next();
+                if (ev.getLatitud() == null || ev.getLongitud() == null) continue;
+                Point p = new GeoJsonPoint(ev.getLongitud(), ev.getLatitud());   // lon, lat order
+                String comunaId = comunaRepo.findOneByGeometryIntersects(p)
+                                            .map(ComunaInfo::getId).orElse(null);
+                if (comunaId != null) attributed++; else offshore++;
+                bulk.updateOne(query(where("_id").is(ev.getId())),
+                               new Update().set("comunaId", comunaId));            // explicit null for offshore
+                if (++inBatch == BATCH) {
+                    bulk.execute(); batches++;
+                    bulk = mongoTemplate.bulkOps(BulkMode.UNORDERED, HeatAlertEvent.class);
+                    inBatch = 0;
+                    LOGGER.info("firms_backfill status=progress batches={} attributed={} offshore={}",
+                                batches, attributed, offshore);
+                }
+            }
+            if (inBatch > 0) { bulk.execute(); batches++; }
         }
-        LOGGER.info("firms_backfill status=done attributed={} offshore={}", ...);
+        LOGGER.info("firms_backfill status=done batches={} attributed={} offshore={}",
+                    batches, attributed, offshore);
     }
 }
 ```
 
 Notes:
-- **Idempotency / re-runnability:** the query filter is `comunaId IS NULL`. Once a row is attributed it is skipped on the next boot. A row that legitimately resolves to `null` (offshore) WILL be re-evaluated on every boot — this is acceptable (it is a no-op write that re-confirms `null`) and cheap because offshore rows are a small minority. If even that re-scan is undesirable later, add a `comunaIdResolvedAt` marker; not needed for ~2k rows now.
-- **Order guarantee:** `@Order(LOWEST_PRECEDENCE)` on the `@EventListener` ensures it fires after `MonitoredComunasConfig`'s default-order listener, so geometry + 2dsphere index exist before the first `$geoIntersects` runs.
+- **Bulk write is the core fix.** The `$geoIntersects` *read* is still per-row (it must be — each point resolves to its own comuna; see Decision 4), but the *writes* are batched into one `bulkWrite` per `BATCH` rows. That collapses ~2,000 individual `.save()` round-trips into ~4 bulk round-trips — the dominant cost against Atlas latency. `BulkMode.UNORDERED` lets the server parallelize within a batch.
+- **Async, non-blocking.** `@Async("backfillExecutor")` runs the job on a dedicated single-thread executor so `ApplicationReadyEvent` returns immediately and the app is healthy at once. Requires `@EnableAsync` and a `backfillExecutor` bean (single thread, so the job never competes with itself across boots).
+- **Idempotency / re-runnability** unchanged: filter is `comunaId IS NULL`; attributed rows are skipped next boot; offshore rows re-confirm `null` cheaply.
+- **Order guarantee:** `@Order(LOWEST_PRECEDENCE)` still fires after `MonitoredComunasConfig`'s seed listener, so geometry + 2dsphere index exist before the first `$geoIntersects`.
 
-### Ordering / gating constraint (explicit, MANDATORY)
+### Ordering constraint (RELAXED — no longer a hard gate)
 
-> **Slice B readers MUST NOT query `heat_alert_events` by `comunaId` until the backfill has completed for the deployed environment.**
+> The backfill **improves precision**; it is no longer a correctness prerequisite for Slice B reads.
 
 Concretely:
-- Slice A (schema + seed + sync attribution + backfill) ships and runs to completion FIRST. After the first successful boot with the backfill component present, every FIRMS row has either a real `comunaId` or an explicit `null`.
-- Slice B (swapping `ComunaRiskServiceImpl` / `TerritoryRiskServiceImpl` to query by `comunaId`) MUST NOT be merged/deployed until that backfill boot has happened. Because the backfill runs at startup and Slice B reads also start at startup, deploying them together is safe ONLY because the backfill listener is ordered before any scheduled read recompute (the FIRMS sync and risk recompute crons fire on a schedule, not at boot; the first scheduled recompute is minutes-to-hours later). The risk recompute cron (`0 30 1,13`) and FIRMS sync cron (`0 0 */12`) do not run at `ApplicationReadyEvent`, so the backfill always wins the race within a single boot.
-- **Verification gate before Slice B:** a query for `count({fuente:'NASA_FIRMS', comunaId: {$exists:false}})` must return 0 post-backfill. This is the success-criteria check and the go/no-go signal for enabling Slice B reads.
+- Slice A (schema + seed + sync attribution + bulk async backfill) and Slice B (geometry-aware risk reads with centroid fallback) can ship together. There is no boot-race to win: while the backfill runs in the background, a read against a not-yet-attributed row in a *covered* region briefly resolves via fallback (centroid) and is upgraded to the precise `comunaId` once the backfill batch lands. A read against an *uncovered* region always uses fallback, by design (Decision 6).
+- **Observability replaces the gate:** the success signal is `count({fuente:'NASA_FIRMS', comunaId:{$exists:false}})` trending to 0 *for covered regions* after the backfill logs `status=done`. A non-zero count is no longer a blocker — it is a precision-staleness metric, not a correctness failure, because the fallback already covers those rows. Uncovered regions will legitimately retain `comunaId=null` rows forever (until their GeoJSON is added) and must not be treated as a failed backfill.
 
 ---
 
@@ -293,6 +333,19 @@ This is the proposal's HIGH-risk item ("changes live CRITICO escalation — MUST
 
 Because both services currently have private `resolveAlertLevel`, the tasks phase should either (a) drive these through the public `recomputeByComuna`/`recomputeRiskByRegion` with mocked repositories returning crafted `HeatAlertEvent` lists, or (b) extract the threshold logic to a shared, testable unit. Option (a) is lower-risk (no refactor) and tests the real path; prefer it unless the shared-constant duplication is extracted.
 
+### Layer D — coverage-gap fallback regression (Decision 6, MANDATORY, post-incident)
+
+This is the regression that the production incident proved was missing. It must make the "uncovered region goes blind" failure **impossible to silently reintroduce**.
+
+| Spec scenario | Assertion |
+|---|---|
+| **Uncovered region uses centroid fallback, NOT zero** | `countByRegionIdAndGeometryNotNull(region) == 0` → `TerritoryRiskServiceImpl.recomputeRiskByRegion` (and `ComunaRiskServiceImpl.recomputeByComuna`) routes to the centroid path; with FIRMS events present in that region, `firmsCount > 0` (i.e. the FIRMS component is functional, not silently zero/blind) |
+| Covered region uses `comunaId` path | `countByRegionIdAndGeometryNotNull(region) > 0` → service queries by persisted `comunaId`; centroid method is NOT invoked (`verify(..., never())`) |
+| Covered region, point truly offshore stays null | a covered region whose FIRMS row has `comunaId == null` (geometry loaded, point offshore) is NOT re-routed to fallback — it stays excluded from comuna-scoped counts (preserves Invariant 4; the gap-vs-offshore distinction from Decision 6 holds) |
+| Auto-upgrade on coverage change | after geometry is added to a previously-uncovered region (coverage probe flips 0 → >0), the next recompute switches from centroid to `comunaId` path with no code change |
+
+These run as Mockito unit tests on both services (mock the coverage probe `countByRegionIdAndGeometryNotNull` to return 0 vs. >0, and verify which read path executes), plus optionally one `@DataMongoTest` end-to-end on the probe. They directly defend the corrected Invariant 3.
+
 ### Layer C — sync attribution & dedup test
 
 | Spec scenario | Assertion |
@@ -308,24 +361,100 @@ Because both services currently have private `resolveAlertLevel`, the tasks phas
 
 ---
 
+## Decision 6 — Coverage-gap fallback (NEW, post-incident root-cause fix)
+
+**Decision: the centroid-based attribution methods (`ComunaRiskServiceImpl.assignFocosToComuna`/`findNearestComuna`, `TerritoryRiskServiceImpl.findNearestRegionId`) are RETAINED as a permanent secondary attribution path. Each risk service, before reading FIRMS events, probes whether the region currently has comuna geometry loaded via `comunaInfoRepository.countByRegionIdAndGeometryNotNull(regionId) > 0`. If COVERED → read by persisted `comunaId` (geometric source of truth). If UNCOVERED → use the retained centroid path so the region's FIRMS component stays functional instead of going blind. This reverses the original Phase 10.1 deletion of those methods.**
+
+### Rationale (the WHY — driven directly by the incident)
+
+The original design assumed nationwide comuna-polygon coverage and therefore deleted the centroid fallback as dead code. In production only **3 of 19 regions** have GeoJSON, so for the other 16 every `comunaId` is permanently `null`, and a `comunaId`-only read returns **zero FIRMS detections forever** for those regions — a silent, permanent regression in a life-safety alerting system. The user's explicit direction: do NOT shrink monitoring to 3 regions (national coverage is delivered value); instead keep the precise geometric path where geometry exists and fall back to the old imprecise-but-functional centroid path where it does not, auto-upgrading region-by-region as GeoJSON is added — **with no code change** to onboard a new region.
+
+### The critical distinction: coverage-gap vs. genuine offshore (MUST NOT be conflated)
+
+Two states both produce `comunaId == null`, but they are semantically different and route differently:
+
+| State | How to detect | Routing |
+|---|---|---|
+| **Coverage gap** — region has no geometry loaded at all | `countByRegionIdAndGeometryNotNull(regionId) == 0` | Use **centroid fallback** (the whole region is uncovered) |
+| **Genuine offshore / no-polygon match** — region HAS geometry, this specific point intersects nothing (ocean, GADM edge) | `countByRegionIdAndGeometryNotNull(regionId) > 0` AND that row's `comunaId == null` | `comunaId` stays null, row excluded from comuna counts — **NOT a fallback trigger** (preserves Invariant 4) |
+
+The probe is at **region granularity**, never per-row: "does this region have ANY comuna geometry?" If yes, a null `comunaId` on an individual row is a legitimate offshore/edge result and must be honored as null (the original SETTLED offshore rule). If no, the whole region is uncovered and the entire region's FIRMS attribution runs through centroid. This keeps the offshore semantics from Decisions 2/4 intact while closing the coverage gap.
+
+### Implementation shape
+
+New repository probe (cheap, indexed count — `regionId` is already queried, `geometry` is sparse-indexed):
+
+```java
+// ComunaInfoRepository
+long countByRegionIdAndGeometryNotNull(String regionId);
+```
+
+`TerritoryRiskServiceImpl.recomputeRiskByRegion` (region-level), grounded in the real post-revert method:
+
+```java
+boolean covered = comunaInfoRepository.countByRegionIdAndGeometryNotNull(regionId) > 0;
+List<HeatAlertEvent> firmsEvents;
+if (covered) {
+    // geometric source of truth: events whose persisted comunaId belongs to this region
+    List<String> comunaIds = comunaInfoRepository.findByRegionId(regionId).stream()
+        .map(ComunaInfo::getId).toList();
+    firmsEvents = heatAlertEventRepository
+        .findByComunaIdInAndFechaEventoAfter(comunaIds, firms48hAgo).stream()
+        .filter(/* NASA_FIRMS, confidence, lat/lon */).toList();
+} else {
+    // RETAINED centroid fallback — region uncovered, keep it functional (not blind)
+    List<Region> allRegions = regionRepository.findAll();
+    firmsEvents = heatAlertEventRepository.findByRegionId(regionId).stream()
+        .filter(/* window, NASA_FIRMS, confidence, lat/lon */)
+        .filter(e -> regionId.equals(findNearestRegionId(e.getLatitud(), e.getLongitud(), allRegions)))
+        .toList();
+}
+```
+
+`ComunaRiskServiceImpl.recomputeByComuna` (comuna-level) mirrors this: probe `countByRegionIdAndGeometryNotNull(comuna.getRegionId())`; if covered, read `findByComunaIdAndFechaEventoAfter(comunaId, firms48h)`; if uncovered, keep `assignFocosToComuna(regionFocos, comunaId, comunaRepository.findByRegionId(...))` exactly as it is today.
+
+- **`assignFocosToComuna`, `findNearestComuna`, `findNearestRegionId` stay** (private methods, current signatures verified against post-revert source). Do not re-delete them. They are the documented secondary path, not dead code.
+- **Auto-upgrade:** the moment a region's GeoJSON is seeded (geometry becomes non-null for its comunas), the probe flips `0 → >0` and the next recompute switches to the `comunaId` path automatically — no deploy, no code change.
+
+### Rejected alternatives
+
+- **Shrink monitoring to the 3 covered regions** — rejected by explicit user decision. National 19-region coverage is delivered value; retreating to 3 regions discards it.
+- **Per-row "if `comunaId` null, try centroid"** — rejected. It conflates genuine offshore (null is correct, must stay null per Invariant 4) with coverage gap, re-introducing the silent-fabrication problem the offshore rule exists to prevent. Region-granularity probing keeps the two cases distinct.
+- **A boolean `coverageLoaded` flag on `Region`** — rejected as redundant state to maintain. The geometry count IS the source of truth; deriving coverage from it (`countByRegionIdAndGeometryNotNull > 0`) cannot drift out of sync with the actual seeded data.
+- **Re-derive constants per path** — rejected. Both paths feed the SAME reconciled constants (Decision-5 / Invariant 5); only the *event-selection* differs, not the scoring.
+
+### Amendment — comuna-granularity correction (post-review fix, findings C1/C5/C6/C7/C9)
+
+A fresh-context review of the first implementation of this decision found that "region-granularity probing keeps the two cases distinct" (above) was true but insufficient: `countByRegionIdAndGeometryNotNull(regionId) > 0` answers "does ANY comuna in this region have geometry," not "does THIS comuna." A region can be 9/10 covered while one comuna's GADM polygon failed Decision-3 validation and has `geometry = null` — that comuna's region still reads as "covered," so `recomputeByComuna` for it took the geometric path, but its own `comunaId` can never resolve (no polygon to intersect against). That one comuna went permanently blind with the fallback never triggering — a narrower recurrence of the exact incident this decision exists to prevent.
+
+**Fix**: the probe is **per-comuna**, not per-region: `comuna.getGeometry() != null`, checked directly on the already-loaded entity (free — no DB round trip, which also fixed a separate finding that the old region-level probe was being re-queried once per comuna per batch run instead of once per region). This is a refinement of the granularity, not a reversal of the original reasoning above — it is still **not** per-row: a covered comuna's individual offshore events still resolve `comunaId = null` and stay excluded (Invariant 4 unchanged), because the per-comuna geometry check happens once per comuna/region call, before any row is read. `TerritoryRiskServiceImpl`'s region-level rollup now splits its comunas into covered/uncovered subsets and sums both contributions (geometric for covered, centroid for uncovered) instead of an all-or-nothing region decision.
+
+A second, related bug was found in the centroid fallback itself: it sourced its candidate event pool via `findByRegionId(thisRegion)` before applying centroid distance — but Decision 2 made dedup region-independent, so a row's persisted `regionId` is just "whichever cron leg synced it first," not a geographic fact. For two uncovered, overlapping regions, a detection physically owned by region B but synced first by region A's leg was invisible to B's fallback (B's `findByRegionId('B')` never returns it), silently undercounting B with no recovery path. Git archaeology against the pre-incident commit (before any comuna-geo-attribution work existed) confirmed the original centroid logic did not pre-filter by region — it scored every recent FIRMS event by distance and let proximity decide ownership. The fallback's candidate pool is now sourced by `fuente` + recency only, matching that original behavior, never pre-filtered by persisted `regionId`.
+
+Both corrections, plus the previously-duplicated routing logic between the two risk services, are now consolidated into a single `FirmsAttributionRouter` component that both `ComunaRiskServiceImpl` and `TerritoryRiskServiceImpl` delegate to — the one sanctioned place that knows how to read FIRMS events by attribution, closing the gap where a future caller could query `HeatAlertEventRepository` by `comunaId` directly and bypass the coverage check.
+
+---
+
 ## ADR Summary (decisions + rejected alternatives)
 
 | # | Decision | Chosen | Rejected (why) |
 |---|---|---|---|
-| 1 | Backfill mechanism | Startup `@EventListener` component, ordered after seed, idempotent on `comunaId IS NULL` | Inline in config (couples concerns, swallows errors); admin endpoint (race window); `railway run` script (re-expresses geo logic, no ordering guarantee) |
+| 1 | Backfill mechanism (REVISED) | **Bulk-write** batched `@Component`, **async** off `ApplicationReadyEvent`, idempotent on `comunaId IS NULL`; no longer gates reads (fallback covers them) | Sync on boot (hung 9+h vs Atlas latency — the incident); inline in config (couples concerns); `railway run` (re-expresses geo logic). Admin endpoint **re-accepted** as DR re-trigger since the fallback removes the race window |
 | 2 | Dedup key | `(lat, lon, fechaEvento, fuente)` — drop `regionId`; keep per-region sync | Carve-out non-overlapping bboxes (NASA API can't request non-rectangles; needless machinery; loses border resilience) |
 | 3 | Invalid geometry | Validate at seed; log + skip that comuna's geometry; sparse 2dsphere; never crash | Crash startup (one bad polygon kills life-safety system); skip validation (index build fails opaquely) |
 | 4 | Query shape | `findByGeometryIntersects(Point)` derived query, first-match, per-row post-dedup | Batched `$geoIntersects` (no clean per-point fan-out; volume doesn't justify it) |
-| 5 | Tests | `@DataMongoTest`+auto-index geo tests; Mockito escalation regression in BOTH services; sync/dedup test | Embedded-Mongo-assumed without verifying runner; testing only `ComunaRiskServiceImpl` (leaves sibling divergence) |
+| 5 | Tests | `@DataMongoTest`+auto-index geo tests; Mockito escalation regression in BOTH services; sync/dedup test; **coverage-gap fallback regression (Layer D)** | Embedded-Mongo-assumed without verifying runner; testing only `ComunaRiskServiceImpl` (leaves sibling divergence) |
+| 6 | Coverage-gap fallback (NEW) | Retain centroid methods; per-region probe `countByRegionIdAndGeometryNotNull > 0` → `comunaId` path, else centroid fallback; auto-upgrades on re-seed | Shrink to 3 covered regions (loses national value); per-row null→centroid (conflates offshore with gap); `coverageLoaded` flag on Region (redundant, drift-prone) |
 
 ## Architectural Invariants (must hold after this change)
 
-1. Comuna attribution logic exists in exactly ONE expression, reused by sync and backfill.
+1. The geometric attribution logic exists in exactly ONE expression (`findOneByGeometryIntersects`), reused by sync and backfill.
 2. A FIRMS detection is one row, identified by `(lat, lon, fecha, fuente)`, regardless of how many region bboxes fetched it.
-3. Region for risk counting is DERIVED from `comunaId`'s comuna, never re-guessed by centroid.
-4. Offshore = `comunaId null`, never a fabricated nearest comuna.
-5. Both risk services use one constant set: `FIRMS_MAX_COUNT=5`, `FIRMS_COUNT_CRITICO=4`, `FIRMS_FRP_CRITICO=60`.
+3. **(CORRECTED post-incident)** For a region that HAS comuna geometry loaded (`countByRegionIdAndGeometryNotNull > 0`), risk counting is DERIVED from `comunaId`'s comuna. For a region with NO geometry loaded, risk counting falls back to the retained centroid attribution — never silently zero. The centroid methods (`assignFocosToComuna`/`findNearestComuna`/`findNearestRegionId`) are a permanent secondary path, not dead code. *(Supersedes the original "never re-guessed by centroid", which assumed nationwide coverage and caused 16/19 regions to go blind in production.)*
+4. **Genuine offshore (geometry loaded, point intersects nothing) = `comunaId null`, never a fabricated nearest comuna.** This is distinct from the coverage gap of Invariant 3: offshore is a per-row null in a COVERED region; the gap is a whole UNCOVERED region. The two are routed by the region-granularity coverage probe and must never be conflated.
+5. Both risk services use one constant set: `FIRMS_MAX_COUNT=5`, `FIRMS_COUNT_CRITICO=4`, `FIRMS_FRP_CRITICO=60`. Both attribution paths (geometric and centroid fallback) feed these SAME constants.
 6. Startup never crashes on a single invalid GADM polygon.
-7. Slice B reads are gated on backfill completion (`count(comunaId missing & NASA_FIRMS) == 0`).
+7. **(RELAXED post-incident)** Slice B reads are NO LONGER gated on backfill completion — the Decision 6 fallback makes a late/incomplete backfill a precision-staleness concern, not a correctness one. `count(comunaId missing & NASA_FIRMS) → 0` for COVERED regions remains an observability signal (precision), not a deploy gate; uncovered regions legitimately retain null `comunaId` rows until their GeoJSON is added.
+8. **(NEW)** A region auto-upgrades from centroid fallback to geometric `comunaId` attribution the moment its comuna geometry is seeded — with no code change, only a new GeoJSON file and a re-seed.
 </content>
 </invoke>

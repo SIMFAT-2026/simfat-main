@@ -14,7 +14,8 @@ import org.springframework.data.mongodb.core.mapping.Document;
 @Document(collection = "heat_alert_events")
 @CompoundIndexes({
     @CompoundIndex(name = "idx_heat_region_fecha_desc", def = "{'regionId': 1, 'fechaEvento': -1}"),
-    @CompoundIndex(name = "idx_heat_region_fuente_fecha", def = "{'regionId': 1, 'fuente': 1, 'fechaEvento': -1}")
+    @CompoundIndex(name = "idx_heat_region_fuente_fecha", def = "{'regionId': 1, 'fuente': 1, 'fechaEvento': -1}"),
+    @CompoundIndex(name = "idx_heat_comuna_fecha_desc", def = "{'comunaId': 1, 'fechaEvento': -1}")
 })
 public class HeatAlertEvent {
 
@@ -23,6 +24,14 @@ public class HeatAlertEvent {
 
     @NotBlank(message = "El regionId es obligatorio")
     private String regionId;
+
+    // Geometric comuna attribution (Decision 4). Nullable: null means either genuine
+    // offshore/no-polygon-match (the comuna IS covered, point intersects nothing) or the
+    // comuna has no geometry of its own loaded yet (coverage gap, Decision 6 — corrected
+    // to comuna granularity post-incident, see design.md Decision 6 amendment). Readers
+    // distinguish the two cases via the comuna's own ComunaInfo#getGeometry() != null
+    // (FirmsAttributionRouter), never by inspecting this field alone.
+    private String comunaId;
 
     @NotNull(message = "La fecha del evento es obligatoria")
     private LocalDateTime fechaEvento;
@@ -66,6 +75,14 @@ public class HeatAlertEvent {
 
     public void setRegionId(String regionId) {
         this.regionId = regionId;
+    }
+
+    public String getComunaId() {
+        return comunaId;
+    }
+
+    public void setComunaId(String comunaId) {
+        this.comunaId = comunaId;
     }
 
     public LocalDateTime getFechaEvento() {

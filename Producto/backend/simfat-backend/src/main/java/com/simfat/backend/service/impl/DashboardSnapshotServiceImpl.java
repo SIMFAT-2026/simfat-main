@@ -51,7 +51,7 @@ public class DashboardSnapshotServiceImpl implements DashboardSnapshotService {
         List<OpenEoIndicatorObservation> ndmiSeries = observationRepository
             .findByRegionIdAndIndicatorAndObservedAtBetweenOrderByObservedAtAsc(regionId, IndicatorType.NDMI, from30d, now);
 
-        Long heatAlerts7d = heatAlertRepository.countByRegionIdAndFechaEventoBetween(regionId, now.minusDays(7), now);
+        Long heatAlerts7d = heatAlertRepository.countByRegionIdAndFuenteAndFechaEventoBetween(regionId, "NASA_FIRMS", now.minusDays(7), now);
         Double lossCurrentPct = resolveCurrentLossPercentage(regionId);
         Long freshnessSeconds = resolveFreshnessSeconds(now, latestNdvi, latestNdmi);
 

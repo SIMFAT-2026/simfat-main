@@ -12,7 +12,6 @@ import com.simfat.backend.model.TerritoryWeatherObservation;
 import com.simfat.backend.repository.CitizenReportRepository;
 import com.simfat.backend.repository.ComunaInfoRepository;
 import com.simfat.backend.repository.ComunaRiskSnapshotRepository;
-import com.simfat.backend.repository.HeatAlertEventRepository;
 import com.simfat.backend.repository.OpenEoIndicatorObservationRepository;
 import com.simfat.backend.repository.TerritoryWeatherObservationRepository;
 import com.simfat.backend.service.ComunaRiskService;
@@ -26,7 +25,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -54,8 +52,6 @@ public class ComunaRiskServiceImpl implements ComunaRiskService {
 
     // Normalización
     private static final double FWI_MAX = 50.0;
-    private static final double FIRMS_MAX_COUNT = 5.0;
-    private static final double FIRMS_MAX_FRP = 80.0;
     private static final double REPORTS_MAX = 3.0;
     private static final double NDMI_DRY = -0.4;
     private static final double NDMI_WET = 0.4;
@@ -68,11 +64,6 @@ public class ComunaRiskServiceImpl implements ComunaRiskService {
     private static final double SCORE_CRITICO = 0.85;
     private static final double FWI_PREVENTIVO = 20.0;
     private static final double FWI_CRITICO = 45.0;
-    // A single low-intensity FIRMS detection (e.g. a stray VIIRS pixel) should not by
-    // itself force CRITICO — it already feeds the weighted score via firmsNorm. Only
-    // escalate directly when detections cluster or one is genuinely intense.
-    private static final int FIRMS_COUNT_CRITICO = 4;
-    private static final double FIRMS_FRP_CRITICO = 60.0;
 
     private static final double COPERNICUS_COMUNA_PAD_DEG = 0.15;
 
@@ -84,33 +75,33 @@ public class ComunaRiskServiceImpl implements ComunaRiskService {
     private final ComunaInfoRepository comunaRepository;
     private final ComunaRiskSnapshotRepository snapshotRepository;
     private final TerritoryWeatherObservationRepository weatherRepository;
-    private final HeatAlertEventRepository heatAlertRepository;
     private final CitizenReportRepository citizenReportRepository;
     private final OpenWeatherFwiService fwiService;
     private final OpenEoIndicatorObservationRepository openEoObsRepository;
     private final NotificationService notificationService;
     private final OpenEoServiceClient openEoServiceClient;
+    private final FirmsAttributionRouter firmsAttributionRouter;
 
     public ComunaRiskServiceImpl(
         ComunaInfoRepository comunaRepository,
         ComunaRiskSnapshotRepository snapshotRepository,
         TerritoryWeatherObservationRepository weatherRepository,
-        HeatAlertEventRepository heatAlertRepository,
         CitizenReportRepository citizenReportRepository,
         OpenWeatherFwiService fwiService,
         OpenEoIndicatorObservationRepository openEoObsRepository,
         NotificationService notificationService,
-        OpenEoServiceClient openEoServiceClient
+        OpenEoServiceClient openEoServiceClient,
+        FirmsAttributionRouter firmsAttributionRouter
     ) {
         this.comunaRepository = comunaRepository;
         this.snapshotRepository = snapshotRepository;
         this.weatherRepository = weatherRepository;
-        this.heatAlertRepository = heatAlertRepository;
         this.citizenReportRepository = citizenReportRepository;
         this.fwiService = fwiService;
         this.openEoObsRepository = openEoObsRepository;
         this.notificationService = notificationService;
         this.openEoServiceClient = openEoServiceClient;
+        this.firmsAttributionRouter = firmsAttributionRouter;
     }
 
     @Scheduled(cron = "${territory.riesgo.comunal.cron:0 30 1,13 * * *}")
@@ -152,16 +143,11 @@ public class ComunaRiskServiceImpl implements ComunaRiskService {
             fwiNorm = normalize(fwiRaw, 0.0, FWI_MAX);
         }
 
-        // --- FIRMS (distancia al centroide) ---
-        List<HeatAlertEvent> regionFocos = heatAlertRepository.findByRegionId(comuna.getRegionId())
-            .stream()
-            .filter(e -> "NASA_FIRMS".equals(e.getFuente()))
-            .filter(e -> e.getFechaEvento() != null && e.getFechaEvento().isAfter(firms48h))
-            .filter(e -> e.getFirmsConfidence() != null && !"l".equals(e.getFirmsConfidence()))
-            .filter(e -> e.getLatitud() != null && e.getLongitud() != null)
-            .collect(Collectors.toList());
-
-        List<HeatAlertEvent> comunaFocos = assignFocosToComuna(regionFocos, comunaId, comunaRepository.findByRegionId(comuna.getRegionId()));
+        // --- FIRMS — Decision 6 coverage-gap fallback, routed via the shared
+        // FirmsAttributionRouter (FIX 1/2/6, post-review): the routing decision is
+        // PER-COMUNA (comuna.getGeometry() != null), not per-region, and the fallback's
+        // candidate pool is never pre-filtered by persisted regionId.
+        List<HeatAlertEvent> comunaFocos = firmsAttributionRouter.resolveForComuna(comuna, firms48h);
         int firmsCount = comunaFocos.size();
         boolean hasTodayFoco = comunaFocos.stream().anyMatch(e -> isToday(e.getFechaEvento()));
         double firmsFrpMean = comunaFocos.stream()
@@ -170,8 +156,8 @@ public class ComunaRiskServiceImpl implements ComunaRiskService {
             .average().orElse(0.0);
         double firmsNorm = 0.0;
         if (firmsCount > 0) {
-            firmsNorm = normalize(firmsCount, 0, FIRMS_MAX_COUNT) * 0.6
-                + normalize(firmsFrpMean, 0, FIRMS_MAX_FRP) * 0.4;
+            firmsNorm = normalize(firmsCount, 0, FirmsScoringConstants.FIRMS_MAX_COUNT) * 0.6
+                + normalize(firmsFrpMean, 0, FirmsScoringConstants.FIRMS_MAX_FRP) * 0.4;
         }
 
         // --- Reportes ciudadanos ---
@@ -341,33 +327,6 @@ public class ComunaRiskServiceImpl implements ComunaRiskService {
         return recomputeByComuna(comunaId);
     }
 
-    private List<HeatAlertEvent> assignFocosToComuna(
-        List<HeatAlertEvent> regionFocos,
-        String targetComunaId,
-        List<ComunaInfo> allComunas
-    ) {
-        return regionFocos.stream()
-            .filter(foco -> {
-                String nearest = findNearestComuna(foco.getLatitud(), foco.getLongitud(), allComunas);
-                return targetComunaId.equals(nearest);
-            })
-            .collect(Collectors.toList());
-    }
-
-    private String findNearestComuna(double lat, double lon, List<ComunaInfo> comunas) {
-        String nearest = null;
-        double minDist = Double.MAX_VALUE;
-        for (ComunaInfo c : comunas) {
-            if (c.getCenterLat() == null || c.getCenterLon() == null) continue;
-            double dist = Math.pow(lat - c.getCenterLat(), 2) + Math.pow(lon - c.getCenterLon(), 2);
-            if (dist < minDist) {
-                minDist = dist;
-                nearest = c.getId();
-            }
-        }
-        return nearest;
-    }
-
     private String resolveAlertLevel(double score, Double fwiRaw, int firmsCount, double firmsFrpMean, boolean hasTodayFirms) {
         // A FIRMS detection from TODAY is an active fire happening right now — always CRITICO.
         if (hasTodayFirms || (fwiRaw != null && fwiRaw >= FWI_CRITICO) || score >= SCORE_CRITICO) {
@@ -376,7 +335,7 @@ public class ComunaRiskServiceImpl implements ComunaRiskService {
         // Detections that are only "recent" (not today) still escalate to CRITICO if they
         // cluster (FIRMS_COUNT_CRITICO) or are individually intense (FIRMS_FRP_CRITICO) —
         // otherwise they just feed the weighted score via firmsNorm.
-        if (firmsCount >= FIRMS_COUNT_CRITICO || firmsFrpMean >= FIRMS_FRP_CRITICO) {
+        if (firmsCount >= FirmsScoringConstants.FIRMS_COUNT_CRITICO || firmsFrpMean >= FirmsScoringConstants.FIRMS_FRP_CRITICO) {
             return "CRITICO";
         }
         if ((fwiRaw != null && fwiRaw >= FWI_PREVENTIVO) || score >= SCORE_ALTO) {
