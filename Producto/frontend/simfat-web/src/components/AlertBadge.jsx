@@ -1,6 +1,7 @@
 const CLASS_BY_LEVEL = {
   BAJO: 'badge badge-low',
   MEDIO: 'badge badge-medium',
+  PREVENTIVO: 'badge badge-preventivo',
   ALTO: 'badge badge-high',
   CRITICO: 'badge badge-critical'
 };

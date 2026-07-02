@@ -5,7 +5,7 @@ import ErrorMessage from '../components/ErrorMessage';
 import LoadingSpinner from '../components/LoadingSpinner';
 import SectionTitle from '../components/SectionTitle';
 import { useAuth } from '../auth/AuthContext';
-import { useFeedback } from '../hooks';
+import { useCloseDetailsOnOutsideClick, useFeedback } from '../hooks';
 import {
   getAccessPermissions,
   getAccessRoles,
@@ -33,6 +33,7 @@ const PROFILE_OPTIONS = [
 ];
 
 function AccessControlPage() {
+  useCloseDetailsOnOutsideClick();
   const { user } = useAuth();
   const feedback = useFeedback();
   const [loading, setLoading] = useState(true);
