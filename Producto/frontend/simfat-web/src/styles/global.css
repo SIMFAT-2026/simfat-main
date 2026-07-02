@@ -1737,6 +1737,33 @@ textarea {
   gap: 8px;
 }
 
+.access-help {
+  font-size: 0.8rem;
+  color: #64748b;
+  margin-bottom: 2px;
+}
+
+.access-help summary {
+  cursor: pointer;
+  list-style: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: #64748b;
+  font-size: 0.78rem;
+}
+
+.access-help summary::-webkit-details-marker { display: none; }
+
+.access-help ul,
+.access-help p {
+  margin: 4px 0 0 0;
+  line-height: 1.6;
+  background: #f1f5f9;
+  border-radius: 6px;
+  padding: 6px 10px 6px 1.4rem;
+}
+
 .access-advanced {
   border: 1px solid #e2e8f0;
   border-radius: 8px;

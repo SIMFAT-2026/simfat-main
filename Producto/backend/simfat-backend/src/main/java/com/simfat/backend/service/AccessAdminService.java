@@ -27,4 +27,6 @@ public interface AccessAdminService {
     AccessUserDTO updateVerificationStatus(String targetUserId, UpdateVerificationStatusRequestDTO request, String actorUserId);
 
     List<PendingReviewUserDTO> getPendingReview();
+
+    void deleteUser(String targetUserId, String actorUserId);
 }

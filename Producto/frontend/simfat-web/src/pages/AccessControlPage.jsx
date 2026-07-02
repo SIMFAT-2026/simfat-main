@@ -17,12 +17,12 @@ import {
   updateAccessUserRoles,
   updateCommunityChatAccess,
   updateCommunityModuleAccess,
-  updateVerificationStatus
+  updateVerificationStatus,
+  deleteUser
 } from '../services';
 
 const PROFILE_OPTIONS = [
   { value: 'COMMUNITY', label: 'Comunidad', roles: ['ROLE_COMMUNITY_USER'] },
-  { value: 'VERIFIED', label: 'Verificado', roles: ['ROLE_VERIFIED_USER', 'ROLE_COMMUNITY_USER'] },
   { value: 'MODERATOR', label: 'Moderador', roles: ['ROLE_MODERATOR', 'ROLE_VERIFIED_USER', 'ROLE_COMMUNITY_USER'] },
   { value: 'ADMIN', label: 'Administrador', roles: ['ROLE_ADMIN', 'ROLE_MODERATOR', 'ROLE_VERIFIED_USER', 'ROLE_COMMUNITY_USER'] },
   {
@@ -56,6 +56,10 @@ function AccessControlPage() {
     // (solo "ADMIN"/"USER") y nunca tendra "ROLE_SUPER_ADMIN".
     const roleSet = new Set(user?.roleCodes || []);
     return roleSet.has('ROLE_ADMIN') || roleSet.has('ROLE_SUPER_ADMIN');
+  }, [user]);
+
+  const isSuperAdmin = useMemo(() => {
+    return new Set(user?.roleCodes || []).has('ROLE_SUPER_ADMIN');
   }, [user]);
 
   useEffect(() => {
@@ -161,6 +165,18 @@ function AccessControlPage() {
       }
       return { ...prev, [userId]: [...current] };
     });
+  }
+
+  async function handleDeleteUser(userId, email) {
+    if (!window.confirm(`¿Eliminar a ${email}? Esta acción desactiva la cuenta permanentemente.`)) return;
+    feedback.clear();
+    try {
+      await deleteUser(userId);
+      setUsers((prev) => prev.filter((u) => u.id !== userId));
+      feedback.showSuccess(`Usuario ${email} eliminado`);
+    } catch (err) {
+      feedback.showError(err.message);
+    }
   }
 
   async function saveRoles(userId) {
@@ -318,18 +334,29 @@ function AccessControlPage() {
     'SUSPENDED'
   ];
 
+  const VERIFICATION_LABEL = {
+    IDENTITY_VERIFIED: 'Verificado',
+    EMAIL_VERIFIED: 'Email verificado',
+    FULLY_VERIFIED: 'Verificado',
+    SUSPENDED: 'Suspendido',
+    UNVERIFIED: 'Sin verificar'
+  };
+
   const columns = [
     { key: 'email', header: 'Email' },
     { key: 'fullName', header: 'Nombre' },
     {
       key: 'effectiveRoles',
-      header: 'Roles efectivos',
-      render: (row) => (row.effectiveRoles || []).join(', ') || '-'
+      header: 'Perfil',
+      render: (row) => {
+        const val = detectProfile(row.effectiveRoles || []);
+        return PROFILE_OPTIONS.find((p) => p.value === val)?.label || 'Comunidad';
+      }
     },
     {
       key: 'verificationStatus',
-      header: 'Verificacion',
-      render: (row) => row.verificationStatus || 'UNVERIFIED'
+      header: 'Verificado',
+      render: (row) => VERIFICATION_LABEL[row.verificationStatus] ?? row.verificationStatus ?? 'Sin verificar'
     }
   ];
 
@@ -352,14 +379,26 @@ function AccessControlPage() {
 
       {!loading && !error && users.length > 0 ? (
         <>
-          <DataTable columns={columns} rows={users} rowKey="id" />
-
+          <h3 style={{ marginBottom: '8px', fontSize: '1rem', color: 'var(--color-text-muted, #666)' }}>
+            Gestión individual de usuarios
+          </h3>
           <div className="access-grid">
             {users.map((target) => (
               <article key={target.id} className="access-user-card">
                 <div className="access-user-header">
-                  <h3>{target.fullName || target.email}</h3>
-                  <p>{target.email}</p>
+                  <div>
+                    <h3>{target.fullName || target.email}</h3>
+                    <p>{target.email}</p>
+                  </div>
+                  {isSuperAdmin && target.id !== user?.id && (
+                    <button
+                      type="button"
+                      className="btn btn-danger btn-sm"
+                      onClick={() => handleDeleteUser(target.id, target.email)}
+                    >
+                      Eliminar
+                    </button>
+                  )}
                 </div>
 
                 <div className="access-controls-row">
@@ -387,8 +426,18 @@ function AccessControlPage() {
                   </label>
                 </div>
 
+                <details className="access-help">
+                  <summary>ⓘ Sobre los perfiles</summary>
+                  <ul>
+                    <li><strong>Comunidad</strong>: acceso básico al sistema, sin acceso a recursos comunitarios.</li>
+                    <li><strong>Moderador</strong>: modera contenido y accede a recursos comunitarios (requiere verificación activa).</li>
+                    <li><strong>Administrador</strong>: acceso completo al sistema y a todos los recursos.</li>
+                    <li><strong>Super Admin</strong>: gestión total, incluida la eliminación de usuarios.</li>
+                  </ul>
+                </details>
+
                 <details className="access-advanced">
-                  <summary>Ajustes avanzados</summary>
+                  <summary>Asignar o cambiar perfil</summary>
                   <div className="access-role-list">
                     {roles.map((role) => (
                       <label key={`${target.id}-${role.code}`} className="access-role-item">
@@ -401,6 +450,11 @@ function AccessControlPage() {
                       </label>
                     ))}
                   </div>
+                </details>
+
+                <details className="access-help">
+                  <summary>ⓘ Sobre el chat comunitario</summary>
+                  <p>Define en qué salas regionales puede participar el usuario. La región principal es su sala base; las adicionales permiten coordinación entre regiones.</p>
                 </details>
 
                 <details className="access-advanced">
@@ -450,10 +504,15 @@ function AccessControlPage() {
                   </div>
                 </details>
 
+                <details className="access-help">
+                  <summary>ⓘ Sobre los recursos comunitarios</summary>
+                  <p>Controla qué regiones puede consultar el usuario en el módulo comunitario (tablero, recursos, contactos). Los administradores ven todas las regiones sin restricción.</p>
+                </details>
+
                 <details className="access-advanced">
-                  <summary>Acceso modulo comunidad (tablero, recursos, contactos)</summary>
+                  <summary>Acceso a recursos comunitarios</summary>
                   <p className="community-source-note">
-                    Los usuarios ROLE_ADMIN ven todas las regiones sin restriccion.
+                    Los administradores ven todas las regiones sin restriccion.
                   </p>
                   <div className="access-role-list">
                     {dedupedRegions.map((region) => (
@@ -492,6 +551,11 @@ function AccessControlPage() {
               </article>
             ))}
           </div>
+
+          <h3 style={{ marginTop: '2rem', marginBottom: '8px', fontSize: '1rem', color: 'var(--color-text-muted, #666)' }}>
+            Resumen de usuarios ({users.length})
+          </h3>
+          <DataTable columns={columns} rows={users} rowKey="id" />
 
           <h3 style={{ marginTop: '2rem' }}>Verificaciones pendientes de revision</h3>
           {pendingReview.length === 0 ? (
@@ -599,17 +663,6 @@ function AccessControlPage() {
             </div>
           )}
 
-          <h3 style={{ marginTop: '1.5rem' }}>Catalogo de permisos</h3>
-          <DataTable
-            rowKey="code"
-            rows={permissions}
-            columns={[
-              { key: 'code', header: 'Permiso' },
-              { key: 'module', header: 'Modulo' },
-              { key: 'name', header: 'Nombre' },
-              { key: 'description', header: 'Descripcion' }
-            ]}
-          />
         </>
       ) : null}
     </section>
