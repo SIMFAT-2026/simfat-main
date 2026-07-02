@@ -25,9 +25,8 @@ export async function createCommunityBoardPost(payload, file) {
     formData.append('payload', JSON.stringify(body));
     formData.append('file', file);
 
-    const response = await axiosClient.post(API_ENDPOINTS.communityBoard, formData, {
-      headers: { 'Content-Type': 'multipart/form-data' }
-    });
+    // Do NOT set Content-Type manually — axios must auto-set it with the multipart boundary
+    const response = await axiosClient.post(API_ENDPOINTS.communityBoard, formData);
     return extractData(response.data);
   }
 

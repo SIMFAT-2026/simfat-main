@@ -200,16 +200,13 @@ export function useCommunityData() {
   const createBoard = useCallback(
     async (payload) => {
       if (source === 'backend') {
-        try {
-          const created = await createCommunityBoardPost(payload, payload.attachmentFile);
-          const normalized = normalizeBoard([created])[0];
-          setBoard((prev) => [normalized, ...prev]);
-          return normalized;
-        } catch {
-          // fallback local controlado
-        }
+        const created = await createCommunityBoardPost(payload, payload.attachmentFile);
+        const normalized = normalizeBoard([created])[0];
+        setBoard((prev) => [normalized, ...prev]);
+        return normalized;
       }
 
+      // Offline / demo mode only
       const createdLocal = {
         id: createId('board'),
         title: payload.title,
