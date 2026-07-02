@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import ConfirmModal from '../components/ConfirmModal';
 import DataTable from '../components/DataTable';
 import EmptyState from '../components/EmptyState';
@@ -71,17 +71,14 @@ function ThresholdHints({ fieldName, onSelect }) {
   if (!config) return null;
 
   return (
-    <div style={{ marginTop: '4px' }}>
-      <small style={{ color: 'var(--color-text-muted, #666)', display: 'block', marginBottom: '4px' }}>
-        {config.description}
-      </small>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+    <div className="threshold-hints">
+      <small className="threshold-hints-desc">{config.description}</small>
+      <div className="threshold-hints-presets">
         {config.presets.map((preset) => (
           <button
             key={preset.label}
             type="button"
-            className="btn btn-secondary"
-            style={{ fontSize: '0.72rem', padding: '2px 8px' }}
+            className="btn btn-secondary btn-xs"
             onClick={() => onSelect(fieldName, preset.value)}
           >
             {preset.label}: {preset.value}
@@ -112,6 +109,7 @@ function RulesPage() {
   const [validationErrors, setValidationErrors] = useState({});
   const [deleteId, setDeleteId] = useState('');
   const feedback = useFeedback();
+  const formRef = useRef(null);
 
   async function loadRegions() {
     const data = await getRegions();
@@ -145,6 +143,12 @@ function RulesPage() {
     init();
   }, []);
 
+  useEffect(() => {
+    if (editingId && formRef.current) {
+      formRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, [editingId]);
+
   const regionMap = useMemo(() => {
     return regions.reduce((acc, region) => {
       acc[region.id] = region.nombre;
@@ -154,10 +158,16 @@ function RulesPage() {
 
   const columns = useMemo(
     () => [
-      { key: 'nombre', header: 'Nombre' },
-      { key: 'regionId', header: 'Region', render: (row) => (row.regionId ? regionMap[row.regionId] || row.regionId : 'Global') },
+      { key: 'nombre', header: 'Nombre', sortable: true },
+      {
+        key: 'regionId',
+        header: 'Region',
+        sortable: true,
+        sortValue: (row) => (row.regionId ? regionMap[row.regionId] || row.regionId : 'Global'),
+        render: (row) => (row.regionId ? regionMap[row.regionId] || row.regionId : 'Global')
+      },
       { key: 'umbrales', header: 'Umbrales configurados', render: (row) => summarizeThresholds(row) },
-      { key: 'activa', header: 'Activa', render: (row) => (row.activa ? 'Si' : 'No') }
+      { key: 'activa', header: 'Activa', sortable: true, sortValue: (row) => (row.activa ? 1 : 0), render: (row) => (row.activa ? 'Si' : 'No') }
     ],
     [regionMap]
   );
@@ -228,32 +238,29 @@ function RulesPage() {
     }
   }
 
-  async function confirmDelete() {
-    if (!deleteId) {
-      return;
-    }
-
-    try {
-      await deleteRule(deleteId);
-      feedback.showSuccess('Regla eliminada correctamente.');
-      setDeleteId('');
-      await loadRules();
-    } catch (err) {
-      feedback.showError(err.message);
-      setDeleteId('');
-    }
-  }
-
   return (
     <section className="page-container">
       <SectionTitle title="Reglas" subtitle="Configuracion de reglas de alerta" />
 
       {feedback.message ? <p className={`feedback feedback-${feedback.type}`}>{feedback.message}</p> : null}
 
-      <form onSubmit={onSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+      <form ref={formRef} onSubmit={onSubmit} className={`rules-form${editingId ? ' rules-form--editing' : ''}`}>
 
-        {/* Fila 1: identificación */}
-        <div className="form-grid" style={{ gridTemplateColumns: '1fr 1fr', margin: '18px 0 0' }}>
+        {editingId ? (
+          <div className="rules-edit-banner">
+            <div className="rules-edit-banner-label">
+              <span className="rules-edit-banner-icon">✏️</span>
+              Editando regla: <strong>{form.nombre}</strong>
+            </div>
+            <button type="button" className="btn btn-secondary btn-sm" onClick={resetForm}>
+              Cancelar edicion
+            </button>
+          </div>
+        ) : (
+          <p className="rules-form-section-title">Nueva regla</p>
+        )}
+
+        <div className="form-grid rules-form-row-2col">
           <label>
             Nombre
             <input name="nombre" value={form.nombre} onChange={onInputChange} required />
@@ -273,11 +280,9 @@ function RulesPage() {
           </label>
         </div>
 
-        {/* Fila 2: umbrales satelitales */}
-        <p style={{ margin: '14px 0 0', fontSize: '0.75rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-          Umbrales de activacion
-        </p>
-        <div className="form-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)', margin: 0, alignItems: 'start' }}>
+        <p className="rules-form-section-title">Umbrales de activacion</p>
+
+        <div className="form-grid rules-form-row-3col">
           <label>
             Umbral FWI <small>(FWI &ge; valor)</small>
             <input name="umbralFwi" type="number" step="0.01" value={form.umbralFwi} onChange={onInputChange} />
@@ -300,8 +305,7 @@ function RulesPage() {
           </label>
         </div>
 
-        {/* Fila 3: umbrales de conteo + estado + acciones */}
-        <div className="form-grid" style={{ gridTemplateColumns: '1fr 1fr 140px', margin: '4px 0 0', alignItems: 'start' }}>
+        <div className="form-grid rules-form-row-count">
           <label>
             Umbral FIRMS <small>(detecciones &ge; valor)</small>
             <input name="umbralFirmsCount" type="number" value={form.umbralFirmsCount} onChange={onInputChange} />
@@ -330,7 +334,7 @@ function RulesPage() {
 
         <div className="form-actions">
           <button className="btn" type="submit">
-            {editingId ? 'Actualizar' : 'Crear'}
+            {editingId ? 'Actualizar regla' : 'Crear regla'}
           </button>
           {editingId ? (
             <button type="button" className="btn btn-secondary" onClick={resetForm}>
@@ -349,12 +353,14 @@ function RulesPage() {
           columns={columns}
           rows={rules}
           rowKey="id"
+          defaultSortKey="nombre"
+          defaultSortDir="asc"
           actions={(row) => (
             <div className="row-actions">
-              <button type="button" className="btn btn-secondary" onClick={() => startEdit(row)}>
+              <button type="button" className="btn btn-secondary btn-sm" onClick={() => startEdit(row)}>
                 Editar
               </button>
-              <button type="button" className="btn btn-danger" onClick={() => setDeleteId(row.id)}>
+              <button type="button" className="btn btn-danger btn-sm" onClick={() => setDeleteId(row.id)}>
                 Eliminar
               </button>
             </div>

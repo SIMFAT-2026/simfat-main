@@ -112,6 +112,89 @@ textarea {
   font-size: 0.8rem;
 }
 
+.btn-xs {
+  padding: 2px 8px;
+  font-size: 0.72rem;
+}
+
+/* Rules page */
+.rules-form {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.rules-form--editing {
+  border-left: 3px solid #3b82f6;
+  padding-left: 16px;
+  margin-left: -19px;
+}
+
+.rules-edit-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 6px;
+  padding: 10px 14px;
+  margin-bottom: 4px;
+}
+
+.rules-edit-banner-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9rem;
+  color: #1e40af;
+}
+
+.rules-edit-banner-icon {
+  font-size: 1rem;
+}
+
+.rules-form-section-title {
+  margin: 14px 0 0;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.rules-form-row-2col {
+  grid-template-columns: 1fr 1fr;
+  margin: 8px 0 0;
+}
+
+.rules-form-row-3col {
+  grid-template-columns: repeat(3, 1fr);
+  margin: 0;
+  align-items: start;
+}
+
+.rules-form-row-count {
+  grid-template-columns: 1fr 1fr 140px;
+  margin: 4px 0 0;
+  align-items: start;
+}
+
+.threshold-hints {
+  margin-top: 4px;
+}
+
+.threshold-hints-desc {
+  color: #64748b;
+  display: block;
+  margin-bottom: 4px;
+}
+
+.threshold-hints-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
 .btn-preset-active {
   background: #1e40af;
   border-color: #1e40af;
