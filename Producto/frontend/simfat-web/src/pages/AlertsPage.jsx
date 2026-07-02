@@ -383,7 +383,7 @@ function AlertsPage() {
 
   function applyPreset(preset) {
     setFilterPreset(preset);
-    if (preset === 'custom' || preset === '') {
+    if (preset === 'all' || preset === 'custom' || preset === '') {
       setFilterFrom('');
       setFilterTo('');
       return;
@@ -438,20 +438,24 @@ function AlertsPage() {
         <div className="filter-presets">
           <span className="filter-presets-label">Periodo</span>
           {[
+            { key: 'all', label: 'Mostrar todo' },
             { key: '24h', label: 'Ultimas 24h' },
             { key: '48h', label: 'Ultimas 48h' },
             { key: '7d', label: 'Ultima semana' },
             { key: 'custom', label: 'Personalizado' }
-          ].map(({ key, label }) => (
-            <button
-              key={key}
-              type="button"
-              className={`btn btn-sm${filterPreset === key ? ' btn-preset-active' : ' btn-secondary'}`}
-              onClick={() => applyPreset(key)}
-            >
-              {label}
-            </button>
-          ))}
+          ].map(({ key, label }) => {
+            const isActive = filterPreset === key || (key === 'all' && filterPreset === '');
+            return (
+              <button
+                key={key}
+                type="button"
+                className={`btn btn-sm btn-preset${isActive ? ' btn-preset-active' : ' btn-secondary'}`}
+                onClick={() => applyPreset(key)}
+              >
+                {label}
+              </button>
+            );
+          })}
         </div>
 
         {filterPreset === 'custom' ? (

@@ -125,6 +125,11 @@ textarea {
   flex-wrap: wrap;
 }
 
+.btn-preset {
+  min-width: 110px;
+  text-align: center;
+}
+
 .filter-presets-label {
   font-size: 0.82rem;
   color: #64748b;
