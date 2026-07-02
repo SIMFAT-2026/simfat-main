@@ -1,6 +1,5 @@
 package com.simfat.backend.service.impl;
 
-import com.simfat.backend.model.CitizenReport;
 import com.simfat.backend.model.HeatAlertEvent;
 import com.simfat.backend.model.IndicatorType;
 import com.simfat.backend.model.OpenEoIndicatorObservation;
@@ -8,7 +7,6 @@ import com.simfat.backend.model.Region;
 import com.simfat.backend.model.TerritoryRiskSnapshot;
 import com.simfat.backend.model.TerritoryWeatherObservation;
 import com.simfat.backend.repository.CitizenReportRepository;
-import com.simfat.backend.repository.HeatAlertEventRepository;
 import com.simfat.backend.repository.OpenEoIndicatorObservationRepository;
 import com.simfat.backend.repository.RegionRepository;
 import com.simfat.backend.repository.TerritoryRiskSnapshotRepository;
@@ -43,8 +41,6 @@ public class TerritoryRiskServiceImpl implements TerritoryRiskService {
     private static final double NDMI_WET = 0.4;
     private static final double NDVI_MIN = 0.1;
     private static final double NDVI_MAX = 0.8;
-    private static final double FIRMS_MAX_COUNT = 10.0;
-    private static final double FIRMS_MAX_FRP = 100.0;
     private static final double REPORTS_MAX = 5.0;
 
     // Umbrales de alerta (SDD v1)
@@ -54,36 +50,31 @@ public class TerritoryRiskServiceImpl implements TerritoryRiskService {
     private static final double FWI_PREVENTIVO = 20.0;
     private static final double FWI_ALTO = 30.0;
     private static final double FWI_CRITICO = 45.0;
-    // A single low-intensity FIRMS detection should not by itself force CRITICO — it
-    // already feeds the weighted score via firmsNorm. Only escalate directly when
-    // detections cluster or one is genuinely intense (see resolveAlertLevel).
-    private static final int FIRMS_COUNT_CRITICO = 8;
-    private static final double FIRMS_FRP_CRITICO = 75.0;
     // Matches the frontend's "today" vs "recent" FIRMS bucket (TerritoryMapPanel.jsx
     // santiagoDateKey) so the alert override and the map legend agree.
     private static final ZoneId SANTIAGO_ZONE = ZoneId.of("America/Santiago");
 
-    private final RegionRepository regionRepository;
     private final OpenEoIndicatorObservationRepository observationRepository;
     private final TerritoryWeatherObservationRepository weatherRepository;
-    private final HeatAlertEventRepository heatAlertEventRepository;
     private final CitizenReportRepository citizenReportRepository;
     private final TerritoryRiskSnapshotRepository snapshotRepository;
+    private final RegionRepository regionRepository;
+    private final FirmsAttributionRouter firmsAttributionRouter;
 
     public TerritoryRiskServiceImpl(
         RegionRepository regionRepository,
         OpenEoIndicatorObservationRepository observationRepository,
         TerritoryWeatherObservationRepository weatherRepository,
-        HeatAlertEventRepository heatAlertEventRepository,
         CitizenReportRepository citizenReportRepository,
-        TerritoryRiskSnapshotRepository snapshotRepository
+        TerritoryRiskSnapshotRepository snapshotRepository,
+        FirmsAttributionRouter firmsAttributionRouter
     ) {
         this.regionRepository = regionRepository;
         this.observationRepository = observationRepository;
         this.weatherRepository = weatherRepository;
-        this.heatAlertEventRepository = heatAlertEventRepository;
         this.citizenReportRepository = citizenReportRepository;
         this.snapshotRepository = snapshotRepository;
+        this.firmsAttributionRouter = firmsAttributionRouter;
     }
 
     @Scheduled(cron = "${territory.risk.recompute.cron:0 0 1 * * *}")
@@ -138,20 +129,13 @@ public class TerritoryRiskServiceImpl implements TerritoryRiskService {
             availableComponents++;
         }
 
-        // FIRMS (focos activos ultimas 48h)
+        // FIRMS (focos activos ultimas 48h) — Decision 6 coverage-gap fallback, routed via
+        // the shared FirmsAttributionRouter (FIX 1/2/6, post-review): per-region routing
+        // now SPLITS coverage (covered comunas read geometrically, uncovered comunas fall
+        // back to centroid, both summed) instead of an all-or-nothing region decision, and
+        // the fallback's candidate pool is never pre-filtered by persisted regionId.
         LocalDateTime firms48hAgo = now.minusHours(48);
-        List<Region> allRegions = regionRepository.findAll();
-        // Reasigna por centroide mas cercano: los aoiBbox de regiones vecinas (ej. Biobio-Nuble,
-        // Biobio-Araucania) se superponen, por lo que el mismo foco puede haberse persistido bajo
-        // mas de un regionId durante el sync. Sin este filtro Biobio queda inflado por ser la unica
-        // region monitoreada con vecinos en ambos lados.
-        List<HeatAlertEvent> firmsEvents = heatAlertEventRepository.findByRegionId(regionId).stream()
-            .filter(e -> e.getFechaEvento() != null && e.getFechaEvento().isAfter(firms48hAgo))
-            .filter(e -> "NASA_FIRMS".equals(e.getFuente()))
-            .filter(e -> e.getFirmsConfidence() != null && !"l".equals(e.getFirmsConfidence()))
-            .filter(e -> e.getLatitud() != null && e.getLongitud() != null)
-            .filter(e -> regionId.equals(findNearestRegionId(e.getLatitud(), e.getLongitud(), allRegions)))
-            .toList();
+        List<HeatAlertEvent> firmsEvents = firmsAttributionRouter.resolveForRegion(regionId, firms48hAgo);
 
         int firmsCountFiltered = firmsEvents.size();
         boolean hasTodayFirms = firmsEvents.stream().anyMatch(e -> isToday(e.getFechaEvento()));
@@ -163,8 +147,8 @@ public class TerritoryRiskServiceImpl implements TerritoryRiskService {
 
         double firmsNorm = 0.0;
         if (firmsCountFiltered > 0) {
-            double countNorm = normalize(firmsCountFiltered, 0, FIRMS_MAX_COUNT);
-            double frpNorm = normalize(firmsFrpMean, 0, FIRMS_MAX_FRP);
+            double countNorm = normalize(firmsCountFiltered, 0, FirmsScoringConstants.FIRMS_MAX_COUNT);
+            double frpNorm = normalize(firmsFrpMean, 0, FirmsScoringConstants.FIRMS_MAX_FRP);
             firmsNorm = countNorm * 0.6 + frpNorm * 0.4;
             availableComponents++;
         }
@@ -190,13 +174,14 @@ public class TerritoryRiskServiceImpl implements TerritoryRiskService {
         score = Math.min(1.0, Math.max(0.0, score));
 
         String qualityFlag = availableComponents >= 4 ? "OK" : availableComponents >= 2 ? "PARTIAL" : "MINIMAL";
-        String alertLevel = resolveAlertLevel(score, fwiRaw, firmsCountFiltered, firmsFrpMean, hasTodayFirms);
+        AlertResolution alert = resolveAlert(score, fwiRaw, firmsCountFiltered, firmsFrpMean, hasTodayFirms);
 
         TerritoryRiskSnapshot snapshot = new TerritoryRiskSnapshot();
         snapshot.setRegionId(regionId);
         snapshot.setComputedAt(now);
         snapshot.setScoreComposite(round4(score));
-        snapshot.setAlertLevel(alertLevel);
+        snapshot.setAlertLevel(alert.level());
+        snapshot.setAlertDriver(alert.driver());
         snapshot.setQualityFlag(qualityFlag);
         snapshot.setComponentFwi(round4(fwiNorm * W_FWI));
         snapshot.setComponentNdmi(round4(ndmiNorm * W_NDMI));
@@ -215,8 +200,8 @@ public class TerritoryRiskServiceImpl implements TerritoryRiskService {
         snapshotRepository.save(snapshot);
 
         LOGGER.info(
-            "risk_recompute regionId={} score={} alertLevel={} quality={} components={}",
-            regionId, score, alertLevel, qualityFlag, availableComponents
+            "risk_recompute regionId={} score={} alertLevel={} alertDriver={} quality={} components={}",
+            regionId, score, alert.level(), alert.driver(), qualityFlag, availableComponents
         );
 
         return snapshot;
@@ -227,24 +212,44 @@ public class TerritoryRiskServiceImpl implements TerritoryRiskService {
         return snapshotRepository.findTopByRegionIdOrderByComputedAtDesc(regionId).orElse(null);
     }
 
-    private String resolveAlertLevel(double score, Double fwiRaw, int firmsHighConfidenceCount, double firmsFrpMean, boolean hasTodayFirms) {
-        // CRITICO: fuego activo HOY (detectado en la fecha calendario actual, zona Santiago),
-        // FWI extremo, o score. Una deteccion de hoy es un incendio ocurriendo ahora mismo.
-        if (hasTodayFirms || (fwiRaw != null && fwiRaw >= FWI_CRITICO) || score >= SCORE_CRITICO) {
-            return "CRITICO";
+    private record AlertResolution(String level, String driver) {}
+
+    // Returns both the resolved alert level and the primary driver that triggered it.
+    // Conditions are evaluated in priority order; the first match wins and becomes
+    // the single named driver stored in the snapshot for PDF/audit reporting.
+    private AlertResolution resolveAlert(double score, Double fwiRaw, int firmsHighConfidenceCount, double firmsFrpMean, boolean hasTodayFirms) {
+        // CRITICO — priority 1: active fire today (most urgent signal; an ongoing event)
+        if (hasTodayFirms) {
+            return new AlertResolution("CRITICO", "FIRMS_HOY");
         }
-        // Detecciones solo "recientes" (no de hoy) escalan a CRITICO si se agrupan o son
-        // individualmente intensas; de lo contrario solo alimentan el score via firmsNorm.
-        if (firmsHighConfidenceCount >= FIRMS_COUNT_CRITICO || firmsFrpMean >= FIRMS_FRP_CRITICO) {
-            return "CRITICO";
+        // CRITICO — priority 2: FWI in extreme range (meteorological driver)
+        if (fwiRaw != null && fwiRaw >= FWI_CRITICO) {
+            return new AlertResolution("CRITICO", "FWI");
         }
-        if ((fwiRaw != null && fwiRaw >= FWI_ALTO) || score >= SCORE_ALTO) {
-            return "ALTO";
+        // CRITICO — priority 3: composite score threshold
+        if (score >= SCORE_CRITICO) {
+            return new AlertResolution("CRITICO", "SCORE_WLC");
         }
-        if ((fwiRaw != null && fwiRaw >= FWI_PREVENTIVO) || score >= SCORE_PREVENTIVO) {
-            return "PREVENTIVO";
+        // CRITICO — priority 4: recent FIRMS cluster (not today, but dense or intense enough)
+        if (firmsHighConfidenceCount >= FirmsScoringConstants.FIRMS_COUNT_CRITICO) {
+            return new AlertResolution("CRITICO", "FIRMS_COUNT");
         }
-        return "NORMAL";
+        if (firmsFrpMean >= FirmsScoringConstants.FIRMS_FRP_CRITICO) {
+            return new AlertResolution("CRITICO", "FIRMS_FRP");
+        }
+        if (fwiRaw != null && fwiRaw >= FWI_ALTO) {
+            return new AlertResolution("ALTO", "FWI");
+        }
+        if (score >= SCORE_ALTO) {
+            return new AlertResolution("ALTO", "SCORE_WLC");
+        }
+        if (fwiRaw != null && fwiRaw >= FWI_PREVENTIVO) {
+            return new AlertResolution("PREVENTIVO", "FWI");
+        }
+        if (score >= SCORE_PREVENTIVO) {
+            return new AlertResolution("PREVENTIVO", "SCORE_WLC");
+        }
+        return new AlertResolution("NORMAL", "SCORE_WLC");
     }
 
     private boolean isToday(LocalDateTime fechaEventoUtc) {
@@ -265,24 +270,5 @@ public class TerritoryRiskServiceImpl implements TerritoryRiskService {
 
     private double round4(double value) {
         return Math.round(value * 10000.0) / 10000.0;
-    }
-
-    private String findNearestRegionId(double lat, double lon, List<Region> regions) {
-        String nearest = null;
-        double minDist = Double.MAX_VALUE;
-        for (Region region : regions) {
-            List<Double> bbox = region.getAoiBbox();
-            if (bbox == null || bbox.size() != 4) {
-                continue;
-            }
-            double centerLat = (bbox.get(1) + bbox.get(3)) / 2;
-            double centerLon = (bbox.get(0) + bbox.get(2)) / 2;
-            double dist = Math.pow(lat - centerLat, 2) + Math.pow(lon - centerLon, 2);
-            if (dist < minDist) {
-                minDist = dist;
-                nearest = region.getId();
-            }
-        }
-        return nearest;
     }
 }

@@ -1,8 +1,10 @@
 package com.simfat.backend.service.impl;
 
+import com.simfat.backend.model.ComunaInfo;
 import com.simfat.backend.model.HeatAlertEvent;
 import com.simfat.backend.model.Region;
 import com.simfat.backend.model.RiskLevel;
+import com.simfat.backend.repository.ComunaInfoRepository;
 import com.simfat.backend.repository.HeatAlertEventRepository;
 import com.simfat.backend.repository.RegionRepository;
 import com.simfat.backend.service.NasaFirmsService;
@@ -19,6 +21,7 @@ import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.mongodb.core.geo.GeoJsonPoint;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
@@ -33,6 +36,7 @@ public class NasaFirmsServiceImpl implements NasaFirmsService {
 
     private final HeatAlertEventRepository heatAlertEventRepository;
     private final RegionRepository regionRepository;
+    private final ComunaInfoRepository comunaInfoRepository;
 
     @Value("${firms.api.map-key:}")
     private String mapKey;
@@ -51,10 +55,12 @@ public class NasaFirmsServiceImpl implements NasaFirmsService {
 
     public NasaFirmsServiceImpl(
         HeatAlertEventRepository heatAlertEventRepository,
-        RegionRepository regionRepository
+        RegionRepository regionRepository,
+        ComunaInfoRepository comunaInfoRepository
     ) {
         this.heatAlertEventRepository = heatAlertEventRepository;
         this.regionRepository = regionRepository;
+        this.comunaInfoRepository = comunaInfoRepository;
     }
 
     @Scheduled(cron = "${firms.sync.cron:0 0 */12 * * *}")
@@ -163,15 +169,28 @@ public class NasaFirmsServiceImpl implements NasaFirmsService {
             String acqTime = acqTimeIdx != null ? fields[acqTimeIdx].trim() : "0000";
             LocalDateTime fechaEvento = parseAcqDateTime(acqDate, acqTime);
 
-            if (heatAlertEventRepository.existsByRegionIdAndLatitudAndLongitudAndFechaEventoAndFuente(
-                regionId, lat, lon, fechaEvento, SOURCE)) {
+            // Decision 2: region-independent identity dedup. The same physical VIIRS
+            // pixel can fall inside two overlapping region bboxes (e.g. Biobio/Nuble),
+            // so the second leg to see it must short-circuit instead of re-inserting it
+            // under a different regionId.
+            if (heatAlertEventRepository.existsByLatitudAndLongitudAndFechaEventoAndFuente(
+                lat, lon, fechaEvento, SOURCE)) {
                 continue;
             }
 
             RiskLevel nivelRiesgo = "h".equals(confidence) ? RiskLevel.ALTO : RiskLevel.MEDIO;
 
+            // Decision 4: geometric comuna attribution at insert time — the single
+            // expression also reused by BackfillComunaIdRunner. Offshore / no-polygon
+            // match (or region not yet covered by geometry) resolves to null.
+            String comunaId = comunaInfoRepository
+                .findOneByGeometryIntersects(new GeoJsonPoint(lon, lat))
+                .map(ComunaInfo::getId)
+                .orElse(null);
+
             HeatAlertEvent event = new HeatAlertEvent();
             event.setRegionId(regionId);
+            event.setComunaId(comunaId);
             event.setLatitud(lat);
             event.setLongitud(lon);
             event.setNivelRiesgo(nivelRiesgo);

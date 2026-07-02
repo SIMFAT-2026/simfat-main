@@ -15,6 +15,7 @@ import jakarta.validation.Valid;
 import java.util.List;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -85,5 +86,12 @@ public class AccessAdminController {
     @GetMapping("/users/pending-review")
     public ResponseEntity<ApiResponse<List<PendingReviewUserDTO>>> getPendingReview() {
         return ResponseEntity.ok(ApiResponse.ok("Usuarios pendientes de revision obtenidos", accessAdminService.getPendingReview()));
+    }
+
+    @DeleteMapping("/users/{userId}")
+    @PreAuthorize("hasAuthority('ROLE_SUPER_ADMIN')")
+    public ResponseEntity<ApiResponse<Void>> deleteUser(@PathVariable String userId) {
+        accessAdminService.deleteUser(userId, SecurityUtils.currentUserIdOrThrow());
+        return ResponseEntity.ok(ApiResponse.ok("Usuario eliminado correctamente", null));
     }
 }

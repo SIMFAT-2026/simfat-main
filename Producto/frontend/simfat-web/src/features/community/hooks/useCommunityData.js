@@ -155,7 +155,7 @@ export function useCommunityData() {
   const isAdmin = Boolean(
     user?.roleCodes?.includes('ROLE_ADMIN') || user?.roleCodes?.includes('ROLE_SUPER_ADMIN')
   );
-  const accessibleRegions = isAdmin ? null : (user?.communityModuleAccess?.regionIds ?? undefined);
+  const accessibleRegions = isAdmin ? null : (user?.communityModuleAccess?.regionIds ?? []);
 
   function filterByAccess(items) {
     if (!accessibleRegions) return items;

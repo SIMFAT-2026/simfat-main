@@ -4,6 +4,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.simfat.backend.model.DashboardRegionSnapshot;
@@ -78,7 +80,7 @@ class DashboardSnapshotServiceImplTest {
             .thenReturn(List.of(ndviOld, ndviLatest));
         when(observationRepository.findByRegionIdAndIndicatorAndObservedAtBetweenOrderByObservedAtAsc(eq(regionId), eq(IndicatorType.NDMI), any(), any()))
             .thenReturn(List.of(ndmiOld, ndmiLatest));
-        when(heatAlertRepository.countByRegionIdAndFechaEventoBetween(eq(regionId), any(), any())).thenReturn(3L);
+        when(heatAlertRepository.countByRegionIdAndFuenteAndFechaEventoBetween(eq(regionId), eq("NASA_FIRMS"), any(), any())).thenReturn(3L);
         when(forestLossRepository.findByRegionId(regionId)).thenReturn(List.of(record));
         when(snapshotRepository.findByRegionId(regionId)).thenReturn(Optional.empty());
         when(snapshotRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
@@ -92,5 +94,6 @@ class DashboardSnapshotServiceImplTest {
         assertEquals(0.04, snapshot.getNdmiTrend30d());
         assertEquals("LOW", snapshot.getCriticality());
         assertNotNull(snapshot.getDataFreshnessSeconds());
+        verify(heatAlertRepository, never()).countByRegionIdAndFechaEventoBetween(any(), any(), any());
     }
 }

@@ -14,14 +14,25 @@ L.Icon.Default.mergeOptions({
 
 function FitMapBounds({ bounds }) {
   const map = useMap();
-
   useEffect(() => {
-    if (!Array.isArray(bounds) || bounds.length !== 2) {
-      return;
-    }
+    if (!Array.isArray(bounds) || bounds.length !== 2) return;
     map.fitBounds(bounds, { padding: [18, 18] });
   }, [bounds, map]);
+  return null;
+}
 
+function FlyToSelected({ alertId, alerts }) {
+  const map = useMap();
+  useEffect(() => {
+    if (!alertId) return;
+    const alert = alerts.find((a) => a.id === alertId);
+    if (!alert) return;
+    const lat = Number(alert.latitud);
+    const lon = Number(alert.longitud);
+    if (Number.isFinite(lat) && Number.isFinite(lon)) {
+      map.setView([lat, lon], 12);
+    }
+  }, [alertId, alerts, map]);
   return null;
 }
 
@@ -42,9 +53,7 @@ function toBounds(alerts, reports) {
     .map((item) => [normalizeCoordinate(item.latitud || item.latitude), normalizeCoordinate(item.longitud || item.longitude)])
     .filter((item) => item[0] !== null && item[1] !== null);
 
-  if (points.length === 0) {
-    return null;
-  }
+  if (points.length === 0) return null;
 
   let minLat = points[0][0];
   let maxLat = points[0][0];
@@ -58,42 +67,58 @@ function toBounds(alerts, reports) {
     maxLng = Math.max(maxLng, lng);
   });
 
-  return [
-    [minLat, minLng],
-    [maxLat, maxLng]
-  ];
+  return [[minLat, minLng], [maxLat, maxLng]];
 }
 
-function AlertsOperationalMap({ alerts, reports, center = [-37.9, -72.4], zoom = 7 }) {
-  const bounds = toBounds(alerts, reports);
-  const safeAlerts = alerts.filter((item) => Number.isFinite(Number(item.latitud)) && Number.isFinite(Number(item.longitud)));
-  const safeReports = reports.filter(
-    (item) => Number.isFinite(Number(item.latitude)) && Number.isFinite(Number(item.longitude))
-  );
+// Chile territory zones (mainland + Easter Island + Juan Fernández + Desventuradas)
+function withinChile(lat, lon) {
+  const mainland = lat >= -57 && lat <= -17 && lon >= -77 && lon <= -65;
+  const easterIsland = lat >= -28 && lat <= -26 && lon >= -110 && lon <= -108;
+  const juanFernandez = lat >= -35 && lat <= -31 && lon >= -81 && lon <= -77;
+  const desventuradas = lat >= -27 && lat <= -25 && lon >= -81 && lon <= -79;
+  return mainland || easterIsland || juanFernandez || desventuradas;
+}
+
+function AlertsOperationalMap({ alerts, reports, selectedAlertId, center = [-37.9, -72.4], zoom = 7 }) {
+  const safeAlerts = alerts.filter((item) => {
+    const lat = Number(item.latitud);
+    const lon = Number(item.longitud);
+    return Number.isFinite(lat) && Number.isFinite(lon) && withinChile(lat, lon);
+  });
+  const safeReports = reports.filter((item) => {
+    const lat = Number(item.latitude);
+    const lon = Number(item.longitude);
+    return Number.isFinite(lat) && Number.isFinite(lon) && withinChile(lat, lon);
+  });
+  const bounds = toBounds(safeAlerts, safeReports);
 
   return (
     <div className="alerts-map-wrapper">
       <MapContainer className="alerts-map" center={center} zoom={zoom} scrollWheelZoom>
         <TileLayer attribution="&copy; OpenStreetMap contributors" url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
         <FitMapBounds bounds={bounds} />
+        <FlyToSelected alertId={selectedAlertId} alerts={safeAlerts} />
 
-        {safeAlerts.map((alert) => (
-          <CircleMarker
-            key={`alert-${alert.id}`}
-            center={[Number(alert.latitud), Number(alert.longitud)]}
-            radius={8}
-            pathOptions={{
-              color: '#0f172a',
-              fillColor: riskColor(alert.nivelRiesgo),
-              fillOpacity: 0.88,
-              weight: 1
-            }}
-          >
-            <Popup>
-              <strong>{alert.nivelRiesgo}</strong> | {alert.descripcion || 'Alerta territorial'}
-            </Popup>
-          </CircleMarker>
-        ))}
+        {safeAlerts.map((alert) => {
+          const isSelected = alert.id === selectedAlertId;
+          return (
+            <CircleMarker
+              key={`alert-${alert.id}`}
+              center={[Number(alert.latitud), Number(alert.longitud)]}
+              radius={isSelected ? 13 : 8}
+              pathOptions={{
+                color: isSelected ? '#1e40af' : '#0f172a',
+                fillColor: isSelected ? '#3b82f6' : riskColor(alert.nivelRiesgo),
+                fillOpacity: isSelected ? 1 : 0.88,
+                weight: isSelected ? 3 : 1
+              }}
+            >
+              <Popup>
+                <strong>{alert.nivelRiesgo}</strong> | {alert.descripcion || 'Alerta territorial'}
+              </Popup>
+            </CircleMarker>
+          );
+        })}
 
         {safeReports.map((report) => (
           <CircleMarker

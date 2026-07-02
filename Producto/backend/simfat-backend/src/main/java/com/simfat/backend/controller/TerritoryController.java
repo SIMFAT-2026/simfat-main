@@ -4,10 +4,10 @@ import com.simfat.backend.dto.ApiResponse;
 import com.simfat.backend.dto.TerritoryBoundsResponseDTO;
 import com.simfat.backend.dto.TerritoryLayersResponseDTO;
 import com.simfat.backend.model.ComunaRiskSnapshot;
+import com.simfat.backend.model.HeatAlertEvent;
 import com.simfat.backend.service.ComunaRiskService;
 import com.simfat.backend.model.CitizenReport;
 import com.simfat.backend.model.ForestLossRecord;
-import com.simfat.backend.model.HeatAlertEvent;
 import com.simfat.backend.model.IndicatorType;
 import com.simfat.backend.model.OpenEoIndicatorObservation;
 import com.simfat.backend.model.TerritoryRiskSnapshot;
@@ -24,6 +24,7 @@ import com.simfat.backend.service.NasaFirmsService;
 import com.simfat.backend.service.OpenWeatherFwiService;
 import com.simfat.backend.service.TerritoryRiskService;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
@@ -265,13 +266,40 @@ public class TerritoryController {
         return featureCollection(features);
     }
 
-    // Exclude NASA_FIRMS events — those are already shown in the FIRMS layer.
-    // ALERTS shows non-satellite sources (CONAF, manual, temperature alerts, etc.).
-    // The $ne filter is applied server-side by findAlertsEvents to avoid transferring FIRMS records.
+    // ALERTS layer: one feature per comuna with at least one NASA FIRMS detection today
+    // (Santiago timezone). Semantically distinct from the choropleth (which shows WLC risk
+    // levels) — these dots mean "confirmed satellite fire detection in this commune today".
     private Map<String, Object> alertsLayer(String regionId, LocalDateTime from, LocalDateTime to) {
-        List<Map<String, Object>> features = heatAlertRepository.findAlertsEvents(regionId, from, to)
-            .stream()
-            .map(this::toAlertFeature)
+        List<ComunaInfo> comunas = comunaInfoRepository.findByRegionId(regionId);
+        if (comunas.isEmpty()) return featureCollection(List.of());
+
+        Map<String, ComunaInfo> comunaById = comunas.stream()
+            .collect(Collectors.toMap(ComunaInfo::getId, c -> c, (a, b) -> a));
+
+        LocalDateTime todaySantiago = LocalDate.now(ZoneId.of("America/Santiago")).atStartOfDay(ZoneId.of("America/Santiago"))
+            .withZoneSameInstant(java.time.ZoneOffset.UTC).toLocalDateTime();
+
+        List<String> comunaIds = comunas.stream().map(ComunaInfo::getId).toList();
+        List<HeatAlertEvent> todayFirms = heatAlertRepository.findByComunaIdInAndFechaEventoAfter(comunaIds, todaySantiago);
+
+        List<Map<String, Object>> features = todayFirms.stream()
+            .collect(Collectors.toMap(
+                HeatAlertEvent::getComunaId,
+                e -> e,
+                (a, b) -> a
+            ))
+            .entrySet().stream()
+            .map(e -> {
+                ComunaInfo info = comunaById.get(e.getKey());
+                Double lat = info != null ? info.getCenterLat() : null;
+                Double lng = info != null ? info.getCenterLon() : null;
+                String nombre = info != null && info.getNombre() != null ? info.getNombre() : e.getKey();
+                return pointFeature(e.getKey(), lng, lat, Map.of(
+                    "label", nombre,
+                    "indicator", "ALERTS",
+                    "type", "FIRMS_HOY"
+                ));
+            })
             .toList();
 
         return featureCollection(features);
@@ -285,14 +313,6 @@ public class TerritoryController {
             .toList();
 
         return featureCollection(features);
-    }
-
-    private Map<String, Object> toAlertFeature(HeatAlertEvent item) {
-        return pointFeature(item.getId(), item.getLongitud(), item.getLatitud(), Map.of(
-            "label", item.getDescripcion() == null || item.getDescripcion().isBlank() ? "Alerta de calor" : item.getDescripcion(),
-            "indicator", "ALERTS",
-            "level", item.getNivelRiesgo() == null ? "BAJO" : item.getNivelRiesgo().name()
-        ));
     }
 
     private Map<String, Object> toReportFeature(CitizenReport item) {

@@ -47,6 +47,11 @@ export async function getAccessUserById(userId) {
   return extractData(response.data);
 }
 
+export async function deleteUser(userId) {
+  const response = await axiosClient.delete(`${API_ENDPOINTS.adminAccessUsers}/${userId}`);
+  return extractData(response.data);
+}
+
 export async function updateCommunityModuleAccess(userId, payload) {
   try {
     const response = await axiosClient.put(
