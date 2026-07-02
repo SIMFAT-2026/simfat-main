@@ -122,12 +122,16 @@ textarea {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  margin-top: 4px;
 }
 
-.rules-form--editing {
+.rules-form-card {
+  margin-bottom: 16px;
+}
+
+.rules-form-card--editing {
   border-left: 3px solid #3b82f6;
-  padding-left: 16px;
-  margin-left: -19px;
+  padding-left: calc(var(--card-padding, 20px) - 3px);
 }
 
 .rules-edit-banner {
@@ -138,23 +142,16 @@ textarea {
   border: 1px solid #bfdbfe;
   border-radius: 6px;
   padding: 10px 14px;
-  margin-bottom: 4px;
+  margin-bottom: 8px;
 }
 
 .rules-edit-banner-label {
-  display: flex;
-  align-items: center;
-  gap: 8px;
   font-size: 0.9rem;
   color: #1e40af;
 }
 
-.rules-edit-banner-icon {
-  font-size: 1rem;
-}
-
 .rules-form-section-title {
-  margin: 14px 0 0;
+  margin: 14px 0 2px;
   font-size: 0.75rem;
   font-weight: 700;
   color: #64748b;
@@ -169,7 +166,7 @@ textarea {
 
 .rules-form-row-3col {
   grid-template-columns: repeat(3, 1fr);
-  margin: 0;
+  margin: 4px 0 0;
   align-items: start;
 }
 
@@ -179,20 +176,18 @@ textarea {
   align-items: start;
 }
 
-.threshold-hints {
-  margin-top: 4px;
-}
-
-.threshold-hints-desc {
-  color: #64748b;
-  display: block;
-  margin-bottom: 4px;
+.rule-field-label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
 }
 
 .threshold-hints-presets {
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
+  margin-top: 6px;
 }
 
 .btn-preset-active {
