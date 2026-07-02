@@ -165,10 +165,15 @@ function AccessControlPage() {
 
   async function saveRoles(userId) {
     const nextRoles = draftRolesByUser[userId] || [];
+    const isVerified = nextRoles.includes('ROLE_VERIFIED_USER');
     setSavingUserId(userId);
     feedback.clear();
     try {
       const updatedUser = await updateAccessUserRoles(userId, nextRoles);
+      await updateVerificationStatus(userId, {
+        newStatus: isVerified ? 'IDENTITY_VERIFIED' : 'UNVERIFIED',
+        notes: isVerified ? 'Verificado via panel de control de accesos' : 'Verificacion removida via panel de control de accesos'
+      });
       setUsers((prev) => prev.map((row) => (row.id === userId ? updatedUser : row)));
       feedback.showSuccess(`Roles actualizados para ${updatedUser.email}`);
     } catch (err) {
@@ -293,6 +298,18 @@ function AccessControlPage() {
     }
   }
 
+  const dedupedRegions = useMemo(() => {
+    const seen = new Set();
+    return regions
+      .filter((r) => r.nombre || r.name || r.id)
+      .filter((r) => {
+        const key = (r.nombre || r.name || r.id || '').toLowerCase().replace(/[^a-z]/g, '');
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+  }, [regions]);
+
   const VERIFICATION_STATUSES = [
     'EMAIL_VERIFIED',
     'PHONE_VERIFIED',
@@ -395,7 +412,7 @@ function AccessControlPage() {
                       onChange={(event) => updatePrimaryChatRegion(target.id, event.target.value)}
                     >
                       <option value="">Sin region asignada</option>
-                      {regions.map((region) => (
+                      {dedupedRegions.map((region) => (
                         <option key={region.id} value={region.id}>
                           {region.nombre || region.name || region.id}
                         </option>
@@ -409,7 +426,7 @@ function AccessControlPage() {
                   </p>
 
                   <div className="access-role-list">
-                    {regions.map((region) => (
+                    {dedupedRegions.map((region) => (
                       <label key={`${target.id}-chat-${region.id}`} className="access-role-item">
                         <input
                           type="checkbox"
@@ -439,7 +456,7 @@ function AccessControlPage() {
                     Los usuarios ROLE_ADMIN ven todas las regiones sin restriccion.
                   </p>
                   <div className="access-role-list">
-                    {regions.map((region) => (
+                    {dedupedRegions.map((region) => (
                       <label key={`${target.id}-module-${region.id}`} className="access-role-item">
                         <input
                           type="checkbox"
