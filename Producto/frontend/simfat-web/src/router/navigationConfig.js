@@ -7,7 +7,8 @@ export const primaryNavigationLinks = [
 
 export const adminNavigationLinks = [
   { label: 'Accesos', to: '/admin/access-control' },
-  { label: 'Reglas', to: '/admin/rules' }
+  { label: 'Reglas', to: '/admin/rules' },
+  { label: 'Perfil', to: '/account' }
   // /admin/regions oculto: lógica de pérdida forestal obsoleta.
   // Pendiente rediseño como panel de monitorización por región.
 ];
