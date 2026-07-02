@@ -174,13 +174,14 @@ public class TerritoryRiskServiceImpl implements TerritoryRiskService {
         score = Math.min(1.0, Math.max(0.0, score));
 
         String qualityFlag = availableComponents >= 4 ? "OK" : availableComponents >= 2 ? "PARTIAL" : "MINIMAL";
-        String alertLevel = resolveAlertLevel(score, fwiRaw, firmsCountFiltered, firmsFrpMean, hasTodayFirms);
+        AlertResolution alert = resolveAlert(score, fwiRaw, firmsCountFiltered, firmsFrpMean, hasTodayFirms);
 
         TerritoryRiskSnapshot snapshot = new TerritoryRiskSnapshot();
         snapshot.setRegionId(regionId);
         snapshot.setComputedAt(now);
         snapshot.setScoreComposite(round4(score));
-        snapshot.setAlertLevel(alertLevel);
+        snapshot.setAlertLevel(alert.level());
+        snapshot.setAlertDriver(alert.driver());
         snapshot.setQualityFlag(qualityFlag);
         snapshot.setComponentFwi(round4(fwiNorm * W_FWI));
         snapshot.setComponentNdmi(round4(ndmiNorm * W_NDMI));
@@ -199,8 +200,8 @@ public class TerritoryRiskServiceImpl implements TerritoryRiskService {
         snapshotRepository.save(snapshot);
 
         LOGGER.info(
-            "risk_recompute regionId={} score={} alertLevel={} quality={} components={}",
-            regionId, score, alertLevel, qualityFlag, availableComponents
+            "risk_recompute regionId={} score={} alertLevel={} alertDriver={} quality={} components={}",
+            regionId, score, alert.level(), alert.driver(), qualityFlag, availableComponents
         );
 
         return snapshot;
@@ -211,25 +212,44 @@ public class TerritoryRiskServiceImpl implements TerritoryRiskService {
         return snapshotRepository.findTopByRegionIdOrderByComputedAtDesc(regionId).orElse(null);
     }
 
-    private String resolveAlertLevel(double score, Double fwiRaw, int firmsHighConfidenceCount, double firmsFrpMean, boolean hasTodayFirms) {
-        // CRITICO: fuego activo HOY (detectado en la fecha calendario actual, zona Santiago),
-        // FWI extremo, o score. Una deteccion de hoy es un incendio ocurriendo ahora mismo.
-        if (hasTodayFirms || (fwiRaw != null && fwiRaw >= FWI_CRITICO) || score >= SCORE_CRITICO) {
-            return "CRITICO";
+    private record AlertResolution(String level, String driver) {}
+
+    // Returns both the resolved alert level and the primary driver that triggered it.
+    // Conditions are evaluated in priority order; the first match wins and becomes
+    // the single named driver stored in the snapshot for PDF/audit reporting.
+    private AlertResolution resolveAlert(double score, Double fwiRaw, int firmsHighConfidenceCount, double firmsFrpMean, boolean hasTodayFirms) {
+        // CRITICO — priority 1: active fire today (most urgent signal; an ongoing event)
+        if (hasTodayFirms) {
+            return new AlertResolution("CRITICO", "FIRMS_HOY");
         }
-        // Detecciones solo "recientes" (no de hoy) escalan a CRITICO si se agrupan o son
-        // individualmente intensas; de lo contrario solo alimentan el score via firmsNorm.
-        if (firmsHighConfidenceCount >= FirmsScoringConstants.FIRMS_COUNT_CRITICO
-            || firmsFrpMean >= FirmsScoringConstants.FIRMS_FRP_CRITICO) {
-            return "CRITICO";
+        // CRITICO — priority 2: FWI in extreme range (meteorological driver)
+        if (fwiRaw != null && fwiRaw >= FWI_CRITICO) {
+            return new AlertResolution("CRITICO", "FWI");
         }
-        if ((fwiRaw != null && fwiRaw >= FWI_ALTO) || score >= SCORE_ALTO) {
-            return "ALTO";
+        // CRITICO — priority 3: composite score threshold
+        if (score >= SCORE_CRITICO) {
+            return new AlertResolution("CRITICO", "SCORE_WLC");
         }
-        if ((fwiRaw != null && fwiRaw >= FWI_PREVENTIVO) || score >= SCORE_PREVENTIVO) {
-            return "PREVENTIVO";
+        // CRITICO — priority 4: recent FIRMS cluster (not today, but dense or intense enough)
+        if (firmsHighConfidenceCount >= FirmsScoringConstants.FIRMS_COUNT_CRITICO) {
+            return new AlertResolution("CRITICO", "FIRMS_COUNT");
         }
-        return "NORMAL";
+        if (firmsFrpMean >= FirmsScoringConstants.FIRMS_FRP_CRITICO) {
+            return new AlertResolution("CRITICO", "FIRMS_FRP");
+        }
+        if (fwiRaw != null && fwiRaw >= FWI_ALTO) {
+            return new AlertResolution("ALTO", "FWI");
+        }
+        if (score >= SCORE_ALTO) {
+            return new AlertResolution("ALTO", "SCORE_WLC");
+        }
+        if (fwiRaw != null && fwiRaw >= FWI_PREVENTIVO) {
+            return new AlertResolution("PREVENTIVO", "FWI");
+        }
+        if (score >= SCORE_PREVENTIVO) {
+            return new AlertResolution("PREVENTIVO", "SCORE_WLC");
+        }
+        return new AlertResolution("NORMAL", "SCORE_WLC");
     }
 
     private boolean isToday(LocalDateTime fechaEventoUtc) {

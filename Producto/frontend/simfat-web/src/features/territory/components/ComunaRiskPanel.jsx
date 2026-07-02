@@ -4,6 +4,7 @@ import { LineChart, Line, XAxis, YAxis, Tooltip as ChartTooltip, ResponsiveConta
 import { fetchComunaHistory, fetchComunalRiskScores, syncComunaCopernicus } from '../services/territoryApiService';
 import { ALERT_LEVEL_CONFIG } from '../constants/colorScales';
 import { generateComunalReport } from '../utils/reportPrint';
+import { REGIONES } from '../../../data/territorioChile';
 
 
 const COMPONENT_META = {
@@ -245,7 +246,9 @@ export default function ComunaRiskPanel({ comunaId, score, regionId, onClose, ca
     : null;
 
   function handleExportComunal() {
-    const regionLabel = displayScore.regionId || regionId || '';
+    const rawRegionId = displayScore.regionId || regionId || '';
+    const regionEntry = REGIONES.find(r => r.value === rawRegionId);
+    const regionLabel = regionEntry ? regionEntry.label : rawRegionId;
     generateComunalReport({ score: displayScore, comunaId, regionLabel, generatedAt: displayScore.computedAt });
   }
 

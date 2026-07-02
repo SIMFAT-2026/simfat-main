@@ -78,7 +78,8 @@ public class AccessAdminServiceImpl implements AccessAdminService {
     @Override
     @Transactional(readOnly = true)
     public List<AccessUserDTO> getUsers() {
-        List<AppUser> users = appUserRepository.findAllByOrderByCreatedAtDesc();
+        List<AppUser> users = appUserRepository.findAllByOrderByCreatedAtDesc().stream()
+            .filter(AppUser::isEnabled).toList();
         Map<String, Set<String>> assignedRoleCodesByUser = resolveAssignedRoleCodesByUser(users);
         Map<String, UserVerification> verificationByUser = userVerificationRepository.findAll().stream()
             .collect(Collectors.toMap(UserVerification::getUserId, item -> item));
@@ -255,6 +256,8 @@ public class AccessAdminServiceImpl implements AccessAdminService {
         event.setNotes(request.notes());
         verificationEventRepository.save(event);
 
+        syncVerifiedRole(targetUserId, newStatus, actorUserId);
+
         return toAccessUserDTO(
             user,
             resolveAssignedRoleCodesByUser(List.of(user)).getOrDefault(user.getId(), Set.of()),
@@ -262,6 +265,48 @@ public class AccessAdminServiceImpl implements AccessAdminService {
             userCommunityProfileRepository.findById(user.getId()).orElse(null),
             resolveAdditionalRegions(user.getId())
         );
+    }
+
+    private void syncVerifiedRole(String userId, VerificationStatus newStatus, String actorUserId) {
+        AppRole verifiedRole = appRoleRepository.findByCode("ROLE_VERIFIED_USER").orElse(null);
+        if (verifiedRole == null) return;
+
+        boolean shouldBeVerified = newStatus == VerificationStatus.IDENTITY_VERIFIED
+            || newStatus == VerificationStatus.FULLY_VERIFIED;
+
+        UserRoleAssignmentId assignmentId = new UserRoleAssignmentId(userId, verifiedRole.getId());
+        boolean alreadyAssigned = userRoleAssignmentRepository.existsById(assignmentId);
+
+        if (shouldBeVerified && !alreadyAssigned) {
+            UserRoleAssignment assignment = new UserRoleAssignment();
+            assignment.setId(assignmentId);
+            assignment.setAssignedBy(actorUserId);
+            assignment.setAssignedAt(Instant.now());
+            userRoleAssignmentRepository.save(assignment);
+        } else if (!shouldBeVerified && alreadyAssigned) {
+            userRoleAssignmentRepository.deleteById(assignmentId);
+        }
+    }
+
+    @Override
+    @Transactional
+    public void deleteUser(String targetUserId, String actorUserId) {
+        if (targetUserId.equals(actorUserId)) {
+            throw new BadRequestException("No puedes eliminar tu propia cuenta");
+        }
+        AppUser user = appUserRepository.findById(targetUserId)
+            .orElseThrow(() -> new ResourceNotFoundException("Usuario no encontrado"));
+
+        appRoleRepository.findByCode("ROLE_SUPER_ADMIN").ifPresent(superAdminRole -> {
+            boolean targetIsSuperAdmin = userRoleAssignmentRepository.findByIdUserId(targetUserId).stream()
+                .anyMatch(a -> superAdminRole.getId().equals(a.getId().getRoleId()));
+            if (targetIsSuperAdmin) {
+                throw new BadRequestException("No se puede eliminar a otro Super Admin");
+            }
+        });
+
+        user.setEnabled(false);
+        appUserRepository.save(user);
     }
 
     @Override

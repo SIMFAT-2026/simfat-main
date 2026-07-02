@@ -23,6 +23,9 @@ public class TerritoryRiskSnapshot {
 
     private Double scoreComposite;
     private String alertLevel;
+    // The primary condition that determined alertLevel (e.g. FIRMS_HOY, FIRMS_COUNT,
+    // FIRMS_FRP, FWI, SCORE_WLC). Null for snapshots computed before this field was added.
+    private String alertDriver;
     private String qualityFlag;
 
     private Double componentFwi;
@@ -54,6 +57,9 @@ public class TerritoryRiskSnapshot {
 
     public String getAlertLevel() { return alertLevel; }
     public void setAlertLevel(String alertLevel) { this.alertLevel = alertLevel; }
+
+    public String getAlertDriver() { return alertDriver; }
+    public void setAlertDriver(String alertDriver) { this.alertDriver = alertDriver; }
 
     public String getQualityFlag() { return qualityFlag; }
     public void setQualityFlag(String qualityFlag) { this.qualityFlag = qualityFlag; }
