@@ -25,4 +25,4 @@ echo "Conectado a: Supabase (PostgreSQL) + MongoDB Atlas"
 echo ""
 
 cd "$SCRIPT_DIR"
-./mvnw spring-boot:run
+mvn spring-boot:run

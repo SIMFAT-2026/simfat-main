@@ -42,6 +42,7 @@ function dateStr(isoString) {
     timeZone: 'America/Santiago',
     day: '2-digit', month: 'long', year: 'numeric',
     hour: '2-digit', minute: '2-digit',
+    hour12: false,
   });
 }
 
@@ -89,6 +90,7 @@ const SHARED_CSS = (alertColor, alertBg) => `
   .alert-badge { background: ${alertColor}; color: #fff; border-radius: 999px; padding: 1px 10px; font-size: 11px; font-weight: 700; }
   .alert-desc { font-size: 12px; color: #333; margin-top: 4px; }
   .alert-score { font-size: 11px; color: #555; margin-top: 6px; }
+  .alert-driver { font-size: 11px; color: #555; margin-top: 4px; font-style: italic; }
   table { width: 100%; border-collapse: collapse; margin-bottom: 4px; }
   thead th { background: #f0f0f0; padding: 6px 8px; text-align: left; font-size: 10px; text-transform: uppercase; letter-spacing: 0.04em; border-bottom: 1.5px solid #ccc; }
   tbody td { padding: 6px 8px; border-bottom: 1px solid #e8e8e8; font-size: 12px; vertical-align: middle; }
@@ -102,6 +104,28 @@ const SHARED_CSS = (alertColor, alertBg) => `
   .ref-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 4px; vertical-align: middle; }
   @media print { .print-bar { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
 `;
+
+// ─── Alert driver → human-readable escalation reason ─────────────────────────
+
+function buildDriverText(alertDriver, snapshotFirmsCount, snapshotFirmsFrpMean, snapshotFwiRaw) {
+  const count = snapshotFirmsCount != null ? snapshotFirmsCount : '—';
+  const frp   = snapshotFirmsFrpMean != null ? fmt(snapshotFirmsFrpMean, 1) : '—';
+  const fwi   = snapshotFwiRaw != null ? fmt(snapshotFwiRaw, 1) : '—';
+  switch (alertDriver) {
+    case 'FIRMS_HOY':
+      return 'Detección satelital activa el día de hoy en horario de Santiago (NASA FIRMS).';
+    case 'FIRMS_COUNT':
+      return `Focos de alta confianza en ventana de 48 h: ${count} — supera umbral operativo de 4.`;
+    case 'FIRMS_FRP':
+      return `Intensidad media de focos (FRP) en ventana de 48 h: ${frp} MW — supera umbral operativo de 60 MW.`;
+    case 'FWI':
+      return `Índice de Peligro de Incendio (FWI) meteorológico: ${fwi} — supera umbral del nivel.`;
+    case 'SCORE_WLC':
+      return 'Score WLC compuesto supera umbral del nivel.';
+    default:
+      return null;
+  }
+}
 
 // ─── Thresholds section (shared) ─────────────────────────────────────────────
 
@@ -133,7 +157,8 @@ const THRESHOLDS_HTML = `
   </tbody>
 </table>
 <p style="font-size:10px;color:#666;margin-top:6px;">
-  <strong>FIRMS</strong>: Focos activos detectados por satélite NASA en las últimas 24 h — a mayor número de focos de alta confianza, mayor riesgo inmediato.
+  <strong>FIRMS</strong>: Focos activos detectados por satélite NASA en las últimas 48 h — a mayor número de focos de alta confianza, mayor riesgo inmediato.
+  El nivel de alerta puede superar el rango del score WLC cuando se activan condiciones de override por FIRMS (≥ 4 focos o FRP medio ≥ 60 MW) o FWI extremo (≥ 45) — ver "Motivo de escalamiento" en Estado de Alerta.
   <strong>Reportes ciudadanos</strong>: observaciones verificadas de humo, focos o incendios activos que complementan los datos satelitales.
 </p>`;
 
@@ -141,14 +166,17 @@ const THRESHOLDS_HTML = `
 
 export function generateRegionalReport({
   regionLabel, generatedAt, alertLevel, score,
+  alertDriver, snapshotFirmsCount, snapshotFirmsFrpMean, snapshotFwiRaw,
   firms, alerts, reports,
   ndvi, ndmiVal, ndviLabel, ndmiLabel,
   wind, humidity, airTemp, soilTemp,
 }) {
   const cfg = ALERT_LEVEL_CONFIG[alertLevel] || ALERT_LEVEL_CONFIG.NORMAL;
   const desc = ALERT_DESCRIPTIONS[alertLevel] || ALERT_DESCRIPTIONS.NORMAL;
-  const date = dateStr(generatedAt);
+  const date = dateStr();
+  const dataDate = generatedAt ? dateStr(generatedAt) : null;
   const reportsTotal = (reports.HUMO || 0) + (reports.FOCO || 0) + (reports.INCENDIO || 0) + (reports.OTRO || 0);
+  const driverText = buildDriverText(alertDriver, snapshotFirmsCount, snapshotFirmsFrpMean, snapshotFwiRaw);
 
   const html = `<!DOCTYPE html>
 <html lang="es">
@@ -171,6 +199,7 @@ export function generateRegionalReport({
     <div class="header-right">
       <strong>${regionLabel}</strong>
       <em>Generado: ${date}</em>
+      ${dataDate ? `<em style="font-size:10px;color:#888;">Datos calculados al: ${dataDate}</em>` : ''}
     </div>
   </div>
 
@@ -179,6 +208,7 @@ export function generateRegionalReport({
     <div class="alert-level">Nivel <span class="alert-badge">${cfg.label.toUpperCase()}</span></div>
     <div class="alert-desc">${desc}</div>
     <div class="alert-score">Score de riesgo compuesto (WLC): <strong>${score != null ? `${score}/100` : '—'}</strong></div>
+    ${driverText ? `<div class="alert-driver">Motivo de escalamiento: ${driverText}</div>` : ''}
   </div>
 
   <h2>Detecciones y Alertas</h2>
@@ -236,7 +266,8 @@ export function generateComunalReport({ score, comunaId, regionLabel, generatedA
   const alertLevel = score.alertLevel || 'NORMAL';
   const cfg = ALERT_LEVEL_CONFIG[alertLevel] || ALERT_LEVEL_CONFIG.NORMAL;
   const desc = ALERT_DESCRIPTIONS[alertLevel] || ALERT_DESCRIPTIONS.NORMAL;
-  const date = dateStr(generatedAt || score.computedAt);
+  const date = dateStr();
+  const dataDate = dateStr(generatedAt || score.computedAt);
 
   const compositeScore = typeof score.scoreComposite === 'number'
     ? Math.round(score.scoreComposite * 100) : null;
@@ -306,6 +337,7 @@ export function generateComunalReport({ score, comunaId, regionLabel, generatedA
       <strong>${nombreComuna}</strong>
       <em>${regionLabel}</em>
       <em>Generado: ${date}</em>
+      <em style="font-size:10px;color:#888;">Datos calculados al: ${dataDate}</em>
     </div>
   </div>
 
@@ -317,6 +349,7 @@ export function generateComunalReport({ score, comunaId, regionLabel, generatedA
     </div>
     <div class="alert-desc">${desc}</div>
     <div class="alert-score">Score de riesgo compuesto (WLC): <strong>${compositeScore != null ? `${compositeScore}/100` : '—'}</strong></div>
+    ${mode === 'ENHANCED' ? `<div style="font-size:10px;color:#166534;margin-top:6px;">&#9432; Modo <strong>ENHANCED (Copernicus)</strong>: el score incluye índices de vegetación satelital (NDVI y NDMI) provistos por el programa Copernicus de la Unión Europea vía OpenEO. Estos indicadores aumentan la precisión del modelo al incorporar el estado real de la vegetación como factor de riesgo.</div>` : ''}
   </div>
 
   <h2>Desglose por componente WLC</h2>
