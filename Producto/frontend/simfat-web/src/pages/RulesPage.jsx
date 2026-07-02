@@ -205,6 +205,20 @@ function RulesPage() {
     feedback.clear();
   }
 
+  async function confirmDelete() {
+    if (!deleteId) return;
+
+    try {
+      await deleteRule(deleteId);
+      feedback.showSuccess('Regla eliminada correctamente.');
+      setDeleteId('');
+      await loadRules();
+    } catch (err) {
+      feedback.showError(err.message);
+      setDeleteId('');
+    }
+  }
+
   async function onSubmit(event) {
     event.preventDefault();
     feedback.clear();
