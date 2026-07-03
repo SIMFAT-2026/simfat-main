@@ -113,6 +113,11 @@ function CitizenReportsPage() {
   const [galleryReport, setGalleryReport] = useState(null);
   const [activePhotoIndex, setActivePhotoIndex] = useState(0);
 
+  const monitoredRegions = useMemo(
+    () => regions.filter((region) => getComunasByRegion(region.id).length > 0),
+    [regions]
+  );
+
   const regionMap = useMemo(
     () =>
       regions.reduce((acc, region) => {
@@ -329,7 +334,7 @@ function CitizenReportsPage() {
           Region
           <select name="regionId" value={filters.regionId} onChange={onFilterChange}>
             <option value="">Todas</option>
-            {regions.map((region) => (
+            {monitoredRegions.map((region) => (
               <option key={region.id} value={region.id}>
                 {region.nombre}
               </option>
@@ -375,7 +380,7 @@ function CitizenReportsPage() {
             Region
             <select name="regionId" value={form.regionId} onChange={onInputChange} required>
               <option value="">Seleccione region</option>
-              {regions.map((region) => (
+              {monitoredRegions.map((region) => (
                 <option key={region.id} value={region.id}>
                   {region.nombre}
                 </option>
