@@ -51,6 +51,7 @@ function normalizeRegions(rawRegions = []) {
 
   return [
     { id: 'biobio', nombre: 'Biobio' },
+    { id: 'nuble', nombre: 'Nuble' },
     { id: 'araucania', nombre: 'La Araucania' }
   ];
 }

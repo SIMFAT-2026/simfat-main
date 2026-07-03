@@ -54,9 +54,8 @@ export async function createCommunityResource(payload, file) {
     formData.append('payload', JSON.stringify(body));
     formData.append('file', file || payloadFile);
 
-    const response = await axiosClient.post(API_ENDPOINTS.communityResources, formData, {
-      headers: { 'Content-Type': 'multipart/form-data' }
-    });
+    // Do NOT set Content-Type manually — axios must auto-set it with the multipart boundary
+    const response = await axiosClient.post(API_ENDPOINTS.communityResources, formData);
     return extractData(response.data);
   }
 

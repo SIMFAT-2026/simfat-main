@@ -25,11 +25,8 @@ export async function createCitizenReport({ payload, files = [] }) {
   formData.append('payload', JSON.stringify(payload));
   optimizedFiles.forEach((file) => formData.append('files', file));
 
-  const response = await axiosClient.post(API_ENDPOINTS.citizenReports, formData, {
-    headers: {
-      'Content-Type': 'multipart/form-data'
-    }
-  });
+  // Do NOT set Content-Type manually — axios must auto-set it with the multipart boundary
+  const response = await axiosClient.post(API_ENDPOINTS.citizenReports, formData);
   return extractData(response.data);
 }
 
