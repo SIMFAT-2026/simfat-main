@@ -201,12 +201,12 @@ function KpiInfo({ label, info }: { label: string; info: string }) {
 
 // ─── FIRMS Panel ──────────────────────────────────────────────────────────────
 
-interface FirmsProperties { frp?: number; acqDate?: string; }
+interface FirmsProperties { frp?: number; acquiredAt?: string; }
 
 function FirmsPanel({ features }: { features: GeoFeature[] }) {
   const today = new Date().toISOString().slice(0, 10);
   const todayCount = features.filter((f) => {
-    const d = (f.properties as FirmsProperties)?.acqDate;
+    const d = (f.properties as FirmsProperties)?.acquiredAt;
     return typeof d === 'string' && d.slice(0, 10) === today;
   }).length;
   const highFrpCount = features.filter((f) => {
@@ -466,7 +466,7 @@ function buildReportData(
   const firms = {
     total: firmsFeatures.length,
     today: firmsFeatures.filter((f) => {
-      const d = (f.properties as { acqDate?: string })?.acqDate;
+      const d = (f.properties as { acquiredAt?: string })?.acquiredAt;
       return typeof d === 'string' && d.slice(0, 10) === today;
     }).length,
     highFrp: firmsFeatures.filter((f) => {

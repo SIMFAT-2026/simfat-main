@@ -29,6 +29,7 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -493,12 +494,34 @@ public class TerritoryController {
     // choropleth. Sorted by FRP descending so the most intense fires are kept.
     private static final int FIRMS_LAYER_MAX_FEATURES = 300;
 
-    // Filter, sort by FRP desc, and limit are all pushed to MongoDB via findTopFirmsEvents —
-    // only the top FIRMS_LAYER_MAX_FEATURES records are transferred over the network.
+    // Query by comunaId (geographic attribution) instead of the persisted regionId.
+    // Decision 2 made FIRMS dedup region-independent: a detection is stored under
+    // whichever region's cron leg ran first, so persisted regionId is not a reliable
+    // geographic filter. comunaId is set by geometric intersection and IS reliable.
+    // Falls back to the regionId query only when no comunas are seeded for the region.
     private Map<String, Object> firmsLayer(String regionId, LocalDateTime from, LocalDateTime to) {
-        List<Map<String, Object>> features = heatAlertRepository
-            .findTopFirmsEvents(regionId, from, to, PageRequest.of(0, FIRMS_LAYER_MAX_FEATURES))
+        List<String> comunaIds = comunaInfoRepository.findByRegionId(regionId)
             .stream()
+            .map(ComunaInfo::getId)
+            .toList();
+
+        List<HeatAlertEvent> events;
+        if (!comunaIds.isEmpty()) {
+            events = heatAlertRepository
+                .findByComunaIdInAndFechaEventoAfter(comunaIds, from)
+                .stream()
+                .filter(e -> !"l".equals(e.getFirmsConfidence()))
+                .filter(e -> e.getFechaEvento() != null && !e.getFechaEvento().isAfter(to))
+                .sorted(Comparator.comparing(HeatAlertEvent::getFechaEvento,
+                    Comparator.nullsLast(Comparator.reverseOrder())))
+                .limit(FIRMS_LAYER_MAX_FEATURES)
+                .toList();
+        } else {
+            events = heatAlertRepository
+                .findTopFirmsEvents(regionId, from, to, PageRequest.of(0, FIRMS_LAYER_MAX_FEATURES));
+        }
+
+        List<Map<String, Object>> features = events.stream()
             .map(e -> {
                 Map<String, Object> props = new LinkedHashMap<>();
                 props.put("label", "Foco activo VIIRS");
