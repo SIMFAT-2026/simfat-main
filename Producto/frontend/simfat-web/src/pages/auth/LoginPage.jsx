@@ -80,7 +80,7 @@ function LoginPage() {
   return (
     <AuthCard
       title="Iniciar sesion"
-      subtitle="Accede al panel operativo de SIMFAT"
+      subtitle="Accede al panel operativo de NoFires"
       footer={
         <>
           <Link to="/register">Crear cuenta</Link>

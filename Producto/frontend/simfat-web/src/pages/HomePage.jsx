@@ -5,7 +5,7 @@ import { homeQuickLinks } from '../router/navigationConfig';
 function HomePage() {
   return (
     <section className="page-container">
-      <SectionTitle title="SIMFAT" subtitle="Plataforma territorial para prevencion y alerta temprana de incendios" />
+      <SectionTitle title="NoFires" subtitle="Plataforma territorial para prevencion y alerta temprana de incendios" />
 
       <p>
         Esta iteracion prioriza la monitorizacion territorial, coordinacion comunitaria, reportes ciudadanos y alertas

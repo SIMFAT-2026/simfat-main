@@ -182,19 +182,19 @@ export function generateRegionalReport({
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Informe Regional SIMFAT — ${regionLabel} — ${date}</title>
+  <title>Informe Regional NoFires — ${regionLabel} — ${date}</title>
   <style>${SHARED_CSS(cfg.color, cfg.bg)}</style>
 </head>
 <body>
   <div class="print-bar">
-    <span>SIMFAT · Informe Regional · ${regionLabel}</span>
+    <span>NoFires · Informe Regional · ${regionLabel}</span>
     <button class="print-btn" onclick="window.print()">Imprimir / Guardar PDF</button>
   </div>
 
   <div class="header">
     <div class="header-left">
       <h1>Informe Regional de Monitorización de Riesgo de Incendio</h1>
-      <p>Sistema de Monitorización Forestal y Ambiental Territorial (SIMFAT) · AIFBN</p>
+      <p>Sistema de Monitorización Forestal y Ambiental Territorial (NoFires) · AIFBN</p>
     </div>
     <div class="header-right">
       <strong>${regionLabel}</strong>
@@ -249,8 +249,8 @@ export function generateRegionalReport({
   ${THRESHOLDS_HTML}
 
   <div class="footer">
-    <p><strong>Fuentes de datos:</strong> NASA FIRMS (detecciones térmicas satelitales) · Copernicus CDSE / OpenEO (NDVI, NDMI) · Open-Meteo (variables climáticas) · SIMFAT reportes ciudadanos verificados.</p>
-    <p>Este informe fue generado automáticamente por el Sistema SIMFAT y no reemplaza la evaluación técnica de un profesional en terreno. Para más información contacte a AIFBN.</p>
+    <p><strong>Fuentes de datos:</strong> NASA FIRMS (detecciones térmicas satelitales) · Copernicus CDSE / OpenEO (NDVI, NDMI) · Open-Meteo (variables climáticas) · NoFires reportes ciudadanos verificados.</p>
+    <p>Este informe fue generado automáticamente por el Sistema NoFires y no reemplaza la evaluación técnica de un profesional en terreno. Para más información contacte a AIFBN.</p>
   </div>
 </body>
 </html>`;
@@ -316,7 +316,7 @@ export function generateComunalReport({ score, comunaId, regionLabel, generatedA
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Informe Comunal SIMFAT — ${nombreComuna} — ${date}</title>
+  <title>Informe Comunal NoFires — ${nombreComuna} — ${date}</title>
   <style>
     ${SHARED_CSS(cfg.color, cfg.bg)}
     .mode-badge { display: inline-block; background: #f0fdf4; border: 1px solid #86efac; color: #166534; border-radius: 4px; padding: 1px 8px; font-size: 10px; font-weight: 700; margin-left: 6px; }
@@ -324,14 +324,14 @@ export function generateComunalReport({ score, comunaId, regionLabel, generatedA
 </head>
 <body>
   <div class="print-bar">
-    <span>SIMFAT · Informe Comunal · ${nombreComuna}, ${regionLabel}</span>
+    <span>NoFires · Informe Comunal · ${nombreComuna}, ${regionLabel}</span>
     <button class="print-btn" onclick="window.print()">Imprimir / Guardar PDF</button>
   </div>
 
   <div class="header">
     <div class="header-left">
       <h1>Informe Comunal de Monitorización de Riesgo de Incendio</h1>
-      <p>Sistema de Monitorización Forestal y Ambiental Territorial (SIMFAT) · AIFBN</p>
+      <p>Sistema de Monitorización Forestal y Ambiental Territorial (NoFires) · AIFBN</p>
     </div>
     <div class="header-right">
       <strong>${nombreComuna}</strong>
@@ -373,7 +373,7 @@ export function generateComunalReport({ score, comunaId, regionLabel, generatedA
   ${THRESHOLDS_HTML}
 
   <div class="footer">
-    <p><strong>Fuentes de datos:</strong> NASA FIRMS (detecciones térmicas) · Copernicus CDSE / OpenEO (NDVI, NDMI) · Open-Meteo (FWI) · SIMFAT reportes ciudadanos verificados.</p>
+    <p><strong>Fuentes de datos:</strong> NASA FIRMS (detecciones térmicas) · Copernicus CDSE / OpenEO (NDVI, NDMI) · Open-Meteo (FWI) · NoFires reportes ciudadanos verificados.</p>
     <p>Las variables climáticas (viento, humedad, temperatura) están disponibles en el informe regional. Este informe no reemplaza la evaluación técnica de un profesional en terreno. Para más información contacte a AIFBN.</p>
   </div>
 </body>

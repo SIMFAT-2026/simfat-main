@@ -145,7 +145,7 @@ function RegionsPage() {
 
   return (
     <section className="page-container">
-      <SectionTitle title="Regiones" subtitle="Gestion de regiones del sistema SIMFAT" />
+      <SectionTitle title="Regiones" subtitle="Gestion de regiones del sistema NoFires" />
 
       {feedback.message ? <p className={`feedback feedback-${feedback.type}`}>{feedback.message}</p> : null}
 

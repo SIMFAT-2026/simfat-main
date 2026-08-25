@@ -1,4 +1,4 @@
-// Regiones y comunas cubiertas por SIMFAT (Biobío, Ñuble, Araucanía).
+// Regiones y comunas cubiertas por NoFires (Biobío, Ñuble, Araucanía).
 // comunaId coincide con el gadmGid usado en el choropleth.
 
 function fmt(nombre) {

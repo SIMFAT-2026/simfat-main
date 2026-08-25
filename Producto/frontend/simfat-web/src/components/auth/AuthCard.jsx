@@ -12,7 +12,7 @@ function AuthCard({ title, subtitle, children, footer }) {
         {footer ? <footer className="auth-footer">{footer}</footer> : null}
       </section>
       <p className="auth-brand-note">
-        SIMFAT | Sistema Integrado de Monitoreo y Alerta Temprana Forestal
+        NoFires | Monitoreo y Alerta Temprana Forestal
       </p>
       <Link to="/" className="auth-back-link">
         Volver al inicio

@@ -83,7 +83,7 @@ function RegisterPage() {
   return (
     <AuthCard
       title="Crear cuenta"
-      subtitle="Registro minimo para entorno de desarrollo SIMFAT"
+      subtitle="Registro minimo para entorno de desarrollo NoFires"
       footer={
         <>
           <Link to="/login">Ya tengo cuenta</Link>

@@ -15,8 +15,11 @@ function Navbar() {
   return (
     <header className="navbar">
       <div className="navbar-brand">
-        <h1>SIMFAT</h1>
-        <span>Sistema Integrado de Monitoreo y Alerta Temprana Forestal</span>
+        <img src="/logo-aifbn.png" alt="AIFBN" className="navbar-aifbn-logo" />
+        <div className="navbar-brand-text">
+          <h1>NoFires</h1>
+          <span>Monitoreo y Alerta Temprana Forestal</span>
+        </div>
       </div>
 
       <div className="navbar-actions">

@@ -25,7 +25,7 @@ const MOCK_BOARD = [
     priority: 'ALTA',
     regionId: 'biobio',
     publishedAt: '2026-04-20T10:30:00Z',
-    author: 'Unidad territorial SIMFAT'
+    author: 'Unidad territorial NoFires'
   },
   {
     id: 'board-2',
