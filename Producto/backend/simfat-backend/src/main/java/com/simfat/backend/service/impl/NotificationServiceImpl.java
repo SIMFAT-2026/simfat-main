@@ -9,11 +9,11 @@ import com.simfat.backend.model.AppUser;
 import com.simfat.backend.model.CitizenReport;
 import com.simfat.backend.model.ComunaRiskSnapshot;
 import com.simfat.backend.model.Notification;
-import com.simfat.backend.repository.AlertRuleRepository;
 import com.simfat.backend.repository.AppUserRepository;
 import com.simfat.backend.repository.NotificationRepository;
 import com.simfat.backend.security.AuthorizationResolverService;
 import com.simfat.backend.service.AlertRuleEvaluationService;
+import com.simfat.backend.service.AlertRuleService;
 import com.simfat.backend.service.NotificationService;
 import java.util.List;
 import java.util.Map;
@@ -39,20 +39,20 @@ public class NotificationServiceImpl implements NotificationService {
 
     private final NotificationRepository notificationRepository;
     private final AppUserRepository appUserRepository;
-    private final AlertRuleRepository alertRuleRepository;
+    private final AlertRuleService alertRuleService;
     private final AuthorizationResolverService authorizationResolverService;
     private final AlertRuleEvaluationService alertRuleEvaluationService;
 
     public NotificationServiceImpl(
         NotificationRepository notificationRepository,
         AppUserRepository appUserRepository,
-        AlertRuleRepository alertRuleRepository,
+        AlertRuleService alertRuleService,
         AuthorizationResolverService authorizationResolverService,
         AlertRuleEvaluationService alertRuleEvaluationService
     ) {
         this.notificationRepository = notificationRepository;
         this.appUserRepository = appUserRepository;
-        this.alertRuleRepository = alertRuleRepository;
+        this.alertRuleService = alertRuleService;
         this.authorizationResolverService = authorizationResolverService;
         this.alertRuleEvaluationService = alertRuleEvaluationService;
     }
@@ -99,15 +99,22 @@ public class NotificationServiceImpl implements NotificationService {
             return;
         }
 
-        // Verificar que existe una AlertRule activa cuyo umbral fue superado por el snapshot
-        List<AlertRule> rules = alertRuleRepository.findByRegionIdAndActivaTrue(snapshot.getRegionId());
+        // Verificar que existe una AlertRule activa cuyo umbral fue superado por el snapshot.
+        // getActiveRulesForRegion trata regionId==null como regla global (aplica a todas las regiones).
+        List<AlertRule> rules = alertRuleService.getActiveRulesForRegion(snapshot.getRegionId());
         boolean anyRuleExceeded = rules.stream().anyMatch(rule -> alertRuleEvaluationService.isThresholdExceeded(snapshot, rule));
         if (!anyRuleExceeded) {
             return;
         }
 
-        // Usuarios cuya comuna principal es la afectada
+        // Usuarios cuya comuna principal es la afectada.
+        // Fallback a admins globales si nadie tiene esa comuna asignada (evita notificaciones perdidas).
         List<AppUser> targets = appUserRepository.findByComunaCode(snapshot.getComunaId());
+        if (targets.isEmpty()) {
+            targets = appUserRepository.findAll().stream()
+                .filter(authorizationResolverService::hasGlobalAdminCapability)
+                .toList();
+        }
         if (targets.isEmpty()) {
             return;
         }

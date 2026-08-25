@@ -242,7 +242,7 @@ export default function ComunaRiskPanel({ comunaId, score, regionId, onClose, ca
   const meta = COMPONENT_META[mode] || COMPONENT_META.STANDARD;
 
   const computedAt = displayScore.computedAt
-    ? (() => { const u = /Z|[+-]\d{2}:?\d{2}$/.test(displayScore.computedAt) ? displayScore.computedAt : displayScore.computedAt + 'Z'; return new Date(u).toLocaleString('es-CL', { timeZone: 'America/Santiago', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }); })()
+    ? (() => { const u = /Z|[+-]\d{2}:?\d{2}$/.test(displayScore.computedAt) ? displayScore.computedAt : displayScore.computedAt + 'Z'; return new Date(u).toLocaleString('es-CL', { timeZone: 'America/Santiago', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }); })()
     : null;
 
   function handleExportComunal() {

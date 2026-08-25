@@ -15,14 +15,22 @@ if [ ! -f "$ENV_FILE" ]; then
   exit 1
 fi
 
-set -a
-# shellcheck source=/dev/null
-source "$ENV_FILE"
-set +a
+while IFS= read -r line || [[ -n "$line" ]]; do
+  line="${line%$'\r'}"
+  [[ "$line" =~ ^[[:space:]]*# ]] && continue
+  [[ -z "${line// }" ]] && continue
+  [[ "$line" == *=* ]] || continue
+  key="${line%%=*}"
+  value="${line#*=}"
+  # Strip surrounding quotes (both single and double)
+  if [[ "$value" == '"'*'"' ]] || [[ "$value" == "'"*"'" ]]; then
+    value="${value:1:${#value}-2}"
+  fi
+  export "$key=$value"
+done < "$ENV_FILE"
 
 echo "Backend arrancando en http://localhost:8080"
 echo "Conectado a: Supabase (PostgreSQL) + MongoDB Atlas"
 echo ""
 
-cd "$SCRIPT_DIR"
-mvn spring-boot:run
+JAVA_TOOL_OPTIONS="-Duser.timezone=UTC" mvn spring-boot:run -f "$SCRIPT_DIR/pom.xml"

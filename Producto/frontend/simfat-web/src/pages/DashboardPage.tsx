@@ -203,11 +203,18 @@ function KpiInfo({ label, info }: { label: string; info: string }) {
 
 interface FirmsProperties { frp?: number; acquiredAt?: string; }
 
+function toSantiagoDateKey(str: string): string | null {
+  const utc = /Z|[+-]\d{2}:?\d{2}$/.test(str) ? str : str + 'Z';
+  const date = new Date(utc);
+  if (Number.isNaN(date.getTime())) return null;
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Santiago' }).format(date);
+}
+
 function FirmsPanel({ features }: { features: GeoFeature[] }) {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Santiago' }).format(new Date());
   const todayCount = features.filter((f) => {
     const d = (f.properties as FirmsProperties)?.acquiredAt;
-    return typeof d === 'string' && d.slice(0, 10) === today;
+    return typeof d === 'string' && toSantiagoDateKey(d) === today;
   }).length;
   const highFrpCount = features.filter((f) => {
     const frp = (f.properties as FirmsProperties)?.frp;
@@ -223,15 +230,15 @@ function FirmsPanel({ features }: { features: GeoFeature[] }) {
     },
     {
       lbl: 'DETECCIONES (7 DÍAS)',
-      val: features.length,
+      val: features.length - todayCount,
       color: undefined as string | undefined,
-      info: 'Total de focos térmicos de alta confianza detectados por satélite NASA (VIIRS) en los últimos 7 días.\nNo representan incendios activos en este momento — incluyen eventos ya extinguidos.\nFuente: NASA FIRMS NRT.',
+      info: 'Focos térmicos de alta confianza detectados por satélite NASA (VIIRS) en los últimos 7 días, sin incluir los de hoy.\nNo representan incendios activos en este momento — incluyen eventos ya extinguidos.\nFuente: NASA FIRMS NRT.',
     },
     {
       lbl: 'FRP > 50 MW',
       val: highFrpCount,
       color: (highFrpCount > 0 ? '#b45309' : undefined) as string | undefined,
-      info: 'Focos con Potencia Radiativa de Fuego (FRP) superior a 50 MW — indica incendios de alta intensidad energética.\nUmbral operativo SIMFAT: FRP promedio ≥ 60 MW en ventana de 48 h activa nivel CRÍTICO.',
+      info: 'Focos con Potencia Radiativa de Fuego (FRP) superior a 50 MW — indica incendios de alta intensidad energética.\nUmbral operativo NoFires: FRP promedio ≥ 60 MW en ventana de 48 h activa nivel CRÍTICO.',
     },
   ];
 
@@ -318,7 +325,7 @@ function CitizenReportsPanel({ features }: { features: GeoFeature[] }) {
     <div style={panel}>
       <h3 style={panelTitle}>
         Reportes ciudadanos
-        <KpiInfo label="reportes ciudadanos" info={'Reportes verificados enviados por ciudadanos a través de la plataforma SIMFAT.\nComplementan los datos satelitales con observación directa en terreno.\nCategorías: HUMO · FOCO · INCENDIO · OTRO'} />
+        <KpiInfo label="reportes ciudadanos" info={'Reportes verificados enviados por ciudadanos a través de la plataforma NoFires.\nComplementan los datos satelitales con observación directa en terreno.\nCategorías: HUMO · FOCO · INCENDIO · OTRO'} />
       </h3>
       <ResponsiveContainer width="100%" height={90}>
         <BarChart data={data} barSize={28} margin={{ top: 4, right: 4, left: -24, bottom: 0 }}>
@@ -461,13 +468,13 @@ function buildReportData(
   const snapshotFirmsFrpMean = rs?.firmsFrpMean ?? null;
   const snapshotFwiRaw = rs?.fwiRaw ?? null;
 
-  const today = new Date().toISOString().slice(0, 10);
+  const todaySantiago = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Santiago' }).format(new Date());
   const firmsFeatures = regionFilteredFirms ?? layers?.FIRMS?.features ?? [];
   const firms = {
     total: firmsFeatures.length,
     today: firmsFeatures.filter((f) => {
       const d = (f.properties as { acquiredAt?: string })?.acquiredAt;
-      return typeof d === 'string' && d.slice(0, 10) === today;
+      return typeof d === 'string' && toSantiagoDateKey(d) === todaySantiago;
     }).length,
     highFrp: firmsFeatures.filter((f) => {
       const frp = (f.properties as { frp?: number })?.frp;
