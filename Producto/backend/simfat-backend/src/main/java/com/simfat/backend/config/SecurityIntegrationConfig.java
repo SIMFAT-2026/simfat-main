@@ -56,6 +56,10 @@ public class SecurityIntegrationConfig {
                 .requestMatchers(HttpMethod.GET, "/api/auth/me").authenticated()
                 .requestMatchers(HttpMethod.POST, "/api/auth/logout").authenticated()
                 .requestMatchers("/api/account/**").authenticated()
+                // Ya es permitAll via el catch-all de abajo; declarado aparte para que la
+                // ruta publica del demo de portafolio (/monitoreo) no se rompa si alguien
+                // restringe anyRequest() mas adelante.
+                .requestMatchers(HttpMethod.GET, "/api/territory/public/**").permitAll()
                 .anyRequest().permitAll()
             )
             .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)

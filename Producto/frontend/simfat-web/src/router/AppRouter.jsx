@@ -7,6 +7,7 @@ const MainLayout = lazy(() => import('../layouts/MainLayout'));
 const HomePage = lazy(() => import('../pages/HomePage'));
 const DashboardPage = lazy(() => import('../pages/DashboardPage'));
 const TerritoryPage = lazy(() => import('../pages/TerritoryPage'));
+const PublicMonitoringPage = lazy(() => import('../pages/PublicMonitoringPage'));
 const CommunityPage = lazy(() => import('../pages/CommunityPage'));
 const CitizenReportsPage = lazy(() => import('../pages/CitizenReportsPage'));
 const RegionsPage = lazy(() => import('../pages/RegionsPage'));
@@ -47,6 +48,10 @@ function AppRouter() {
         path="/reset-password"
         element={<PublicOnlyRoute>{withSuspense(<ResetPasswordPage />)}</PublicOnlyRoute>}
       />
+
+      {/* Publica, sin login (spec: Fase 1B portafolio) — visible con o sin sesion,
+          por eso va fuera tanto de ProtectedRoute como de PublicOnlyRoute. */}
+      <Route path="/monitoreo" element={withSuspense(<PublicMonitoringPage />)} />
 
       <Route
         element={<ProtectedRoute>{withSuspense(<MainLayout />)}</ProtectedRoute>}

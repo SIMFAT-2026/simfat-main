@@ -1,5 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { fetchTerritoryBounds, fetchTerritoryGeoJson, fetchTerritoryLayers, fetchTerritoryRiskScore, fetchComunalRiskScores } from '../services/territoryApiService';
+import {
+  fetchTerritoryBounds,
+  fetchTerritoryGeoJson,
+  fetchTerritoryLayers,
+  fetchTerritoryRiskScore,
+  fetchComunalRiskScores,
+  fetchPublicTerritoryBounds,
+  fetchPublicTerritoryLayers
+} from '../services/territoryApiService';
 
 const CACHE_TTL_MS = 120_000;
 const pendingKeys = new Set();
@@ -214,14 +222,17 @@ function createMockRegionData(regionId, from, to) {
   };
 }
 
-function cacheKey(regionId, from, to) {
-  return `${regionId}|${from}|${to}`;
+// publicMode is part of the key so the anonymized REPORTS payload from
+// /monitoreo never leaks into (or gets overwritten by) the authenticated
+// /territorio cache entry for the same region/date-range.
+function cacheKey(regionId, from, to, publicMode) {
+  return `${regionId}|${from}|${to}|${publicMode ? 'public' : 'auth'}`;
 }
 
-function readCacheSnapshot(dateRange) {
+function readCacheSnapshot(dateRange, publicMode) {
   const snapshot = {};
   for (const region of REGION_OPTIONS) {
-    const key = cacheKey(region.id, dateRange.from, dateRange.to);
+    const key = cacheKey(region.id, dateRange.from, dateRange.to, publicMode);
     const entry = cacheByKey.get(key);
     if (entry && Date.now() < entry.expiresAt) {
       snapshot[region.id] = entry.data;
@@ -232,11 +243,16 @@ function readCacheSnapshot(dateRange) {
 
 // Phase 1: fetch metadata + critical indicators (RISK_SCORE, ALERTS, FIRMS) in parallel.
 // Returns enough data to render the choropleth and active fire/alert markers.
-async function loadRegionPhase1(regionId, from, to) {
+// publicMode routes bounds/layers through the anonymous /public endpoints (spec:
+// portafolio /monitoreo); riskScore/geojson/comunalScores are already safe aggregate
+// data with no PII, so they're reused as-is regardless of mode.
+async function loadRegionPhase1(regionId, from, to, publicMode) {
   const regionFallback = REGION_CONFIG[regionId] || REGION_CONFIG.biobio;
+  const boundsFetcher = publicMode ? fetchPublicTerritoryBounds : fetchTerritoryBounds;
+  const layersFetcher = publicMode ? fetchPublicTerritoryLayers : fetchTerritoryLayers;
   const [boundsData, layerData, riskScoreData, comunalGeoJson, comunalScores] = await Promise.all([
-    fetchTerritoryBounds(regionId, regionFallback),
-    fetchTerritoryLayers({ regionId, indicators: CRITICAL_INDICATORS, from, to }),
+    boundsFetcher(regionId, regionFallback),
+    layersFetcher({ regionId, indicators: CRITICAL_INDICATORS, from, to }),
     fetchTerritoryRiskScore(regionId).catch(() => null),
     fetchTerritoryGeoJson(regionId).catch(() => null),
     fetchComunalRiskScores(regionId).catch(() => null)
@@ -269,6 +285,7 @@ function defaultDateRange() {
 }
 
 export function useTerritoryLayers(options = {}) {
+  const publicMode = Boolean(options.publicMode);
   const initialRegionId = REGION_IDS.has(options.initialRegionId) ? options.initialRegionId : 'biobio';
   const initialVisibleIndicators = Array.isArray(options.initialVisibleIndicators) && options.initialVisibleIndicators.length > 0
     ? options.initialVisibleIndicators.filter((indicator) => DEFAULT_INDICATORS.includes(indicator))
@@ -277,13 +294,13 @@ export function useTerritoryLayers(options = {}) {
   const [selectedRegionId, setSelectedRegionId] = useState(initialRegionId);
   const [visibleIndicators, setVisibleIndicators] = useState(initialVisibleIndicators);
   const [dateRange] = useState(defaultDateRange);
-  const [dataByRegion, setDataByRegion] = useState(() => readCacheSnapshot(dateRange));
+  const [dataByRegion, setDataByRegion] = useState(() => readCacheSnapshot(dateRange, publicMode));
   const [loadingRegions, setLoadingRegions] = useState(() => new Set());
   const [errorByRegion, setErrorByRegion] = useState({});
 
   const loadRegion = useCallback(
     async (regionId, force = false) => {
-      const key = cacheKey(regionId, dateRange.from, dateRange.to);
+      const key = cacheKey(regionId, dateRange.from, dateRange.to, publicMode);
       const cached = cacheByKey.get(key);
 
       if (!force && cached && Date.now() < cached.expiresAt) {
@@ -304,7 +321,7 @@ export function useTerritoryLayers(options = {}) {
         // Phase 1: critical indicators — user sees the map and can interact
         let phase1Data;
         try {
-          phase1Data = await loadRegionPhase1(regionId, dateRange.from, dateRange.to);
+          phase1Data = await loadRegionPhase1(regionId, dateRange.from, dateRange.to, publicMode);
         } catch {
           const mockData = createMockRegionData(regionId, dateRange.from, dateRange.to);
           cacheByKey.set(key, { data: mockData, expiresAt: Date.now() + 8_000 });
@@ -317,7 +334,8 @@ export function useTerritoryLayers(options = {}) {
 
         // Phase 2: secondary indicators merged silently while user explores phase-1 data
         try {
-          const secondaryData = await fetchTerritoryLayers({
+          const secondaryLayersFetcher = publicMode ? fetchPublicTerritoryLayers : fetchTerritoryLayers;
+          const secondaryData = await secondaryLayersFetcher({
             regionId,
             indicators: SECONDARY_INDICATORS,
             from: dateRange.from,
@@ -356,7 +374,7 @@ export function useTerritoryLayers(options = {}) {
         pendingKeys.delete(key);
       }
     },
-    [dateRange.from, dateRange.to]
+    [dateRange.from, dateRange.to, publicMode]
   );
 
   useEffect(() => {

@@ -922,7 +922,8 @@ function TerritoryMapPanel({
   loading,
   refreshing,
   error,
-  onRetry
+  onRetry,
+  readOnly = false
 }) {
   const comunalGeoJson = regionData?.comunalGeoJson || null;
   const comunalScores = regionData?.comunalScores || null;
@@ -1054,10 +1055,14 @@ function TerritoryMapPanel({
           >
             {refreshing ? 'Actualizando...' : 'Actualizar capas'}
           </button>
-          <WeatherSyncButton regionId={selectedRegionId} />
-          <small style={{ color: '#94a3b8', fontSize: '0.68rem', marginTop: 2 }}>
-            ⓘ La sincronización puede tardar aprox. 2–3 min
-          </small>
+          {!readOnly && (
+            <>
+              <WeatherSyncButton regionId={selectedRegionId} />
+              <small style={{ color: '#94a3b8', fontSize: '0.68rem', marginTop: 2 }}>
+                ⓘ La sincronización puede tardar aprox. 2–3 min
+              </small>
+            </>
+          )}
         </div>
 
         {visibleIndicators.includes('WIND') && windHourlyTimestamps.length > 0 && (
@@ -1201,6 +1206,7 @@ function TerritoryMapPanel({
               onClose={() => setSelectedComuna(null)}
               onScoreUpdated={handleScoreUpdated}
               canSync={false}
+              readOnly={readOnly}
             />
           ) : (
             <div className="territory-legend">

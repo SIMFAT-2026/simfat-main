@@ -119,12 +119,38 @@ public class TerritoryController {
         return ResponseEntity.ok(ApiResponse.ok("Bounds territoriales obtenidos correctamente", dto));
     }
 
+    // Publico/anonimo: mismos bounds agregados que /bounds, sin PII involucrada.
+    @GetMapping("/public/bounds")
+    public ResponseEntity<ApiResponse<TerritoryBoundsResponseDTO>> getPublicBounds(@RequestParam String regionId) {
+        return getBounds(regionId);
+    }
+
     @GetMapping("/layers")
     public ResponseEntity<ApiResponse<TerritoryLayersResponseDTO>> getLayers(
         @RequestParam String regionId,
         @RequestParam(required = false) String indicators,
         @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
         @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to
+    ) {
+        return buildLayersResponse(regionId, indicators, from, to, false);
+    }
+
+    // Publico/anonimo: sin login, para el demo de portafolio en /monitoreo. Reusa exactamente
+    // la misma logica de capas que /layers, salvo REPORTS (ver reportsLayerPublic) — nunca debe
+    // llamar a reportsLayer()/toReportFeature(), que exponen id Mongo, coordenadas exactas y
+    // texto libre usados por el equipo de terreno en la vista autenticada.
+    @GetMapping("/public/layers")
+    public ResponseEntity<ApiResponse<TerritoryLayersResponseDTO>> getPublicLayers(
+        @RequestParam String regionId,
+        @RequestParam(required = false) String indicators,
+        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to
+    ) {
+        return buildLayersResponse(regionId, indicators, from, to, true);
+    }
+
+    private ResponseEntity<ApiResponse<TerritoryLayersResponseDTO>> buildLayersResponse(
+        String regionId, String indicators, LocalDate from, LocalDate to, boolean anonymizeReports
     ) {
         LocalDateTime fromDate = from != null ? from.atStartOfDay() : LocalDate.now().minusDays(7).atStartOfDay();
         LocalDateTime toDate = to != null ? to.atTime(23, 59, 59) : LocalDate.now().atTime(23, 59, 59);
@@ -149,7 +175,9 @@ public class TerritoryController {
             layers.put("FIRMS", firmsLayer(regionId, fromDate, toDate));
         }
         if (requestedIndicators.contains("REPORTS")) {
-            layers.put("REPORTS", reportsLayer(regionId, fromDate, toDate));
+            layers.put("REPORTS", anonymizeReports
+                ? reportsLayerPublic(regionId, fromDate, toDate)
+                : reportsLayer(regionId, fromDate, toDate));
         }
         if (requestedIndicators.contains("RISK_SCORE")) {
             layers.put("RISK_SCORE", riskScoreLayer(regionId, geometry));
@@ -319,6 +347,31 @@ public class TerritoryController {
     private Map<String, Object> toReportFeature(CitizenReport item) {
         return pointFeature(item.getId(), item.getLongitude(), item.getLatitude(), Map.of(
             "label", item.getDescription() == null || item.getDescription().isBlank() ? "Reporte ciudadano" : item.getDescription(),
+            "indicator", "REPORTS",
+            "category", item.getCategory() == null ? "OTRO" : item.getCategory()
+        ));
+    }
+
+    // Solo para /public/layers. A diferencia de reportsLayer()/toReportFeature() (usados por
+    // el equipo de terreno vía la vista autenticada), esto NUNCA expone el id de Mongo, las
+    // coordenadas exactas ni el texto libre de la descripcion a un visitante anonimo.
+    private Map<String, Object> reportsLayerPublic(String regionId, LocalDateTime from, LocalDateTime to) {
+        List<CitizenReport> reports = citizenReportRepository.findByRegionIdAndCreatedAtBetween(regionId, from, to);
+
+        List<Map<String, Object>> features = new ArrayList<>();
+        for (int i = 0; i < reports.size(); i++) {
+            features.add(toPublicReportFeature(reports.get(i), i));
+        }
+
+        return featureCollection(features);
+    }
+
+    private Map<String, Object> toPublicReportFeature(CitizenReport item, int index) {
+        Double lat = item.getLatitude() == null ? null : Math.round(item.getLatitude() * 100.0) / 100.0;
+        Double lng = item.getLongitude() == null ? null : Math.round(item.getLongitude() * 100.0) / 100.0;
+
+        return pointFeature("public-report-" + index, lng, lat, Map.of(
+            "label", "Reporte ciudadano",
             "indicator", "REPORTS",
             "category", item.getCategory() == null ? "OTRO" : item.getCategory()
         ));

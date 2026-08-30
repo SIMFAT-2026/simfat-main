@@ -1,0 +1,33 @@
+.public-monitoring-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 14px;
+  border-bottom: 1px solid #d6dbe2;
+  background: #ffffff;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.public-monitoring-logo {
+  height: 32px;
+  width: auto;
+  object-fit: contain;
+}
+
+.public-monitoring-brand-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.public-monitoring-brand-text h1 {
+  margin: 0;
+  font-size: 1rem;
+  color: #0f172a;
+}
+
+.public-monitoring-brand-text span {
+  font-size: 0.68rem;
+  color: #5b6472;
+}

@@ -10,6 +10,13 @@ const TERRITORY_ENDPOINTS = {
   copernicusSync: (comunaId) => `/api/territory/risk-score/comunas/${comunaId}/copernicus-sync`
 };
 
+// Sin login (spec: /monitoreo del portafolio) — mismo shape de respuesta que
+// /bounds y /layers, salvo REPORTS (anonimizado en el backend).
+const PUBLIC_TERRITORY_ENDPOINTS = {
+  layers: '/api/territory/public/layers',
+  bounds: '/api/territory/public/bounds'
+};
+
 function isFeatureCollection(value) {
   return Boolean(value) && typeof value === 'object' && value.type === 'FeatureCollection';
 }
@@ -138,6 +145,26 @@ export async function fetchTerritoryLayers({ regionId, indicators, from, to }) {
 
 export async function fetchTerritoryBounds(regionId, fallback) {
   const response = await axiosClient.get(TERRITORY_ENDPOINTS.bounds, {
+    params: { regionId }
+  });
+  return normalizeBoundsPayload(response.data, fallback);
+}
+
+export async function fetchPublicTerritoryLayers({ regionId, indicators, from, to }) {
+  const response = await axiosClient.get(PUBLIC_TERRITORY_ENDPOINTS.layers, {
+    params: {
+      regionId,
+      indicators: indicators.join(','),
+      from,
+      to
+    }
+  });
+
+  return normalizeLayerPayload(response.data, regionId);
+}
+
+export async function fetchPublicTerritoryBounds(regionId, fallback) {
+  const response = await axiosClient.get(PUBLIC_TERRITORY_ENDPOINTS.bounds, {
     params: { regionId }
   });
   return normalizeBoundsPayload(response.data, fallback);
