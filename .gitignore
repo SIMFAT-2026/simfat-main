@@ -16,3 +16,9 @@ Producto/frontend/simfat-web/*.log
 
 # Agent local registry
 .atl/
+
+# Local env files with real secrets (never commit these)
+.env
+.env.local
+.env.*.local
+.vercel/
