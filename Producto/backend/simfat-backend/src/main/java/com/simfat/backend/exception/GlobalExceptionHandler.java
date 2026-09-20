@@ -12,8 +12,14 @@ import org.springframework.validation.FieldError;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.authorization.AuthorizationDeniedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 
 @RestControllerAdvice
@@ -152,6 +158,75 @@ public class GlobalExceptionHandler {
             request.getRequestURI()
         );
         return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).body(apiError);
+    }
+
+    // Client errors, not server faults: logged at DEBUG only. Only the parameter NAME (server-defined) is
+    // echoed; the raw, attacker-controlled value never is.
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ResponseEntity<ApiError> handleMissingParameter(
+        MissingServletRequestParameterException ex,
+        HttpServletRequest request
+    ) {
+        LOGGER.debug("missing_request_parameter path={} parameter={}", request.getRequestURI(), ex.getParameterName());
+        return badRequest("Falta el parametro requerido: " + ex.getParameterName(), request);
+    }
+
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ApiError> handleParameterTypeMismatch(
+        MethodArgumentTypeMismatchException ex,
+        HttpServletRequest request
+    ) {
+        LOGGER.debug("invalid_request_parameter path={} parameter={}", request.getRequestURI(), ex.getName());
+        return badRequest("El parametro '" + ex.getName() + "' tiene un valor invalido", request);
+    }
+
+    private static ResponseEntity<ApiError> badRequest(String message, HttpServletRequest request) {
+        ApiError apiError = ApiError.of(
+            HttpStatus.BAD_REQUEST.value(),
+            HttpStatus.BAD_REQUEST.getReasonPhrase(),
+            message,
+            request.getRequestURI()
+        );
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(apiError);
+    }
+
+    private static ResponseEntity<ApiError> clientError(HttpStatus status, String message, HttpServletRequest request) {
+        ApiError apiError = ApiError.of(status.value(), status.getReasonPhrase(), message, request.getRequestURI());
+        return ResponseEntity.status(status).body(apiError);
+    }
+
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<ApiError> handleMaxUploadSize(MaxUploadSizeExceededException ex, HttpServletRequest request) {
+        LOGGER.debug("upload_too_large path={}", request.getRequestURI());
+        return clientError(HttpStatus.PAYLOAD_TOO_LARGE, "El archivo o la solicitud supera el tamano maximo permitido", request);
+    }
+
+    // Only the part NAME (server-defined) is echoed, never user input.
+    @ExceptionHandler(MissingServletRequestPartException.class)
+    public ResponseEntity<ApiError> handleMissingPart(MissingServletRequestPartException ex, HttpServletRequest request) {
+        LOGGER.debug("missing_request_part path={} part={}", request.getRequestURI(), ex.getRequestPartName());
+        return clientError(HttpStatus.BAD_REQUEST, "Falta la parte requerida: " + ex.getRequestPartName(), request);
+    }
+
+    @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
+    public ResponseEntity<ApiError> handleUnsupportedMediaType(
+        HttpMediaTypeNotSupportedException ex,
+        HttpServletRequest request
+    ) {
+        LOGGER.debug("unsupported_media_type path={}", request.getRequestURI());
+        return clientError(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "Tipo de contenido no soportado", request);
+    }
+
+    // A missing static file (e.g. /uploads/... or /geojson/...) is a plain 404, not an unhandled error.
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<ApiError> handleNoResource(NoResourceFoundException ex, HttpServletRequest request) {
+        ApiError apiError = ApiError.of(
+            HttpStatus.NOT_FOUND.value(),
+            HttpStatus.NOT_FOUND.getReasonPhrase(),
+            "Recurso no encontrado",
+            request.getRequestURI()
+        );
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(apiError);
     }
 
     @ExceptionHandler(Exception.class)

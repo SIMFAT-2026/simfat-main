@@ -67,6 +67,8 @@ class SecurityDefaultDenyContractTest {
         "POST /api/auth/refresh",
         "POST /api/auth/dev/seed-users",
         "POST /api/indicators/measurements",
+        "GET /api/alerts/public",
+        "GET /api/citizen-reports/public",
         "GET /api/territory/public",
         "GET /api/territory/public/**",
         "GET /api/territory/risk-score/**",
@@ -151,6 +153,8 @@ class SecurityDefaultDenyContractTest {
     @Test
     void allowlistedGetPathsAreNotRejectedBySecurity() throws Exception {
         for (String path : List.of(
+            "/api/alerts/public?regionId=biobio",
+            "/api/citizen-reports/public",
             "/api/territory/public/layers?regionId=biobio",
             "/api/territory/public/bounds",
             "/api/territory/risk-score/biobio",
@@ -230,12 +234,21 @@ class SecurityDefaultDenyContractTest {
 
     @Test
     void publicSegmentOnOtherResourcesIsNotAllowlisted() throws Exception {
-        // Only /api/territory/public is public today; other resources must opt in explicitly.
-        assertThat(PublicEndpointPaths.isPublic("GET", "/api/alerts/public")).isFalse();
-        assertThat(PublicEndpointPaths.isPublic("GET", "/api/citizen-reports/public")).isFalse();
+        // Public routes are opt-in per resource; a "public" segment elsewhere grants nothing.
         assertThat(PublicEndpointPaths.isPublic("GET", "/api/community/public/x")).isFalse();
-        assertThat(statusOf(request(HttpMethod.GET, "/api/alerts/public"))).isEqualTo(401);
-        assertThat(statusOf(request(HttpMethod.GET, "/api/citizen-reports/public"))).isEqualTo(401);
+    }
+
+    @Test
+    void publicAlertsAndReportsAllowlistIsExact() throws Exception {
+        // Only the exact GET paths are public: no sub-paths, no write methods.
+        assertThat(PublicEndpointPaths.isPublic("GET", "/api/alerts/public/x")).isFalse();
+        assertThat(PublicEndpointPaths.isPublic("GET", "/api/citizen-reports/public/x")).isFalse();
+        assertThat(PublicEndpointPaths.isPublic("POST", "/api/alerts/public")).isFalse();
+        assertThat(PublicEndpointPaths.isPublic("POST", "/api/citizen-reports/public")).isFalse();
+        assertThat(statusOf(request(HttpMethod.GET, "/api/alerts/public/x"))).isEqualTo(401);
+        assertThat(statusOf(request(HttpMethod.GET, "/api/citizen-reports/public/x"))).isEqualTo(401);
+        assertThat(statusOf(request(HttpMethod.POST, "/api/alerts/public"))).isEqualTo(401);
+        assertThat(statusOf(request(HttpMethod.POST, "/api/citizen-reports/public"))).isEqualTo(401);
     }
 
     @Test
