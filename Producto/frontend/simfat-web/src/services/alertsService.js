@@ -1,4 +1,5 @@
 import axiosClient from '../api/axiosClient';
+import publicAxiosClient from '../api/publicAxiosClient';
 import { API_ENDPOINTS } from '../api/endpoints';
 import { extractData } from '../api/responseAdapter';
 
@@ -91,4 +92,20 @@ export async function getAlertsMap(filters = {}) {
       return byLevel && byDate;
     });
   }
+}
+
+// Anonymous, minimized alerts (no id/source/description, rounded coordinates).
+// regionId is required by the backend; from/to are ISO YYYY-MM-DD (default window
+// 30 days, max span 90 days, at most 1000 newest-first rows). Tokenless client on
+// purpose: a public page must never attach a token nor trigger a session refresh.
+export async function getPublicAlerts({ regionId, from, to } = {}) {
+  const response = await publicAxiosClient.get(API_ENDPOINTS.alertsPublic, {
+    params: {
+      regionId,
+      from: from || undefined,
+      to: to || undefined
+    }
+  });
+  const data = extractData(response.data);
+  return Array.isArray(data) ? data : [];
 }

@@ -4,9 +4,7 @@ export const primaryNavigationLinks = [
   { label: 'Territorio', to: '/territorio', requiresAuth: false },
   { label: 'Comunidad', to: '/comunidad', requiresAuth: true },
   { label: 'Reportes', to: '/reportes', requiresAuth: true },
-  // TODO(S3b): flip to false once AlertsPage has its anonymous read-only view.
-  // Until then /alertas would call authenticated endpoints, so it stays locked.
-  { label: 'Alertas', to: '/alertas', requiresAuth: true }
+  { label: 'Alertas', to: '/alertas', requiresAuth: false }
 ];
 
 export const adminNavigationLinks = [
