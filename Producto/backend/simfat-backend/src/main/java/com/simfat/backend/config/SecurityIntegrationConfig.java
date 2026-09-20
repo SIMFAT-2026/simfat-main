@@ -1,14 +1,15 @@
 package com.simfat.backend.config;
 
 import com.simfat.backend.security.AuthProperties;
+import jakarta.servlet.DispatcherType;
 import com.simfat.backend.security.JwtAuthenticationFilter;
 import com.simfat.backend.security.PrivilegedActionAuditFilter;
+import com.simfat.backend.security.PublicEndpointPaths;
 import com.simfat.backend.security.RestAccessDeniedHandler;
 import com.simfat.backend.security.RestAuthenticationEntryPoint;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Bean;
-import org.springframework.http.HttpMethod;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -44,24 +45,20 @@ public class SecurityIntegrationConfig {
                 .authenticationEntryPoint(authenticationEntryPoint)
                 .accessDeniedHandler(accessDeniedHandler)
             )
-            .authorizeHttpRequests(auth -> auth
-                .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
-                .requestMatchers(HttpMethod.POST, "/api/auth/register").permitAll()
-                .requestMatchers(HttpMethod.POST, "/api/auth/login").permitAll()
-                .requestMatchers(HttpMethod.POST, "/api/auth/forgot-password").permitAll()
-                .requestMatchers(HttpMethod.POST, "/api/auth/reset-password").permitAll()
-                .requestMatchers(HttpMethod.POST, "/api/auth/refresh").permitAll()
-                .requestMatchers(HttpMethod.POST, "/api/auth/dev/seed-users").permitAll()
-                .requestMatchers(HttpMethod.GET, "/api/auth/me").authenticated()
-                .requestMatchers(HttpMethod.POST, "/api/auth/logout").authenticated()
-                .requestMatchers("/api/account/**").authenticated()
-                // Ya es permitAll via el catch-all de abajo; declarado aparte para que la
-                // ruta publica del demo de portafolio (/monitoreo) no se rompa si alguien
-                // restringe anyRequest() mas adelante.
-                .requestMatchers(HttpMethod.GET, "/api/territory/public/**").permitAll()
-                .anyRequest().permitAll()
-            )
+            .authorizeHttpRequests(auth -> {
+                // Default deny: only PublicEndpointPaths is reachable anonymously.
+                for (PublicEndpointPaths.Rule rule : PublicEndpointPaths.RULES) {
+                    if (rule.method() == null) {
+                        auth.requestMatchers(rule.pattern()).permitAll();
+                    } else {
+                        auth.requestMatchers(rule.method(), rule.pattern()).permitAll();
+                    }
+                }
+                // The container ERROR dispatch runs anonymously (stateless, JWT filter skipped on error
+                // dispatches); without this, a failure on a protected path would be masked as 401.
+                auth.dispatcherTypeMatchers(DispatcherType.ERROR).permitAll();
+                auth.anyRequest().authenticated();
+            })
             .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
             .addFilterAfter(privilegedActionAuditFilter, JwtAuthenticationFilter.class);
 
