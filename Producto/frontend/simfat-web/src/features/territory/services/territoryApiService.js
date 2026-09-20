@@ -10,7 +10,7 @@ const TERRITORY_ENDPOINTS = {
   copernicusSync: (comunaId) => `/api/territory/risk-score/comunas/${comunaId}/copernicus-sync`
 };
 
-// Sin login (spec: /monitoreo del portafolio) — mismo shape de respuesta que
+// Sin login (modo publico de /territorio) — mismo shape de respuesta que
 // /bounds y /layers, salvo REPORTS (anonimizado en el backend).
 const PUBLIC_TERRITORY_ENDPOINTS = {
   layers: '/api/territory/public/layers',

@@ -1,11 +1,15 @@
 import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../auth/AuthContext';
-import { primaryNavigationLinks } from '../../router/navigationConfig';
+import {
+  LOCKED_NAV_TITLE,
+  isNavItemLocked,
+  primaryNavigationLinks
+} from '../../router/navigationConfig';
 import NotificationBell from './NotificationBell';
 
 function Navbar() {
   const navigate = useNavigate();
-  const { user, logout } = useAuth();
+  const { user, logout, isAuthenticated, isBootstrapping } = useAuth();
 
   async function handleLogout() {
     await logout();
@@ -23,27 +27,59 @@ function Navbar() {
       </div>
 
       <div className="navbar-actions">
+        {/* While the session bootstraps, render a plain non-landmark
+            placeholder (no empty nav landmark, no locked/authenticated flash). */}
+        {isBootstrapping ? (
+          <div className="navbar-nav" aria-hidden="true" />
+        ) : (
         <nav className="navbar-nav" aria-label="Navegacion principal">
-          {primaryNavigationLinks.map((link) => (
-            <NavLink
-              key={link.to}
-              to={link.to}
-              className={({ isActive }) => (isActive ? 'nav-link nav-link-active' : 'nav-link')}
-            >
-              {link.label}
-            </NavLink>
-          ))}
+          {primaryNavigationLinks.map((link) =>
+            isNavItemLocked(link, isAuthenticated) ? (
+              <Link
+                key={link.to}
+                to="/login"
+                state={{ from: { pathname: link.to } }}
+                className="nav-link nav-link-locked"
+              >
+                <span className="nav-link-lock" aria-hidden="true">
+                  {'\u{1F512}'}
+                </span>{' '}
+                {link.label}
+                <span className="sr-only"> ({LOCKED_NAV_TITLE.toLowerCase()})</span>
+              </Link>
+            ) : (
+              <NavLink
+                key={link.to}
+                to={link.to}
+                className={({ isActive }) => (isActive ? 'nav-link nav-link-active' : 'nav-link')}
+              >
+                {link.label}
+              </NavLink>
+            )
+          )}
         </nav>
+        )}
 
-        <div className="navbar-user">
-          <NotificationBell />
-          <Link to="/account" className="navbar-user-name navbar-account-link">
-            {user?.name || user?.fullName || 'Usuario'}
-          </Link>
-          <button type="button" className="btn btn-secondary navbar-logout-btn" onClick={handleLogout}>
-            Cerrar sesion
-          </button>
-        </div>
+        {isBootstrapping ? (
+          <div className="navbar-user navbar-user-placeholder" aria-hidden="true" />
+        ) : isAuthenticated ? (
+          <div className="navbar-user">
+            <NotificationBell />
+            <Link to="/account" className="navbar-user-name navbar-account-link">
+              {user?.name || user?.fullName || 'Usuario'}
+            </Link>
+            <button type="button" className="btn btn-secondary navbar-logout-btn" onClick={handleLogout}>
+              Cerrar sesion
+            </button>
+          </div>
+        ) : (
+          <div className="navbar-user">
+            <span className="navbar-guest-badge">Invitado</span>
+            <Link to="/login" className="btn btn-secondary navbar-login-btn">
+              Ingresar
+            </Link>
+          </div>
+        )}
       </div>
     </header>
   );

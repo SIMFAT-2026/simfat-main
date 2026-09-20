@@ -1,5 +1,5 @@
 import { lazy, Suspense } from 'react';
-import { Navigate, Route, Routes } from 'react-router-dom';
+import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import ProtectedRoute from '../auth/ProtectedRoute';
 import PublicOnlyRoute from '../auth/PublicOnlyRoute';
 
@@ -7,7 +7,6 @@ const MainLayout = lazy(() => import('../layouts/MainLayout'));
 const HomePage = lazy(() => import('../pages/HomePage'));
 const DashboardPage = lazy(() => import('../pages/DashboardPage'));
 const TerritoryPage = lazy(() => import('../pages/TerritoryPage'));
-const PublicMonitoringPage = lazy(() => import('../pages/PublicMonitoringPage'));
 const CommunityPage = lazy(() => import('../pages/CommunityPage'));
 const CitizenReportsPage = lazy(() => import('../pages/CitizenReportsPage'));
 const RegionsPage = lazy(() => import('../pages/RegionsPage'));
@@ -27,6 +26,17 @@ function RouteLoader() {
 
 function withSuspense(element) {
   return <Suspense fallback={<RouteLoader />}>{element}</Suspense>;
+}
+
+// Leaf-level guard: redirects anonymous users to /login keeping state.from.
+function guarded(element) {
+  return <ProtectedRoute>{withSuspense(element)}</ProtectedRoute>;
+}
+
+// Keeps the query string (e.g. ?regionId=nuble) so shared links still work.
+function LegacyMonitoringRedirect() {
+  const location = useLocation();
+  return <Navigate to={`/territorio${location.search}${location.hash}`} replace />;
 }
 
 function AppRouter() {
@@ -49,28 +59,29 @@ function AppRouter() {
         element={<PublicOnlyRoute>{withSuspense(<ResetPasswordPage />)}</PublicOnlyRoute>}
       />
 
-      {/* Publica, sin login (spec: Fase 1B portafolio) — visible con o sin sesion,
-          por eso va fuera tanto de ProtectedRoute como de PublicOnlyRoute. */}
-      <Route path="/monitoreo" element={withSuspense(<PublicMonitoringPage />)} />
+      {/* Legacy public route: the public view now lives at /territorio. */}
+      <Route path="/monitoreo" element={<LegacyMonitoringRedirect />} />
 
-      <Route
-        element={<ProtectedRoute>{withSuspense(<MainLayout />)}</ProtectedRoute>}
-      >
+      {/* One unguarded shell: anonymous visitors get the same layout. Guards
+          live on the leaf routes that need a session. */}
+      <Route element={withSuspense(<MainLayout />)}>
         <Route path="/" element={<Navigate to="/territorio" replace />} />
-        <Route path="/home" element={withSuspense(<HomePage />)} />
+        <Route path="/home" element={guarded(<HomePage />)} />
 
+        {/* Renders for anonymous users too (public mode inside the page). */}
         <Route path="/territorio" element={withSuspense(<TerritoryPage />)} />
-        <Route path="/comunidad" element={withSuspense(<CommunityPage />)} />
-        <Route path="/reportes" element={withSuspense(<CitizenReportsPage />)} />
-        <Route path="/alertas" element={withSuspense(<AlertsPage />)} />
+        <Route path="/comunidad" element={guarded(<CommunityPage />)} />
+        <Route path="/reportes" element={guarded(<CitizenReportsPage />)} />
+        {/* TODO(S3b): unguard once AlertsPage has an anonymous read-only view. */}
+        <Route path="/alertas" element={guarded(<AlertsPage />)} />
 
-        <Route path="/admin/regions" element={withSuspense(<RegionsPage />)} />
-        <Route path="/admin/rules" element={withSuspense(<RulesPage />)} />
-        <Route path="/admin/access-control" element={withSuspense(<AccessControlPage />)} />
+        <Route path="/admin/regions" element={guarded(<RegionsPage />)} />
+        <Route path="/admin/rules" element={guarded(<RulesPage />)} />
+        <Route path="/admin/access-control" element={guarded(<AccessControlPage />)} />
 
-        <Route path="/account" element={withSuspense(<AccountPage />)} />
+        <Route path="/account" element={guarded(<AccountPage />)} />
 
-        <Route path="/dashboard" element={withSuspense(<DashboardPage />)} />
+        <Route path="/dashboard" element={guarded(<DashboardPage />)} />
         <Route path="/alerts" element={<Navigate to="/alertas" replace />} />
         <Route path="/regions" element={<Navigate to="/admin/regions" replace />} />
         <Route path="/rules" element={<Navigate to="/admin/rules" replace />} />
