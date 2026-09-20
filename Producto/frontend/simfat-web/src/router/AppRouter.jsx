@@ -72,8 +72,8 @@ function AppRouter() {
         <Route path="/territorio" element={withSuspense(<TerritoryPage />)} />
         <Route path="/comunidad" element={guarded(<CommunityPage />)} />
         <Route path="/reportes" element={guarded(<CitizenReportsPage />)} />
-        {/* TODO(S3b): unguard once AlertsPage has an anonymous read-only view. */}
-        <Route path="/alertas" element={guarded(<AlertsPage />)} />
+        {/* Unguarded: AlertsPage picks the public read view or the full CRUD page from the session. */}
+        <Route path="/alertas" element={withSuspense(<AlertsPage />)} />
 
         <Route path="/admin/regions" element={guarded(<RegionsPage />)} />
         <Route path="/admin/rules" element={guarded(<RulesPage />)} />
