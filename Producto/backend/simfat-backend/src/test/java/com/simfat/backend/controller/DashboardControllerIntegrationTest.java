@@ -44,6 +44,7 @@ class DashboardControllerIntegrationTest {
     private OpenEoSyncService openEoSyncService;
 
     @Test
+    @WithMockUser
     void getLatestIndicator_returnsApiResponseWrappedPayload() throws Exception {
         IndicatorLatestDTO latest = new IndicatorLatestDTO();
         latest.setRegionId("region-1");
@@ -79,6 +80,7 @@ class DashboardControllerIntegrationTest {
     }
 
     @Test
+    @WithMockUser
     void getSeriesMapAndFreshness_areExposed() throws Exception {
         IndicatorSeriesDTO series = new IndicatorSeriesDTO();
         series.setRegionId("region-1");

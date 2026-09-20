@@ -8,6 +8,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.simfat.backend.dto.AlertRuleResponseDTO;
+import com.simfat.backend.repository.RegionRepository;
 import com.simfat.backend.service.AlertRuleService;
 import com.simfat.backend.service.DashboardIndicatorService;
 import com.simfat.backend.service.DashboardService;
@@ -27,6 +28,10 @@ class SecurityAuthorizationIntegrationTest {
     @Autowired
     private MockMvc mockMvc;
 
+    // Keeps startup runners (MonitoredRegionsConfig) off a real Mongo, which is not available in tests.
+    @MockBean
+    private RegionRepository regionRepository;
+
     @MockBean
     private AlertRuleService alertRuleService;
 
@@ -40,12 +45,12 @@ class SecurityAuthorizationIntegrationTest {
     private OpenEoSyncService openEoSyncService;
 
     @Test
-    void createRule_returnsForbidden_whenNoAuthentication() throws Exception {
+    void createRule_returnsUnauthorized_whenNoAuthentication() throws Exception {
         mockMvc.perform(post("/api/rules")
                 .contentType("application/json")
                 .content(validRulePayload()))
-            .andExpect(status().isForbidden())
-            .andExpect(jsonPath("$.status", is(403)));
+            .andExpect(status().isUnauthorized())
+            .andExpect(jsonPath("$.status", is(401)));
     }
 
     @Test

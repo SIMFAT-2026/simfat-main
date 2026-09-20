@@ -13,6 +13,7 @@ import java.io.IOException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.stereotype.Component;
@@ -51,6 +52,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
 
         String token = authHeader.substring(7);
+        boolean publicPath = PublicEndpointPaths.isPublic(request);
         try {
             Jws<Claims> access = jwtService.parseAndValidate(token, JwtService.TOKEN_TYPE_ACCESS);
             AppUser user = appUserRepository.findById(access.getPayload().getSubject()).orElse(null);
@@ -71,19 +73,22 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 snapshot.getAuthorities()
             );
             SecurityContextHolder.getContext().setAuthentication(authentication);
-            filterChain.doFilter(request, response);
-        } catch (JwtException | IllegalArgumentException ex) {
-            if (isInternalOpenEoIngestPath(request)) {
-                SecurityContextHolder.clearContext();
-                filterChain.doFilter(request, response);
+        } catch (JwtException | IllegalArgumentException | AuthenticationException ex) {
+            SecurityContextHolder.clearContext();
+            if (!publicPath) {
+                authenticationEntryPoint.commence(request, response, new BadCredentialsException("Token invalido", ex));
                 return;
             }
+            // A public URL must stay reachable with a stale or unusable token: continue anonymously.
+        } catch (RuntimeException ex) {
             SecurityContextHolder.clearContext();
-            authenticationEntryPoint.commence(request, response, new BadCredentialsException("Token invalido", ex));
+            if (!publicPath) {
+                // Infrastructure failure on a protected path: surface it, never downgrade to anonymous.
+                throw ex;
+            }
+            logger.warn("Token resolution failed on a public path; continuing anonymously: " + ex.getClass().getSimpleName());
         }
-    }
-
-    private boolean isInternalOpenEoIngestPath(HttpServletRequest request) {
-        return "/api/indicators/measurements".equals(request.getRequestURI());
+        // Outside the try: downstream failures must not be mistaken for authentication failures.
+        filterChain.doFilter(request, response);
     }
 }
