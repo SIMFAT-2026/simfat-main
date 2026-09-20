@@ -223,8 +223,8 @@ function createMockRegionData(regionId, from, to) {
 }
 
 // publicMode is part of the key so the anonymized REPORTS payload from
-// /monitoreo never leaks into (or gets overwritten by) the authenticated
-// /territorio cache entry for the same region/date-range.
+// public-mode /territorio never leaks into (or gets overwritten by) the
+// authenticated cache entry for the same region/date-range.
 function cacheKey(regionId, from, to, publicMode) {
   return `${regionId}|${from}|${to}|${publicMode ? 'public' : 'auth'}`;
 }
@@ -244,7 +244,7 @@ function readCacheSnapshot(dateRange, publicMode) {
 // Phase 1: fetch metadata + critical indicators (RISK_SCORE, ALERTS, FIRMS) in parallel.
 // Returns enough data to render the choropleth and active fire/alert markers.
 // publicMode routes bounds/layers through the anonymous /public endpoints (spec:
-// portafolio /monitoreo); riskScore/geojson/comunalScores are already safe aggregate
+// public mode on /territorio); riskScore/geojson/comunalScores are already safe aggregate
 // data with no PII, so they're reused as-is regardless of mode.
 async function loadRegionPhase1(regionId, from, to, publicMode) {
   const regionFallback = REGION_CONFIG[regionId] || REGION_CONFIG.biobio;

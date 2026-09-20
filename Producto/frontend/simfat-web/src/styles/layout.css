@@ -68,8 +68,53 @@
   color: #475569;
 }
 
-.navbar-logout-btn {
+.navbar-logout-btn,
+.navbar-login-btn {
   padding: 4px 8px;
+}
+
+.navbar-guest-badge {
+  border: 1px solid #cbd5e1;
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #475569;
+  background: #f1f5f9;
+}
+
+/* Muted locked colour: #556070 is >= 5.86:1 on #ffffff/#f8fafc/#eff6ff.
+   Higher specificity so it wins over .nav-link / .sidebar-link. */
+.nav-link.nav-link-locked,
+.sidebar-link.sidebar-link-locked {
+  color: #556070;
+}
+
+.nav-link.nav-link-locked:focus-visible,
+.sidebar-link.sidebar-link-locked:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+}
+
+.sidebar-link-marker-lock {
+  position: absolute;
+  right: -2px;
+  bottom: -3px;
+  font-size: 0.5rem;
+  line-height: 1;
+}
+
+.sidebar-link-locked .sidebar-link-marker {
+  position: relative;
+}
+
+.sidebar-placeholder {
+  min-height: 220px;
+}
+
+.navbar-user-placeholder {
+  min-width: 140px;
+  min-height: 30px;
 }
 
 .notification-bell {
