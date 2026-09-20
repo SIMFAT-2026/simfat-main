@@ -49,6 +49,8 @@ public final class PublicEndpointPaths {
         // Anonymous read contract. Explicit per resource: no wildcard over "/api/*/public", so a
         // new controller cannot become anonymous by naming a route "public". The bare path and the
         // "/**" form are both listed because zero-segment "/**" matching is version-sensitive.
+        new Rule(HttpMethod.GET, "/api/alerts/public"),
+        new Rule(HttpMethod.GET, "/api/citizen-reports/public"),
         new Rule(HttpMethod.GET, "/api/territory/public"),
         new Rule(HttpMethod.GET, "/api/territory/public/**"),
         new Rule(HttpMethod.GET, "/api/territory/risk-score/**"),
