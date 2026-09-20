@@ -2,6 +2,7 @@ package com.simfat.backend.service;
 
 import com.simfat.backend.dto.HeatAlertRequestDTO;
 import com.simfat.backend.dto.HeatAlertResponseDTO;
+import com.simfat.backend.dto.PublicHeatAlertDTO;
 import com.simfat.backend.model.RiskLevel;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -15,6 +16,8 @@ public interface HeatAlertService {
     List<HeatAlertResponseDTO> getByRegion(String regionId);
 
     List<HeatAlertResponseDTO> getMap(String regionId, LocalDateTime from, LocalDateTime to, RiskLevel level);
+
+    List<PublicHeatAlertDTO> getPublicMap(String regionId, LocalDateTime from, LocalDateTime endExclusive);
 
     HeatAlertResponseDTO create(HeatAlertRequestDTO request);
 

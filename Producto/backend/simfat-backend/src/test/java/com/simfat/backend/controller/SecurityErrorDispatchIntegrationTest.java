@@ -23,8 +23,8 @@ import org.springframework.http.ResponseEntity;
  * Asserts that anonymous callers on public paths are not answered with 401/403, that protected
  * paths still answer 401 to anonymous callers, and that an infrastructure failure on a protected
  * path (which reaches the container ERROR dispatch) is answered with 500 rather than 401.
- * The missing-upload case currently ends in a 500 from GlobalExceptionHandler (known issue,
- * deferred), so only the absence of 401/403 is asserted there.
+ * A missing upload on a public path is a real 404 (GlobalExceptionHandler maps
+ * NoResourceFoundException), never 401/403/500.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class SecurityErrorDispatchIntegrationTest {
@@ -43,9 +43,9 @@ class SecurityErrorDispatchIntegrationTest {
     private AppUserRepository appUserRepository;
 
     @Test
-    void missingUploadOnPublicPathIsNotAnsweredWithUnauthorizedOrForbidden() {
+    void missingUploadOnPublicPathIsNotFound() {
         ResponseEntity<String> response = restTemplate.getForEntity("/uploads/citizen-reports/does-not-exist.jpg", String.class);
-        assertThat(response.getStatusCode().value()).isNotIn(401, 403);
+        assertThat(response.getStatusCode().value()).isEqualTo(404);
     }
 
     @Test

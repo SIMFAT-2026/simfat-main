@@ -3,8 +3,11 @@ package com.simfat.backend.controller;
 import com.simfat.backend.dto.ApiResponse;
 import com.simfat.backend.dto.HeatAlertRequestDTO;
 import com.simfat.backend.dto.HeatAlertResponseDTO;
+import com.simfat.backend.dto.PublicHeatAlertDTO;
+import com.simfat.backend.exception.BadRequestException;
 import com.simfat.backend.model.RiskLevel;
 import com.simfat.backend.service.HeatAlertService;
+import com.simfat.backend.web.PublicQueryWindow;
 import jakarta.validation.Valid;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -62,6 +65,26 @@ public class HeatAlertController {
         return ResponseEntity.ok(ApiResponse.ok(
             "Alertas para mapa obtenidas correctamente",
             heatAlertService.getMap(regionId, fromDate, toDate, level)
+        ));
+    }
+
+    // Anonymous, minimized view (no id/source/description, rounded coordinates). Allowlisted
+    // explicitly in PublicEndpointPaths; the literal path wins over "/{id}".
+    @GetMapping("/public")
+    public ResponseEntity<ApiResponse<List<PublicHeatAlertDTO>>> getPublic(
+        @RequestParam String regionId,
+        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to
+    ) {
+        // Bounded read: default last 30 days, max span 90 days, at most 1000 newest alerts.
+        String region = regionId == null ? "" : regionId.trim();
+        if (region.isEmpty()) {
+            throw new BadRequestException("Falta el parametro requerido: regionId");
+        }
+        PublicQueryWindow window = PublicQueryWindow.resolve(from, to);
+        return ResponseEntity.ok(ApiResponse.ok(
+            "Alertas publicas obtenidas correctamente",
+            heatAlertService.getPublicMap(region, window.from(), window.endExclusive())
         ));
     }
 

@@ -7,6 +7,7 @@ import com.simfat.backend.model.ComunaRiskSnapshot;
 import com.simfat.backend.model.HeatAlertEvent;
 import com.simfat.backend.service.ComunaRiskService;
 import com.simfat.backend.model.CitizenReport;
+import com.simfat.backend.model.CitizenReportStatus;
 import com.simfat.backend.model.ForestLossRecord;
 import com.simfat.backend.model.IndicatorType;
 import com.simfat.backend.model.OpenEoIndicatorObservation;
@@ -23,6 +24,9 @@ import com.simfat.backend.repository.TerritoryWeatherObservationRepository;
 import com.simfat.backend.service.NasaFirmsService;
 import com.simfat.backend.service.OpenWeatherFwiService;
 import com.simfat.backend.service.TerritoryRiskService;
+import com.simfat.backend.web.CoordinateRounding;
+import com.simfat.backend.web.PublicQueryWindow;
+import org.springframework.data.domain.PageRequest;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.io.InputStream;
@@ -56,6 +60,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/territory")
 public class TerritoryController {
 
+    private static final int PUBLIC_LAYER_DEFAULT_DAYS = 7;
     private static final List<String> VALID_INDICATORS =
         List.of("NDVI", "NDMI", "LOSS", "ALERTS", "REPORTS", "FIRMS", "RISK_SCORE",
             "WIND", "HUMIDITY", "AIR_TEMP", "SOIL_TEMP");
@@ -176,7 +181,7 @@ public class TerritoryController {
         }
         if (requestedIndicators.contains("REPORTS")) {
             layers.put("REPORTS", anonymizeReports
-                ? reportsLayerPublic(regionId, fromDate, toDate)
+                ? reportsLayerPublic(regionId, from, to)
                 : reportsLayer(regionId, fromDate, toDate));
         }
         if (requestedIndicators.contains("RISK_SCORE")) {
@@ -355,11 +360,17 @@ public class TerritoryController {
     // Solo para /public/layers. A diferencia de reportsLayer()/toReportFeature() (usados por
     // el equipo de terreno vía la vista autenticada), esto NUNCA expone el id de Mongo, las
     // coordenadas exactas ni el texto libre de la descripcion a un visitante anonimo.
-    private Map<String, Object> reportsLayerPublic(String regionId, LocalDateTime from, LocalDateTime to) {
-        List<CitizenReport> reports = citizenReportRepository.findByRegionIdAndCreatedAtBetween(regionId, from, to);
+    private Map<String, Object> reportsLayerPublic(String regionId, LocalDate from, LocalDate to) {
+        // Same bounds as the public reports endpoint: max span, sane dates, half-open window, newest-first cap.
+        // Absent bounds keep this map's own default (last 7 days).
+        PublicQueryWindow window = PublicQueryWindow.resolve(from, to, PUBLIC_LAYER_DEFAULT_DAYS);
+        // Only moderated reports are public; the status filter runs in the database.
+        List<CitizenReport> reports = citizenReportRepository.findByRegionIdAndStatusInWindowNewestFirst(
+            regionId, CitizenReportStatus.VALIDADO, window.from(), window.endExclusive(),
+            PageRequest.of(0, PublicQueryWindow.MAX_PUBLIC_REPORTS));
 
         List<Map<String, Object>> features = new ArrayList<>();
-        for (int i = 0; i < reports.size(); i++) {
+        for (int i = 0; i < Math.min(reports.size(), PublicQueryWindow.MAX_PUBLIC_REPORTS); i++) {
             features.add(toPublicReportFeature(reports.get(i), i));
         }
 
@@ -367,8 +378,8 @@ public class TerritoryController {
     }
 
     private Map<String, Object> toPublicReportFeature(CitizenReport item, int index) {
-        Double lat = item.getLatitude() == null ? null : Math.round(item.getLatitude() * 100.0) / 100.0;
-        Double lng = item.getLongitude() == null ? null : Math.round(item.getLongitude() * 100.0) / 100.0;
+        Double lat = CoordinateRounding.round(item.getLatitude());
+        Double lng = CoordinateRounding.round(item.getLongitude());
 
         return pointFeature("public-report-" + index, lng, lat, Map.of(
             "label", "Reporte ciudadano",

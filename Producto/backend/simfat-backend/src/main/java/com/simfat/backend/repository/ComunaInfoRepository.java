@@ -11,6 +11,11 @@ public interface ComunaInfoRepository extends MongoRepository<ComunaInfo, String
 
     List<ComunaInfo> findByRegionId(String regionId);
 
+    // Projection for anonymous reads: only "nombre" (plus _id, always returned) is loaded, so the heavy
+    // MultiPolygon "geometry" never leaves the database. One batched call per request.
+    @Query(value = "{ 'regionId': ?0 }", fields = "{ 'nombre': 1 }")
+    List<ComunaInfo> findNamesByRegionId(String regionId);
+
     long countByRegionId(String regionId);
 
     // Point-in-polygon attribution (Decision 4). Implemented as an explicit @Query

@@ -46,6 +46,12 @@ public interface HeatAlertEventRepository extends MongoRepository<HeatAlertEvent
 
     List<HeatAlertEvent> findByRegionIdAndFechaEventoBetween(String regionId, LocalDateTime from, LocalDateTime to);
 
+    // Bounded, newest-first read used by the anonymous alerts endpoint (the page size is the hard cap).
+    // Half-open window [from, endExclusive): "Between" is exclusive on both ends and would drop 00:00:00.
+    @Query(value = "{ 'regionId': ?0, 'fechaEvento': { '$gte': ?1, '$lt': ?2 } }", sort = "{ 'fechaEvento': -1 }")
+    List<HeatAlertEvent> findByRegionIdInWindowNewestFirst(
+        String regionId, LocalDateTime from, LocalDateTime endExclusive, Pageable pageable);
+
     // Returns the most recent NASA_FIRMS hotspots for the given period, sorted by date descending.
     // Sorting by recency (instead of FRP) ensures active detections from large/noisy regions
     // are never pushed out of the page by older, higher-FRP hotspots elsewhere in the bbox.

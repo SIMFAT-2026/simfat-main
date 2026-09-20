@@ -5,19 +5,27 @@ import com.simfat.backend.dto.ApiResponse;
 import com.simfat.backend.dto.CitizenReportPayloadDTO;
 import com.simfat.backend.dto.CitizenReportResponseDTO;
 import com.simfat.backend.dto.CitizenReportStatusPatchDTO;
+import com.simfat.backend.dto.PublicCitizenReportDTO;
 import com.simfat.backend.exception.BadRequestException;
 import com.simfat.backend.exception.ResourceNotFoundException;
 import com.simfat.backend.model.CitizenReport;
 import com.simfat.backend.model.CitizenReportStatus;
 import com.simfat.backend.repository.CitizenReportRepository;
+import com.simfat.backend.service.ImageSanitizer;
 import com.simfat.backend.service.ObjectStorageService;
 import com.simfat.backend.service.impl.LocalObjectFallbackStorageService;
+import com.simfat.backend.web.CoordinateRounding;
+import com.simfat.backend.web.PublicQueryWindow;
 import jakarta.validation.Valid;
 import java.io.IOException;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -83,17 +91,20 @@ public class CitizenReportController {
     private final ObjectMapper objectMapper;
     private final ObjectStorageService storageService;
     private final LocalObjectFallbackStorageService localObjectFallbackStorageService;
+    private final ImageSanitizer imageSanitizer;
 
     public CitizenReportController(
         CitizenReportRepository citizenReportRepository,
         ObjectMapper objectMapper,
         ObjectStorageService storageService,
-        LocalObjectFallbackStorageService localObjectFallbackStorageService
+        LocalObjectFallbackStorageService localObjectFallbackStorageService,
+        ImageSanitizer imageSanitizer
     ) {
         this.citizenReportRepository = citizenReportRepository;
         this.objectMapper = objectMapper;
         this.storageService = storageService;
         this.localObjectFallbackStorageService = localObjectFallbackStorageService;
+        this.imageSanitizer = imageSanitizer;
     }
 
     @GetMapping
@@ -116,6 +127,31 @@ public class CitizenReportController {
             .toList();
 
         return ResponseEntity.ok(ApiResponse.ok("Reportes ciudadanos obtenidos correctamente", items));
+    }
+
+    // Anonymous view: only moderated reports, selected at the repository so non-validated
+    // reports are never loaded. Allowlisted explicitly in PublicEndpointPaths.
+    @GetMapping("/public")
+    public ResponseEntity<ApiResponse<List<PublicCitizenReportDTO>>> getPublic(
+        @RequestParam(required = false) String regionId,
+        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to
+    ) {
+        // Bounded read: default last 30 days, max span 90 days, at most 500 newest reports.
+        PublicQueryWindow window = PublicQueryWindow.resolve(from, to);
+        Pageable cap = PageRequest.of(0, PublicQueryWindow.MAX_PUBLIC_REPORTS);
+        // A blank regionId means "no region filter" (explicitly), still bounded by window + cap.
+        String region = regionId == null || regionId.isBlank() ? null : regionId.trim();
+        List<CitizenReport> validated = region == null
+            ? citizenReportRepository.findByStatusInWindowNewestFirst(
+                CitizenReportStatus.VALIDADO, window.from(), window.endExclusive(), cap)
+            : citizenReportRepository.findByRegionIdAndStatusInWindowNewestFirst(
+                region, CitizenReportStatus.VALIDADO, window.from(), window.endExclusive(), cap);
+        List<PublicCitizenReportDTO> items = validated.stream()
+            .limit(PublicQueryWindow.MAX_PUBLIC_REPORTS)
+            .map(this::toPublicResponse)
+            .toList();
+        return ResponseEntity.ok(ApiResponse.ok("Reportes ciudadanos publicos obtenidos correctamente", items));
     }
 
     @PostMapping(consumes = { "multipart/form-data" })
@@ -211,7 +247,10 @@ public class CitizenReportController {
     }
 
     private List<String> resolvePhotoReferences(List<MultipartFile> files) {
-        return files.stream()
+        // Sanitize every file first: a rejected file aborts the request before anything is stored,
+        // and storage (remote or local fallback) only ever sees metadata-free bytes.
+        List<MultipartFile> sanitized = files.stream().map(imageSanitizer::sanitize).toList();
+        return sanitized.stream()
             .map(this::safeUploadReference)
             .filter(Objects::nonNull)
             .filter(value -> !value.isBlank())
@@ -247,6 +286,18 @@ public class CitizenReportController {
             return baseUrl + reference;
         }
         return baseUrl + "/" + reference;
+    }
+
+    private PublicCitizenReportDTO toPublicResponse(CitizenReport item) {
+        return new PublicCitizenReportDTO(
+            item.getCategory(),
+            item.getSubCategory(),
+            item.getDescription(),
+            item.getCreatedAt() == null ? null : item.getCreatedAt().toLocalDate(),
+            item.getPhotos() == null ? List.of() : List.copyOf(item.getPhotos()),
+            CoordinateRounding.round(item.getLatitude()),
+            CoordinateRounding.round(item.getLongitude())
+        );
     }
 
     private CitizenReportResponseDTO toResponse(CitizenReport item) {
