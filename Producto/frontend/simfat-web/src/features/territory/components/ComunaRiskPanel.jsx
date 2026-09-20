@@ -39,14 +39,14 @@ function ChartDot({ cx, cy, payload }) {
   return <circle cx={cx} cy={cy} r={4} fill={color} stroke="#0f172a" strokeWidth={1} />;
 }
 
-function RiskHistoryChart({ gadmGid }) {
+function RiskHistoryChart({ gadmGid, publicMode = false }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    fetchComunaHistory(gadmGid, 30)
+    fetchComunaHistory(gadmGid, 30, { publicMode })
       .then((res) => {
         if (!cancelled) {
           const snaps = Array.isArray(res?.snapshots) ? res.snapshots : [];
@@ -64,7 +64,7 @@ function RiskHistoryChart({ gadmGid }) {
       .catch(() => { if (!cancelled) setData([]); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [gadmGid]);
+  }, [gadmGid, publicMode]);
 
   if (loading) return <p className="panel-chart-empty">Cargando historial…</p>;
   if (!data || data.length === 0) return <p className="panel-chart-empty">Sin historial disponible aún.</p>;
@@ -324,7 +324,7 @@ export default function ComunaRiskPanel({ comunaId, score, regionId, onClose, ca
 
       <section className="panel-section">
         <h5 className="panel-section-title">Evolución 30 días</h5>
-        <RiskHistoryChart gadmGid={comunaId} />
+        <RiskHistoryChart gadmGid={comunaId} publicMode={readOnly} />
         <p className="panel-chart-legend">
           <span style={{ borderBottom: '2px dashed #ca8a04' }}>&nbsp;&nbsp;</span> Preventivo &nbsp;
           <span style={{ borderBottom: '2px dashed #ea580c' }}>&nbsp;&nbsp;</span> Alto &nbsp;

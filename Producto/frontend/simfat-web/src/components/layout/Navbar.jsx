@@ -30,7 +30,7 @@ function Navbar() {
         {/* While the session bootstraps, render a plain non-landmark
             placeholder (no empty nav landmark, no locked/authenticated flash). */}
         {isBootstrapping ? (
-          <div className="navbar-nav" aria-hidden="true" />
+          <div className="navbar-nav navbar-nav-placeholder" aria-hidden="true" />
         ) : (
         <nav className="navbar-nav" aria-label="Navegacion principal">
           {primaryNavigationLinks.map((link) =>

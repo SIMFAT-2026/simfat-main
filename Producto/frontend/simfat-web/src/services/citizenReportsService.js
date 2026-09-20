@@ -1,4 +1,5 @@
 import axiosClient from '../api/axiosClient';
+import publicAxiosClient from '../api/publicAxiosClient';
 import { API_ENDPOINTS } from '../api/endpoints';
 import { extractData } from '../api/responseAdapter';
 import { resizeImagesBatch } from '../utils/imageResize';
@@ -38,4 +39,17 @@ export async function updateCitizenReportStatus(id, status) {
 export async function deleteCitizenReport(id) {
   const response = await axiosClient.delete(`${API_ENDPOINTS.citizenReports}/${id}`);
   return extractData(response.data);
+}
+
+// Anonymous view of VALIDADO reports only (no id/status/reporter data).
+export async function getPublicCitizenReports({ regionId, from, to } = {}) {
+  const response = await publicAxiosClient.get(API_ENDPOINTS.citizenReportsPublic, {
+    params: {
+      regionId: regionId || undefined,
+      from: from || undefined,
+      to: to || undefined
+    }
+  });
+  const data = extractData(response.data);
+  return Array.isArray(data) ? data : [];
 }

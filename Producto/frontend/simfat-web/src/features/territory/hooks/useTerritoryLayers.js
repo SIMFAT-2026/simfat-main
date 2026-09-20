@@ -46,7 +46,7 @@ const REGION_CONFIG = {
   }
 };
 
-const REGION_OPTIONS = Object.values(REGION_CONFIG);
+export const REGION_OPTIONS = Object.values(REGION_CONFIG);
 
 // Critical: needed for the first meaningful paint (choropleth + active fires + alerts).
 // Secondary: useful context loaded after the map is already interactive.
@@ -244,8 +244,8 @@ function readCacheSnapshot(dateRange, publicMode) {
 // Phase 1: fetch metadata + critical indicators (RISK_SCORE, ALERTS, FIRMS) in parallel.
 // Returns enough data to render the choropleth and active fire/alert markers.
 // publicMode routes bounds/layers through the anonymous /public endpoints (spec:
-// public mode on /territorio); riskScore/geojson/comunalScores are already safe aggregate
-// data with no PII, so they're reused as-is regardless of mode.
+// public mode on /territorio); riskScore/geojson/comunalScores are safe aggregate data with no PII
+// (same endpoints in both modes) but go through the tokenless client in public mode.
 async function loadRegionPhase1(regionId, from, to, publicMode) {
   const regionFallback = REGION_CONFIG[regionId] || REGION_CONFIG.biobio;
   const boundsFetcher = publicMode ? fetchPublicTerritoryBounds : fetchTerritoryBounds;
@@ -253,9 +253,9 @@ async function loadRegionPhase1(regionId, from, to, publicMode) {
   const [boundsData, layerData, riskScoreData, comunalGeoJson, comunalScores] = await Promise.all([
     boundsFetcher(regionId, regionFallback),
     layersFetcher({ regionId, indicators: CRITICAL_INDICATORS, from, to }),
-    fetchTerritoryRiskScore(regionId).catch(() => null),
-    fetchTerritoryGeoJson(regionId).catch(() => null),
-    fetchComunalRiskScores(regionId).catch(() => null)
+    fetchTerritoryRiskScore(regionId, { publicMode }).catch(() => null),
+    fetchTerritoryGeoJson(regionId, { publicMode }).catch(() => null),
+    fetchComunalRiskScores(regionId, { publicMode }).catch(() => null)
   ]);
 
   return {

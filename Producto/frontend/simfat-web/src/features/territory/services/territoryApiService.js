@@ -1,4 +1,5 @@
 import axiosClient from '../../../api/axiosClient';
+import publicAxiosClient from '../../../api/publicAxiosClient';
 
 const TERRITORY_ENDPOINTS = {
   layers: '/api/territory/layers',
@@ -16,6 +17,11 @@ const PUBLIC_TERRITORY_ENDPOINTS = {
   layers: '/api/territory/public/layers',
   bounds: '/api/territory/public/bounds'
 };
+
+// Anonymous mode must never touch the shared client (Bearer + 401 refresh).
+function clientFor(publicMode) {
+  return publicMode ? publicAxiosClient : axiosClient;
+}
 
 function isFeatureCollection(value) {
   return Boolean(value) && typeof value === 'object' && value.type === 'FeatureCollection';
@@ -151,7 +157,7 @@ export async function fetchTerritoryBounds(regionId, fallback) {
 }
 
 export async function fetchPublicTerritoryLayers({ regionId, indicators, from, to }) {
-  const response = await axiosClient.get(PUBLIC_TERRITORY_ENDPOINTS.layers, {
+  const response = await publicAxiosClient.get(PUBLIC_TERRITORY_ENDPOINTS.layers, {
     params: {
       regionId,
       indicators: indicators.join(','),
@@ -164,26 +170,26 @@ export async function fetchPublicTerritoryLayers({ regionId, indicators, from, t
 }
 
 export async function fetchPublicTerritoryBounds(regionId, fallback) {
-  const response = await axiosClient.get(PUBLIC_TERRITORY_ENDPOINTS.bounds, {
+  const response = await publicAxiosClient.get(PUBLIC_TERRITORY_ENDPOINTS.bounds, {
     params: { regionId }
   });
   return normalizeBoundsPayload(response.data, fallback);
 }
 
-export async function fetchTerritoryGeoJson(regionId) {
+export async function fetchTerritoryGeoJson(regionId, { publicMode = false } = {}) {
   // Served as static asset by Spring Boot — no auth needed, cached 24h
-  const response = await axiosClient.get(`/geojson/comunas-${regionId.toLowerCase()}.geojson`);
+  const response = await clientFor(publicMode).get(`/geojson/comunas-${regionId.toLowerCase()}.geojson`);
   return response.data;
 }
 
-export async function fetchComunalRiskScores(regionId) {
-  const response = await axiosClient.get(TERRITORY_ENDPOINTS.comunalScores(regionId));
+export async function fetchComunalRiskScores(regionId, { publicMode = false } = {}) {
+  const response = await clientFor(publicMode).get(TERRITORY_ENDPOINTS.comunalScores(regionId));
   const source = (response.data && response.data.data) || response.data || {};
   return source;
 }
 
-export async function fetchComunaHistory(gadmGid, days = 7) {
-  const response = await axiosClient.get(TERRITORY_ENDPOINTS.comunaHistory(gadmGid, days));
+export async function fetchComunaHistory(gadmGid, days = 7, { publicMode = false } = {}) {
+  const response = await clientFor(publicMode).get(TERRITORY_ENDPOINTS.comunaHistory(gadmGid, days));
   const source = (response.data && response.data.data) || response.data || {};
   return source;
 }
@@ -194,8 +200,8 @@ export async function syncComunaCopernicus(comunaId) {
   return source;
 }
 
-export async function fetchTerritoryRiskScore(regionId) {
-  const response = await axiosClient.get(TERRITORY_ENDPOINTS.riskScore(regionId));
+export async function fetchTerritoryRiskScore(regionId, { publicMode = false } = {}) {
+  const response = await clientFor(publicMode).get(TERRITORY_ENDPOINTS.riskScore(regionId));
   const source = (response.data && response.data.data) || response.data || {};
   return {
     regionId: source.regionId || regionId,
