@@ -52,19 +52,54 @@ _LABELS: dict[int, str] = {
     UNOBSERVED_CODE: "Not observed",
 }
 
+def validate_tree(
+    tree: dict[int, tuple[int, ...]] | None = None,
+    labels: dict[int, str] | None = None,
+) -> None:
+    """Self-check the legend: labelled codes, unique children, single parent, no cycles."""
+    tree = _TREE if tree is None else tree
+    labels = _LABELS if labels is None else labels
+    parent: dict[int, int] = {}
+    for node, kids in tree.items():
+        missing = sorted(c for c in (node, *kids) if c not in labels)
+        if missing:
+            raise LegendError(f"Legend codes with no label: {missing}")
+        if len(set(kids)) != len(kids):
+            raise LegendError(f"Legend node {node} has duplicate children: {kids}")
+        for kid in kids:
+            if kid in parent:
+                raise LegendError(
+                    f"Legend code {kid} has more than one parent: {parent[kid]} and {node}"
+                )
+            parent[kid] = node
+    for start in parent:
+        seen = {start}
+        code = start
+        while code in parent:
+            code = parent[code]
+            if code in seen:
+                raise LegendError(f"Legend tree has a cycle through code {code}")
+            seen.add(code)
+
+
+validate_tree()
+
 _PARENT: dict[int, int] = {c: p for p, kids in _TREE.items() for c in kids}
 
 
 def children(code: int) -> tuple[int, ...]:
+    require_known([code])
     return _TREE.get(code, ())
 
 
 def is_leaf(code: int) -> bool:
+    require_known([code])
     return code not in _TREE
 
 
 def ancestors(code: int) -> tuple[int, ...]:
     """Ancestors from the direct parent up to the root."""
+    require_known([code])
     chain = []
     while code in _PARENT:
         code = _PARENT[code]
