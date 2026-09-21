@@ -3,6 +3,7 @@
 Fixtures build tiny synthetic xlsx workbooks with openpyxl (see
 ``make_coverage_xlsx`` in conftest.py); no binary xlsx is committed.
 """
+import copy
 import json
 from pathlib import Path
 
@@ -344,10 +345,33 @@ def test_write_name_mapping_writes_sorted_json(tmp_path):
 _PACKAGE_DIR = Path(__file__).resolve().parent.parent
 
 
+def _assert_mapping_resolves_to_its_own_comuna_id(mapping, index):
+    """For every entry, its (xlsxRegion, normalized xlsxName) must resolve,
+    via the real comuna index, back to the SAME comunaId it is keyed under.
+
+    This is the actual join-correctness check: key-set/count/region-set
+    equality alone (as asserted below) cannot catch a fixture where two
+    entries' xlsxName values were swapped between two comunas in the same
+    region -- the shape checks still pass on such a corrupted fixture, but
+    this per-entry resolution check does not.
+    """
+    for comuna_id, entry in mapping.items():
+        resolved = index.get((entry["xlsxRegion"], lulc.normalize_name(entry["xlsxName"])))
+        assert resolved == comuna_id, (
+            f"comuna {comuna_id!r} maps to xlsxName {entry['xlsxName']!r} "
+            f"(region {entry['xlsxRegion']!r}), which resolves to "
+            f"{resolved!r} instead of {comuna_id!r}"
+        )
+
+
 def test_committed_name_mapping_matches_the_86_real_geojson_comunas():
     """The committed fixture must stay in sync with DEFAULT_REGIONS: every
     comunaId in the real GeoJSON seeds has a mapping entry, every entry's
-    comunaId is a real one, and every xlsxRegion is one of our 3 regions."""
+    comunaId is a real one, every xlsxRegion is one of our 3 regions, and
+    every entry's xlsxName actually resolves back to its own comunaId (not
+    just key/count/region-set shape -- see
+    test_committed_name_mapping_would_catch_a_swapped_name for why that
+    matters)."""
     fixture_path = _PACKAGE_DIR / "fixtures" / "comuna_name_mapping.json"
     mapping = json.loads(fixture_path.read_text(encoding="utf-8"))
 
@@ -358,3 +382,35 @@ def test_committed_name_mapping_matches_the_86_real_geojson_comunas():
     assert set(mapping.keys()) == expected_ids
     assert len(mapping) == 86
     assert {entry["xlsxRegion"] for entry in mapping.values()} == {r.xlsx_region for r in lulc.DEFAULT_REGIONS}
+    _assert_mapping_resolves_to_its_own_comuna_id(mapping, index)
+
+
+def test_committed_name_mapping_would_catch_a_swapped_name():
+    """Proves the gap that the shape-only assertions above cannot catch:
+    swap xlsxName between two same-region entries in an in-memory copy of
+    the fixture (Bulnes <-> Chillán, both Ñuble) and show that
+    key-set/count/region-set equality still hold, but the per-entry
+    resolution check in _assert_mapping_resolves_to_its_own_comuna_id
+    catches the corruption. Does not touch the real committed fixture."""
+    fixture_path = _PACKAGE_DIR / "fixtures" / "comuna_name_mapping.json"
+    mapping = json.loads(fixture_path.read_text(encoding="utf-8"))
+    region_features = lulc.load_region_features(lulc.DEFAULT_REGIONS)
+    index = lulc.build_comuna_index(region_features)
+
+    corrupted = copy.deepcopy(mapping)
+    bulnes, chillan = "CHL.13.1.1_1", "CHL.13.1.2_1"
+    corrupted[bulnes]["xlsxName"], corrupted[chillan]["xlsxName"] = (
+        corrupted[chillan]["xlsxName"],
+        corrupted[bulnes]["xlsxName"],
+    )
+
+    # The shape-only checks (what the test looked like before this fix)
+    # still pass on the corrupted mapping -- that is the bug this closes.
+    assert set(corrupted.keys()) == set(mapping.keys())
+    assert len(corrupted) == 86
+    assert {entry["xlsxRegion"] for entry in corrupted.values()} == {
+        entry["xlsxRegion"] for entry in mapping.values()
+    }
+
+    with pytest.raises(AssertionError, match=bulnes):
+        _assert_mapping_resolves_to_its_own_comuna_id(corrupted, index)
