@@ -19,7 +19,11 @@ Status: in progress. Implemented so far: legend tree with disjointness check
 - `fixtures/` small committed text fixtures, e.g. `comuna_name_mapping.json`
 - `data/manifest.json` committed provenance record (url, sha256, bytes) for
   every large source file the pipeline depends on; the files themselves
-  (xlsx, GeoTIFFs) are never committed
+  (xlsx, GeoTIFFs) are never committed. Note: the `downloadedAt` value for
+  `mapbiomas_lulc_col2_coverage` was reconstructed from the commit history
+  (the timestamp of the commit that added this manifest entry) because the
+  original capture instant was not preserved when the entry was first
+  committed -- it is not a live-captured value.
 
 ## Land cover (LULC) join
 
@@ -32,7 +36,10 @@ key; the join is scoped per region so two regions sharing a comuna name
 never cross-match. `join_coverage` requires an exact 86/86 match against
 Biobío + Ñuble + La Araucanía and runs `legend.assert_disjoint` per
 comuna-year before returning, aborting loudly instead of double counting if
-a class and one of its legend ancestors were ever present together.
+a class and one of its legend ancestors were ever present together. A blank
+year cell in the COVERAGE sheet (no observation for that class-year) is
+read as 0.0 hectares, not skipped or treated as missing, so aggregation
+never has to special-case an absent cell.
 
 **Class 3 ("Forest") vs 59/60/67, resolved empirically**: downloading the
 real workbook and inspecting every row confirms class 3 never appears at
