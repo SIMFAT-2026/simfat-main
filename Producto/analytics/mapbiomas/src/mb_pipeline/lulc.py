@@ -158,7 +158,19 @@ def join_coverage(
             )
         by_year = matched.setdefault(comuna_id, {})
         for year, hectares in row["years"].items():
-            by_year.setdefault(year, {})[row["class"]] = hectares
+            by_class = by_year.setdefault(year, {})
+            if row["class"] in by_class:
+                existing = by_class[row["class"]]
+                # Exact float equality: rows re-reading the same cell must be
+                # bit-identical; anything else is a genuine data conflict,
+                # not a rounding artifact, and must fail loudly rather than
+                # silently keep whichever row happened to come last.
+                if existing != hectares:
+                    raise LulcError(
+                        f"Conflicting duplicate rows for comuna={comuna_id!r} "
+                        f"year={year} class={row['class']}: {existing!r} != {hectares!r}"
+                    )
+            by_class[row["class"]] = hectares
 
     expected = set(expected_comuna_ids)
     got = set(matched)

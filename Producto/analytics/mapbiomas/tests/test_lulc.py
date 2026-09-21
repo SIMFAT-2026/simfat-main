@@ -164,6 +164,23 @@ def test_join_coverage_fails_loudly_when_not_all_expected_comunas_matched():
         lulc.join_coverage(rows, index, expected_comuna_ids={"CHL.6.1.1_1", "CHL.6.1.2_1"})
 
 
+def test_join_coverage_fails_loudly_on_conflicting_duplicate_rows():
+    """Two rows for the same (comuna, year, class) with different hectare
+    values must not silently last-write-win -- that would hide a data
+    problem instead of failing loudly, like the rest of this module does."""
+    rows = [
+        _row("Biobío", "Arauco", 59, {2020: 100.0}),
+        _row("Biobío", "Arauco", 59, {2020: 250.0}),
+    ]
+    index = {("Biobío", "ARAUCO"): "CHL.6.1.1_1"}
+
+    with pytest.raises(
+        lulc.LulcError,
+        match=r"CHL\.6\.1\.1_1.*2020.*59.*100(\.0)?.*250(\.0)?",
+    ):
+        lulc.join_coverage(rows, index, expected_comuna_ids={"CHL.6.1.1_1"})
+
+
 def test_join_coverage_fails_loudly_on_unmatched_row_name():
     rows = [_row("Biobío", "Not A Real Comuna", 59, {1999: 10.0})]
     index = {("Biobío", "ARAUCO"): "CHL.6.1.1_1"}
