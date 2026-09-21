@@ -123,6 +123,31 @@ def test_build_comuna_document_land_cover_can_be_none_with_a_reason():
     assert doc["landCoverReason"] == "LULC xlsx not processed in this slice"
 
 
+def test_build_comuna_document_omits_partial_flag_by_default():
+    doc = build_stats.build_comuna_document(
+        "CHL.6.1.1_1",
+        land_cover=None,
+        land_cover_reason="LULC xlsx not processed in this slice",
+        fire={"available": False},
+        provenance={},
+        computed_at="2026-09-21T00:00:00+00:00",
+    )
+    assert "partial" not in doc
+
+
+def test_build_comuna_document_can_be_marked_partial():
+    doc = build_stats.build_comuna_document(
+        "CHL.6.1.1_1",
+        land_cover=None,
+        land_cover_reason="fire-only 2017 partial seed",
+        fire={"available": False},
+        provenance={},
+        computed_at="2026-09-21T00:00:00+00:00",
+        partial=True,
+    )
+    assert doc["partial"] is True
+
+
 # --- combining a REAL join_coverage() output (still synthetic xlsx) --------
 
 

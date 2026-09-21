@@ -79,8 +79,17 @@ def build_comuna_document(
     provenance: dict,
     computed_at: str,
     land_cover_reason: str | None = None,
+    partial: bool | None = None,
 ) -> dict:
-    """Assemble one comuna's seed document from its landCover and fire sections."""
+    """Assemble one comuna's seed document from its landCover and fire sections.
+
+    ``partial`` is omitted from the document unless explicitly set, so a
+    full production seed's shape is unchanged; a caller writing a partial
+    seed (e.g. the fire-only 2017 subset, see
+    ``scripts/generate_fire_report_2017.py``) passes ``partial=True`` so a
+    downstream loader can machine-detect partial status instead of relying
+    only on filename/prose.
+    """
     doc = {
         "comunaId": comuna_id,
         "landCover": land_cover,
@@ -90,6 +99,8 @@ def build_comuna_document(
     }
     if land_cover is None:
         doc["landCoverReason"] = land_cover_reason
+    if partial is not None:
+        doc["partial"] = partial
     return doc
 
 

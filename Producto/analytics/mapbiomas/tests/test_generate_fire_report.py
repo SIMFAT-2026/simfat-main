@@ -67,3 +67,4 @@ def test_generate_writes_86_comunas_with_no_year_last_fire_contradiction(tmp_pat
     # landCover is out of scope for this slice; every document must say so.
     assert florida["landCover"] is None
     assert florida["landCoverReason"] is not None
+    assert florida["partial"] is True

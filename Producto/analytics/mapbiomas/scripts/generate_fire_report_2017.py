@@ -168,6 +168,7 @@ def generate(raster_dir: Path | None = None, data_dir: Path | None = None) -> tu
                 fire=fire_section,
                 provenance=_build_provenance(raster_info),
                 computed_at=computed_at,
+                partial=True,
             )
             docs.append(doc)
 
