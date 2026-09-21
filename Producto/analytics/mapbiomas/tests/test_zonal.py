@@ -137,3 +137,17 @@ def test_zeros_are_counted_even_if_raster_declares_nodata_zero(make_geotiff):
     path = make_geotiff(grid, -72.0, -33.0, 0.01, 0.01, nodata=0)
     result = zonal.zonal_stats(path, rect(-72.0, -33.10, -71.90, -33.0))
     assert result.value_pixels == {0: 99, 1: 1}
+
+
+def test_window_covers_far_edge_pixels_when_polygon_starts_mid_pixel(make_geotiff):
+    path = make_geotiff(np.ones((10, 10), dtype="uint8"), -72.0, -33.0, 0.01, 0.01)
+    # x from 2.7 to 5.6 pixels, y from 3.0 to 7.0: centers of columns 3, 4, 5 are inside
+    poly = rect(-72.0 + 0.027, -33.0 - 0.07, -72.0 + 0.056, -33.0 - 0.03)
+    assert zonal.zonal_stats(path, poly).pixel_count == 3 * 4
+
+
+def test_all_touched_false_excludes_partially_covered_pixels(make_geotiff):
+    path = make_geotiff(np.ones((10, 10), dtype="uint8"), -72.0, -33.0, 0.01, 0.01)
+    # thin sliver covering 40% of column 5 but not its center
+    poly = rect(-72.0 + 0.05, -33.0 - 0.07, -72.0 + 0.054, -33.0 - 0.03)
+    assert zonal.zonal_stats(path, poly).pixel_count == 0

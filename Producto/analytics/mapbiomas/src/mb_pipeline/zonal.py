@@ -48,8 +48,13 @@ def row_pixel_areas_m2(top: float, dlon: float, dlat: float, n_rows: int) -> np.
 def _window_for(src, geometry: dict) -> Window | None:
     coords = np.array(_flatten(geometry["coordinates"]))
     bounds = (coords[:, 0].min(), coords[:, 1].min(), coords[:, 0].max(), coords[:, 1].max())
-    window = from_bounds(*bounds, transform=src.transform)
-    window = window.round_offsets(op="floor").round_lengths(op="ceil")
+    exact = from_bounds(*bounds, transform=src.transform)
+    # Round the near and far edges independently so the window always covers
+    # every pixel the polygon can reach, whatever fraction the offset has.
+    col0, row0 = math.floor(exact.col_off), math.floor(exact.row_off)
+    col1 = math.ceil(exact.col_off + exact.width)
+    row1 = math.ceil(exact.row_off + exact.height)
+    window = Window(col0, row0, col1 - col0, row1 - row0)
     try:
         return window.intersection(Window(0, 0, src.width, src.height))
     except WindowError:
