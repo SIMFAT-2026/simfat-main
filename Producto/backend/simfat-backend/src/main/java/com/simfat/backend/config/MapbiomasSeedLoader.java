@@ -57,6 +57,26 @@ public class MapbiomasSeedLoader {
     @Value("${mapbiomas.seed.data-version:fuego-col1@2017-partial}")
     private String dataVersion;
 
+    // Test seam: lets tests point loadSeed() at a synthetic (e.g. deliberately malformed)
+    // resource without touching the real committed seed file. Same idiom as
+    // setSeedEnabled/setDataVersion below.
+    private String seedResourcePath = SEED_RESOURCE_PATH;
+
+    // Test seam: exposes the outcome of the most recent loadSeed() run so tests can
+    // assert on the computed status directly instead of parsing log output (this project
+    // has no log-capture test utility). volatile because loadSeed() can run on a
+    // different thread than the one reading it in a test.
+    private volatile SeedLoadSummary lastLoadSummary;
+
+    /**
+     * Immutable outcome of a {@link #loadSeed()} run. {@code status} is one of:
+     * {@code ok}, {@code degraded} (some lines failed but at least one loaded),
+     * {@code failed} (every line failed, nothing persisted), or {@code empty_result}
+     * (no line-level errors, but nothing was persisted anyway -- e.g. every referenced
+     * comuna was missing).
+     */
+    record SeedLoadSummary(String status, long loaded, long skipped, long errors) {}
+
     public MapbiomasSeedLoader(
         ComunaMapbiomasStatsRepository statsRepository,
         ComunaInfoRepository comunaInfoRepository,
@@ -86,6 +106,14 @@ public class MapbiomasSeedLoader {
         this.dataVersion = dataVersion;
     }
 
+    void setSeedResourcePath(String seedResourcePath) {
+        this.seedResourcePath = seedResourcePath;
+    }
+
+    SeedLoadSummary getLastLoadSummary() {
+        return lastLoadSummary;
+    }
+
     @EventListener(ComunaGeometrySeededEvent.class)
     public void loadSeed() {
         if (!seedEnabled) {
@@ -93,9 +121,9 @@ public class MapbiomasSeedLoader {
             return;
         }
 
-        ClassPathResource resource = new ClassPathResource(SEED_RESOURCE_PATH);
+        ClassPathResource resource = new ClassPathResource(seedResourcePath);
         if (!resource.exists()) {
-            LOGGER.warn("mapbiomas_seed status=file_not_found path={}", SEED_RESOURCE_PATH);
+            LOGGER.warn("mapbiomas_seed status=file_not_found path={}", seedResourcePath);
             return;
         }
 
@@ -133,10 +161,49 @@ public class MapbiomasSeedLoader {
         }
 
         statsRepository.saveAll(toSave);
-        LOGGER.info(
-            "mapbiomas_seed status=ok dataVersion={} loaded={} skipped={} errors={}",
-            dataVersion, loaded, skipped, errors
-        );
+
+        String status = computeStatus(loaded, skipped, errors);
+        lastLoadSummary = new SeedLoadSummary(status, loaded, skipped, errors);
+
+        // Branch level/status instead of always logging status=ok (the bug this fix
+        // addresses): a future schema drift that breaks every line's deserialization
+        // (a type change, not just an added field -- FAIL_ON_UNKNOWN_PROPERTIES only
+        // protects against unknown fields, as the fire.reason incident already showed for
+        // missing fields) must not look identical to a healthy boot to an operator or an
+        // alerting rule keyed on the literal "status=ok". Mirrors the
+        // status=failed/LOGGER.error convention BackfillComunaIdRunner already uses for
+        // its own failure case; "degraded" and "empty_result" are new, more granular
+        // statuses for this loader's per-line (not whole-job) failure mode.
+        switch (status) {
+            case "failed" -> LOGGER.error(
+                "mapbiomas_seed status=failed dataVersion={} loaded={} skipped={} errors={}",
+                dataVersion, loaded, skipped, errors
+            );
+            case "degraded", "empty_result" -> LOGGER.warn(
+                "mapbiomas_seed status={} dataVersion={} loaded={} skipped={} errors={}",
+                status, dataVersion, loaded, skipped, errors
+            );
+            default -> LOGGER.info(
+                "mapbiomas_seed status=ok dataVersion={} loaded={} skipped={} errors={}",
+                dataVersion, loaded, skipped, errors
+            );
+        }
+    }
+
+    // Pure decision function behind the summary log above: kept static/package-private so
+    // it is directly unit-testable without Mongo or Spring (same rationale as
+    // mapRawRecord below).
+    static String computeStatus(long loaded, long skipped, long errors) {
+        if (errors > 0 && loaded == 0) {
+            return "failed";
+        }
+        if (errors > 0) {
+            return "degraded";
+        }
+        if (loaded == 0 && (skipped > 0 || errors > 0)) {
+            return "empty_result";
+        }
+        return "ok";
     }
 
     // Pure conversion: raw seed JSON line + the comuna it belongs to -> the persisted
