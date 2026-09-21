@@ -12,58 +12,85 @@ import pytest
 from mb_pipeline import fire_stats
 from mb_pipeline.zonal import ZonalResult
 
-# --- year_fire_stats: coverage/burned fraction from a single year's pair -----
+# --- annual_burned_fraction: burned/total from the annual raster alone ------
+#
+# EMPIRICAL FINDING (real 2017 data, see README "annual_burned_coverage_v1
+# discovery"): annual_burned_coverage_v1's nonzero pixel count is EXACTLY
+# equal to annual_burned_v1's burned-pixel count in every comuna checked
+# (confirmed for Arauco, Cañete, Contulmo, Curanilahue, Lebu, Florida). It
+# encodes the LAND-COVER CLASS of pixels that burned, not "was this pixel
+# classified/mapped at all" -- so it cannot be used as a mapped-area
+# denominator. annual_burned_v1 itself has no nodata, so burned fraction is
+# computed against its OWN total polygon area.
 
 
-def test_fully_mapped_comuna_with_no_burn():
+def test_no_burn_gives_zero_fraction():
     annual = ZonalResult(pixel_count=100, area_ha=100.0, value_pixels={0: 100}, value_area_ha={0: 100.0})
-    coverage = ZonalResult(
-        pixel_count=100, area_ha=100.0, value_pixels={3: 100}, value_area_ha={3: 100.0}
-    )
-    result = fire_stats.year_fire_stats(annual, coverage)
-    assert result["coverageFraction"] == pytest.approx(1.0)
-    assert result["mappedHa"] == pytest.approx(100.0)
+    result = fire_stats.annual_burned_fraction(annual)
+    assert result["totalHa"] == pytest.approx(100.0)
     assert result["burnedHa"] == pytest.approx(0.0)
     assert result["burnedFraction"] == pytest.approx(0.0)
 
 
-def test_burned_fraction_uses_mapped_area_not_total_pixel_count():
-    # Half the comuna was never classified (coverage value 0); of the mapped
-    # half, a quarter of ITS area burned. burnedFraction must be computed
-    # against the 50 mapped ha, not the 100 total ha.
+def test_partial_burn_fraction_is_burned_over_total():
     annual = ZonalResult(
         pixel_count=100, area_ha=100.0, value_pixels={0: 87, 1: 13}, value_area_ha={0: 87.0, 1: 13.0}
     )
-    coverage = ZonalResult(
-        pixel_count=100, area_ha=100.0, value_pixels={0: 50, 3: 50}, value_area_ha={0: 50.0, 3: 50.0}
-    )
-    result = fire_stats.year_fire_stats(annual, coverage)
-    assert result["mappedHa"] == pytest.approx(50.0)
-    assert result["coverageFraction"] == pytest.approx(0.5)
+    result = fire_stats.annual_burned_fraction(annual)
     assert result["burnedHa"] == pytest.approx(13.0)
-    # 13 / 50 (mapped), NOT 13 / 100 (total)
-    assert result["burnedFraction"] == pytest.approx(0.26)
+    assert result["burnedFraction"] == pytest.approx(0.13)
 
 
-def test_comuna_fully_outside_mapped_area_gives_zero_coverage_not_a_crash():
-    # Polygon does not intersect the raster at all: zonal_stats returns the
-    # empty ZonalResult() (area_ha=0). Division by zero must not happen.
-    annual = ZonalResult()
-    coverage = ZonalResult()
-    result = fire_stats.year_fire_stats(annual, coverage)
-    assert result["coverageFraction"] == 0.0
-    assert result["mappedHa"] == 0.0
+def test_comuna_outside_raster_gives_zero_not_a_crash():
+    result = fire_stats.annual_burned_fraction(ZonalResult())
+    assert result["totalHa"] == 0.0
     assert result["burnedHa"] == 0.0
     assert result["burnedFraction"] == 0.0
 
 
-def test_partially_mapped_comuna_reports_the_exact_fraction():
-    coverage = ZonalResult(
-        pixel_count=4, area_ha=4.0, value_pixels={0: 1, 3: 3}, value_area_ha={0: 1.0, 3: 3.0}
-    )
-    annual = ZonalResult(pixel_count=4, area_ha=4.0, value_pixels={0: 4}, value_area_ha={0: 4.0})
-    result = fire_stats.year_fire_stats(annual, coverage)
-    assert result["coverageFraction"] == pytest.approx(0.75)
+# --- bbox_coverage_fraction: is the comuna's geometry inside the raster? ----
+#
+# This replaces the originally-planned "coverage raster as mapped-area mask"
+# gate (falsified above). It measures how much of the comuna's bounding box
+# overlaps the raster's own declared bounding box -- a real geometry+raster
+# extent check, not derived from pixel values at all. For our 3 target
+# regions this is 1.0 for every comuna (Fuego Col 1's bbox comfortably
+# encloses Biobío/Ñuble/Araucanía); the function stays generic so it also
+# catches a comuna that would straddle the raster edge.
+
+
+def _rect(west, south, east, north):
+    return {
+        "type": "Polygon",
+        "coordinates": [[[west, south], [east, south], [east, north], [west, north], [west, south]]],
+    }
+
+
+def test_bbox_coverage_fraction_full_containment_is_1():
+    geometry = _rect(-73.0, -38.0, -72.5, -37.5)
+    raster_bounds = (-74.85, -44.07, -69.77, -32.02)
+    assert fire_stats.bbox_coverage_fraction(geometry, raster_bounds) == pytest.approx(1.0)
+
+
+def test_bbox_coverage_fraction_partial_overlap_is_the_intersection_ratio():
+    # geometry spans lon -70..-68 (width 2); only -70..-69.77 (width 0.23) is
+    # inside the raster's east bound (-69.77) -> 0.23 / 2 = 0.115.
+    geometry = _rect(-70.0, -38.0, -68.0, -37.0)
+    raster_bounds = (-74.85, -44.07, -69.77, -32.02)
+    assert fire_stats.bbox_coverage_fraction(geometry, raster_bounds) == pytest.approx(0.115, abs=1e-3)
+
+
+def test_bbox_coverage_fraction_no_overlap_is_0():
+    geometry = _rect(10.0, 10.0, 11.0, 11.0)
+    raster_bounds = (-74.85, -44.07, -69.77, -32.02)
+    assert fire_stats.bbox_coverage_fraction(geometry, raster_bounds) == 0.0
+
+
+def test_bbox_coverage_fraction_accepts_a_feature_wrapper():
+    geometry = _rect(-73.0, -38.0, -72.5, -37.5)
+    feature = {"type": "Feature", "properties": {}, "geometry": geometry}
+    raster_bounds = (-74.85, -44.07, -69.77, -32.02)
+    assert fire_stats.bbox_coverage_fraction(feature, raster_bounds) == pytest.approx(1.0)
 
 
 # --- available_flag (MCS-8 gate) --------------------------------------------

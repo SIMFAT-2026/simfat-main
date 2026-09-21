@@ -4,14 +4,25 @@ Every function here takes ``zonal.ZonalResult`` (or plain dicts derived from
 one) and returns plain dicts -- no raster I/O, no filesystem access -- so the
 aggregation rules are unit-testable without a single GeoTIFF.
 
-Denominator rule (MCS-6b): the Fuego rasters carry no nodata sentinel, so a
-pixel value of 0 in ``annual_burned_v1`` is real data ("not burned"), not
-"unmapped". Whether a pixel was classified AT ALL that year comes from the
-paired ``annual_burned_coverage_v1`` raster instead: it holds a land-cover
-class code (matching the MapBiomas legend) for every pixel that was
-classified, and 0 for pixels that were not (no legend code is 0). Burned
-fraction is therefore always computed against the MAPPED area, never the
-raw polygon/pixel-count area.
+Denominator rule (MCS-6b, AMENDED after real-data evidence): the Fuego
+rasters carry no nodata sentinel, so a pixel value of 0 in
+``annual_burned_v1`` is real data ("not burned"), not "unmapped" -- burned
+fraction is computed against the raster's OWN total polygon area.
+
+EMPIRICAL FINDING (2026-09-21, real 2017 rasters): the original plan was to
+use ``annual_burned_coverage_v1`` as a "was this pixel classified/mapped at
+all this year" mask, dividing burned area by that mapped area instead of
+the raw polygon area. Downloading the real 2017 file and comparing it
+pixel-for-pixel against ``annual_burned_v1`` for every Biobío comuna shows
+this is WRONG: ``annual_burned_coverage_v1``'s nonzero pixel count is
+EXACTLY EQUAL to ``annual_burned_v1``'s burned-pixel count in every comuna
+tested (Arauco 0==0, Cañete 474==474, Curanilahue 850==850, Florida
+401472==401472, ...). The dataset holds the LAND-COVER CLASS OF PIXELS THAT
+BURNED that year (useful for fuel-type-of-burn analysis), not a general
+mapped/observed-area indicator; using it as a "mapped area" denominator
+would make burnedFraction == 1.0 for every comuna with any fire at all,
+which is a degenerate, useless gate. ``bbox_coverage_fraction`` below is
+the real replacement for the "is this comuna's Fuego data usable" gate.
 """
 from __future__ import annotations
 
@@ -19,27 +30,55 @@ from typing import Mapping, Sequence
 
 from .zonal import ZonalResult
 
-UNMAPPED_VALUE = 0
 BURNED_VALUE = 1
 NO_FIRE_VALUE = 0
 
 
-def year_fire_stats(
-    annual: ZonalResult, coverage: ZonalResult, *, unmapped_value: int = UNMAPPED_VALUE
-) -> dict:
-    """Coverage and burned fraction for one comuna-year from its raster pair."""
-    total_ha = coverage.area_ha
-    mapped_ha = total_ha - coverage.value_area_ha.get(unmapped_value, 0.0)
-    coverage_fraction = mapped_ha / total_ha if total_ha > 0 else 0.0
+def annual_burned_fraction(annual: ZonalResult) -> dict:
+    """Burned hectares and fraction for one comuna-year, from the annual raster alone.
+
+    ``annual_burned_v1`` has no nodata, so its own zonal area IS the
+    comuna's observed total for that year; no second raster is needed.
+    """
+    total_ha = annual.area_ha
     burned_ha = annual.value_area_ha.get(BURNED_VALUE, 0.0)
-    burned_fraction = burned_ha / mapped_ha if mapped_ha > 0 else 0.0
-    return {
-        "mappedHa": mapped_ha,
-        "totalHa": total_ha,
-        "coverageFraction": coverage_fraction,
-        "burnedHa": burned_ha,
-        "burnedFraction": burned_fraction,
-    }
+    burned_fraction = burned_ha / total_ha if total_ha > 0 else 0.0
+    return {"totalHa": total_ha, "burnedHa": burned_ha, "burnedFraction": burned_fraction}
+
+
+def _flatten_coords(coords):
+    if coords and isinstance(coords[0], (int, float)):
+        return [coords]
+    return [pt for part in coords for pt in _flatten_coords(part)]
+
+
+def _geometry_bbox(geometry: dict) -> tuple[float, float, float, float]:
+    """(west, south, east, north) of a Polygon/MultiPolygon or Feature wrapping one."""
+    if geometry.get("type") == "Feature":
+        geometry = geometry["geometry"]
+    points = _flatten_coords(geometry["coordinates"])
+    lons = [p[0] for p in points]
+    lats = [p[1] for p in points]
+    return min(lons), min(lats), max(lons), max(lats)
+
+
+def bbox_coverage_fraction(geometry: dict, raster_bounds: tuple[float, float, float, float]) -> float:
+    """Fraction of ``geometry``'s bounding box that overlaps ``raster_bounds``.
+
+    Replaces the falsified "coverage raster as mapped-area mask" plan (see
+    module docstring): this checks the comuna's geometry against the
+    raster's own declared spatial extent, independent of any pixel value.
+    1.0 means the comuna is fully inside the raster's footprint; a value
+    below the gate threshold flags a comuna that straddles or falls outside
+    the collection's coverage area.
+    """
+    west, south, east, north = _geometry_bbox(geometry)
+    rwest, rsouth, reast, rnorth = raster_bounds
+    inter_w, inter_s = max(west, rwest), max(south, rsouth)
+    inter_e, inter_n = min(east, reast), min(north, rnorth)
+    inter_area = max(0.0, inter_e - inter_w) * max(0.0, inter_n - inter_s)
+    geom_area = max(0.0, east - west) * max(0.0, north - south)
+    return inter_area / geom_area if geom_area > 0 else 0.0
 
 
 def available_flag(coverage_fraction: float, *, threshold: float) -> bool:
