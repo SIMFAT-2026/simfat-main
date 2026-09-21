@@ -65,6 +65,57 @@ class MapbiomasSeedLoaderMappingTest {
     }
 
     @Test
+    void mapRawRecord_realSeedLineWithFireReasonField_doesNotThrowUnrecognizedProperty() throws Exception {
+        // Exact line 1 of the real committed seed
+        // (src/main/resources/seed/mapbiomas/comuna-mapbiomas-stats.fuego-col1-2017-partial.jsonl).
+        // Every one of the 86 lines carries "fire.reason" (nullable string explaining why
+        // fire.available is false; null when available=true), which the Fire model was
+        // missing entirely -- with a plain, unconfigured ObjectMapper this made
+        // treeToValue() throw UnrecognizedPropertyException for every single seed line
+        // (see MapbiomasSeedLoaderIntegrationTest, which loads 0 of 86 documents before
+        // this fix).
+        String raw = "{\"comunaId\":\"CHL.6.1.1_1\",\"landCover\":null,\"fire\":{\"available\":true,"
+            + "\"coverageFraction\":1.0,\"burnedHaByYear\":{\"2017\":0.0},"
+            + "\"burnedFractionByYear\":{\"2017\":0.0},\"frequencyMean\":0.06870792202430369,"
+            + "\"frequencyMax\":2,\"yearLastFire\":2016,\"yearsSinceLastFire\":1,\"reason\":null},"
+            + "\"provenance\":{\"sources\":[\"mapbiomas_fire_chile_col1_annual_burned_2017.tif\"],"
+            + "\"scope\":\"S1b real-data subset: fire year(s) 2017; frequency window 2013-2017\","
+            + "\"downloadDate\":\"2026-09-21\"},"
+            + "\"computedAt\":\"2026-09-21T18:17:35.689908+00:00\","
+            + "\"landCoverReason\":\"LULC xlsx not processed in this S1b slice (fire-only real-data subset); "
+            + "see sdd apply-progress for scope.\",\"partial\":true}";
+        JsonNode node = objectMapper.readTree(raw);
+        ComunaInfo info = comunaInfo("CHL.6.1.1_1", "Arauco", "biobio");
+
+        ComunaMapbiomasStats result = MapbiomasSeedLoader.mapRawRecord(node, info, "fuego-col1@2017-partial", objectMapper);
+
+        assertThat(result.getFire()).isNotNull();
+        assertThat(result.getFire().getReason()).isNull();
+        assertThat(result.getFire().getAvailable()).isTrue();
+        assertThat(result.getFire().getYearLastFire()).isEqualTo(2016);
+    }
+
+    @Test
+    void mapRawRecord_fireReasonPopulated_whenAvailableFalse() throws Exception {
+        // Real semantics from mb_pipeline/fire_stats.py::build_fire_section: "reason" is
+        // non-null exactly when "available" is false, explaining why (e.g. coverage below
+        // threshold, or no fire years processed for the comuna).
+        String raw = "{\"comunaId\":\"CHL.6.9.9_1\",\"landCover\":null,\"fire\":{\"available\":false,"
+            + "\"coverageFraction\":0.42,\"burnedHaByYear\":{},\"burnedFractionByYear\":{},"
+            + "\"frequencyMean\":null,\"frequencyMax\":null,\"yearLastFire\":null,\"yearsSinceLastFire\":null,"
+            + "\"reason\":\"coverageFraction 0.4200 below threshold 0.8\"},"
+            + "\"provenance\":{\"sources\":[],\"scope\":\"2017\",\"downloadDate\":\"2026-09-21\"},"
+            + "\"computedAt\":\"2026-09-21T18:17:35.689908Z\",\"partial\":true}";
+        JsonNode node = objectMapper.readTree(raw);
+        ComunaInfo info = comunaInfo("CHL.6.9.9_1", "Ejemplo", "biobio");
+
+        ComunaMapbiomasStats result = MapbiomasSeedLoader.mapRawRecord(node, info, "fuego-col1@2017-partial", objectMapper);
+
+        assertThat(result.getFire().getAvailable()).isFalse();
+        assertThat(result.getFire().getReason()).isEqualTo("coverageFraction 0.4200 below threshold 0.8");
+    }
+
+    @Test
     void mapRawRecord_differentComunaAndVersion_producesDifferentDeterministicId() throws Exception {
         String raw = "{"
             + "\"comunaId\":\"CHL.6.1.2_1\","
