@@ -107,6 +107,7 @@ def year_last_fire_stats(ylf: ZonalResult, *, no_fire_value: int = NO_FIRE_VALUE
 def build_fire_section(
     per_year: Mapping[int, dict],
     *,
+    coverage_fraction: float,
     frequency: Mapping,
     year_last_fire: Mapping,
     threshold: float,
@@ -117,6 +118,15 @@ def build_fire_section(
     ``available=False`` never hides the underlying numbers (MCS-8): a comuna
     below the coverage threshold still reports its real coverageFraction and
     burnedHaByYear, plus a stated ``reason`` for why it is not usable.
+
+    ``coverage_fraction`` is an EXPLICIT, per-comuna parameter (computed once
+    via ``bbox_coverage_fraction``), not read out of each per-year dict.
+    Coverage is a property of the comuna's geometry vs. the raster's extent,
+    not of any individual fire-year -- and ``annual_burned_fraction`` (the
+    only production source of per-year stats) never returns a
+    ``coverageFraction`` key, so reading it from ``per_year`` values raised a
+    ``KeyError`` on every real call (CRITICAL 2 in the S1b jd-fix review; see
+    ``tests/test_fire_stats.py::test_build_fire_section_composes_with_real_annual_burned_fraction_no_key_error``).
     """
     if not per_year:
         return {
@@ -131,7 +141,6 @@ def build_fire_section(
             "reason": "no fire years processed for this comuna",
         }
 
-    coverage_fraction = min(stats["coverageFraction"] for stats in per_year.values())
     burned_ha_by_year = {str(year): stats["burnedHa"] for year, stats in per_year.items()}
     burned_fraction_by_year = {str(year): stats["burnedFraction"] for year, stats in per_year.items()}
     available = available_flag(coverage_fraction, threshold=threshold)

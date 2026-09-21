@@ -148,18 +148,19 @@ def test_year_last_fire_none_when_polygon_outside_raster():
 
 def test_build_fire_section_combines_multiple_years():
     per_year = {
-        2016: {"coverageFraction": 0.99, "mappedHa": 99.0, "burnedHa": 0.0, "burnedFraction": 0.0},
-        2017: {"coverageFraction": 0.97, "mappedHa": 97.0, "burnedHa": 20.0, "burnedFraction": 20 / 97},
+        2016: {"mappedHa": 99.0, "burnedHa": 0.0, "burnedFraction": 0.0},
+        2017: {"mappedHa": 97.0, "burnedHa": 20.0, "burnedFraction": 20 / 97},
     }
     section = fire_stats.build_fire_section(
         per_year,
+        coverage_fraction=0.97,
         frequency={"frequencyMean": 0.3, "frequencyMax": 2},
         year_last_fire={"yearLastFire": 2017},
         threshold=0.95,
         as_of_year=2017,
     )
     assert section["available"] is True
-    assert section["coverageFraction"] == pytest.approx(0.97)  # the min across processed years
+    assert section["coverageFraction"] == pytest.approx(0.97)  # the explicit per-comuna coverage_fraction
     assert section["burnedHaByYear"] == {"2016": 0.0, "2017": 20.0}
     assert section["burnedFractionByYear"]["2017"] == pytest.approx(20 / 97)
     assert section["frequencyMean"] == pytest.approx(0.3)
@@ -170,11 +171,12 @@ def test_build_fire_section_combines_multiple_years():
 
 def test_build_fire_section_burned_only_in_one_year_leaves_the_other_at_zero():
     per_year = {
-        2015: {"coverageFraction": 0.99, "mappedHa": 99.0, "burnedHa": 40.0, "burnedFraction": 40 / 99},
-        2016: {"coverageFraction": 0.99, "mappedHa": 99.0, "burnedHa": 0.0, "burnedFraction": 0.0},
+        2015: {"mappedHa": 99.0, "burnedHa": 40.0, "burnedFraction": 40 / 99},
+        2016: {"mappedHa": 99.0, "burnedHa": 0.0, "burnedFraction": 0.0},
     }
     section = fire_stats.build_fire_section(
         per_year,
+        coverage_fraction=0.99,
         frequency={"frequencyMean": 0.5, "frequencyMax": 1},
         year_last_fire={"yearLastFire": 2015},
         threshold=0.95,
@@ -189,9 +191,10 @@ def test_build_fire_section_below_threshold_is_unavailable_but_keeps_real_number
     # Biobio gate failure case: available=False, but burnedHaByYear/coverageFraction
     # are the REAL computed values, not hidden or zeroed out (design rule: no
     # hidden zero, a documented reason instead).
-    per_year = {2017: {"coverageFraction": 0.40, "mappedHa": 40.0, "burnedHa": 5.0, "burnedFraction": 0.125}}
+    per_year = {2017: {"mappedHa": 40.0, "burnedHa": 5.0, "burnedFraction": 0.125}}
     section = fire_stats.build_fire_section(
         per_year,
+        coverage_fraction=0.40,
         frequency={"frequencyMean": None, "frequencyMax": None},
         year_last_fire={"yearLastFire": None},
         threshold=0.95,
@@ -207,7 +210,42 @@ def test_build_fire_section_no_processed_years_is_unavailable_with_a_reason():
     section = fire_stats.build_fire_section(
         {}, frequency={"frequencyMean": None, "frequencyMax": None},
         year_last_fire={"yearLastFire": None}, threshold=0.95, as_of_year=2017,
+        coverage_fraction=1.0,
     )
     assert section["available"] is False
     assert section["burnedHaByYear"] == {}
     assert section["reason"] is not None
+
+
+# --- build_fire_section composes with the REAL per-year functions (CRITICAL 2)
+#
+# Regression test for a real KeyError: build_fire_section used to read
+# "coverageFraction" out of each per-year dict, but annual_burned_fraction()
+# (the only production source of per-year stats) never puts that key there
+# -- coverage is a per-comuna property, not a per-year one. This chains the
+# real functions, with no hand-patched per_year dict, to prove the two
+# compose without exploding.
+
+
+def test_build_fire_section_composes_with_real_annual_burned_fraction_no_key_error():
+    geometry = _rect(-73.0, -38.0, -72.5, -37.5)
+    raster_bounds = (-74.85, -44.07, -69.77, -32.02)
+    coverage_fraction = fire_stats.bbox_coverage_fraction(geometry, raster_bounds)
+
+    annual_2017 = ZonalResult(
+        pixel_count=100, area_ha=100.0, value_pixels={0: 87, 1: 13}, value_area_ha={0: 87.0, 1: 13.0}
+    )
+    per_year = {2017: fire_stats.annual_burned_fraction(annual_2017)}
+
+    section = fire_stats.build_fire_section(
+        per_year,
+        coverage_fraction=coverage_fraction,
+        frequency={"frequencyMean": 0.3, "frequencyMax": 1},
+        year_last_fire={"yearLastFire": 2017},
+        threshold=0.95,
+        as_of_year=2017,
+    )
+
+    assert section["available"] is True
+    assert section["coverageFraction"] == pytest.approx(1.0)
+    assert section["burnedFractionByYear"]["2017"] == pytest.approx(0.13)
