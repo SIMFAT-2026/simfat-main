@@ -189,3 +189,123 @@ def test_all_touched_false_excludes_partially_covered_pixels(make_geotiff):
     # thin sliver covering 40% of column 5 but not its center
     poly = rect(-72.0 + 0.05, -33.0 - 0.07, -72.0 + 0.054, -33.0 - 0.03)
     assert zonal.zonal_stats(path, poly).pixel_count == 0
+
+
+# --- raster contract guards ---------------------------------------------------
+
+
+def _write(path, array, transform, crs="EPSG:4326"):
+    import rasterio
+
+    array = np.asarray(array)
+    with rasterio.open(
+        path, "w", driver="GTiff", height=array.shape[0], width=array.shape[1],
+        count=1, dtype=array.dtype, crs=crs, transform=transform,
+    ) as dst:
+        dst.write(array, 1)
+    return path
+
+
+def test_rotated_transform_is_rejected(tmp_path):
+    from affine import Affine
+
+    path = _write(tmp_path / "rot.tif", np.ones((10, 10), "uint8"),
+                  Affine(0.01, 0.001, -72.0, 0.001, -0.01, -33.0))
+    with pytest.raises(ValueError, match="north-up"):
+        zonal.zonal_stats(path, rect(-72.0, -33.1, -71.9, -33.0))
+
+
+def test_south_up_transform_is_rejected(tmp_path):
+    from affine import Affine
+
+    path = _write(tmp_path / "south.tif", np.ones((10, 10), "uint8"),
+                  Affine(0.01, 0.0, -72.0, 0.0, 0.01, -33.1))
+    with pytest.raises(ValueError, match="north-up"):
+        zonal.zonal_stats(path, rect(-72.0, -33.1, -71.9, -33.0))
+
+
+@pytest.mark.parametrize("dtype", ["float32", "float64"])
+def test_float_raster_is_rejected(make_geotiff, dtype):
+    grid = np.ones((10, 10), dtype=dtype)
+    path = make_geotiff(grid, -72.0, -33.0, 0.01, 0.01)
+    with pytest.raises(ValueError, match="integer raster"):
+        zonal.zonal_stats(path, rect(-72.0, -33.1, -71.9, -33.0))
+
+
+def test_float_raster_with_nan_is_rejected(make_geotiff):
+    grid = np.ones((10, 10), dtype="float32")
+    grid[0, 0] = np.nan
+    path = make_geotiff(grid, -72.0, -33.0, 0.01, 0.01)
+    with pytest.raises(ValueError, match="integer raster"):
+        zonal.zonal_stats(path, rect(-72.0, -33.1, -71.9, -33.0))
+
+
+def test_non_4326_crs_is_rejected(tmp_path):
+    from rasterio.transform import from_origin
+
+    path = _write(tmp_path / "utm.tif", np.ones((10, 10), "uint8"),
+                  from_origin(300000, 6000000, 30, 30), crs="EPSG:32718")
+    with pytest.raises(ValueError, match="EPSG:4326"):
+        zonal.zonal_stats(path, rect(-72.0, -33.1, -71.9, -33.0))
+
+
+# --- geometry validation ------------------------------------------------------
+
+
+def test_feature_is_unwrapped_and_matches_bare_geometry(make_geotiff):
+    path = make_geotiff(_grid(), -72.0, -33.0, 0.01, 0.01)
+    geom = rect(-72.0 + 0.02, -33.0 - 0.07, -72.0 + 0.06, -33.0 - 0.03)
+    feature = {"type": "Feature", "properties": {}, "geometry": geom}
+    assert zonal.zonal_stats(path, feature) == zonal.zonal_stats(path, geom)
+
+
+def test_multipolygon_with_two_adjoining_parts(make_geotiff):
+    path = make_geotiff(np.ones((10, 10), dtype="uint8"), -72.0, -33.0, 0.01, 0.01)
+    left = rect(-72.0, -33.05, -71.95, -33.0)["coordinates"]
+    right = rect(-71.95, -33.10, -71.90, -33.05)["coordinates"]
+    # two 5x5 parts touching at a corner (rows 0-4/cols 0-4 and rows 5-9/cols 5-9)
+    multi = {"type": "MultiPolygon", "coordinates": [left, right]}
+    result = zonal.zonal_stats(path, multi)
+    assert result.pixel_count == 50
+
+
+def test_geometry_collection_is_rejected(make_geotiff):
+    path = make_geotiff(_grid(), -72.0, -33.0, 0.01, 0.01)
+    coll = {"type": "GeometryCollection", "geometries": [rect(-72.0, -33.1, -71.9, -33.0)]}
+    with pytest.raises(ValueError, match="GeometryCollection"):
+        zonal.zonal_stats(path, coll)
+
+
+def test_feature_collection_is_rejected(make_geotiff):
+    path = make_geotiff(_grid(), -72.0, -33.0, 0.01, 0.01)
+    fc = {"type": "FeatureCollection", "features": []}
+    with pytest.raises(ValueError, match="FeatureCollection"):
+        zonal.zonal_stats(path, fc)
+
+
+def test_point_geometry_is_rejected(make_geotiff):
+    path = make_geotiff(_grid(), -72.0, -33.0, 0.01, 0.01)
+    with pytest.raises(ValueError, match="Point"):
+        zonal.zonal_stats(path, {"type": "Point", "coordinates": [-72.0, -33.0]})
+
+
+# --- clipping on every side and non-square pixels -------------------------------
+
+
+def test_polygon_spilling_west_is_clipped(make_geotiff):
+    path = make_geotiff(np.ones((10, 10), dtype="uint8"), -72.0, -33.0, 0.01, 0.01)
+    assert zonal.zonal_stats(path, rect(-73.0, -33.10, -71.98, -33.0)).pixel_count == 20
+
+
+def test_polygon_spilling_north_is_clipped(make_geotiff):
+    path = make_geotiff(np.ones((10, 10), dtype="uint8"), -72.0, -33.0, 0.01, 0.01)
+    assert zonal.zonal_stats(path, rect(-72.0, -33.02, -71.9, -32.0)).pixel_count == 20
+
+
+def test_non_square_pixel_area_and_counts(make_geotiff):
+    dlon, dlat, n_c, n_r, north = 0.004, 0.001, 20, 50, -37.0
+    path = make_geotiff(np.ones((n_r, n_c), dtype="uint8"), -72.0, north, dlon, dlat)
+    result = zonal.zonal_stats(path, rect(-72.0, north - n_r * dlat, -72.0 + n_c * dlon, north))
+    assert result.pixel_count == n_r * n_c
+    expected = analytic_rect_ha(-72.0, north - n_r * dlat, -72.0 + n_c * dlon, north)
+    assert result.area_ha == pytest.approx(expected, rel=1e-4)
