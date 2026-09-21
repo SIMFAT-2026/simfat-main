@@ -5,8 +5,11 @@ import pytest
 
 from mb_pipeline import zonal
 
-M_PER_DEG_LON_EQ = 111320.0
-M_PER_DEG_LAT = 110540.0
+# WGS84 constants, restated here on purpose: the oracle below must not import
+# anything from the production module.
+WGS84_A = 6378137.0
+WGS84_F = 1 / 298.257223563
+WGS84_E2 = WGS84_F * (2 - WGS84_F)
 
 
 def rect(west, south, east, north):
@@ -16,23 +19,57 @@ def rect(west, south, east, north):
     }
 
 
+def _authalic_f(phi_deg):
+    e = math.sqrt(WGS84_E2)
+    s = math.sin(math.radians(phi_deg))
+    return s / (2 * (1 - WGS84_E2 * s * s)) + math.log((1 + e * s) / (1 - e * s)) / (4 * e)
+
+
 def analytic_rect_ha(west, south, east, north):
-    mid = math.radians((south + north) / 2)
-    return (east - west) * M_PER_DEG_LON_EQ * math.cos(mid) * (north - south) * M_PER_DEG_LAT / 1e4
+    """Exact WGS84 area of a lat/lon cell, in hectares.
+
+    Formula-independent oracle: it uses the closed-form authalic integral
+    (b^2 * dlam * [F(phi2) - F(phi1)]), not the radii-of-curvature product used
+    by the production code, so the two cannot share a mistake.
+    """
+    b2 = WGS84_A**2 * (1 - WGS84_E2)
+    dlam = math.radians(east - west)
+    return dlam * b2 * (_authalic_f(north) - _authalic_f(south)) / 1e4
 
 
-# --- analytic pixel area -----------------------------------------------------
+# --- oracle sanity: pinned values computed once from the closed form ----------
 
 
-def test_pixel_area_at_equator():
-    assert zonal.pixel_area_m2(0.0, 0.001, 0.001) == pytest.approx(
-        0.001 * M_PER_DEG_LON_EQ * 0.001 * M_PER_DEG_LAT
-    )
+def test_oracle_pinned_values():
+    assert analytic_rect_ha(-72.0, -33.1, -71.9, -33.0) == pytest.approx(10358.609956, rel=1e-9)
+    assert analytic_rect_ha(-72.0, -40.0, -71.9, -39.9) == pytest.approx(9488.504212, rel=1e-9)
+    assert analytic_rect_ha(-72.0, -34.0, -71.9, -33.0) == pytest.approx(103062.225707, rel=1e-9)
 
 
-def test_pixel_area_at_60_degrees_is_half_of_equator():
-    eq = zonal.pixel_area_m2(0.0, 0.0005, 0.0005)
-    assert zonal.pixel_area_m2(-60.0, 0.0005, 0.0005) == pytest.approx(eq / 2, rel=1e-9)
+# --- pixel area vs the independent oracle -------------------------------------
+
+
+@pytest.mark.parametrize("lat", [-33.0, -37.0, -39.7])
+def test_pixel_area_matches_ellipsoidal_oracle(lat):
+    d = 0.0005
+    expected = analytic_rect_ha(-72.0, lat - d / 2, -72.0 + d, lat + d / 2) * 1e4
+    assert zonal.pixel_area_m2(lat, d, d) == pytest.approx(expected, rel=1e-4)
+
+
+@pytest.mark.parametrize("lat", [-33.0, -39.7])
+def test_row_areas_match_ellipsoidal_oracle(lat):
+    d = 0.0005
+    top = lat + d / 2
+    areas = zonal.row_pixel_areas_m2(top=top, dlon=d, dlat=d, n_rows=3)
+    for i, area in enumerate(areas):
+        south = top - (i + 1) * d
+        expected = analytic_rect_ha(-72.0, south, -72.0 + d, south + d) * 1e4
+        assert area == pytest.approx(expected, rel=1e-4)
+
+
+def test_pixel_area_delegates_to_row_formula():
+    row = zonal.row_pixel_areas_m2(top=-33.0 + 0.0005, dlon=0.001, dlat=0.001, n_rows=1)[0]
+    assert zonal.pixel_area_m2(-33.0, 0.001, 0.001) == pytest.approx(row, rel=1e-12)
 
 
 def test_row_areas_shrink_towards_the_pole():
@@ -41,29 +78,30 @@ def test_row_areas_shrink_towards_the_pole():
     assert all(a > b for a, b in zip(transform_rows, transform_rows[1:]))
 
 
-# --- known-area rectangle at two latitudes (MCS-7a) --------------------------
+# --- known-area rectangle at study latitudes (MCS-7a) -------------------------
 
 
-@pytest.mark.parametrize("north", [-33.0, -44.0])
-def test_known_block_area_within_half_percent(make_geotiff, north):
+@pytest.mark.parametrize("north", [-33.0, -37.0, -39.7, -44.0])
+def test_known_block_area_matches_oracle(make_geotiff, north):
     west, size, n = -72.0, 0.001, 100
     path = make_geotiff(np.ones((n, n), dtype="uint8"), west, north, size, size)
     result = zonal.zonal_stats(path, rect(west, north - n * size, west + n * size, north))
     expected = analytic_rect_ha(west, north - n * size, west + n * size, north)
     assert result.pixel_count == n * n
-    assert result.area_ha == pytest.approx(expected, rel=0.005)
+    assert result.area_ha == pytest.approx(expected, rel=1e-4)
 
 
-def test_area_ratio_between_latitudes_follows_cosine(make_geotiff):
-    size, n = 0.001, 100
-    areas = {}
-    for north in (-33.0, -44.0):
-        path = make_geotiff(
-            np.ones((n, n), dtype="uint8"), -72.0, north, size, size, name=f"lat{abs(north)}.tif"
-        )
-        areas[north] = zonal.zonal_stats(path, rect(-72.0, north - n * size, -72.0 + n * size, north)).area_ha
-    expected_ratio = math.cos(math.radians(-44.05)) / math.cos(math.radians(-33.05))
-    assert areas[-44.0] / areas[-33.0] == pytest.approx(expected_ratio, rel=0.005)
+@pytest.mark.parametrize("north", [-33.0, -39.7])
+def test_tall_raster_proves_per_row_correction(make_geotiff, north):
+    # ~1 degree of latitude: a constant (top-row) area per row is off by ~0.5%,
+    # far above the 1e-4 tolerance, so that mutation must fail this test.
+    west, dlon, dlat, rows, cols = -72.0, 0.01, 0.001, 1000, 10
+    path = make_geotiff(np.ones((rows, cols), dtype="uint8"), west, north, dlon, dlat)
+    poly = rect(west, north - rows * dlat, west + cols * dlon, north)
+    result = zonal.zonal_stats(path, poly)
+    assert result.pixel_count == rows * cols
+    expected = analytic_rect_ha(west, north - rows * dlat, west + cols * dlon, north)
+    assert result.area_ha == pytest.approx(expected, rel=1e-4)
 
 
 # --- exact counts on a 10x10 raster (MCS-5a) ---------------------------------
