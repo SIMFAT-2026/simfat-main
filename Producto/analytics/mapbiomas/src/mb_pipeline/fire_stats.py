@@ -23,6 +23,22 @@ mapped/observed-area indicator; using it as a "mapped area" denominator
 would make burnedFraction == 1.0 for every comuna with any fire at all,
 which is a degenerate, useless gate. ``bbox_coverage_fraction`` below is
 the real replacement for the "is this comuna's Fuego data usable" gate.
+
+DEFENSIVE CORRECTION (2026-09-21, real 2017 rasters, CRITICAL 1 in the S1b
+jd-fix review): ``year_last_fire_v1`` and ``annual_burned_v1`` can
+CONTRADICT each other for the same comuna+year. Real evidence: for Florida
+(comuna id ``CHL.6.3.4_1``), the raw ``year_last_fire_v1`` raster's own
+maximum pixel value anywhere in Florida's bounding box is 2016 -- never
+2017 -- yet ``annual_burned_v1`` for 2017 shows 47.6% of Florida burned
+that same year. A shipped document must never assert a ``yearLastFire``
+that contradicts its own ``burnedFractionByYear``, so
+``build_fire_section`` takes ``max(raw_year_last_fire, max(year for year
+with burnedHa > 0 in the processed per_year data))``: when the two
+MapBiomas products disagree, the annual-burned evidence wins because it is
+checked directly against burn extent for years we actually processed. This
+is a defensive correction, not a claim that the upstream MapBiomas
+year-last-fire raster's lag has been root-caused -- that investigation is
+out of scope here.
 """
 from __future__ import annotations
 
@@ -144,7 +160,24 @@ def build_fire_section(
     burned_ha_by_year = {str(year): stats["burnedHa"] for year, stats in per_year.items()}
     burned_fraction_by_year = {str(year): stats["burnedFraction"] for year, stats in per_year.items()}
     available = available_flag(coverage_fraction, threshold=threshold)
-    year_last_fire_value = year_last_fire.get("yearLastFire")
+
+    # DEFENSIVE correction (CRITICAL 1, S1b jd-fix review): the raw
+    # year_last_fire_v1 raster can UNDER-report relative to what
+    # annual_burned_v1 actually shows for a year we processed. Real
+    # evidence: Florida (CHL.6.3.4_1), 2017 -- the raw year_last_fire_v1
+    # raster's own maximum pixel value anywhere in Florida's bounding box
+    # is 2016, never 2017, yet annual_burned_v1 2017 shows 47.6% of
+    # Florida burned that same year. Shipping the raw 2016 would make the
+    # document self-contradictory (yearLastFire=2016 next to
+    # burnedFractionByYear["2017"]=0.476). The two MapBiomas products
+    # should agree; when they don't, we prefer the annual-burned evidence
+    # for years we actually processed, since it is checked directly
+    # against burn extent. This is NOT a claim that we've root-caused why
+    # MapBiomas' year-last-fire raster lags -- that is out of scope here.
+    raw_year_last_fire = year_last_fire.get("yearLastFire")
+    burned_years = [int(year) for year, stats in per_year.items() if stats.get("burnedHa", 0) > 0]
+    candidates = [v for v in (raw_year_last_fire, max(burned_years) if burned_years else None) if v is not None]
+    year_last_fire_value = max(candidates) if candidates else None
     years_since = (as_of_year - year_last_fire_value) if year_last_fire_value is not None else None
 
     return {

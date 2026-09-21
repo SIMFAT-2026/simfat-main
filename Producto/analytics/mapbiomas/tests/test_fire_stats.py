@@ -7,10 +7,36 @@ independently of any real download.
 """
 from __future__ import annotations
 
+import os
+from pathlib import Path
+
 import pytest
 
-from mb_pipeline import fire_stats
+from mb_pipeline import fire_stats, lulc, zonal
 from mb_pipeline.zonal import ZonalResult
+
+_REAL_YLF_RASTER_NAMES = (
+    "mapbiomas_fire_chile_col1_annual_burned_2017.tif",
+    "mapbiomas_fire_chile_col1_year_last_fire_2017.tif",
+)
+
+
+def _real_raster_dir() -> Path | None:
+    # Mirrors test_build_stats_real.py's env var / default-dir lookup.
+    env = os.environ.get("MB_FIRE_RASTER_DIR")
+    candidates = [Path(env)] if env else []
+    candidates.append(Path(os.environ.get("TEMP", "/tmp")) / "mb_fire_col1")
+    for candidate in candidates:
+        if all((candidate / name).exists() for name in _REAL_YLF_RASTER_NAMES):
+            return candidate
+    return None
+
+
+def _florida_geometry() -> dict:
+    biobio_path = next(r.geojson_path for r in lulc.DEFAULT_REGIONS if r.xlsx_region == "Biobío")
+    features = lulc.load_geojson_features(biobio_path)
+    florida = next(f for f in features if f["properties"]["nombre"] == "Florida")
+    return florida["geometry"]
 
 # --- annual_burned_fraction: burned/total from the annual raster alone ------
 #
@@ -141,6 +167,105 @@ def test_year_last_fire_none_when_never_burned():
 
 def test_year_last_fire_none_when_polygon_outside_raster():
     assert fire_stats.year_last_fire_stats(ZonalResult()) == {"yearLastFire": None}
+
+
+# --- build_fire_section's yearLastFire correction (CRITICAL 1) -------------
+#
+# Real evidence (Florida comuna, CHL.6.3.4_1): the raw year_last_fire_v1
+# raster's own maximum pixel value anywhere in Florida's bounding box is
+# 2016 -- never 2017 -- yet annual_burned_v1 for 2017 shows 47.6% of
+# Florida burned that same year. The two MapBiomas products disagree; a
+# shipped document must never assert a yearLastFire that CONTRADICTS its
+# own burnedFractionByYear. build_fire_section corrects for this by taking
+# the max of the raw year-last-fire value and the most recent year with
+# burnedHa > 0 in the per-year data actually processed.
+
+
+def test_build_fire_section_year_last_fire_is_corrected_by_annual_burned_evidence():
+    # Raw year-last-fire raster says 2016, but 2017 shows real burned area:
+    # the corrected yearLastFire must be 2017, not the raw 2016.
+    per_year = {
+        2017: {"mappedHa": 100.0, "burnedHa": 47.6, "burnedFraction": 0.476},
+    }
+    section = fire_stats.build_fire_section(
+        per_year,
+        coverage_fraction=1.0,
+        frequency={"frequencyMean": 0.5, "frequencyMax": 3},
+        year_last_fire={"yearLastFire": 2016},
+        threshold=0.95,
+        as_of_year=2017,
+    )
+    assert section["yearLastFire"] == 2017
+    assert section["yearsSinceLastFire"] == 0
+
+
+def test_build_fire_section_year_last_fire_keeps_raw_value_when_it_is_more_recent():
+    # Raw value already agrees with (or exceeds) the years actually burned;
+    # the correction must not go backwards.
+    per_year = {
+        2015: {"mappedHa": 100.0, "burnedHa": 10.0, "burnedFraction": 0.10},
+    }
+    section = fire_stats.build_fire_section(
+        per_year,
+        coverage_fraction=1.0,
+        frequency={"frequencyMean": 0.1, "frequencyMax": 1},
+        year_last_fire={"yearLastFire": 2018},
+        threshold=0.95,
+        as_of_year=2018,
+    )
+    assert section["yearLastFire"] == 2018
+
+
+def test_build_fire_section_year_last_fire_correction_ignores_zero_burned_years():
+    # A processed year with burnedHa == 0 must not push yearLastFire forward.
+    per_year = {
+        2016: {"mappedHa": 100.0, "burnedHa": 0.0, "burnedFraction": 0.0},
+        2017: {"mappedHa": 100.0, "burnedHa": 0.0, "burnedFraction": 0.0},
+    }
+    section = fire_stats.build_fire_section(
+        per_year,
+        coverage_fraction=1.0,
+        frequency={"frequencyMean": 0.0, "frequencyMax": 0},
+        year_last_fire={"yearLastFire": 2014},
+        threshold=0.95,
+        as_of_year=2017,
+    )
+    assert section["yearLastFire"] == 2014
+
+
+@pytest.mark.skipif(
+    _real_raster_dir() is None,
+    reason="real Fuego Col 1 rasters not present locally (set MB_FIRE_RASTER_DIR); see README for the download step",
+)
+def test_build_fire_section_real_florida_year_last_fire_matches_its_own_2017_burn():
+    # Regression test with the REAL Florida (CHL.6.3.4_1) numbers: the raw
+    # year_last_fire_v1 raster caps out at 2016 for Florida's bbox, but the
+    # real annual_burned_v1 2017 raster shows 47.6% burned that year. This
+    # would have caught the original CRITICAL 1 bug directly against real
+    # rasters, not just a synthetic fixture.
+    raster_dir = _real_raster_dir()
+    geometry = _florida_geometry()
+
+    annual = zonal.zonal_stats(
+        raster_dir / "mapbiomas_fire_chile_col1_annual_burned_2017.tif", geometry
+    )
+    ylf = zonal.zonal_stats(
+        raster_dir / "mapbiomas_fire_chile_col1_year_last_fire_2017.tif", geometry
+    )
+
+    per_year = {2017: fire_stats.annual_burned_fraction(annual)}
+    year_last_fire = fire_stats.year_last_fire_stats(ylf)
+    assert year_last_fire["yearLastFire"] == 2016  # raw raster evidence, capped at 2016
+
+    section = fire_stats.build_fire_section(
+        per_year,
+        coverage_fraction=1.0,
+        frequency={"frequencyMean": None, "frequencyMax": None},
+        year_last_fire=year_last_fire,
+        threshold=0.95,
+        as_of_year=2017,
+    )
+    assert section["yearLastFire"] >= 2017
 
 
 # --- build_fire_section: combines years, applies the gate, no hidden zeros --
