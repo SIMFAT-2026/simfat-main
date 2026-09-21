@@ -3,7 +3,10 @@
 Rasters are EPSG:4326 with square-in-degrees pixels, so the ground area of a
 pixel depends on its latitude. The area is applied per raster ROW:
 
-    A(phi) = (dlon * 111320 * cos(phi)) * (dlat * 110540)   [m^2]
+    A(phi) = (M(phi) * dlat) * (N(phi) * cos(phi) * dlon)   [m^2, angles in rad]
+
+with M the meridian and N the prime-vertical radii of curvature of the WGS84
+ellipsoid, evaluated at the row-centre latitude.
 
 Zero is data, not nodata: rasters are read unmasked and any declared nodata
 value is ignored on purpose (burned-area products use 0 for "not burned").
@@ -20,8 +23,9 @@ from rasterio.errors import WindowError
 from rasterio.features import geometry_mask
 from rasterio.windows import Window, from_bounds
 
-M_PER_DEG_LON_EQUATOR = 111320.0
-M_PER_DEG_LAT = 110540.0
+WGS84_A = 6378137.0
+WGS84_F = 1 / 298.257223563
+WGS84_E2 = WGS84_F * (2 - WGS84_F)
 M2_PER_HA = 10_000.0
 
 
@@ -33,16 +37,18 @@ class ZonalResult:
     value_area_ha: dict[int, float] = field(default_factory=dict)
 
 
-def pixel_area_m2(lat_deg: float, dlon: float, dlat: float) -> float:
-    """Ground area of one pixel centered at ``lat_deg`` (deg pixel sizes)."""
-    width = dlon * M_PER_DEG_LON_EQUATOR * math.cos(math.radians(lat_deg))
-    return width * (dlat * M_PER_DEG_LAT)
-
-
 def row_pixel_areas_m2(top: float, dlon: float, dlat: float, n_rows: int) -> np.ndarray:
-    """Pixel area for each of ``n_rows`` rows below latitude ``top`` (north-up)."""
-    centers = top - (np.arange(n_rows) + 0.5) * dlat
-    return (dlon * M_PER_DEG_LON_EQUATOR * np.cos(np.radians(centers))) * (dlat * M_PER_DEG_LAT)
+    """WGS84 ellipsoidal pixel area for each of ``n_rows`` rows below ``top`` (north-up)."""
+    phi = np.radians(top - (np.arange(n_rows) + 0.5) * dlat)
+    w = 1.0 - WGS84_E2 * np.sin(phi) ** 2
+    meridian = WGS84_A * (1.0 - WGS84_E2) / w**1.5
+    prime_vertical = WGS84_A / np.sqrt(w)
+    return (meridian * math.radians(dlat)) * (prime_vertical * np.cos(phi) * math.radians(dlon))
+
+
+def pixel_area_m2(lat_deg: float, dlon: float, dlat: float) -> float:
+    """Ground area of one pixel centred at ``lat_deg`` (single source: the row formula)."""
+    return float(row_pixel_areas_m2(lat_deg + dlat / 2, dlon, dlat, 1)[0])
 
 
 def _window_for(src, geometry: dict) -> Window | None:
