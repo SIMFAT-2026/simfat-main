@@ -114,6 +114,11 @@ public class ComunaMapbiomasStats {
         private Integer yearLastFire;
         private Integer yearsSinceLastFire;
 
+        // Non-null exactly when available=false, explaining why (e.g. coverage below
+        // threshold, or no fire years processed for the comuna); null when available=true.
+        // See mb_pipeline/fire_stats.py::build_fire_section for the exact semantics.
+        private String reason;
+
         public Boolean getAvailable() { return available; }
         public void setAvailable(Boolean available) { this.available = available; }
 
@@ -137,6 +142,9 @@ public class ComunaMapbiomasStats {
 
         public Integer getYearsSinceLastFire() { return yearsSinceLastFire; }
         public void setYearsSinceLastFire(Integer yearsSinceLastFire) { this.yearsSinceLastFire = yearsSinceLastFire; }
+
+        public String getReason() { return reason; }
+        public void setReason(String reason) { this.reason = reason; }
     }
 
     /** Embedded provenance, matches mb_pipeline output (sources/scope/downloadDate). */
