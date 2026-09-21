@@ -157,4 +157,34 @@ class MapbiomasSeedLoaderIntegrationTest {
         assertThat(statsRepository.count()).isEqualTo(EXPECTED_DOCUMENT_COUNT - 1);
         assertThat(statsRepository.findByComunaId(missingComunaId)).isEmpty();
     }
+
+    @Test
+    void loadSeed_realWorldStatusOk_isReflectedInSummary() {
+        loader.loadSeed();
+
+        MapbiomasSeedLoader.SeedLoadSummary summary = loader.getLastLoadSummary();
+        assertThat(summary.status()).isEqualTo("ok");
+        assertThat(summary.errors()).isZero();
+        assertThat(summary.loaded()).isEqualTo(EXPECTED_DOCUMENT_COUNT);
+    }
+
+    @Test
+    void loadSeed_everyLineFailsToParse_isNeverReportedAsStatusOk() {
+        // Reproduces the failure class flagged for this slice: if a future schema drift
+        // (a type change, not just an added field -- FAIL_ON_UNKNOWN_PROPERTIES only
+        // protects against unknown fields) breaks every line, the per-line try/catch in
+        // loadSeed() swallows every exception and nothing is persisted. Before this fix,
+        // the final summary log line hardcoded "status=ok" regardless -- indistinguishable
+        // from a healthy boot to an operator or an alerting rule keyed on that literal.
+        loader.setSeedResourcePath("seed/mapbiomas/malformed-fixture.jsonl");
+
+        loader.loadSeed();
+
+        assertThat(statsRepository.count()).isZero();
+        MapbiomasSeedLoader.SeedLoadSummary summary = loader.getLastLoadSummary();
+        assertThat(summary.status()).isNotEqualTo("ok");
+        assertThat(summary.status()).isEqualTo("failed");
+        assertThat(summary.loaded()).isZero();
+        assertThat(summary.errors()).isEqualTo(2);
+    }
 }
