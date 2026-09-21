@@ -10,9 +10,11 @@ from __future__ import annotations
 import re
 import unicodedata
 from pathlib import Path
-from typing import Mapping, Sequence
+from typing import Collection, Mapping, Sequence
 
 import openpyxl
+
+from . import legend
 
 YEAR_COLUMNS: tuple[str, ...] = tuple(f"y{year}" for year in range(1999, 2025))
 _YEAR_COLUMN_RE = re.compile(r"^y(\d{4})$")
@@ -92,3 +94,53 @@ def read_coverage_sheet(xlsx_path: Path) -> list[dict]:
             }
         )
     return result
+
+
+def join_coverage(
+    rows: Sequence[dict],
+    comuna_index: Mapping[tuple[str, str], str],
+    expected_comuna_ids: Collection[str],
+) -> dict[str, dict[int, dict[int, float]]]:
+    """Join COVERAGE rows to comunaId via ``comuna_index`` and aggregate.
+
+    Returns ``{comunaId: {year: {classCode: hectares}}}``. Fails loudly
+    (``LulcError``) if a row's (region, comuna) does not match the index, or
+    if the matched comunaIds are not exactly ``expected_comuna_ids``.
+
+    For every (comunaId, year), the set of class codes present is checked
+    with ``legend.assert_disjoint`` before being returned: if a class code
+    and one of its legend ancestors (e.g. 3 "Forest" and 59 "Primary
+    forest") were both present for the same comuna+year, summing them would
+    double count area. This never happens in the real xlsx for our 3
+    regions (see test_real_evidence_our_regions_never_mix_class_3_with_children)
+    but does happen nationally for class 3, so the check stays in place
+    rather than being narrowed to "our AOI never needs it".
+    """
+    matched: dict[str, dict[int, dict[int, float]]] = {}
+    for row in rows:
+        key = (row["region"], normalize_name(row["comuna"]))
+        comuna_id = comuna_index.get(key)
+        if comuna_id is None:
+            raise LulcError(
+                f"COVERAGE row for region={row['region']!r} comuna={row['comuna']!r} "
+                f"(normalized {key[1]!r}) does not match any comuna in the index"
+            )
+        by_year = matched.setdefault(comuna_id, {})
+        for year, hectares in row["years"].items():
+            by_year.setdefault(year, {})[row["class"]] = hectares
+
+    expected = set(expected_comuna_ids)
+    got = set(matched)
+    if got != expected:
+        missing = expected - got
+        extra = got - expected
+        raise LulcError(
+            f"COVERAGE join matched {len(got)}/{len(expected)} expected comunas "
+            f"(missing={sorted(missing)}, extra={sorted(extra)})"
+        )
+
+    for comuna_id, by_year in matched.items():
+        for year, by_class in by_year.items():
+            legend.assert_disjoint(by_class.keys())
+
+    return matched
