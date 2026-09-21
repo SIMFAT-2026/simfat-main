@@ -1,0 +1,10 @@
+[
+  {
+    "dataset": "mapbiomas_lulc_col2_coverage",
+    "url": "https://chile.mapbiomas.org/wp-content/uploads/sites/7/2026/08/statistics_lulc_chile_col2_political_level_234.xlsx",
+    "fileName": "statistics_lulc_chile_col2_political_level_234.xlsx",
+    "sha256": "c4d5d6b3c8b227e2c280e06d4647730f9e72febd9e7faa390fb4f01b72e66cb9",
+    "bytes": 48422307,
+    "downloadedAt": "2026-09-21T16:24:30+00:00"
+  }
+]
