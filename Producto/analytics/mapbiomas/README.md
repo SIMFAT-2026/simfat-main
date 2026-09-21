@@ -9,8 +9,9 @@ Status: in progress. Implemented so far: legend tree with disjointness check
 (`zonal.py`), resilient download with a sha256 provenance manifest
 (`download.py`), the land-cover COVERAGE reader + comuna join (`lulc.py`),
 and Fuego zonal aggregation + document assembly (`fire_stats.py`,
-`build_stats.py`), exercised for real against 2017 data (see "Fuego
-Collection 1 (fire)" below). The Java Mongo loader and the full
+`build_stats.py`), exercised for real against 2017 data via the committed
+`scripts/generate_fire_report_2017.py` (see "Fuego Collection 1 (fire)"
+below). The Java Mongo loader and the full
 LULC+Fuego merged production seed (all years, all comunas) are NOT part of
 this slice; see "S1b scope" below.
 
@@ -49,8 +50,18 @@ comunas, for:
   to confirm the empirical finding above, not as a production denominator.
 - `frequency_burned_v1` 2013-2017 -- real per-comuna frequency mean/max
   over that 5-year window (NOT the full 2013-2025 collection).
-- `year_last_fire_v1` 2017 -- real per-comuna "most recent burn year",
-  necessarily capped at 2017 (the file only knows fires through 2017).
+- `year_last_fire_v1` 2017 -- real per-comuna "most recent burn year", but
+  **corrected, not used raw**: comparing it against `annual_burned_v1` 2017
+  for the same comunas found real disagreements (Florida, `CHL.6.3.4_1`:
+  the raw `year_last_fire_v1` raster's own maximum pixel value in Florida's
+  bounding box is 2016, never 2017, while `annual_burned_v1` 2017 shows
+  47.6% of Florida burned that same year). `build_fire_section` corrects
+  for this by taking `max(raw yearLastFire, most recent processed year
+  with burnedHa > 0)`, so the shipped value can never contradict the same
+  document's own `burnedFractionByYear`. See `fire_stats.py`'s module
+  docstring and `tests/test_fire_stats.py`'s "yearLastFire correction"
+  section for the full evidence and tests (including a real-Florida-data
+  regression test).
 
 Result: `coverageFraction` (bbox extent check) is exactly 1.0 for all 86
 comunas -- the Fuego Col 1 collection's spatial extent fully encloses
@@ -74,6 +85,9 @@ is needed before `comuna-mapbiomas-stats.v1.json` can be produced.
 ## Layout
 
 - `src/mb_pipeline/` pipeline modules
+- `scripts/generate_fire_report_2017.py` real, runnable script that joins
+  the 86 comuna GeoJSONs with the real Fuego rasters and writes
+  `data/coverage_report.csv` / `data/fire_stats_<year>_partial.jsonl`
 - `tests/` pytest suite; fixtures are synthetic and built in temporary
   directories (no binary blobs are committed)
 - `fixtures/` small committed text fixtures, e.g. `comuna_name_mapping.json`
@@ -146,11 +160,18 @@ list it to get each year's `mediaLink`, then download with `download.py`
 into a directory outside the repo, e.g. `%TEMP%\mb_fire_col1`, matching the
 file names `test_build_stats_real.py` expects). With `MB_FIRE_RASTER_DIR`
 set (or the files placed at `%TEMP%\mb_fire_col1`), run
-`pytest tests/test_build_stats_real.py` to exercise the real path, or
-re-run the 86-comuna report generation (same pattern as
-`build_stats.write_coverage_report` / `write_seed_jsonl`, see
-`fire_stats.py` for the per-comuna computation) to refresh
-`data/coverage_report.csv` and `data/fire_stats_2017_partial.jsonl`.
+`pytest tests/test_build_stats_real.py` to exercise the real path, and run
+`scripts/generate_fire_report_2017.py` to (re)generate
+`data/coverage_report.csv` and `data/fire_stats_2017_partial.jsonl` for
+real, for all 86 target comunas -- this is the actual, committed script
+that produced the files in this repo (generic over whatever fire years are
+present in the raster directory, not hardcoded to 2017):
+
+    cd Producto/analytics/mapbiomas
+    MB_FIRE_RASTER_DIR=/path/to/mb_fire_col1 PYTHONPATH=src python scripts/generate_fire_report_2017.py
+
+(or omit `MB_FIRE_RASTER_DIR` if the rasters are at the default
+`%TEMP%\mb_fire_col1`).
 
 ## Pixel area
 
