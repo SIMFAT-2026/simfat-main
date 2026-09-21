@@ -70,6 +70,42 @@ def test_class_27_is_unobserved_and_others_are_observed():
 
 
 def test_every_code_has_a_label():
-    for code in XLSX_CODES:
+    for code in XLSX_CODES + [1, 10, 14, 22, 26]:
         assert legend.label(code)
     assert legend.label(59) == "Primary forest"
+
+
+def test_is_leaf_on_unknown_code_fails_loudly():
+    with pytest.raises(legend.LegendError, match="999"):
+        legend.is_leaf(999)
+
+
+def test_children_and_ancestors_of_unknown_code_fail_loudly():
+    with pytest.raises(legend.LegendError, match="999"):
+        legend.children(999)
+    with pytest.raises(legend.LegendError, match="999"):
+        legend.ancestors(999)
+
+
+def test_tree_is_consistent():
+    legend.validate_tree()  # must not raise on the shipped legend
+
+
+def test_tree_self_check_rejects_unlabeled_child():
+    with pytest.raises(legend.LegendError, match="no label"):
+        legend.validate_tree(tree={1: (3, 500)}, labels={1: "a", 3: "b"})
+
+
+def test_tree_self_check_rejects_duplicate_children():
+    with pytest.raises(legend.LegendError, match="duplicate"):
+        legend.validate_tree(tree={1: (3, 3)}, labels={1: "a", 3: "b"})
+
+
+def test_tree_self_check_rejects_two_parents():
+    with pytest.raises(legend.LegendError, match="more than one parent"):
+        legend.validate_tree(tree={1: (3,), 2: (3,)}, labels={1: "a", 2: "b", 3: "c"})
+
+
+def test_tree_self_check_rejects_cycles():
+    with pytest.raises(legend.LegendError, match="cycle"):
+        legend.validate_tree(tree={1: (2,), 2: (1,)}, labels={1: "a", 2: "b"})
