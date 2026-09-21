@@ -73,9 +73,46 @@ def _flatten(coords):
     return [pt for part in coords for pt in _flatten(part)]
 
 
+_POLYGONAL = ("Polygon", "MultiPolygon")
+
+
+def _as_polygonal(geometry: dict) -> dict:
+    """Unwrap a GeoJSON Feature and accept only Polygon / MultiPolygon."""
+    if not isinstance(geometry, dict):
+        raise ValueError(f"Geometry must be a GeoJSON dict, got {type(geometry).__name__}")
+    if geometry.get("type") == "Feature":
+        geometry = geometry.get("geometry")
+        if not isinstance(geometry, dict):
+            raise ValueError("GeoJSON Feature has no geometry")
+    kind = geometry.get("type")
+    if kind not in _POLYGONAL:
+        raise ValueError(
+            f"Unsupported geometry type {kind!r}: expected Polygon, MultiPolygon "
+            "or a Feature wrapping one"
+        )
+    return geometry
+
+
+def _validate_raster(src, band: int) -> None:
+    t = src.transform
+    if t.b != 0 or t.d != 0 or t.e >= 0 or t.a <= 0:
+        raise ValueError(
+            "Raster must be north-up and unrotated (b == d == 0, e < 0); got "
+            f"transform {tuple(t)[:6]}"
+        )
+    if not np.issubdtype(np.dtype(src.dtypes[band - 1]), np.integer):
+        raise ValueError(
+            f"Expected an integer raster of class codes, got dtype {src.dtypes[band - 1]}"
+        )
+    if src.crs is None or src.crs.to_epsg() != 4326:
+        raise ValueError(f"Raster CRS must be EPSG:4326, got {src.crs}")
+
+
 def zonal_stats(raster_path, geometry: dict, band: int = 1) -> ZonalResult:
     """Pixel counts and corrected area per raster value inside ``geometry``."""
+    geometry = _as_polygonal(geometry)
     with rasterio.open(raster_path) as src:
+        _validate_raster(src, band)
         window = _window_for(src, geometry)
         if window is None or window.width < 1 or window.height < 1:
             return ZonalResult()
