@@ -218,3 +218,108 @@ def test_real_evidence_our_regions_never_mix_class_3_with_children():
     assert 3 not in joined["CHL.9.5.1_1"][2024]
     assert joined["CHL.9.5.1_1"][2024] == {59: pytest.approx(554.2874318542513), 60: pytest.approx(11360.33585045184), 67: 0.0}
     assert joined["CHL.9.1.1_1"][1999][67] == pytest.approx(715.8391669433736)
+
+
+# --- load_geojson_features ------------------------------------------------------
+
+
+def test_load_geojson_features_reads_feature_collection(tmp_path):
+    import json
+
+    path = tmp_path / "comunas.geojson"
+    path.write_text(
+        json.dumps(
+            {
+                "type": "FeatureCollection",
+                "features": [
+                    {"type": "Feature", "properties": {"comunaId": "X-1", "nombre": "Arauco"}}
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    features = lulc.load_geojson_features(path)
+
+    assert len(features) == 1
+    assert features[0]["properties"]["comunaId"] == "X-1"
+
+
+def test_load_region_features_maps_xlsx_region_to_its_geojson_features(tmp_path):
+    import json
+
+    path_a = tmp_path / "a.geojson"
+    path_a.write_text(
+        json.dumps({"type": "FeatureCollection", "features": [_feature("A-1", "Arauco")]}),
+        encoding="utf-8",
+    )
+    path_b = tmp_path / "b.geojson"
+    path_b.write_text(
+        json.dumps({"type": "FeatureCollection", "features": [_feature("B-1", "Chillán")]}),
+        encoding="utf-8",
+    )
+    regions = [lulc.RegionSource("Biobío", path_a), lulc.RegionSource("Ñuble", path_b)]
+
+    region_features = lulc.load_region_features(regions)
+
+    assert region_features["Biobío"][0]["properties"]["comunaId"] == "A-1"
+    assert region_features["Ñuble"][0]["properties"]["comunaId"] == "B-1"
+
+
+# --- DEFAULT_REGIONS against the real repo GeoJSON seeds -----------------------
+
+
+def test_default_regions_point_at_real_geojson_with_86_comunas_total():
+    """Regression guard on the real repo GeoJSON seeds (not synthetic): the 3
+    region files must together match the 86-comuna AOI, with zero ambiguous
+    (duplicate-name) matches within any region. No xlsx/network involved."""
+    for region in lulc.DEFAULT_REGIONS:
+        assert region.geojson_path.exists(), f"missing {region.geojson_path}"
+
+    region_features = lulc.load_region_features(lulc.DEFAULT_REGIONS)
+    index = lulc.build_comuna_index(region_features)
+
+    assert len(index) == 86
+    assert len(set(index.values())) == 86  # every comunaId appears exactly once
+    counts = {"Biobío": 0, "Ñuble": 0, "La Araucanía": 0}
+    for region, _name in index:
+        counts[region] += 1
+    assert counts == {"Biobío": 33, "Ñuble": 21, "La Araucanía": 32}
+
+
+# --- build_name_mapping / write_name_mapping ------------------------------------
+
+
+def test_build_name_mapping_records_the_matched_xlsx_name_per_comuna_id():
+    rows = [
+        _row("Biobío", "Arauco", 59, {1999: 10.0}),
+        _row("Biobío", "Arauco", 60, {1999: 5.0}),  # same comuna, second class row
+        _row("Ñuble", "Chillán", 12, {1999: 1.0}),
+    ]
+    index = {
+        ("Biobío", "ARAUCO"): "CHL.6.1.1_1",
+        ("Ñuble", "CHILLAN"): "CHL.16.1.1_1",
+    }
+
+    mapping = lulc.build_name_mapping(rows, index)
+
+    assert mapping == {
+        "CHL.6.1.1_1": {"xlsxRegion": "Biobío", "xlsxName": "Arauco"},
+        "CHL.16.1.1_1": {"xlsxRegion": "Ñuble", "xlsxName": "Chillán"},
+    }
+
+
+def test_write_name_mapping_writes_sorted_json(tmp_path):
+    mapping = {
+        "CHL.16.1.1_1": {"xlsxRegion": "Ñuble", "xlsxName": "Chillán"},
+        "CHL.6.1.1_1": {"xlsxRegion": "Biobío", "xlsxName": "Arauco"},
+    }
+    path = tmp_path / "comuna_name_mapping.json"
+
+    lulc.write_name_mapping(path, mapping)
+
+    import json
+
+    on_disk = json.loads(path.read_text(encoding="utf-8"))
+    assert list(on_disk.keys()) == sorted(mapping.keys())  # deterministic key order
+    assert on_disk["CHL.6.1.1_1"] == {"xlsxRegion": "Biobío", "xlsxName": "Arauco"}

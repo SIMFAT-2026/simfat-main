@@ -7,8 +7,10 @@ hectares by class code for every year 1999-2024.
 """
 from __future__ import annotations
 
+import json
 import re
 import unicodedata
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Collection, Mapping, Sequence
 
@@ -18,6 +20,35 @@ from . import legend
 
 YEAR_COLUMNS: tuple[str, ...] = tuple(f"y{year}" for year in range(1999, 2025))
 _YEAR_COLUMN_RE = re.compile(r"^y(\d{4})$")
+
+# Repo root, three levels above Producto/analytics/mapbiomas.
+_REPO_ROOT = Path(__file__).resolve().parents[5]
+_GEOJSON_DIR = (
+    _REPO_ROOT
+    / "Producto/backend/simfat-backend/src/main/resources/static/geojson"
+)
+
+
+@dataclass(frozen=True)
+class RegionSource:
+    """Pairs the xlsx's exact ``territory_level_2`` name with its comuna GeoJSON.
+
+    Region names are matched by exact string, not by normalize_name: the
+    xlsx and the GADM-derived GeoJSON spell region names too differently
+    ("La Araucanía" vs "Araucanía", "Biobío" vs "Bío-Bío") for a generic
+    fold to be safe, so the pairing is explicit and scope stays to the 3
+    regions this pipeline targets.
+    """
+
+    xlsx_region: str
+    geojson_path: Path
+
+
+DEFAULT_REGIONS: tuple[RegionSource, ...] = (
+    RegionSource("Biobío", _GEOJSON_DIR / "comunas-biobio.geojson"),
+    RegionSource("Ñuble", _GEOJSON_DIR / "comunas-nuble.geojson"),
+    RegionSource("La Araucanía", _GEOJSON_DIR / "comunas-araucania.geojson"),
+)
 
 _NON_LETTER = re.compile(r"[^A-Z]")
 
@@ -144,3 +175,39 @@ def join_coverage(
             legend.assert_disjoint(by_class.keys())
 
     return matched
+
+
+def load_geojson_features(path: Path) -> list[dict]:
+    """Read a GeoJSON FeatureCollection and return its ``features`` list."""
+    data = json.loads(Path(path).read_text(encoding="utf-8"))
+    return data["features"]
+
+
+def load_region_features(regions: Sequence[RegionSource]) -> dict[str, list[dict]]:
+    """Load every region's GeoJSON, keyed by its xlsx region name."""
+    return {region.xlsx_region: load_geojson_features(region.geojson_path) for region in regions}
+
+
+def build_name_mapping(
+    rows: Sequence[dict], comuna_index: Mapping[tuple[str, str], str]
+) -> dict[str, dict[str, str]]:
+    """comunaId -> the exact xlsx region/comuna name strings that matched it.
+
+    Committed as a small JSON fixture so the name join is auditable without
+    re-downloading the xlsx.
+    """
+    mapping: dict[str, dict[str, str]] = {}
+    for row in rows:
+        key = (row["region"], normalize_name(row["comuna"]))
+        comuna_id = comuna_index.get(key)
+        if comuna_id is not None:
+            mapping.setdefault(comuna_id, {"xlsxRegion": row["region"], "xlsxName": row["comuna"]})
+    return mapping
+
+
+def write_name_mapping(path: Path, mapping: Mapping[str, dict]) -> None:
+    """Write the comunaId -> xlsx name mapping as sorted, stable JSON."""
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    ordered = {comuna_id: mapping[comuna_id] for comuna_id in sorted(mapping)}
+    path.write_text(json.dumps(ordered, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
