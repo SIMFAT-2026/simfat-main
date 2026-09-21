@@ -3,6 +3,9 @@
 Fixtures build tiny synthetic xlsx workbooks with openpyxl (see
 ``make_coverage_xlsx`` in conftest.py); no binary xlsx is committed.
 """
+import json
+from pathlib import Path
+
 import pytest
 
 from mb_pipeline import legend, lulc
@@ -224,8 +227,6 @@ def test_real_evidence_our_regions_never_mix_class_3_with_children():
 
 
 def test_load_geojson_features_reads_feature_collection(tmp_path):
-    import json
-
     path = tmp_path / "comunas.geojson"
     path.write_text(
         json.dumps(
@@ -246,8 +247,6 @@ def test_load_geojson_features_reads_feature_collection(tmp_path):
 
 
 def test_load_region_features_maps_xlsx_region_to_its_geojson_features(tmp_path):
-    import json
-
     path_a = tmp_path / "a.geojson"
     path_a.write_text(
         json.dumps({"type": "FeatureCollection", "features": [_feature("A-1", "Arauco")]}),
@@ -318,8 +317,27 @@ def test_write_name_mapping_writes_sorted_json(tmp_path):
 
     lulc.write_name_mapping(path, mapping)
 
-    import json
-
     on_disk = json.loads(path.read_text(encoding="utf-8"))
     assert list(on_disk.keys()) == sorted(mapping.keys())  # deterministic key order
     assert on_disk["CHL.6.1.1_1"] == {"xlsxRegion": "Biobío", "xlsxName": "Arauco"}
+
+
+# --- committed fixtures/comuna_name_mapping.json --------------------------------
+
+_PACKAGE_DIR = Path(__file__).resolve().parent.parent
+
+
+def test_committed_name_mapping_matches_the_86_real_geojson_comunas():
+    """The committed fixture must stay in sync with DEFAULT_REGIONS: every
+    comunaId in the real GeoJSON seeds has a mapping entry, every entry's
+    comunaId is a real one, and every xlsxRegion is one of our 3 regions."""
+    fixture_path = _PACKAGE_DIR / "fixtures" / "comuna_name_mapping.json"
+    mapping = json.loads(fixture_path.read_text(encoding="utf-8"))
+
+    region_features = lulc.load_region_features(lulc.DEFAULT_REGIONS)
+    index = lulc.build_comuna_index(region_features)
+    expected_ids = set(index.values())
+
+    assert set(mapping.keys()) == expected_ids
+    assert len(mapping) == 86
+    assert {entry["xlsxRegion"] for entry in mapping.values()} == {r.xlsx_region for r in lulc.DEFAULT_REGIONS}
