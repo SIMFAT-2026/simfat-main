@@ -1,5 +1,6 @@
 package com.simfat.backend.config;
 
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.simfat.backend.model.ComunaInfo;
@@ -63,7 +64,16 @@ public class MapbiomasSeedLoader {
     ) {
         this.statsRepository = statsRepository;
         this.comunaInfoRepository = comunaInfoRepository;
-        this.objectMapper = objectMapper;
+        // Copy, don't mutate, the injected mapper: this loader's own instance is made
+        // tolerant of unrecognized JSON fields (FAIL_ON_UNKNOWN_PROPERTIES=false) so a
+        // future field the Python pipeline adds to the seed doesn't silently zero out the
+        // whole load again the way the missing fire.reason field just did (every one of the
+        // 86 seed lines failed mapRawRecord and was swallowed by loadSeed()'s per-line
+        // catch). This is scoped ONLY to seed parsing -- the REST API's Jackson
+        // configuration (e.g. the injected bean itself, used elsewhere in the app) is left
+        // untouched, so unexpected fields on real API payloads still fail loudly there.
+        this.objectMapper = objectMapper.copy()
+            .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
     }
 
     // Test seam: @Value fields are normally only set by Spring; tests construct this
