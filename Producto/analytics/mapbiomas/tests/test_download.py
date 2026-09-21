@@ -97,6 +97,42 @@ def test_download_file_raises_after_exhausting_retries(tmp_path):
         )
 
 
+def test_download_file_removes_partial_file_after_exhausting_retries(tmp_path):
+    """A response that dies mid-stream on the final attempt must not leave a
+    truncated/corrupt file behind at ``dest`` -- callers should never see a
+    partial file mistaken for a complete download."""
+    dest = tmp_path / "partial.bin"
+
+    class DiesMidStream:
+        def __init__(self):
+            self._chunks = [b"partial-bytes"]
+
+        def read(self, _n):
+            if self._chunks:
+                return self._chunks.pop(0)
+            raise ConnectionError("simulated mid-stream failure")
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+    def opener(url, timeout):
+        return DiesMidStream()
+
+    with pytest.raises(download.DownloadError):
+        download.download_file(
+            "https://example.invalid/file.bin",
+            dest,
+            opener=opener,
+            retries=2,
+            sleep=lambda _s: None,
+        )
+
+    assert not dest.exists()
+
+
 def test_manifest_entry_has_expected_shape(tmp_path):
     dest = tmp_path / "file.xlsx"
     dest.write_bytes(b"x")

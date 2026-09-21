@@ -76,6 +76,9 @@ def download_file(
             last_exc = exc
             if attempt < retries:
                 sleep(retry_backoff * attempt)
+    # All retries exhausted: don't leave a partial/corrupt file at dest for a
+    # caller to mistake for a complete download.
+    dest.unlink(missing_ok=True)
     raise DownloadError(f"Failed to download {url} after {retries} attempts") from last_exc
 
 
