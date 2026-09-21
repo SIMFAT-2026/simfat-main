@@ -48,7 +48,7 @@ def test_to_basis_points_largest_remainder_breaks_ties_by_class_code():
     # broken by ascending class code, so it is deterministic.
     bp = build_stats.to_basis_points({1: 1.0, 2: 1.0, 3: 1.0})
     assert sum(bp.values()) == 10000
-    assert bp[1] in (3333, 3334)
+    assert bp[1] == 3334  # ascending class code wins the extra bp on an exact tie
 
 
 # --- land_cover_section: reference year + 5y mean, both in bp --------------

@@ -55,6 +55,12 @@ def annual_burned_fraction(annual: ZonalResult) -> dict:
 
     ``annual_burned_v1`` has no nodata, so its own zonal area IS the
     comuna's observed total for that year; no second raster is needed.
+
+    CAVEAT: the denominator is the comuna POLYGON's total area, with no
+    water mask -- any lake/reservoir surface inside the polygon is counted
+    as unburned land, not excluded. This is undocumented upstream and not
+    corrected here; a lake-heavy comuna's ``burnedFraction`` is relative to
+    total polygon area including water, not vegetated-land-only area.
     """
     total_ha = annual.area_ha
     burned_ha = annual.value_area_ha.get(BURNED_VALUE, 0.0)
@@ -79,14 +85,24 @@ def _geometry_bbox(geometry: dict) -> tuple[float, float, float, float]:
 
 
 def bbox_coverage_fraction(geometry: dict, raster_bounds: tuple[float, float, float, float]) -> float:
-    """Fraction of ``geometry``'s bounding box that overlaps ``raster_bounds``.
+    """Fraction of ``geometry``'s BOUNDING BOX (not its true polygon area) that
+    overlaps ``raster_bounds``.
 
     Replaces the falsified "coverage raster as mapped-area mask" plan (see
     module docstring): this checks the comuna's geometry against the
     raster's own declared spatial extent, independent of any pixel value.
-    1.0 means the comuna is fully inside the raster's footprint; a value
-    below the gate threshold flags a comuna that straddles or falls outside
-    the collection's coverage area.
+    1.0 means the comuna's bounding box is fully inside the raster's
+    footprint; a value below the gate threshold flags a comuna that
+    straddles or falls outside the collection's coverage area.
+
+    CAVEAT: this is a bbox-of-bbox ratio, not a true polygon-intersection
+    check, so it has a provable false-negative failure mode for a concave
+    or multi-part geometry whose bounding box extends past the raster edge
+    while the geometry itself does not (or vice versa). This is harmless
+    for the 3 target regions today (every one of the 86 real comunas
+    reports exactly 1.0, comfortably inside the Fuego Col 1 extent), but
+    would need a true polygon-intersection check (e.g. via shapely) before
+    generalizing this gate beyond those regions.
     """
     west, south, east, north = _geometry_bbox(geometry)
     rwest, rsouth, reast, rnorth = raster_bounds

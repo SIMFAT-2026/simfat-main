@@ -70,6 +70,17 @@ the committed 0.95 threshold. 38/86 comunas show a nonzero burned area in
 2017 (max 47.6%, Florida); this matches the well-documented Jan-Feb 2017
 central-Chile megafires. Real numbers are in `data/coverage_report.csv`.
 
+**Two documented, non-blocking caveats.** `coverageFraction` is a
+bounding-box-overlap ratio (`bbox_coverage_fraction`), not a true
+polygon-area coverage check; this is valid only because all 3 target
+regions are comfortably inside the Fuego Col 1 raster bounds (every real
+comuna reports 1.0) -- generalizing this gate beyond these 3 regions would
+need a true polygon-intersection check instead. Separately,
+`burnedFraction`'s denominator is each comuna's total polygon area with no
+water mask, so a lake-heavy comuna (e.g. Villarrica, Pucón) reports burned
+area relative to its total area including lake surface, not
+vegetated-land-only area.
+
 **NOT YET COVERED in this slice** (do not treat as extrapolated from the
 above): fire years 2013-2016 and 2018-2025 (only 2017 was downloaded for
 `annual_burned_v1`/`annual_burned_coverage_v1`); the LULC land-cover
