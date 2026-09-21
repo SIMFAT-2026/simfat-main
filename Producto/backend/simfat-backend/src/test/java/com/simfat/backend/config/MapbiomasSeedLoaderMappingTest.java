@@ -138,4 +138,41 @@ class MapbiomasSeedLoaderMappingTest {
         assertThat(result.getFire().getYearLastFire()).isEqualTo(2017);
         assertThat(result.getFire().getBurnedHaByYear()).containsEntry("2017", 33.5);
     }
+
+    // computeStatus() is the pure decision function behind loadSeed()'s final summary
+    // log line. Before this fix, loadSeed() hardcoded "status=ok" unconditionally, which
+    // would have made a total parse failure (e.g. from a future schema drift like the
+    // fire.reason incident) indistinguishable from a healthy boot at INFO level. These
+    // tests pin down the branching so the log/summary can never silently regress to
+    // always-ok again.
+    @Test
+    void computeStatus_noErrorsAndSomeLoaded_isOk() {
+        assertThat(MapbiomasSeedLoader.computeStatus(86, 0, 0)).isEqualTo("ok");
+    }
+
+    @Test
+    void computeStatus_nothingProcessedAtAll_isOkByDesign() {
+        // Genuinely empty resource (or fully disabled path never reaching this point in
+        // practice) -- zero of everything is not itself a failure signal.
+        assertThat(MapbiomasSeedLoader.computeStatus(0, 0, 0)).isEqualTo("ok");
+    }
+
+    @Test
+    void computeStatus_someErrorsButSomeLoaded_isDegraded() {
+        assertThat(MapbiomasSeedLoader.computeStatus(70, 5, 11)).isEqualTo("degraded");
+    }
+
+    @Test
+    void computeStatus_allLinesErrorNothingLoaded_isFailed() {
+        // The exact regression scenario the fire.reason incident nearly repeated: every
+        // line fails to parse/map, loaded stays 0, but skipped==0 and errors==total.
+        assertThat(MapbiomasSeedLoader.computeStatus(0, 0, 86)).isEqualTo("failed");
+    }
+
+    @Test
+    void computeStatus_noErrorsButNothingLoadedBecauseAllSkipped_isEmptyResult() {
+        // No line-level errors, but nothing was actually persisted (e.g. every comunaId
+        // referenced by the seed is missing from comuna_info) -- also not a healthy "ok".
+        assertThat(MapbiomasSeedLoader.computeStatus(0, 86, 0)).isEqualTo("empty_result");
+    }
 }
