@@ -177,14 +177,19 @@ public class ComunaFwiStateService {
         FwiState base = new FwiState(state.getBaseFfmc(), state.getBaseDmc(), state.getBaseDc());
         FwiOutputs outputs = calculator.advance(base, todayNoon);
 
+        // Preserve a warmup/restart flag set earlier the SAME calendar day (e.g. the cron's
+        // first daily fire went through coldStart): a same-day resync must not silently discard
+        // it. Only a genuinely NEW calendar day (normalDailyAdvance) clears a stale flag.
+        String preservedQualityFlag = state.getQualityFlag();
+
         state.setFfmc(outputs.ffmc());
         state.setDmc(outputs.dmc());
         state.setDc(outputs.dc());
-        state.setQualityFlag(null);
+        state.setQualityFlag(preservedQualityFlag);
         state.setUpdatedAt(LocalDateTime.now());
         repository.save(state);
 
-        return new ComunaFwiAdvanceResult(outputs, null);
+        return new ComunaFwiAdvanceResult(outputs, preservedQualityFlag);
     }
 
     private ComunaFwiAdvanceResult normalDailyAdvance(
