@@ -7,6 +7,7 @@ import com.simfat.backend.model.TerritoryWeatherObservation;
 import com.simfat.backend.repository.RegionRepository;
 import com.simfat.backend.repository.TerritoryWeatherObservationRepository;
 import com.simfat.backend.service.OpenWeatherFwiService;
+import com.simfat.backend.service.fwi.LegacyProxyFwiCalculator;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -39,6 +40,14 @@ public class OpenWeatherFwiServiceImpl implements OpenWeatherFwiService {
 
     @Value("${openmeteo.sync.enabled:true}")
     private boolean syncEnabled;
+
+    // S1d2: which FWI computation to use. Default PROXY_V1 keeps production behavior
+    // unchanged from this slice; VAN_WAGNER is wired but not yet the default (see class
+    // javadoc note once the branching lands).
+    @Value("${territory.fwi.method:PROXY_V1}")
+    private String fwiMethod;
+
+    private static final String FWI_METHOD_PROXY = "PROXY_V1";
 
     public OpenWeatherFwiServiceImpl(
         TerritoryWeatherObservationRepository weatherRepository,
@@ -130,7 +139,7 @@ public class OpenWeatherFwiServiceImpl implements OpenWeatherFwiService {
                 return false;
             }
 
-            double proxyFwi = computeProxyFwi(tempMax, rhMin, windMax, precip);
+            double proxyFwi = LegacyProxyFwiCalculator.computeProxyFwi(tempMax, rhMin, windMax, precip);
 
             TerritoryWeatherObservation obs = new TerritoryWeatherObservation();
             obs.setRegionId(regionId);
@@ -150,6 +159,7 @@ public class OpenWeatherFwiServiceImpl implements OpenWeatherFwiService {
             obs.setHourlyTimestamps(getHourlyTimestamps(hourly));
             obs.setHourlyWindSpeed(getHourlyDoubles(hourly, "windspeed_10m"));
             obs.setHourlyWindDirection(getHourlyDoubles(hourly, "winddirection_10m"));
+            obs.setFwiMethod(FWI_METHOD_PROXY);
             obs.setIngestedAt(LocalDateTime.now());
             weatherRepository.save(obs);
 
@@ -165,29 +175,6 @@ public class OpenWeatherFwiServiceImpl implements OpenWeatherFwiService {
             LOGGER.warn("fwi_api status=exception regionId={} error={}", regionId, ex.getMessage());
             return false;
         }
-    }
-
-    /**
-     * Proxy FWI en escala 0-60 (similar a CFWI: <15 bajo, 15-30 moderado, 30-45 alto, >45 extremo).
-     * Aproximación documentada para MVP basada en variables Open-Meteo disponibles.
-     * Fuentes: relaciones meteorológicas del CFWI (temperatura-FFMC, humedad-FFMC, viento-ISI).
-     */
-    private double computeProxyFwi(double tempMax, double rhMin, double windMaxKmh, double precipMm) {
-        // Factor de secado: temperatura alta eleva peligro
-        double tempFactor = Math.max(0, Math.min(1.0, tempMax / 40.0));
-
-        // Factor de sequedad: humedad mínima del día (peor caso)
-        double drynessFactor = Math.max(0, (100.0 - rhMin) / 100.0);
-
-        // Factor de viento: velocidad máxima del día
-        double windFactor = Math.max(0, Math.min(1.0, windMaxKmh / 60.0));
-
-        // Amortiguación por precipitación: 3mm+ reduce significativamente el riesgo
-        double rainFactor = Math.max(0.0, 1.0 - precipMm / 3.0);
-
-        // Compuesto: dryness domina (40%), temperatura (30%), viento (30%)
-        double raw = 60.0 * (0.40 * drynessFactor + 0.30 * tempFactor + 0.30 * windFactor) * rainFactor;
-        return Math.max(0, Math.min(60.0, raw));
     }
 
     private Double getFirstDouble(JsonNode daily, String field) {

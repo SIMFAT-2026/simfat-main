@@ -45,6 +45,7 @@ class OpenWeatherFwiServiceImplTest {
         service = new OpenWeatherFwiServiceImpl(weatherRepository, regionRepository, new ObjectMapper());
         ReflectionTestUtils.setField(service, "baseUrl", server.url("/").toString().replaceAll("/$", ""));
         ReflectionTestUtils.setField(service, "syncEnabled", true);
+        ReflectionTestUtils.setField(service, "fwiMethod", "PROXY_V1");
     }
 
     @AfterEach
@@ -215,5 +216,33 @@ class OpenWeatherFwiServiceImplTest {
         assertNull(saved.getSoilTemp());
         assertEquals(28.5, saved.getTempMax());
         assertNotNull(saved.getFwi());
+    }
+
+    @Test
+    void syncFwiByRegion_defaultMethod_stampsFwiMethodProxyV1() throws InterruptedException {
+        server.enqueue(new MockResponse()
+            .setResponseCode(200)
+            .addHeader("Content-Type", "application/json")
+            .setBody("{"
+                + "\"daily\":{"
+                + "\"temperature_2m_max\":[28.5],"
+                + "\"relative_humidity_2m_min\":[35.0],"
+                + "\"windspeed_10m_max\":[20.0],"
+                + "\"precipitation_sum\":[0.0]"
+                + "},"
+                + "\"hourly\":{}"
+                + "}"));
+
+        boolean result = service.syncFwiByRegion("comuna-1", -38.0, -72.0);
+        assertTrue(result);
+
+        ArgumentCaptor<TerritoryWeatherObservation> captor = ArgumentCaptor.forClass(TerritoryWeatherObservation.class);
+        verify(weatherRepository).save(captor.capture());
+        TerritoryWeatherObservation saved = captor.getValue();
+
+        // territory.fwi.method defaults to PROXY_V1: production behavior is unchanged by
+        // this slice, but every saved observation now stamps which method produced it
+        // (design D4: legacy documents with fwiMethod == null are treated as PROXY_V1).
+        assertEquals("PROXY_V1", saved.getFwiMethod());
     }
 }
