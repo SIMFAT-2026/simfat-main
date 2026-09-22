@@ -1,6 +1,7 @@
 package com.simfat.backend.service.fwi;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.BufferedReader;
@@ -286,6 +287,68 @@ class CanadianFwiCalculatorTest {
         assertEquals(d.bui(), out.bui(), CODE_TOLERANCE, "BUI day " + d.month() + "/" + d.day());
         assertEquals(d.fwi(), out.fwi(), CODE_TOLERANCE, "FWI day " + d.month() + "/" + d.day());
         assertEquals(d.dsr(), out.dsr(), DSR_TOLERANCE, "DSR day " + d.month() + "/" + d.day());
+    }
+
+    // ---- FwiInputs validation ----
+
+    @Test
+    void fwiInputs_relativeHumidityAbove100_isClampedTo100() {
+        // Open-Meteo and similar noon-weather APIs (the documented eventual S1d input source) are
+        // known to occasionally report RH slightly above 100 due to rounding near saturation. RH
+        // cannot physically exceed 100%, and a small sensor overshoot is a measurement artifact, not
+        // a data error worth crashing on -- so it is clamped rather than rejected. Without the
+        // clamp, rh=101 makes the FFMC wetting branch compute Math.pow(-0.01, 1.7), which is NaN in
+        // Java (fractional exponent of a negative base), silently propagating through
+        // FFMC->ISI->FWI->DSR.
+        FwiInputs inputs = new FwiInputs(15.0, 101.0, 10.0, 0.0, 6);
+
+        assertEquals(100.0, inputs.rhPct(), 0.0, "rhPct above 100 must be clamped to 100");
+    }
+
+    @Test
+    void fwiInputs_relativeHumidityBelow0_isClampedTo0() {
+        FwiInputs inputs = new FwiInputs(15.0, -5.0, 10.0, 0.0, 6);
+
+        assertEquals(0.0, inputs.rhPct(), 0.0, "rhPct below 0 must be clamped to 0");
+    }
+
+    @Test
+    void fwiInputs_negativeWind_isClampedToZero() {
+        FwiInputs inputs = new FwiInputs(15.0, 50.0, -3.0, 0.0, 6);
+
+        assertEquals(0.0, inputs.windKmh(), 0.0, "windKmh cannot be negative");
+    }
+
+    @Test
+    void fwiInputs_negativePrecip_isClampedToZero() {
+        FwiInputs inputs = new FwiInputs(15.0, 50.0, 10.0, -1.0, 6);
+
+        assertEquals(0.0, inputs.precipMm(), 0.0, "precipMm cannot be negative");
+    }
+
+    @Test
+    void fwiInputs_relativeHumidityAbove100_doesNotPropagateNaN() {
+        // End-to-end regression for the NaN-propagation scenario described above: without the
+        // clamp, this would produce NaN for ffmc (and therefore isi/bui/fwi/dsr).
+        CanadianFwiCalculator calculator = CanadianFwiCalculator.northernHemisphere();
+        FwiState previousState = new FwiState(85.0, 6.0, 15.0);
+        FwiInputs inputs = new FwiInputs(15.0, 101.0, 10.0, 0.0, 6);
+
+        FwiOutputs out = calculator.advance(previousState, inputs);
+
+        assertTrue(Double.isFinite(out.ffmc()), "FFMC must not be NaN for a slightly-out-of-range RH");
+    }
+
+    @Test
+    void fwiInputs_monthOutOfRange_throwsIllegalArgumentException() {
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> new FwiInputs(15.0, 50.0, 10.0, 0.0, 13),
+                "month=13 must be rejected with a clear exception, not silently fail via array index");
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> new FwiInputs(15.0, 50.0, 10.0, 0.0, 0),
+                "month=0 must be rejected with a clear exception, not silently fail via array index");
     }
 
     // ---- Full 49-day sequential replay (the primary proof) ----
