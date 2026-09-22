@@ -206,6 +206,28 @@ class CanadianFwiCalculatorTest {
         assertEquals(d.dc(), out.dc(), CODE_TOLERANCE, "DC day " + d.month() + "/" + d.day());
     }
 
+    @Test
+    void dc_subFreezingTemp_floorsTempAt_minus2_8BeforeVTerm() {
+        // Formula-fidelity test (synthetic input, not a reference-table day): Van Wagner & Pickett
+        // 1985 defines V = 0.36*(T+2.8) + Lf with T floored at -2.8 degC BEFORE the multiplication
+        // (V itself is then floored at 0). July (Lf=6.4) is chosen because Lf is positive there, so
+        // an unfloored T does NOT cancel out to zero like it does for the DMC K-term -- it silently
+        // under-counts the DC increment on cold days. None of the 1985 reference days go below
+        // 5.5 degC, so this branch is otherwise completely unexercised by the reference replay.
+        //
+        // previousDc = 100, temp = -10, no rain:
+        //   unfloored (bug):  v = 0.36*(-10+2.8)+6.4 = 3.808  -> dc = 100 + 0.5*3.808 = 101.904
+        //   floored (correct): t = max(-10, -2.8) = -2.8; v = 0.36*(0)+6.4 = 6.4 -> dc = 103.2
+        ensureLoaded();
+        CanadianFwiCalculator calculator = CanadianFwiCalculator.northernHemisphere();
+        FwiState previousState = new FwiState(85.0, 6.0, 100.0);
+        FwiInputs coldJulyNoon = new FwiInputs(-10.0, 50.0, 10.0, 0.0, 7);
+
+        FwiOutputs out = calculator.advance(previousState, coldJulyNoon);
+
+        assertEquals(103.2, out.dc(), 1e-9, "DC must use the T-floored V term, not the unfloored one");
+    }
+
     // ---- Isolated ISI/BUI/FWI/DSR test (day 1, hand-verified derivation) ----
 
     @Test

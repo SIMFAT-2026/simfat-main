@@ -219,7 +219,13 @@ public final class CanadianFwiCalculator {
             d0 = dr;
         }
 
-        double v = 0.36 * (temp + 2.8) + lf;
+        // Van Wagner & Pickett (1985), Eq. 20: T is floored at -2.8 degC BEFORE the multiplication,
+        // then V itself is floored at 0. This is NOT equivalent to the DMC K-term's "temp < -1.1 ->
+        // k = 0" shortcut: DMC's K is a pure product that happens to cancel to zero at its floor,
+        // while here Lf is ADDITIVE after the temperature term, so it does not cancel -- omitting
+        // the T floor silently under-counts DC growth whenever temp < -2.8 degC.
+        double t = Math.max(temp, -2.8);
+        double v = 0.36 * (t + 2.8) + lf;
         if (v < 0) {
             v = 0;
         }
