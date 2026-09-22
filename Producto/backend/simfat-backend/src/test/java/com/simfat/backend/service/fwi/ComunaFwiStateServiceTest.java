@@ -319,6 +319,44 @@ class ComunaFwiStateServiceTest {
                         + " flag that wasn't there");
     }
 
+    // -- Finiteness guard: never persist NaN/Infinite FWI state ------------------------------
+
+    @Test
+    void coldStart_withNonFiniteTemp_throwsAndNeverPersists() {
+        when(repository.findById(COMUNA_ID)).thenReturn(Optional.empty());
+        FwiInputs badInputs = new FwiInputs(Double.NaN, 42.0, 6.0, 0.0, 1);
+
+        assertThrows(
+                IllegalStateException.class,
+                () -> service.advance(COMUNA_ID, LocalDate.of(2026, 4, 1), badInputs));
+        verify(repository, never()).save(any());
+    }
+
+    @Test
+    void sameDayResync_withNonFiniteTemp_throwsAndNeverPersists() {
+        LocalDate today = LocalDate.of(2026, 4, 5);
+        ComunaFwiState existing =
+                existingState(today, 88.0, 20.0, 100.0, today.minusDays(1), 87.0, 18.0, 95.0);
+        when(repository.findById(COMUNA_ID)).thenReturn(Optional.of(existing));
+        FwiInputs badInputs = new FwiInputs(Double.NaN, 42.0, 6.0, 0.0, 1);
+
+        assertThrows(IllegalStateException.class, () -> service.advance(COMUNA_ID, today, badInputs));
+        verify(repository, never()).save(any());
+    }
+
+    @Test
+    void normalDailyAdvance_withNonFiniteTemp_throwsAndNeverPersists() {
+        LocalDate yesterday = LocalDate.of(2026, 4, 10);
+        LocalDate today = yesterday.plusDays(1);
+        ComunaFwiState existing =
+                existingState(yesterday, 88.0, 20.0, 100.0, yesterday.minusDays(1), 87.0, 18.0, 95.0);
+        when(repository.findById(COMUNA_ID)).thenReturn(Optional.of(existing));
+        FwiInputs badInputs = new FwiInputs(Double.NaN, 42.0, 6.0, 0.0, 1);
+
+        assertThrows(IllegalStateException.class, () -> service.advance(COMUNA_ID, today, badInputs));
+        verify(repository, never()).save(any());
+    }
+
     private static ComunaFwiState existingState(
             LocalDate stateDate, double ffmc, double dmc, double dc,
             LocalDate baseDate, double baseFfmc, double baseDmc, double baseDc) {
