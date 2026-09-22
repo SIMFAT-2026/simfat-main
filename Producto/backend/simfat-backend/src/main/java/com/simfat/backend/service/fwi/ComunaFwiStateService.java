@@ -154,6 +154,7 @@ public class ComunaFwiStateService {
             String comunaId, LocalDate targetDate, FwiInputs todayNoon, String qualityFlag) {
         FwiState startupBase = new FwiState(STARTUP_FFMC, STARTUP_DMC, STARTUP_DC);
         FwiOutputs outputs = calculator.advance(startupBase, todayNoon);
+        requireFiniteOutputs(outputs, comunaId, targetDate);
 
         ComunaFwiState state = new ComunaFwiState();
         state.setId(comunaId);
@@ -176,6 +177,7 @@ public class ComunaFwiStateService {
     private ComunaFwiAdvanceResult sameDayResync(ComunaFwiState state, FwiInputs todayNoon) {
         FwiState base = new FwiState(state.getBaseFfmc(), state.getBaseDmc(), state.getBaseDc());
         FwiOutputs outputs = calculator.advance(base, todayNoon);
+        requireFiniteOutputs(outputs, state.getId(), state.getStateDate());
 
         // Preserve a warmup/restart flag set earlier the SAME calendar day (e.g. the cron's
         // first daily fire went through coldStart): a same-day resync must not silently discard
@@ -196,6 +198,7 @@ public class ComunaFwiStateService {
             ComunaFwiState state, LocalDate targetDate, FwiInputs todayNoon) {
         FwiState newBase = new FwiState(state.getFfmc(), state.getDmc(), state.getDc());
         FwiOutputs outputs = calculator.advance(newBase, todayNoon);
+        requireFiniteOutputs(outputs, state.getId(), targetDate);
 
         state.setBaseDate(state.getStateDate());
         state.setBaseFfmc(state.getFfmc());
@@ -210,5 +213,34 @@ public class ComunaFwiStateService {
         repository.save(state);
 
         return new ComunaFwiAdvanceResult(outputs, null);
+    }
+
+    /**
+     * Guards against persisting a permanently and silently corrupted {@code comuna_fwi_state}
+     * record. {@link FwiInputs} clamps {@code rhPct}/{@code windKmh}/{@code precipMm} but does not
+     * validate {@code tempC} (S1c scope); a {@code NaN} or infinite {@code tempC} propagates
+     * through {@link CanadianFwiCalculator}'s arithmetic into {@code ffmc}/{@code dmc}/{@code dc}.
+     * Since this state is the "base" for every subsequent day, persisting it would poison the
+     * comuna's whole time series from that point forward. Failing loudly here, BEFORE {@code
+     * repository.save}, leaves the last good state untouched so a retry with a better reading can
+     * recover.
+     */
+    private static void requireFiniteOutputs(FwiOutputs outputs, String comunaId, LocalDate targetDate) {
+        if (Double.isFinite(outputs.ffmc()) && Double.isFinite(outputs.dmc()) && Double.isFinite(outputs.dc())) {
+            return;
+        }
+        throw new IllegalStateException(
+                "Refusing to persist non-finite FWI state for comuna "
+                        + comunaId
+                        + " on "
+                        + targetDate
+                        + ": ffmc="
+                        + outputs.ffmc()
+                        + ", dmc="
+                        + outputs.dmc()
+                        + ", dc="
+                        + outputs.dc()
+                        + ". The last good state in comuna_fwi_state was left untouched -- check"
+                        + " today's weather inputs (likely a non-finite tempC) and retry.");
     }
 }
