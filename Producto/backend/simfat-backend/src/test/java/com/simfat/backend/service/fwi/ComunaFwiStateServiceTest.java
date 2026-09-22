@@ -240,6 +240,18 @@ class ComunaFwiStateServiceTest {
         assertEquals(targetDate.minusDays(1), saved.getValue().getBaseDate());
     }
 
+    @Test
+    void gapEqualsMaxGapDays_isStillUnsupportedByThisSlice() {
+        LocalDate stateDate = LocalDate.of(2026, 5, 1);
+        LocalDate targetDate = stateDate.plusDays(3); // gap == maxGapDays(3): the reject/restart boundary
+        ComunaFwiState existing = existingState(stateDate, 90.0, 25.0, 120.0, stateDate.minusDays(1), 89.0, 24.0, 118.0);
+        when(repository.findById(COMUNA_ID)).thenReturn(Optional.of(existing));
+
+        assertThrows(UnsupportedOperationException.class,
+            () -> service.advance(COMUNA_ID, targetDate, someInputs()));
+        verify(repository, never()).save(any());
+    }
+
     // -- Case 5: backwards date rejection -------------------------------------------------------
 
     @Test
