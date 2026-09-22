@@ -267,6 +267,58 @@ class ComunaFwiStateServiceTest {
         verify(repository, times(1)).findById(COMUNA_ID);
     }
 
+    // -- Same-day resync must PRESERVE an existing warmup/restart flag ----------------------
+
+    @Test
+    void sameDayResync_preservesWarmupFlagFromEarlierColdStartOnSameDay() {
+        LocalDate today = LocalDate.of(2026, 1, 20);
+        FwiInputs firstInputs = someInputs();
+        FwiInputs secondInputs = otherInputs();
+
+        // First call of the day: no prior state -> cold start, flags FWI_WARMUP.
+        when(repository.findById(COMUNA_ID)).thenReturn(Optional.empty());
+        ArgumentCaptor<ComunaFwiState> savedFirst = ArgumentCaptor.forClass(ComunaFwiState.class);
+        when(repository.save(savedFirst.capture())).thenAnswer(inv -> inv.getArgument(0));
+
+        ComunaFwiAdvanceResult firstResult = service.advance(COMUNA_ID, today, firstInputs);
+        assertEquals("FWI_WARMUP", firstResult.qualityFlag());
+        ComunaFwiState persistedAfterFirst = savedFirst.getValue();
+
+        // Second call, SAME calendar day, different inputs (a same-day resync, e.g. the cron's
+        // second daily fire).
+        when(repository.findById(COMUNA_ID)).thenReturn(Optional.of(persistedAfterFirst));
+        ArgumentCaptor<ComunaFwiState> savedSecond = ArgumentCaptor.forClass(ComunaFwiState.class);
+        when(repository.save(savedSecond.capture())).thenAnswer(inv -> inv.getArgument(0));
+
+        ComunaFwiAdvanceResult secondResult = service.advance(COMUNA_ID, today, secondInputs);
+
+        assertEquals(
+                "FWI_WARMUP",
+                secondResult.qualityFlag(),
+                "a same-day resync must PRESERVE an existing warmup/restart flag set earlier the"
+                        + " same day, not silently discard it");
+        assertEquals("FWI_WARMUP", savedSecond.getValue().getQualityFlag());
+    }
+
+    @Test
+    void sameDayResync_keepsQualityFlagNullWhenNoneWasSet() {
+        LocalDate today = LocalDate.of(2026, 1, 21);
+        LocalDate yesterday = today.minusDays(1);
+        // Existing state for TODAY already, with no warmup/restart flag (a normal day).
+        ComunaFwiState existing =
+                existingState(today, 88.0, 20.0, 100.0, yesterday, 87.0, 18.0, 95.0);
+        existing.setQualityFlag(null);
+        when(repository.findById(COMUNA_ID)).thenReturn(Optional.of(existing));
+        when(repository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        ComunaFwiAdvanceResult result = service.advance(COMUNA_ID, today, otherInputs());
+
+        assertNull(
+                result.qualityFlag(),
+                "a same-day resync of an already-normal state must remain unflagged, not invent a"
+                        + " flag that wasn't there");
+    }
+
     private static ComunaFwiState existingState(
             LocalDate stateDate, double ffmc, double dmc, double dc,
             LocalDate baseDate, double baseFfmc, double baseDmc, double baseDc) {
