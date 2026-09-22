@@ -138,9 +138,13 @@ class CanadianFwiCalculatorTest {
     }
 
     @Test
-    void ffmc_heavyRain_wettingAndClampBranch() {
-        // Day 22 (Apr 22): prec = 9.0 mm, rh = 93% -- exercises the rain-effect branch (r > 0.5)
-        // and the wetting-side moisture computation, following on from day 21's own reported FFMC.
+    void ffmc_heavyRain_rainEffectBranch() {
+        // Day 22 (Apr 22): prec = 9.0 mm, rh = 93% -- exercises the generic rain-effect branch
+        // (r > 0.5) and its moisture recomputation. NOTE: this does NOT reach the mo>150
+        // heavy-moisture-carry term nor the mr>250 clamp (mo ~14.29, mr ~146.29 for these inputs,
+        // both comfortably below their thresholds) -- see the dedicated
+        // ffmc_moAbove150_appliesHeavyMoistureCarryTerm and ffmc_mrAbove250_clampsTo250 tests below
+        // for those two branches specifically.
         ensureLoaded();
         CanadianFwiCalculator calculator = CanadianFwiCalculator.northernHemisphere();
         ReferenceDay previous = day(8); // Apr 21
@@ -150,6 +154,44 @@ class CanadianFwiCalculatorTest {
                 calculator.advance(
                         previousState, new FwiInputs(d.temp(), d.rh(), d.ws(), d.prec(), d.month()));
         assertEquals(d.ffmc(), out.ffmc(), CODE_TOLERANCE, "FFMC day " + d.month() + "/" + d.day());
+    }
+
+    @Test
+    void ffmc_moAbove150_appliesHeavyMoistureCarryTerm() {
+        // Formula-fidelity test (synthetic input): a low previous FFMC (F=10) puts the pre-rain
+        // moisture mo ~192.75, comfortably above the mo>150 threshold (algebraically mo>150 <=>
+        // F<~20.0). None of the 49 reference days nor any other existing test ever drives mo above
+        // 150, so this branch (the extra 0.0015*(mo-150)^2*sqrt(rf) term) previously had zero
+        // coverage. Expected value hand-derived via an independent reimplementation of Eq. 1-10.
+        ensureLoaded();
+        CanadianFwiCalculator calculator = CanadianFwiCalculator.northernHemisphere();
+        FwiState previousState = new FwiState(10.0, 6.0, 15.0);
+        FwiInputs rainyNoon = new FwiInputs(20.0, 50.0, 10.0, 5.0, 6);
+
+        FwiOutputs out = calculator.advance(previousState, rainyNoon);
+
+        assertEquals(
+                51.97010884982895,
+                out.ffmc(),
+                1e-6,
+                "FFMC must apply the mo>150 heavy-moisture-carry term");
+    }
+
+    @Test
+    void ffmc_mrAbove250_clampsTo250() {
+        // Formula-fidelity test (synthetic input): same low previous FFMC as above but with much
+        // heavier rain (30 mm) so the rain-adjusted moisture mr exceeds 250 before clamping. None
+        // of the 49 reference days nor any other existing test ever drives mr above 250, so this
+        // clamp previously had zero coverage. Expected value hand-derived via an independent
+        // reimplementation of Eq. 1-10, with mr clamped to exactly 250 before continuing.
+        ensureLoaded();
+        CanadianFwiCalculator calculator = CanadianFwiCalculator.northernHemisphere();
+        FwiState previousState = new FwiState(10.0, 6.0, 15.0);
+        FwiInputs heavyRainNoon = new FwiInputs(20.0, 50.0, 10.0, 30.0, 6);
+
+        FwiOutputs out = calculator.advance(previousState, heavyRainNoon);
+
+        assertEquals(48.95210203908465, out.ffmc(), 1e-6, "FFMC must clamp mr to 250");
     }
 
     // ---- Isolated DMC tests ----
@@ -166,8 +208,9 @@ class CanadianFwiCalculatorTest {
     }
 
     @Test
-    void dmc_rainDay_wettingBranch() {
-        // Day 22 (Apr 22): prec = 9.0 mm > 1.5 mm threshold -- exercises the DMC rain-effect branch.
+    void dmc_rainDay_rainEffectBranch() {
+        // Day 22 (Apr 22): prec = 9.0 mm > 1.5 mm threshold -- exercises the DMC rain-effect branch
+        // (there is no separate "wetting" branch for DMC; this is the generic Eq. 12-14 recompute).
         ensureLoaded();
         CanadianFwiCalculator calculator = CanadianFwiCalculator.northernHemisphere();
         ReferenceDay previous = day(8);
@@ -193,8 +236,9 @@ class CanadianFwiCalculatorTest {
     }
 
     @Test
-    void dc_rainDay_wettingBranch() {
-        // Day 22 (Apr 22): prec = 9.0 mm > 2.8 mm threshold -- exercises the DC rain-effect branch.
+    void dc_rainDay_rainEffectBranch() {
+        // Day 22 (Apr 22): prec = 9.0 mm > 2.8 mm threshold -- exercises the DC rain-effect branch
+        // (there is no separate "wetting" branch for DC; this is the generic Eq. 18-19 recompute).
         ensureLoaded();
         CanadianFwiCalculator calculator = CanadianFwiCalculator.northernHemisphere();
         ReferenceDay previous = day(8);
