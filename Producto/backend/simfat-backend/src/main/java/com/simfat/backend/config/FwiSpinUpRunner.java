@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.simfat.backend.model.ComunaInfo;
 import com.simfat.backend.repository.ComunaInfoRepository;
+import com.simfat.backend.service.fwi.ComunaFwiAdvanceResult;
 import com.simfat.backend.service.fwi.ComunaFwiStateService;
 import com.simfat.backend.service.fwi.FwiInputs;
 import java.io.IOException;
@@ -85,6 +86,16 @@ public class FwiSpinUpRunner implements ApplicationRunner {
      */
     private static final int ARCHIVE_LATENCY_DAYS = 2;
 
+    /**
+     * Mirrors {@code ComunaFwiStateService.QUALITY_FLAG_RESTARTED} (S1d1, package-private,
+     * intentionally not modified for this slice -- see class javadoc "Idempotency"). Set on a
+     * {@link ComunaFwiAdvanceResult} when {@code advance} silently bridged a gap larger than
+     * {@code maxGapDays} by restarting the chain from published startup values instead of
+     * throwing. Duplicated here as a literal, not imported, because the source constant is not
+     * accessible outside {@code service.fwi}.
+     */
+    private static final String QUALITY_FLAG_RESTARTED = "FWI_RESTARTED";
+
     private final ComunaInfoRepository comunaInfoRepository;
     private final ComunaFwiStateService comunaFwiStateService;
     private final ObjectMapper objectMapper;
@@ -132,11 +143,27 @@ public class FwiSpinUpRunner implements ApplicationRunner {
         );
 
         int comunasOk = 0;
+        int comunasPartial = 0;
+        int comunasAlreadyWarm = 0;
         int comunasFailed = 0;
         for (ComunaInfo comuna : comunas) {
             try {
-                spinUpComuna(comuna, startDate, endDate);
-                comunasOk++;
+                SpinUpOutcome outcome = spinUpComuna(comuna, startDate, endDate);
+                if (outcome == SpinUpOutcome.PARTIAL) {
+                    comunasPartial++;
+                } else {
+                    comunasOk++;
+                }
+            } catch (IllegalArgumentException ex) {
+                // S1d1's backwards-date rejection: a SAFE, EXPECTED outcome when re-running the
+                // spin-up against a comuna whose state is already past the window's start date
+                // (see class javadoc "Idempotency") -- not a real failure, so it gets its own
+                // status and its own bucket instead of being lumped into comuna_error.
+                comunasAlreadyWarm++;
+                LOGGER.info(
+                        "fwi_spinup status=already_up_to_date comunaId={} reason={}",
+                        comuna.getId(), ex.getMessage()
+                );
             } catch (Exception ex) {
                 comunasFailed++;
                 LOGGER.warn(
@@ -146,10 +173,21 @@ public class FwiSpinUpRunner implements ApplicationRunner {
             }
         }
 
-        LOGGER.info(
-                "fwi_spinup status=done comunasOk={} comunasFailed={} startDate={} endDate={}",
-                comunasOk, comunasFailed, startDate, endDate
-        );
+        String summary = "fwi_spinup status=done comunasOk={} comunasPartial={} comunasAlreadyWarm={}"
+                + " comunasFailed={} startDate={} endDate={}";
+        if (comunasFailed > 0 || comunasPartial > 0) {
+            // Elevate to WARN: a fully clean run stays at INFO, anything else must be loud
+            // enough that an operator scanning logs at WARN level does not miss it.
+            LOGGER.warn(summary, comunasOk, comunasPartial, comunasAlreadyWarm, comunasFailed, startDate, endDate);
+        } else {
+            LOGGER.info(summary, comunasOk, comunasPartial, comunasAlreadyWarm, comunasFailed, startDate, endDate);
+        }
+    }
+
+    /** Outcome of one comuna's spin-up, used by {@link #run} to pick the right summary bucket. */
+    private enum SpinUpOutcome {
+        OK,
+        PARTIAL
     }
 
     /**
@@ -158,7 +196,7 @@ public class FwiSpinUpRunner implements ApplicationRunner {
      * in ascending order so only the FINAL state is persisted per comuna, not one document per
      * observed day.
      */
-    private void spinUpComuna(ComunaInfo comuna, LocalDate startDate, LocalDate endDate)
+    private SpinUpOutcome spinUpComuna(ComunaInfo comuna, LocalDate startDate, LocalDate endDate)
             throws IOException, InterruptedException {
         String url = archiveBaseUrl + "/v1/archive"
                 + "?latitude=" + comuna.getCenterLat()
@@ -187,21 +225,56 @@ public class FwiSpinUpRunner implements ApplicationRunner {
 
         int daysAdvanced = 0;
         int daysSkipped = 0;
+        boolean partial = false;
+        LocalDate lastSkippedDate = null;
         for (LocalDate day = startDate; !day.isAfter(endDate); day = day.plusDays(1)) {
             FwiInputs inputs = deriveNoonInputsForDay(hourly, daily, day);
             if (inputs == null) {
                 daysSkipped++;
+                lastSkippedDate = day;
                 LOGGER.warn("fwi_spinup status=missing_day_inputs comunaId={} date={}", comuna.getId(), day);
                 continue;
             }
-            comunaFwiStateService.advance(comuna.getId(), day, inputs);
+
+            ComunaFwiAdvanceResult result;
+            try {
+                result = comunaFwiStateService.advance(comuna.getId(), day, inputs);
+            } catch (UnsupportedOperationException ex) {
+                // S1d1's "gap too large to bridge, too small to restart" signal (gap in
+                // (1, maxGapDays]): the chain is now stuck for this comuna -- any day after this
+                // point would need the same unfillable gap resolved first. Stop here instead of
+                // silently letting run()'s outer catch lump a PARTIAL success (days before the
+                // hole really did persist) in with comunasFailed.
+                partial = true;
+                LOGGER.warn(
+                        "fwi_spinup status=window_truncated_by_gap comunaId={} daysAdvanced={}"
+                                + " skippedDate={} reason={}",
+                        comuna.getId(), daysAdvanced, lastSkippedDate, ex.getMessage()
+                );
+                break;
+            }
+
+            // S1d1 bridges a gap beyond maxGapDays SILENTLY via a restart from published startup
+            // values -- no exception. If that happens after this comuna already advanced at
+            // least one day THIS run, real warm-up progress made earlier in this same run was
+            // just discarded; a restart on the very first day processed is a normal cold start
+            // relative to stale prior state and not flagged here.
+            if (QUALITY_FLAG_RESTARTED.equals(result.qualityFlag()) && daysAdvanced > 0) {
+                partial = true;
+                LOGGER.warn(
+                        "fwi_spinup status=window_restarted_by_gap comunaId={}"
+                                + " daysAdvancedBeforeRestart={} restartedOn={}",
+                        comuna.getId(), daysAdvanced, day
+                );
+            }
             daysAdvanced++;
         }
 
         LOGGER.info(
-                "fwi_spinup status=comuna_done comunaId={} daysAdvanced={} daysSkipped={}",
-                comuna.getId(), daysAdvanced, daysSkipped
+                "fwi_spinup status=comuna_done comunaId={} daysAdvanced={} daysSkipped={} partial={}",
+                comuna.getId(), daysAdvanced, daysSkipped, partial
         );
+        return partial ? SpinUpOutcome.PARTIAL : SpinUpOutcome.OK;
     }
 
     /**
