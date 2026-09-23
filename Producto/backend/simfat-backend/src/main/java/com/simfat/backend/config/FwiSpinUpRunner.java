@@ -67,6 +67,19 @@ import org.springframework.stereotype.Component;
  * (quantile matching, task 1e.2) and the CEMS cross-check (task 1e.3) are separate slices --
  * per decision Q24, Open-Meteo Archive is the sole historical source and the CEMS
  * cross-check is demoted to optional/deferred, not built here.
+ *
+ * <p><b>Known limitation -- 120-day lookback may under-represent true seasonal DC:</b> {@code
+ * CanadianFwiCalculator#computeDc} (S1c) has no time-based decay term -- unlike FFMC/DMC, a
+ * cold-start bias in DC persists ADDITIVELY through the whole window and is only reset by a
+ * real rain event (precipitation &gt; 2.8mm) inside that window. If the spin-up runs deep into
+ * a long dry season with no qualifying rain event in the {@code lookback-days} window, the
+ * resulting DC can under-represent the true seasonal drought severity -- 120 days is not
+ * guaranteed to "catch up" on its own. This is a real limitation for methodological rigor, not
+ * a code bug: recommend running the spin-up as close as possible to the end of the wet season
+ * (when DC is naturally low and a cold start is a closer approximation of reality), or
+ * validating the resulting DC against a known reference before trusting it for production
+ * alerting. No change to the lookback-days default or new logic is made for this point in this
+ * fix round -- documentation only.
  */
 @Component
 public class FwiSpinUpRunner implements ApplicationRunner {
