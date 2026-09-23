@@ -1,0 +1,52 @@
+package com.simfat.backend.service.mapbiomas;
+
+/**
+ * Result of {@link MapbiomasSusceptibilityService#forComuna}, design D3.
+ *
+ * @param score {@code S_mapbiomas} in {@code [0,1]}. See {@code qualityFlag} for whether this
+ *     is the full 0.65/0.35 fuel+history blend or a degraded, single-component signal.
+ * @param fuelIndex {@code fuel} in {@code [0,1]}, or {@code null} when {@code landCover} is
+ *     unavailable for this comuna -- {@code null} means "genuinely unknown", never an implicit
+ *     zero (a zero fuel index would claim "no flammable vegetation", which is a different,
+ *     unsupported statement).
+ * @param historyIndex {@code history} in {@code [0,1]}, or {@code null} when fire data is
+ *     unavailable ({@code fire.available=false} or missing), for the same reason.
+ * @param dataVersion the {@code comuna_mapbiomas_stats} {@code dataVersion} this result was
+ *     computed from, so callers can attribute/audit it.
+ * @param qualityFlag {@code null} when both components are available and the full blend was
+ *     computed; otherwise one of {@link #MAPBIOMAS_FUEL_UNAVAILABLE},
+ *     {@link #MAPBIOMAS_FIRE_UNAVAILABLE}, {@link #MAPBIOMAS_UNAVAILABLE}.
+ */
+public record MapbiomasSusceptibility(
+    double score,
+    Double fuelIndex,
+    Double historyIndex,
+    String dataVersion,
+    String qualityFlag
+) {
+
+    /**
+     * {@code landCover} is null for this comuna's stats document (decision Q26 -- the reality
+     * for all 86 comunas today, since only S1b2's fire-only 2017 seed is loaded). {@code score}
+     * is the {@code history} component ALONE, not a fuel-penalized blend.
+     */
+    public static final String MAPBIOMAS_FUEL_UNAVAILABLE = "MAPBIOMAS_FUEL_UNAVAILABLE";
+
+    /**
+     * {@code fire.available=false} (or {@code fire} missing) for this comuna, symmetric to
+     * {@link #MAPBIOMAS_FUEL_UNAVAILABLE} (design D2 Biobio-coverage note). {@code score} is
+     * the {@code fuel} component ALONE.
+     */
+    public static final String MAPBIOMAS_FIRE_UNAVAILABLE = "MAPBIOMAS_FIRE_UNAVAILABLE";
+
+    /**
+     * Neither {@code landCover} nor an available {@code fire} exists for this comuna, even
+     * though a {@code comuna_mapbiomas_stats} document does (distinct from
+     * {@link MapbiomasSusceptibilityService#forComuna} returning {@code Optional.empty()},
+     * which strictly means "no document at all"). {@code score} is {@code 0.0} as a safe
+     * placeholder, NOT a claim of "no susceptibility" -- a future consumer wiring this into a
+     * score blend MUST treat this flag the same as "absent data", not blend in the literal
+     * {@code 0.0}.
+     */
+    public static final String MAPBIOMAS_UNAVAILABLE = "MAPBIOMAS_UNAVAILABLE";
+}
