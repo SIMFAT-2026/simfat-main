@@ -20,38 +20,20 @@ import org.springframework.stereotype.Service;
  * {@code ComunaRiskServiceImpl.recomputeAllComunas}). Deferred to S2a2, documented rather than
  * silently skipped.
  *
- * <p><b>Percentile-rank deferral (corrected rationale).</b> Design D3 (decision D3, engram
+ * <p><b>Percentile-rank blocker RESOLVED (S1b3).</b> Design D3 (engram
  * {@code sdd/mapbiomas-integration/design}) normalizes burned area via
  * {@code fire.burnedFractionPct}, an empirical percentile rank across the 86 comunas, frozen per
- * {@code dataVersion} (ties take the mean rank, exact zeros pinned to 0.0). {@link
- * #computeBurnedNorm} instead uses the most recent year's raw {@code burnedFractionByYear}
- * fraction (already normalized to {@code [0,1]} per design D2). The real reasons this is a
- * simplification, not the design's intended formula, are TWO, and both must hold before this
- * can be fixed -- NOT "a percentile rank across one year would be near-meaningless" (a
- * cross-sectional rank across the 86 comunas needs no additional years and would be a valid
- * statistic even for a single year; that claim was inaccurate and has been removed):
- * <ol>
- *   <li><b>Architecture.</b> A percentile rank needs a bulk read across all 86 comunas for the
- *       same {@code dataVersion} (see the bulk-read deferral above); {@link #forComuna}'s
- *       single-comuna lookup cannot compute one. Deferred to S2a2 alongside the bulk-read
- *       wiring.</li>
- *   <li><b>Missing field.</b> {@code fire.burnedFractionPct} does not exist on the actual S1b2
- *       {@link ComunaMapbiomasStats.Fire} model -- only the raw per-year
- *       {@code burnedFractionByYear} was shipped. The Python pipeline
- *       ({@code Producto/analytics/mapbiomas/src/mb_pipeline/build_stats.py}) must compute and
- *       add this field to the seed before a percentile-rank {@code burnedNorm} can be
- *       implemented at all, independent of the architecture question above.</li>
- * </ol>
- *
- * <p><b>S2a2 wiring blocker (read before enabling {@code wM > 0} in production).</b> {@code wM}
- * defaults to {@code 0.0} today, so this simplification has no production effect yet. Whoever
- * wires this service into {@code ComunaRiskServiceImpl} (S2a2) with a production-affecting
- * {@code wM > 0} MUST NOT do so while {@code computeBurnedNorm} still uses the raw-fraction
- * proxy above, UNLESS an explicit, documented decision is made to ship with that proxy anyway --
- * in which case that decision itself must be recorded (e.g. a new design amendment or decision
- * entry), not silently defaulted into. The correct fix is: either (a) add
- * {@code fire.burnedFractionPct} to the pipeline and switch {@link #computeBurnedNorm} to it, or
- * (b) explicitly accept and document the raw-fraction proxy for the first production rollout.
+ * {@code dataVersion} (ties take the mean rank, exact zeros pinned to 0.0). This field now exists
+ * on {@link ComunaMapbiomasStats.Fire} and is populated for every {@code available=true} comuna
+ * in the committed seed (Python: {@code mb_pipeline.build_stats.add_burned_fraction_pct}).
+ * {@link #computeBurnedNormResult} uses it whenever it is non-null. The S2a2 wiring blocker
+ * described in the S2a1 apply-progress (engram obs 774) is therefore resolved: a future {@code
+ * wM > 0} rollout no longer silently ships the raw-fraction proxy. The proxy is kept ONLY as a
+ * fallback for a comuna whose {@code fire.available=true} but {@code burnedFractionPct} is
+ * {@code null} (e.g. a stats document predating S1b3, or a future regression in the pipeline);
+ * when that fallback fires, {@link MapbiomasSusceptibility#qualityFlag} carries {@link
+ * MapbiomasSusceptibility#MAPBIOMAS_BURNED_NORM_RAW_FALLBACK} so the degradation is visible to
+ * callers instead of silent.
  */
 @Service
 public class MapbiomasSusceptibilityServiceImpl implements MapbiomasSusceptibilityService {
@@ -136,9 +118,10 @@ public class MapbiomasSusceptibilityServiceImpl implements MapbiomasSusceptibili
         Double fuelIndex = landCoverAvailable
             ? computeFuelIndex(stats.getLandCover().getSharesByClass(), fuelWeightTable)
             : null;
-        Double historyIndex = fireAvailable
-            ? computeHistoryIndex(stats.getFire(), recencyRMax, recencyTau)
+        HistoryResult historyResult = fireAvailable
+            ? computeHistoryIndexResult(stats.getFire(), recencyRMax, recencyTau)
             : null;
+        Double historyIndex = historyResult != null ? historyResult.historyIndex() : null;
         // Informational only (see MapbiomasSusceptibility#unobservedShare) -- does NOT feed
         // fuelIndex or score. null when landCover itself is unavailable, distinct from 0.0
         // (class 27 present but with zero share).
@@ -147,22 +130,22 @@ public class MapbiomasSusceptibilityServiceImpl implements MapbiomasSusceptibili
             : null;
 
         double score;
-        String qualityFlag;
+        String baseFlag;
         if (landCoverAvailable && fireAvailable) {
             score = clamp01(FUEL_WEIGHT * fuelIndex + HISTORY_WEIGHT * historyIndex);
-            qualityFlag = null;
+            baseFlag = null;
         } else if (fireAvailable) {
             // landCover missing (decision Q26, today's reality for all 86 comunas): the score
             // is the history component ALONE, never 0.65*0 + 0.35*history -- that would
             // silently penalize the score by the fuel weight for having no fuel data, which is
             // worse than not having a fuel signal at all.
             score = historyIndex;
-            qualityFlag = MapbiomasSusceptibility.MAPBIOMAS_FUEL_UNAVAILABLE;
+            baseFlag = MapbiomasSusceptibility.MAPBIOMAS_FUEL_UNAVAILABLE;
         } else if (landCoverAvailable) {
             // Symmetric case (design D2's Biobio-coverage note): fire.available=false ->
             // fuel-only, never 0.65*fuel + 0.35*0.
             score = fuelIndex;
-            qualityFlag = MapbiomasSusceptibility.MAPBIOMAS_FIRE_UNAVAILABLE;
+            baseFlag = MapbiomasSusceptibility.MAPBIOMAS_FIRE_UNAVAILABLE;
         } else {
             // A stats document exists (we did not return Optional.empty() above) but neither
             // component is usable. There is no signal at all to report. score=0.0 is a safe
@@ -170,14 +153,40 @@ public class MapbiomasSusceptibilityServiceImpl implements MapbiomasSusceptibili
             // qualityFlag as equivalent to "no data" when wiring the blend, not multiply a
             // literal 0.0 in.
             score = 0.0;
-            qualityFlag = MapbiomasSusceptibility.MAPBIOMAS_UNAVAILABLE;
+            baseFlag = MapbiomasSusceptibility.MAPBIOMAS_UNAVAILABLE;
         }
+
+        // Independent of the base flag above: fire.burnedFractionPct (design D3's intended
+        // burnedNorm) was absent even though fire was available, so computeHistoryIndexResult
+        // fell back to the raw-fraction proxy. Combine, don't overwrite -- both conditions can
+        // hold at once (e.g. landCover missing AND pct missing).
+        boolean usedRawBurnedNormFallback =
+            historyResult != null && historyResult.usedRawBurnedNormFallback();
+        String qualityFlag = combineFlags(
+            baseFlag,
+            usedRawBurnedNormFallback ? MapbiomasSusceptibility.MAPBIOMAS_BURNED_NORM_RAW_FALLBACK : null
+        );
 
         return Optional.of(
             new MapbiomasSusceptibility(
                 score, fuelIndex, historyIndex, stats.getDataVersion(), qualityFlag, unobservedShare
             )
         );
+    }
+
+    private static String combineFlags(String... flags) {
+        StringBuilder combined = null;
+        for (String flag : flags) {
+            if (flag == null) {
+                continue;
+            }
+            if (combined == null) {
+                combined = new StringBuilder(flag);
+            } else {
+                combined.append(',').append(flag);
+            }
+        }
+        return combined == null ? null : combined.toString();
     }
 
     private static boolean isFireAvailable(ComunaMapbiomasStats.Fire fire) {
@@ -234,15 +243,48 @@ public class MapbiomasSusceptibilityServiceImpl implements MapbiomasSusceptibili
         return clamp01(fuel);
     }
 
+    /**
+     * {@code history} plus whether it fell back to the raw-fraction {@code burnedNorm} proxy
+     * (see {@link MapbiomasSusceptibility#MAPBIOMAS_BURNED_NORM_RAW_FALLBACK}), returned together
+     * so {@link #forComuna} can surface the fallback as a quality flag without recomputing it.
+     */
+    record HistoryResult(double historyIndex, boolean usedRawBurnedNormFallback) {}
+
+    /** {@code burnedNorm} plus whether it is the raw-fraction fallback (design D3, S1b3). */
+    private record BurnedNormResult(double value, boolean usedRawFallback) {}
+
     /** {@code history = clamp(0.60*burnedNorm + 0.40*recurrenceNorm) * recency} (design D3). */
-    static double computeHistoryIndex(ComunaMapbiomasStats.Fire fire, double recencyRMax, double recencyTau) {
-        double burnedNorm = computeBurnedNorm(fire.getBurnedFractionByYear());
+    static HistoryResult computeHistoryIndexResult(
+        ComunaMapbiomasStats.Fire fire, double recencyRMax, double recencyTau
+    ) {
+        BurnedNormResult burnedNormResult = computeBurnedNormResult(fire);
         double recurrenceNorm = computeRecurrenceNorm(fire.getFrequencyMean());
         double recency = computeRecency(fire.getYearsSinceLastFire(), recencyRMax, recencyTau);
-        double raw = BURNED_WEIGHT * burnedNorm + RECURRENCE_WEIGHT * recurrenceNorm;
-        return clamp01(raw * recency);
+        double raw = BURNED_WEIGHT * burnedNormResult.value() + RECURRENCE_WEIGHT * recurrenceNorm;
+        return new HistoryResult(clamp01(raw * recency), burnedNormResult.usedRawFallback());
     }
 
+    /**
+     * {@code burnedNorm} (design D3): {@code fire.burnedFractionPct} (the empirical percentile
+     * rank across all comunas, S1b3) when present, otherwise the raw most-recent-year {@code
+     * burnedFractionByYear} fraction as a fallback (flagged by the returned {@code
+     * usedRawFallback}, see {@link MapbiomasSusceptibility#MAPBIOMAS_BURNED_NORM_RAW_FALLBACK}).
+     */
+    private static BurnedNormResult computeBurnedNormResult(ComunaMapbiomasStats.Fire fire) {
+        Double pct = fire.getBurnedFractionPct();
+        if (pct != null) {
+            return new BurnedNormResult(clamp01(pct), false);
+        }
+        return new BurnedNormResult(computeBurnedNorm(fire.getBurnedFractionByYear()), true);
+    }
+
+    /**
+     * Raw-fraction {@code burnedNorm} FALLBACK ONLY (design D3's intended {@code burnedNorm} is
+     * {@code fire.burnedFractionPct}, see {@link #computeBurnedNormResult}): the most recent
+     * year's raw {@code burnedFractionByYear} value, used when {@code burnedFractionPct} is
+     * unavailable. Kept as its own package-private static method (unchanged signature) so it
+     * stays directly unit-testable without constructing a whole {@code Fire} object.
+     */
     static double computeBurnedNorm(Map<String, Double> burnedFractionByYear) {
         if (burnedFractionByYear == null || burnedFractionByYear.isEmpty()) {
             return 0.0;
