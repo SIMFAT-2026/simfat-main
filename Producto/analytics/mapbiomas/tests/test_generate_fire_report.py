@@ -68,3 +68,15 @@ def test_generate_writes_86_comunas_with_no_year_last_fire_contradiction(tmp_pat
     assert florida["landCover"] is None
     assert florida["landCoverReason"] is not None
     assert florida["partial"] is True
+
+    # design D1/D3: every comuna with usable fire data gets a burnedFractionPct
+    # (empirical percentile rank across all 86 comunas, computed from this
+    # dataset's only Fuego year, 2017 -- see build_stats.add_burned_fraction_pct
+    # and fire_stats.select_burned_fraction_for_pct). Florida burned the most
+    # of any comuna in 2017, so it must be at the top of the rank.
+    assert florida["fire"]["burnedFractionPct"] == pytest.approx(1.0)
+    pct_values = [doc["fire"]["burnedFractionPct"] for doc in docs.values() if doc["fire"]["available"]]
+    assert all(0.0 <= v <= 1.0 for v in pct_values)
+    # At least one comuna had zero burned area in 2017 and must be pinned to
+    # exactly 0.0, not a small positive tie-averaged rank.
+    assert 0.0 in pct_values

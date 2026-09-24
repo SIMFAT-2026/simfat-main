@@ -51,7 +51,14 @@ def test_to_basis_points_largest_remainder_breaks_ties_by_class_code():
     assert bp[1] == 3334  # ascending class code wins the extra bp on an exact tie
 
 
-# --- land_cover_section: reference year + 5y mean, both in bp --------------
+# --- land_cover_section: reference year + 5y mean, both FRACTIONS (design D1) ----
+#
+# sharesByClass/sharesByClassMean5y hold fractions summing to ~1.0, NOT basis
+# points -- only sharesByYear.classes (not implemented in this slice) is
+# documented as bp. Internally the largest-remainder bp rounding is still
+# used (so the emitted fractions are exact multiples of 1/10000, reproducible
+# and free of naive floating-point rounding drift), then divided by 10000
+# before being returned.
 
 
 def _by_year():
@@ -64,30 +71,42 @@ def _by_year():
     }
 
 
-def test_land_cover_section_reference_year_shares_sum_to_10000():
+def test_land_cover_section_reference_year_shares_sum_to_one():
     section = build_stats.land_cover_section(_by_year(), reference_year=2024, mean_years=range(2020, 2025))
-    assert sum(section["sharesByClass"].values()) == 10000
+    assert sum(section["sharesByClass"].values()) == pytest.approx(1.0, abs=1e-9)
     assert section["referenceYear"] == 2024
 
 
 def test_land_cover_section_reference_shares_match_ratio_within_1e4():
     section = build_stats.land_cover_section(_by_year(), reference_year=2024, mean_years=range(2020, 2025))
     # 2024: 59=40/100, 60=50/100, 15=10/100
-    assert section["sharesByClass"][59] / 10000 == pytest.approx(0.40, abs=1e-4)
-    assert section["sharesByClass"][60] / 10000 == pytest.approx(0.50, abs=1e-4)
+    assert section["sharesByClass"][59] == pytest.approx(0.40, abs=1e-4)
+    assert section["sharesByClass"][60] == pytest.approx(0.50, abs=1e-4)
 
 
-def test_land_cover_section_mean_5y_sums_to_10000_and_is_the_average():
+def test_land_cover_section_mean_5y_sums_to_one_and_is_the_average():
     section = build_stats.land_cover_section(_by_year(), reference_year=2024, mean_years=range(2020, 2025))
-    assert sum(section["sharesByClassMean5y"].values()) == 10000
+    assert sum(section["sharesByClassMean5y"].values()) == pytest.approx(1.0, abs=1e-9)
     # mean of 59 shares across 2020..2024 (each year sums to 100 ha):
     # 60,55,50,45,40 -> mean 50.0/100 = 0.50
-    assert section["sharesByClassMean5y"][59] / 10000 == pytest.approx(0.50, abs=1e-4)
+    assert section["sharesByClassMean5y"][59] == pytest.approx(0.50, abs=1e-4)
 
 
 def test_land_cover_section_different_reference_year_is_reflected():
     section_2020 = build_stats.land_cover_section(_by_year(), reference_year=2020, mean_years=range(2020, 2025))
-    assert section_2020["sharesByClass"][59] / 10000 == pytest.approx(0.60, abs=1e-4)
+    assert section_2020["sharesByClass"][59] == pytest.approx(0.60, abs=1e-4)
+
+
+def test_land_cover_section_fractions_are_exact_bp_over_10000():
+    # The fraction shape must never drift from the largest-remainder bp
+    # rounding: an independently computed to_basis_points() call on the same
+    # hectares must equal sharesByClass * 10000 exactly (not just "close").
+    by_year = _by_year()
+    section = build_stats.land_cover_section(by_year, reference_year=2024, mean_years=range(2020, 2025))
+    expected_bp = build_stats.to_basis_points(by_year[2024])
+    assert sum(expected_bp.values()) == 10000
+    for code, bp in expected_bp.items():
+        assert section["sharesByClass"][code] == bp / build_stats.BP_TOTAL
 
 
 # --- build_comuna_document: assembles landCover + fire + provenance --------
@@ -163,8 +182,8 @@ def test_land_cover_section_from_a_real_join_coverage_output(make_coverage_xlsx)
     index = {("Biobío", lulc.normalize_name("Arauco")): "CHL.6.1.1_1"}
     joined = lulc.join_coverage(rows, index, expected_comuna_ids=["CHL.6.1.1_1"])
     section = build_stats.land_cover_section(joined["CHL.6.1.1_1"], reference_year=2024, mean_years=[2024])
-    assert sum(section["sharesByClass"].values()) == 10000
-    assert section["sharesByClass"][60] / 10000 == pytest.approx(0.60, abs=1e-4)
+    assert sum(section["sharesByClass"].values()) == pytest.approx(1.0, abs=1e-9)
+    assert section["sharesByClass"][60] == pytest.approx(0.60, abs=1e-4)
 
 
 # --- CSV coverage report (the Biobio gate artifact) -------------------------
@@ -198,3 +217,68 @@ def test_write_seed_jsonl_one_document_per_line(tmp_path):
     assert len(lines) == 2
     assert json.loads(lines[0])["comunaId"] == "A"
     assert json.loads(lines[1])["comunaId"] == "B"
+
+
+# --- percentile_rank_burned_fraction: design D3's burnedFractionPct ---------
+#
+# Empirical percentile rank of a burned-fraction value across all comunas,
+# frozen with dataVersion (design D1/D3): ties take the mean rank EXCEPT
+# exact zeros, which are pinned to 0.0 (the distribution is zero-inflated);
+# comunas excluded from the rank (no usable fire data) map to None and do
+# not count toward N.
+
+
+def test_percentile_rank_single_nonzero_max_is_exactly_one():
+    result = build_stats.percentile_rank_burned_fraction({"a": 0.1, "b": 0.5})
+    assert result["b"] == pytest.approx(1.0)
+    assert result["a"] == pytest.approx(0.5)  # unique smaller value: rank 1/2
+
+
+def test_percentile_rank_exact_zeros_are_pinned_to_zero_not_tie_averaged():
+    result = build_stats.percentile_rank_burned_fraction({"a": 0.0, "b": 0.0, "c": 0.5})
+    assert result["a"] == 0.0
+    assert result["b"] == 0.0
+    assert result["c"] == pytest.approx(1.0)  # unique max, rank 3/3
+
+
+def test_percentile_rank_all_zero_are_all_pinned_to_zero():
+    result = build_stats.percentile_rank_burned_fraction({"a": 0.0, "b": 0.0, "c": 0.0})
+    assert result == {"a": 0.0, "b": 0.0, "c": 0.0}
+
+
+def test_percentile_rank_nonzero_ties_share_the_mean_rank():
+    # sorted [0.2, 0.2, 0.6] -> ranks 1,2 average to 1.5 for the tied pair.
+    result = build_stats.percentile_rank_burned_fraction({"a": 0.2, "b": 0.2, "c": 0.6})
+    assert result["a"] == pytest.approx(0.5)  # 1.5 / 3
+    assert result["b"] == pytest.approx(0.5)
+    assert result["c"] == pytest.approx(1.0)  # 3 / 3
+
+
+def test_percentile_rank_none_values_are_excluded_and_do_not_count_toward_n():
+    result = build_stats.percentile_rank_burned_fraction({"a": 0.5, "b": None, "c": 0.5})
+    assert result["b"] is None
+    # a and c tie as the only two ranked comunas (n=2, b excluded): 1.5/2.
+    assert result["a"] == pytest.approx(0.75)
+    assert result["c"] == pytest.approx(0.75)
+
+
+def test_percentile_rank_everything_excluded_returns_all_none():
+    result = build_stats.percentile_rank_burned_fraction({"a": None, "b": None})
+    assert result == {"a": None, "b": None}
+
+
+# --- add_burned_fraction_pct: wires the rank into the fire section ---------
+
+
+def test_add_burned_fraction_pct_mutates_every_docs_fire_section():
+    docs = [
+        {"comunaId": "A", "fire": {"available": True, "burnedFractionByYear": {"2017": 0.0}}},
+        {"comunaId": "B", "fire": {"available": True, "burnedFractionByYear": {"2017": 0.5}}},
+        {"comunaId": "C", "fire": {"available": False, "burnedFractionByYear": {"2017": 0.9}}},
+    ]
+
+    build_stats.add_burned_fraction_pct(docs)
+
+    assert docs[0]["fire"]["burnedFractionPct"] == 0.0
+    assert docs[1]["fire"]["burnedFractionPct"] == pytest.approx(1.0)
+    assert docs[2]["fire"]["burnedFractionPct"] is None
