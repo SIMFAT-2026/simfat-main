@@ -15,6 +15,7 @@ import com.simfat.backend.model.ComunaInfo;
 import com.simfat.backend.model.ComunaRiskSnapshot;
 import com.simfat.backend.model.HeatAlertEvent;
 import com.simfat.backend.model.IndicatorType;
+import com.simfat.backend.model.OpenEoIndicatorObservation;
 import com.simfat.backend.model.TerritoryWeatherObservation;
 import com.simfat.backend.repository.CitizenReportRepository;
 import com.simfat.backend.repository.ComunaInfoRepository;
@@ -30,10 +31,12 @@ import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -144,6 +147,23 @@ class ComunaRiskServiceImplMapbiomasBlendTest {
             .thenReturn(Optional.empty());
     }
 
+    // Mirrors ComunaRiskServiceImplMapbiomasGoldenTest#stubCopernicus -- duplicated here
+    // deliberately (same rationale as #round4 below) so this class does not reach into the
+    // golden test's private fixtures.
+    private void stubCopernicus(ComunaInfo comuna, double ndmi, double ndvi) {
+        OpenEoIndicatorObservation ndmiObs = new OpenEoIndicatorObservation();
+        ndmiObs.setId("ndmi-" + comuna.getId());
+        ndmiObs.setValue(ndmi);
+        ndmiObs.setObservedAt(LocalDateTime.now().minusDays(1));
+        OpenEoIndicatorObservation ndviObs = new OpenEoIndicatorObservation();
+        ndviObs.setValue(ndvi);
+        ndviObs.setObservedAt(LocalDateTime.now().minusDays(1));
+        when(openEoObsRepository.findTopByRegionIdAndIndicatorOrderByObservedAtDesc(comuna.getRegionId(), IndicatorType.NDMI))
+            .thenReturn(Optional.of(ndmiObs));
+        when(openEoObsRepository.findTopByRegionIdAndIndicatorOrderByObservedAtDesc(comuna.getRegionId(), IndicatorType.NDVI))
+            .thenReturn(Optional.of(ndviObs));
+    }
+
     // Mirrors ComunaRiskServiceImpl's private round4 -- duplicated here deliberately so the
     // test computes its own expected value independently of the production rounding call site.
     private static double round4(double value) {
@@ -232,6 +252,47 @@ class ComunaRiskServiceImplMapbiomasBlendTest {
         double sum = snapshot.getComponentFwi() + snapshot.getComponentFirms() + snapshot.getComponentReports()
             + snapshot.getComponentMapbiomas();
         assertEquals(snapshot.getScoreComposite(), sum, 1e-4);
+    }
+
+    /**
+     * ENHANCED-mode fixtures for {@link
+     * #componentSumInvariant_matchesScoreComposite_enhancedModeNotClamped}, chosen (via a small
+     * offline search over the production formula) specifically to hit the rounding boundary
+     * where rounding {@code cNdmi}/{@code cNdvi} to 4 decimals BEFORE scaling by {@code (1 -
+     * wEff)} (the pre-fix code) diverges from rounding the raw product AFTER scaling (the
+     * fixed code) by more than the {@code 1e-4} sum-invariant tolerance. All three use
+     * pre-registered {@code wM} grid values (0.10/0.25/0.35).
+     */
+    private static Stream<EnhancedRoundingCase> enhancedRoundingBoundaryCases() {
+        return Stream.of(
+            new EnhancedRoundingCase(0.0, -0.398, 0.113, 0.10),
+            new EnhancedRoundingCase(0.0, -0.386, 0.105, 0.25),
+            new EnhancedRoundingCase(0.0, -0.338, 0.126, 0.35)
+        );
+    }
+
+    private record EnhancedRoundingCase(double fwiRaw, double ndmi, double ndvi, double wM) {}
+
+    @ParameterizedTest
+    @MethodSource("enhancedRoundingBoundaryCases")
+    void componentSumInvariant_matchesScoreComposite_enhancedModeNotClamped(EnhancedRoundingCase fixture) {
+        ComunaInfo comuna = comunaInfo("comuna-sum-invariant-enh-" + fixture.wM());
+        when(comunaRepository.findById(comuna.getId())).thenReturn(Optional.of(comuna));
+        stubWeather(comuna, fixture.fwiRaw());
+        stubFirms(comuna, List.of());
+        stubReports(comuna, 0);
+        stubCopernicus(comuna, fixture.ndmi(), fixture.ndvi());
+        when(mapbiomasService.forComuna(comuna.getId())).thenReturn(Optional.of(
+            new MapbiomasSusceptibility(0.9, 0.8, 0.6, "fuego-col1@2017-partial", null, 0.0)
+        ));
+        service.setMapbiomasWeight(fixture.wM());
+
+        ComunaRiskSnapshot snapshot = service.recomputeByComuna(comuna.getId());
+
+        double sum = snapshot.getComponentFwi() + snapshot.getComponentFirms() + snapshot.getComponentReports()
+            + snapshot.getComponentNdmi() + snapshot.getComponentNdvi() + snapshot.getComponentMapbiomas();
+        assertEquals(snapshot.getScoreComposite(), sum, 1e-4,
+            "wM=" + fixture.wM() + " fwiRaw=" + fixture.fwiRaw() + " ndmi=" + fixture.ndmi() + " ndvi=" + fixture.ndvi());
     }
 
     @ParameterizedTest

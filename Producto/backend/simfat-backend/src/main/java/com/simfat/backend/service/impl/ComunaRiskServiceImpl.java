@@ -310,8 +310,14 @@ public class ComunaRiskServiceImpl implements ComunaRiskService {
                 cFwi = fwiNorm * W_FWI_ENH;
                 cFirms = firmsNorm * W_FIRMS_ENH;
                 cReports = reportsNorm * W_REPORTS_ENH;
-                cNdmi = round4(ndmiNorm * W_NDMI_ENH);
-                cNdvi = round4(ndviNorm * W_NDVI_ENH);
+                // Kept as raw (unrounded) doubles here -- rounded exactly once, together with
+                // the MapBiomas blend scaling below, at snapshot.setComponentNdmi/Ndvi. Rounding
+                // here AND again after the (1-wEff) scale would round4() twice, which can shift
+                // the final 4th decimal versus a single round4() of the true product (double
+                // rounding is not a no-op in general -- see ComunaRiskServiceImplMapbiomasBlendTest
+                // #componentSumInvariant_matchesScoreComposite_enhancedModeNotClamped).
+                cNdmi = ndmiNorm * W_NDMI_ENH;
+                cNdvi = ndviNorm * W_NDVI_ENH;
                 ndmiRawVal = ndmi;
                 ndviRawVal = ndvi;
                 openeoObsId = ndmiObs.get().getId();
@@ -345,10 +351,10 @@ public class ComunaRiskServiceImpl implements ComunaRiskService {
         cFirms = cFirms * (1.0 - wEff);
         cReports = cReports * (1.0 - wEff);
         if (cNdmi != null) {
-            cNdmi = round4(cNdmi * (1.0 - wEff));
+            cNdmi = cNdmi * (1.0 - wEff);
         }
         if (cNdvi != null) {
-            cNdvi = round4(cNdvi * (1.0 - wEff));
+            cNdvi = cNdvi * (1.0 - wEff);
         }
         double componentMapbiomas = round4(wEff * sMapbiomas);
         Double mapbiomasFuelIndex = mapbiomasResult.map(MapbiomasSusceptibility::fuelIndex).orElse(null);
@@ -375,8 +381,8 @@ public class ComunaRiskServiceImpl implements ComunaRiskService {
         snapshot.setComponentFwi(round4(cFwi));
         snapshot.setComponentFirms(round4(cFirms));
         snapshot.setComponentReports(round4(cReports));
-        snapshot.setComponentNdmi(cNdmi);
-        snapshot.setComponentNdvi(cNdvi);
+        snapshot.setComponentNdmi(cNdmi != null ? round4(cNdmi) : null);
+        snapshot.setComponentNdvi(cNdvi != null ? round4(cNdvi) : null);
         snapshot.setComponentLoss(null);
         snapshot.setNdmiRaw(ndmiRawVal);
         snapshot.setNdviRaw(ndviRawVal);
