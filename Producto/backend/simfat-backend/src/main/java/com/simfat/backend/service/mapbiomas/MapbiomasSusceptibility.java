@@ -16,13 +16,21 @@ package com.simfat.backend.service.mapbiomas;
  * @param qualityFlag {@code null} when both components are available and the full blend was
  *     computed; otherwise one of {@link #MAPBIOMAS_FUEL_UNAVAILABLE},
  *     {@link #MAPBIOMAS_FIRE_UNAVAILABLE}, {@link #MAPBIOMAS_UNAVAILABLE}.
+ * @param unobservedShare class 27's ("not observed") share of {@code sharesByClass} when
+ *     {@code landCover} is available (0.0 when class 27 has no entry for this comuna), or
+ *     {@code null} when {@code landCover} itself is unavailable. This is informational only --
+ *     it does NOT change {@code fuelIndex} (see {@link FuelWeightTable}'s class Javadoc) --
+ *     surfaced so a future consumer (e.g. a UI or the S2a2 blend) can flag/discount a comuna
+ *     whose fuel score is diluted by a large unclassified/cloud-covered area, instead of that
+ *     information being silently lost.
  */
 public record MapbiomasSusceptibility(
     double score,
     Double fuelIndex,
     Double historyIndex,
     String dataVersion,
-    String qualityFlag
+    String qualityFlag,
+    Double unobservedShare
 ) {
 
     /**

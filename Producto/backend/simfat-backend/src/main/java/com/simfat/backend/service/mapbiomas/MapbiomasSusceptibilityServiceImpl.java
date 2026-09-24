@@ -53,6 +53,10 @@ public class MapbiomasSusceptibilityServiceImpl implements MapbiomasSusceptibili
     // computing a saturated, meaningless fuel index.
     static final double SHARE_SUM_TOLERANCE = 0.01;
 
+    // MapBiomas Land Cover Col 2 class code for "not observed" -- see FuelWeightTable's class
+    // Javadoc for why it is excluded from the fuel sum rather than given a literal 0.0 weight.
+    private static final String UNOBSERVED_CLASS_CODE = "27";
+
     private final ComunaMapbiomasStatsRepository statsRepository;
     private final FuelWeightTable fuelWeightTable;
 
@@ -113,6 +117,12 @@ public class MapbiomasSusceptibilityServiceImpl implements MapbiomasSusceptibili
         Double historyIndex = fireAvailable
             ? computeHistoryIndex(stats.getFire(), recencyRMax, recencyTau)
             : null;
+        // Informational only (see MapbiomasSusceptibility#unobservedShare) -- does NOT feed
+        // fuelIndex or score. null when landCover itself is unavailable, distinct from 0.0
+        // (class 27 present but with zero share).
+        Double unobservedShare = landCoverAvailable
+            ? stats.getLandCover().getSharesByClass().getOrDefault(UNOBSERVED_CLASS_CODE, 0.0)
+            : null;
 
         double score;
         String qualityFlag;
@@ -142,7 +152,9 @@ public class MapbiomasSusceptibilityServiceImpl implements MapbiomasSusceptibili
         }
 
         return Optional.of(
-            new MapbiomasSusceptibility(score, fuelIndex, historyIndex, stats.getDataVersion(), qualityFlag)
+            new MapbiomasSusceptibility(
+                score, fuelIndex, historyIndex, stats.getDataVersion(), qualityFlag, unobservedShare
+            )
         );
     }
 

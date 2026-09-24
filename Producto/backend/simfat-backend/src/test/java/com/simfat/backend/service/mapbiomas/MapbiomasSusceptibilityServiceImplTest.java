@@ -123,6 +123,7 @@ class MapbiomasSusceptibilityServiceImplTest {
         assertEquals(0.26, result.score(), 1e-9);
         assertFalse(Math.abs(result.score() - 0.091) < 1e-6, "must not equal the wrongly fuel-penalized formula");
         assertEquals(MapbiomasSusceptibility.MAPBIOMAS_FUEL_UNAVAILABLE, result.qualityFlag());
+        assertNull(result.unobservedShare(), "landCover unavailable -- unobservedShare is genuinely unknown, not 0.0");
     }
 
     @Test
@@ -212,5 +213,17 @@ class MapbiomasSusceptibilityServiceImplTest {
         // fuel = 0.5*1.00 (class 9) + 0.2*0.60 (class 12) = 0.62; class 27's 0.3 share is
         // dropped entirely, not treated as 0.3*0.
         assertEquals(0.62, result.fuelIndex(), 1e-9);
+        assertEquals(0.3, result.unobservedShare(), 1e-9, "class 27's share must be surfaced, not lost");
+    }
+
+    @Test
+    void computeBurnedNorm_multipleYears_usesMostRecentYear() {
+        // Only single-entry maps were exercised before; this proves the "most recent year"
+        // selection against a genuine multi-year map.
+        Map<String, Double> burnedFractionByYear = Map.of("2017", 0.20, "2019", 0.02, "2021", 0.05);
+
+        double result = MapbiomasSusceptibilityServiceImpl.computeBurnedNorm(burnedFractionByYear);
+
+        assertEquals(0.05, result, 1e-9);
     }
 }

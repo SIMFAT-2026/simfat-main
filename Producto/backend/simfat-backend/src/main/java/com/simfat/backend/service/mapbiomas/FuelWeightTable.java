@@ -27,9 +27,21 @@ import org.springframework.stereotype.Component;
  *
  * <p>Class 27 (MapBiomas "not observed") is deliberately NOT a weighted class: it is listed in
  * {@code excludedClasses} and {@link #isExcluded} returns {@code true} for it, so callers must
- * skip it entirely rather than treat a missing weight as zero. Folding its area share into "no
- * fuel" would silently misrepresent "we do not know what is there" as "there is nothing
- * flammable there".
+ * skip it entirely rather than call {@link #weightFor} on it.
+ *
+ * <p><b>Numeric note (corrected):</b> in an un-renormalized weighted sum (see
+ * {@code MapbiomasSusceptibilityServiceImpl#computeFuelIndex}), skipping class 27's share
+ * entirely is numerically IDENTICAL to the resulting fuel index as if class 27 had an explicit
+ * {@code 0.0} entry in {@code classWeights} -- it does NOT preserve a distinction between "we
+ * do not know what is there" and "there is nothing flammable there" in the returned score. The
+ * real reasons this table tracks class 27 as excluded rather than as a literal {@code 0.0}
+ * weight entry are: (1) self-documentation -- a {@code 0.0} weight would read as an
+ * evidence-based "zero flammability" literature judgment, which is not true for an unclassified
+ * pixel; and (2) safety -- it lets {@link #weightFor} keep failing loudly on a genuinely unknown
+ * class code, instead of a maintainer mistaking a missing entry for 27 as a bug and adding a
+ * fabricated weight for it. Consumers that need the "how much of this comuna is unobserved"
+ * signal must read it separately (see {@code MapbiomasSusceptibility#unobservedShare}), not
+ * infer it from the fuel index.
  */
 @Component
 public class FuelWeightTable {
