@@ -20,6 +20,7 @@ import com.simfat.backend.repository.OpenEoIndicatorObservationRepository;
 import com.simfat.backend.repository.TerritoryWeatherObservationRepository;
 import com.simfat.backend.service.NotificationService;
 import com.simfat.backend.service.OpenWeatherFwiService;
+import com.simfat.backend.service.mapbiomas.MapbiomasSusceptibilityService;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
@@ -73,6 +74,8 @@ class ComunaRiskServiceImplMapbiomasGoldenTest {
     private OpenEoServiceClient openEoServiceClient;
     @Mock
     private FirmsAttributionRouter firmsAttributionRouter;
+    @Mock
+    private MapbiomasSusceptibilityService mapbiomasService;
 
     private ComunaRiskServiceImpl service;
 
@@ -87,10 +90,15 @@ class ComunaRiskServiceImplMapbiomasGoldenTest {
             openEoObsRepository,
             notificationService,
             openEoServiceClient,
-            firmsAttributionRouter
+            firmsAttributionRouter,
+            mapbiomasService
         );
         when(snapshotRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         when(snapshotRepository.findTopByComunaIdOrderByComputedAtDesc(any())).thenReturn(Optional.empty());
+        // wM = 0 exact-equivalence (design D3, "award Consistencia"): no MapBiomas stats row
+        // for any comuna is equivalent to wEff=0, so every value captured against the
+        // pre-blend implementation (see class Javadoc) must still hold bit-identically.
+        when(mapbiomasService.forComuna(any())).thenReturn(Optional.empty());
     }
 
     private ComunaInfo comunaInfo(String id) {
