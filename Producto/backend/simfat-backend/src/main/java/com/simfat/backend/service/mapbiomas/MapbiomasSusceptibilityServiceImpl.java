@@ -20,16 +20,38 @@ import org.springframework.stereotype.Service;
  * {@code ComunaRiskServiceImpl.recomputeAllComunas}). Deferred to S2a2, documented rather than
  * silently skipped.
  *
- * <p><b>Percentile-rank deferral.</b> Design D3 normalizes burned area via
- * {@code fire.burnedFractionPct}, an empirical percentile rank across the 86 comunas frozen
- * per {@code dataVersion} -- a field that does not exist on the actual S1b2
- * {@link ComunaMapbiomasStats.Fire} model (only the raw per-year {@code burnedFractionByYear}
- * was shipped, and today only a single year, 2017, exists). Computing a real percentile rank
- * needs the bulk read above, across genuinely multi-year data; with a single fire-only year a
- * percentile rank would be close to meaningless. {@link #computeBurnedNorm} uses the most
- * recent year's raw fraction (already normalized to {@code [0,1]} per design D2) as an honest,
- * documented simplification. TODO: replace with the real percentile-rank normalization once
- * multi-year Fuego data justifies it.
+ * <p><b>Percentile-rank deferral (corrected rationale).</b> Design D3 (decision D3, engram
+ * {@code sdd/mapbiomas-integration/design}) normalizes burned area via
+ * {@code fire.burnedFractionPct}, an empirical percentile rank across the 86 comunas, frozen per
+ * {@code dataVersion} (ties take the mean rank, exact zeros pinned to 0.0). {@link
+ * #computeBurnedNorm} instead uses the most recent year's raw {@code burnedFractionByYear}
+ * fraction (already normalized to {@code [0,1]} per design D2). The real reasons this is a
+ * simplification, not the design's intended formula, are TWO, and both must hold before this
+ * can be fixed -- NOT "a percentile rank across one year would be near-meaningless" (a
+ * cross-sectional rank across the 86 comunas needs no additional years and would be a valid
+ * statistic even for a single year; that claim was inaccurate and has been removed):
+ * <ol>
+ *   <li><b>Architecture.</b> A percentile rank needs a bulk read across all 86 comunas for the
+ *       same {@code dataVersion} (see the bulk-read deferral above); {@link #forComuna}'s
+ *       single-comuna lookup cannot compute one. Deferred to S2a2 alongside the bulk-read
+ *       wiring.</li>
+ *   <li><b>Missing field.</b> {@code fire.burnedFractionPct} does not exist on the actual S1b2
+ *       {@link ComunaMapbiomasStats.Fire} model -- only the raw per-year
+ *       {@code burnedFractionByYear} was shipped. The Python pipeline
+ *       ({@code Producto/analytics/mapbiomas/src/mb_pipeline/build_stats.py}) must compute and
+ *       add this field to the seed before a percentile-rank {@code burnedNorm} can be
+ *       implemented at all, independent of the architecture question above.</li>
+ * </ol>
+ *
+ * <p><b>S2a2 wiring blocker (read before enabling {@code wM > 0} in production).</b> {@code wM}
+ * defaults to {@code 0.0} today, so this simplification has no production effect yet. Whoever
+ * wires this service into {@code ComunaRiskServiceImpl} (S2a2) with a production-affecting
+ * {@code wM > 0} MUST NOT do so while {@code computeBurnedNorm} still uses the raw-fraction
+ * proxy above, UNLESS an explicit, documented decision is made to ship with that proxy anyway --
+ * in which case that decision itself must be recorded (e.g. a new design amendment or decision
+ * entry), not silently defaulted into. The correct fix is: either (a) add
+ * {@code fire.burnedFractionPct} to the pipeline and switch {@link #computeBurnedNorm} to it, or
+ * (b) explicitly accept and document the raw-fraction proxy for the first production rollout.
  */
 @Service
 public class MapbiomasSusceptibilityServiceImpl implements MapbiomasSusceptibilityService {
