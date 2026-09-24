@@ -8,9 +8,13 @@ This module has two independent halves:
 - writers (``write_coverage_report``, ``write_seed_jsonl``) -- plain file
   I/O with a fixed, tested shape.
 
-Land-cover shares are stored in basis points (bp, 1/100 of a percent) as
-integers, largest-remainder rounded so every comuna-year's shares sum to
-EXACTLY 10000 -- never 9999 or 10001 from naive per-class rounding.
+Land-cover shares are ROUNDED internally in basis points (bp, 1/100 of a
+percent) as integers, largest-remainder rounded so every comuna-year's shares
+sum to EXACTLY 10000 -- never 9999 or 10001 from naive per-class rounding.
+The two fields exposed on the seed document, ``sharesByClass`` and
+``sharesByClassMean5y``, are FRACTIONS (bp / 10000) summing to ~1.0 (design
+D1); only the (not yet implemented) ``sharesByYear.classes`` field is
+documented to hold raw basis points.
 """
 from __future__ import annotations
 
@@ -52,22 +56,27 @@ def land_cover_section(
 ) -> dict:
     """Build the ``landCover`` section for one comuna from its per-year hectares.
 
-    ``sharesByClass`` is the reference year's shares in bp; ``sharesByClassMean5y``
-    is the mean of ``mean_years`` hectares, converted to bp the same way.
+    ``sharesByClass`` (the reference year's shares) and ``sharesByClassMean5y``
+    (the mean of ``mean_years`` hectares) are FRACTIONS summing to ~1.0 (design
+    D1) -- basis points are reserved for ``sharesByYear.classes`` only (not
+    implemented in this slice). Internally the largest-remainder bp rounding
+    (``to_basis_points``) is still used so the emitted fractions are exact
+    multiples of 1/10000, deterministic and reproducible, then divided by
+    ``BP_TOTAL`` before being returned.
     """
-    reference_shares = to_basis_points(by_year[reference_year])
+    reference_bp = to_basis_points(by_year[reference_year])
 
     total_ha_by_class: dict[int, float] = {}
     for year in mean_years:
         for code, ha in by_year[year].items():
             total_ha_by_class[code] = total_ha_by_class.get(code, 0.0) + ha
     mean_ha_by_class = {code: total / len(mean_years) for code, total in total_ha_by_class.items()}
-    mean_shares = to_basis_points(mean_ha_by_class)
+    mean_bp = to_basis_points(mean_ha_by_class)
 
     return {
         "referenceYear": reference_year,
-        "sharesByClass": reference_shares,
-        "sharesByClassMean5y": mean_shares,
+        "sharesByClass": {code: bp / BP_TOTAL for code, bp in reference_bp.items()},
+        "sharesByClassMean5y": {code: bp / BP_TOTAL for code, bp in mean_bp.items()},
     }
 
 

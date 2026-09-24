@@ -51,7 +51,14 @@ def test_to_basis_points_largest_remainder_breaks_ties_by_class_code():
     assert bp[1] == 3334  # ascending class code wins the extra bp on an exact tie
 
 
-# --- land_cover_section: reference year + 5y mean, both in bp --------------
+# --- land_cover_section: reference year + 5y mean, both FRACTIONS (design D1) ----
+#
+# sharesByClass/sharesByClassMean5y hold fractions summing to ~1.0, NOT basis
+# points -- only sharesByYear.classes (not implemented in this slice) is
+# documented as bp. Internally the largest-remainder bp rounding is still
+# used (so the emitted fractions are exact multiples of 1/10000, reproducible
+# and free of naive floating-point rounding drift), then divided by 10000
+# before being returned.
 
 
 def _by_year():
@@ -64,30 +71,42 @@ def _by_year():
     }
 
 
-def test_land_cover_section_reference_year_shares_sum_to_10000():
+def test_land_cover_section_reference_year_shares_sum_to_one():
     section = build_stats.land_cover_section(_by_year(), reference_year=2024, mean_years=range(2020, 2025))
-    assert sum(section["sharesByClass"].values()) == 10000
+    assert sum(section["sharesByClass"].values()) == pytest.approx(1.0, abs=1e-9)
     assert section["referenceYear"] == 2024
 
 
 def test_land_cover_section_reference_shares_match_ratio_within_1e4():
     section = build_stats.land_cover_section(_by_year(), reference_year=2024, mean_years=range(2020, 2025))
     # 2024: 59=40/100, 60=50/100, 15=10/100
-    assert section["sharesByClass"][59] / 10000 == pytest.approx(0.40, abs=1e-4)
-    assert section["sharesByClass"][60] / 10000 == pytest.approx(0.50, abs=1e-4)
+    assert section["sharesByClass"][59] == pytest.approx(0.40, abs=1e-4)
+    assert section["sharesByClass"][60] == pytest.approx(0.50, abs=1e-4)
 
 
-def test_land_cover_section_mean_5y_sums_to_10000_and_is_the_average():
+def test_land_cover_section_mean_5y_sums_to_one_and_is_the_average():
     section = build_stats.land_cover_section(_by_year(), reference_year=2024, mean_years=range(2020, 2025))
-    assert sum(section["sharesByClassMean5y"].values()) == 10000
+    assert sum(section["sharesByClassMean5y"].values()) == pytest.approx(1.0, abs=1e-9)
     # mean of 59 shares across 2020..2024 (each year sums to 100 ha):
     # 60,55,50,45,40 -> mean 50.0/100 = 0.50
-    assert section["sharesByClassMean5y"][59] / 10000 == pytest.approx(0.50, abs=1e-4)
+    assert section["sharesByClassMean5y"][59] == pytest.approx(0.50, abs=1e-4)
 
 
 def test_land_cover_section_different_reference_year_is_reflected():
     section_2020 = build_stats.land_cover_section(_by_year(), reference_year=2020, mean_years=range(2020, 2025))
-    assert section_2020["sharesByClass"][59] / 10000 == pytest.approx(0.60, abs=1e-4)
+    assert section_2020["sharesByClass"][59] == pytest.approx(0.60, abs=1e-4)
+
+
+def test_land_cover_section_fractions_are_exact_bp_over_10000():
+    # The fraction shape must never drift from the largest-remainder bp
+    # rounding: an independently computed to_basis_points() call on the same
+    # hectares must equal sharesByClass * 10000 exactly (not just "close").
+    by_year = _by_year()
+    section = build_stats.land_cover_section(by_year, reference_year=2024, mean_years=range(2020, 2025))
+    expected_bp = build_stats.to_basis_points(by_year[2024])
+    assert sum(expected_bp.values()) == 10000
+    for code, bp in expected_bp.items():
+        assert section["sharesByClass"][code] == bp / build_stats.BP_TOTAL
 
 
 # --- build_comuna_document: assembles landCover + fire + provenance --------
@@ -163,8 +182,8 @@ def test_land_cover_section_from_a_real_join_coverage_output(make_coverage_xlsx)
     index = {("Biobío", lulc.normalize_name("Arauco")): "CHL.6.1.1_1"}
     joined = lulc.join_coverage(rows, index, expected_comuna_ids=["CHL.6.1.1_1"])
     section = build_stats.land_cover_section(joined["CHL.6.1.1_1"], reference_year=2024, mean_years=[2024])
-    assert sum(section["sharesByClass"].values()) == 10000
-    assert section["sharesByClass"][60] / 10000 == pytest.approx(0.60, abs=1e-4)
+    assert sum(section["sharesByClass"].values()) == pytest.approx(1.0, abs=1e-9)
+    assert section["sharesByClass"][60] == pytest.approx(0.60, abs=1e-4)
 
 
 # --- CSV coverage report (the Biobio gate artifact) -------------------------
