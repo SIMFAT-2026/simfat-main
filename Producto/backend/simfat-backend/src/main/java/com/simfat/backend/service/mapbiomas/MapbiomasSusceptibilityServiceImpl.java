@@ -43,6 +43,16 @@ public class MapbiomasSusceptibilityServiceImpl implements MapbiomasSusceptibili
     static final double RECURRENCE_WEIGHT = 0.40;
     static final double FREQUENCY_CAP = 5.0;
 
+    // design D1: sharesByClass values are FRACTIONS (0-1) summing to ~1.0 per comuna-year, not
+    // basis points (0-10000). Verified directly against the committed pipeline
+    // (Producto/analytics/mapbiomas/src/mb_pipeline/build_stats.py): land_cover_section()
+    // currently stores to_basis_points()'s bp integers straight into sharesByClass with no
+    // conversion back to a fraction, which contradicts D1's stated shape for this field (only
+    // the newer sharesByYear.classes field is documented as bp). This tolerance guards against
+    // that live unit mismatch (or any future drift) by failing loudly instead of silently
+    // computing a saturated, meaningless fuel index.
+    static final double SHARE_SUM_TOLERANCE = 0.01;
+
     private final ComunaMapbiomasStatsRepository statsRepository;
     private final FuelWeightTable fuelWeightTable;
 
@@ -146,15 +156,38 @@ public class MapbiomasSusceptibilityServiceImpl implements MapbiomasSusceptibili
 
     /**
      * {@code fuel = SUM_c share_c * weight_c} (design D3), skipping class 27 (unobserved,
-     * {@link FuelWeightTable#isExcluded}) entirely rather than treating its share as
-     * zero-weighted fuel. Package-private and static so it is directly unit-testable without
-     * Mongo or Spring.
+     * {@link FuelWeightTable#isExcluded}) entirely rather than looking it up in the weight
+     * table. Package-private and static so it is directly unit-testable without Mongo or
+     * Spring.
      *
-     * @throws IllegalArgumentException if a class code in {@code sharesByClass} has no entry
-     *     in the weight table and is not excluded -- fails loudly rather than silently
+     * <p><b>Numeric note (corrected):</b> dropping class 27's share from this un-renormalized
+     * weighted sum is numerically IDENTICAL to the resulting {@code fuel} value as if class 27
+     * had an explicit {@code 0.0} entry in the weight table -- it is not a different score
+     * outcome. See {@link FuelWeightTable}'s class Javadoc for why it is tracked as "excluded"
+     * rather than as a literal zero-weight table entry.
+     *
+     * <p><b>Unit validation.</b> {@code sharesByClass} values must be FRACTIONS (0-1) summing
+     * to ~1.0 for a comuna-year (design D1), never basis points (0-10000). This is checked
+     * before the weighted sum so a unit mismatch fails loudly with the actual sum, rather than
+     * silently producing a saturated {@code fuel} close to 1.0.
+     *
+     * @throws IllegalArgumentException if the shares do not sum to ~1.0 within
+     *     {@link #SHARE_SUM_TOLERANCE}, or if a class code in {@code sharesByClass} has no
+     *     entry in the weight table and is not excluded -- fails loudly rather than silently
      *     assuming weight zero for an unknown class (that would be inventing a fact).
      */
     static double computeFuelIndex(Map<String, Double> sharesByClass, FuelWeightTable weights) {
+        double sum = 0.0;
+        for (Double value : sharesByClass.values()) {
+            sum += value == null ? 0.0 : value;
+        }
+        if (Math.abs(sum - 1.0) > SHARE_SUM_TOLERANCE) {
+            throw new IllegalArgumentException(
+                "MapBiomas land-cover shares must sum to ~1.0 (fractions), but got " + sum
+                    + ". This looks like a basis-points/fraction unit mismatch (e.g. values in "
+                    + "0-10000 instead of 0-1) -- check the seed pipeline's sharesByClass unit."
+            );
+        }
         double fuel = 0.0;
         for (Map.Entry<String, Double> entry : sharesByClass.entrySet()) {
             String classCode = entry.getKey();

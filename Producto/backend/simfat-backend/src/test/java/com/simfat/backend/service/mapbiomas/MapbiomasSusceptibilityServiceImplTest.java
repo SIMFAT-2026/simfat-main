@@ -170,6 +170,35 @@ class MapbiomasSusceptibilityServiceImplTest {
     }
 
     @Test
+    void computeFuelIndex_fractionShapedShares_computesWeightedSum() {
+        // Genuine fraction-shaped fixture (sum == 1.0), the real seed's documented shape
+        // (design D1: sharesByClass values sum to ~1.0). Must still pass unchanged.
+        Map<String, Double> shares = Map.of("9", 0.5, "12", 0.5);
+        FuelWeightTable table = new FuelWeightTable(new ObjectMapper());
+
+        double fuel = MapbiomasSusceptibilityServiceImpl.computeFuelIndex(shares, table);
+
+        assertEquals(0.80, fuel, 1e-9);
+    }
+
+    @Test
+    void computeFuelIndex_basisPointShapedShares_throwsClearUnitMismatchException() {
+        // If a future pipeline change reintroduces basis-point-shaped shares (values summing
+        // to 10000 instead of 1.0), computeFuelIndex must fail loudly instead of silently
+        // computing a saturated fuel index close to 1.0.
+        Map<String, Double> shares = Map.of("9", 5000.0, "12", 5000.0);
+        FuelWeightTable table = new FuelWeightTable(new ObjectMapper());
+
+        IllegalArgumentException ex = assertThrows(
+            IllegalArgumentException.class,
+            () -> MapbiomasSusceptibilityServiceImpl.computeFuelIndex(shares, table)
+        );
+
+        assertTrue(ex.getMessage().contains("10000"));
+        assertTrue(ex.getMessage().toLowerCase().contains("unit"));
+    }
+
+    @Test
     void forComuna_shareOfUnobservedClass27_isExcludedFromFuelSum() {
         // 0.3 share of class 27 (unobserved) must NOT count as zero-weighted fuel; only the
         // remaining classified shares contribute.
