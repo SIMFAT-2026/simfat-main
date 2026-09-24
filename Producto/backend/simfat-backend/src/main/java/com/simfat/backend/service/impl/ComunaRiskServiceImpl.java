@@ -19,6 +19,7 @@ import com.simfat.backend.service.NotificationService;
 import com.simfat.backend.service.OpenWeatherFwiService;
 import com.simfat.backend.service.mapbiomas.MapbiomasSusceptibility;
 import com.simfat.backend.service.mapbiomas.MapbiomasSusceptibilityService;
+import jakarta.annotation.PostConstruct;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -86,6 +87,13 @@ public class ComunaRiskServiceImpl implements ComunaRiskService {
     @Value("${territory.riesgo.mapbiomas.weight:0.0}")
     private double mapbiomasWeight = 0.0;
 
+    // Pre-registered wM grid (design D3 / spec Global definitions "Grid"; MRB-3b). Any value
+    // outside this set -- NaN, negative, above the 0.50 ceiling, or simply a value with no
+    // committed threshold-table entry (e.g. 0.30) -- MUST fail application startup rather than
+    // silently reach production with an unstudied weight.
+    static final java.util.Set<Double> MAPBIOMAS_WEIGHT_GRID =
+        java.util.Set.of(0.0, 0.10, 0.25, 0.35, 0.50);
+
     private final ComunaInfoRepository comunaRepository;
     private final ComunaRiskSnapshotRepository snapshotRepository;
     private final TerritoryWeatherObservationRepository weatherRepository;
@@ -148,6 +156,39 @@ public class ComunaRiskServiceImpl implements ComunaRiskService {
 
     static double enhancedFwiWeight() {
         return W_FWI_ENH;
+    }
+
+    /**
+     * Fail-fast validation of {@code territory.riesgo.mapbiomas.weight} (task 2a.4, MRB-3b).
+     * Runs once per bean construction via {@code @PostConstruct} -- BEFORE this service can
+     * serve any request -- so an un-shipped or malformed wM (NaN, negative, above the 0.50
+     * ceiling, or any value with no committed threshold-table entry) fails application startup
+     * with a clear message instead of silently reaching production. The safe default (0.0) and
+     * every pre-registered grid value always pass (MRB-3a/3c).
+     */
+    @PostConstruct
+    void validateMapbiomasWeight() {
+        if (!isValidMapbiomasWeight(mapbiomasWeight)) {
+            throw new IllegalStateException(
+                "Invalid territory.riesgo.mapbiomas.weight=" + mapbiomasWeight
+                    + ". It MUST be one of the pre-registered grid values " + MAPBIOMAS_WEIGHT_GRID
+                    + " (design D3 / spec MRB-3b). NaN, negative values, values above 0.50, or "
+                    + "any value with no committed threshold-table entry are rejected at "
+                    + "startup so an unstudied weight can never reach production silently."
+            );
+        }
+    }
+
+    static boolean isValidMapbiomasWeight(double weight) {
+        if (Double.isNaN(weight)) {
+            return false;
+        }
+        for (double allowed : MAPBIOMAS_WEIGHT_GRID) {
+            if (Math.abs(weight - allowed) < 1e-9) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @Scheduled(cron = "${territory.riesgo.comunal.cron:0 30 1,13 * * *}")
