@@ -139,6 +139,17 @@ public class ComunaRiskServiceImpl implements ComunaRiskService {
         this.scoreCritico = scoreCritico;
     }
 
+    // Test seams (MRB-10, dominance boundary): expose the production FWI weights so
+    // ComunaRiskServiceImplMapbiomasBlendTest derives its breakeven from the REAL constants
+    // instead of duplicating magic numbers that could silently drift from production.
+    static double standardFwiWeight() {
+        return W_FWI_STD;
+    }
+
+    static double enhancedFwiWeight() {
+        return W_FWI_ENH;
+    }
+
     @Scheduled(cron = "${territory.riesgo.comunal.cron:0 30 1,13 * * *}")
     @Override
     public void recomputeAllComunas() {
