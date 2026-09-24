@@ -1,5 +1,7 @@
 package com.simfat.backend.service.mapbiomas;
 
+import java.util.Arrays;
+
 /**
  * Result of {@link MapbiomasSusceptibilityService#forComuna}, design D3.
  *
@@ -24,7 +26,10 @@ package com.simfat.backend.service.mapbiomas;
  *     be rare once every comuna's seed carries {@code burnedFractionPct} (S1b3 regenerated the
  *     committed seed with it for every {@code available=true} comuna) -- the fallback flag exists
  *     to make a REGRESSION of that (a future seed missing the field again, or a stats document
- *     predating S1b3) visible instead of silently reverting to the raw-fraction proxy.
+ *     predating S1b3) visible instead of silently reverting to the raw-fraction proxy. Use {@link
+ *     #hasFlag(String)} to read this field -- never a hand-rolled comma split or a substring
+ *     {@code contains} check, since e.g. {@link #MAPBIOMAS_UNAVAILABLE} is a substring of {@link
+ *     #MAPBIOMAS_FUEL_UNAVAILABLE}.
  * @param unobservedShare class 27's ("not observed") share of {@code sharesByClass} when
  *     {@code landCover} is available (0.0 when class 27 has no entry for this comuna), or
  *     {@code null} when {@code landCover} itself is unavailable. This is informational only --
@@ -77,4 +82,25 @@ public record MapbiomasSusceptibility(
      * either in a comma-separated {@code qualityFlag}.
      */
     public static final String MAPBIOMAS_BURNED_NORM_RAW_FALLBACK = "MAPBIOMAS_BURNED_NORM_RAW_FALLBACK";
+
+    /**
+     * Returns whether {@code flag} is one of the tokens in the comma-joined {@link
+     * #qualityFlag}. Matches an exact token after splitting on {@code ","}, never a substring
+     * (a substring match would wrongly consider {@link #MAPBIOMAS_UNAVAILABLE} present whenever
+     * {@link #MAPBIOMAS_FUEL_UNAVAILABLE} is).
+     *
+     * @param flag the flag constant to look for; must be non-null and non-blank.
+     * @return {@code false} when {@link #qualityFlag} is {@code null}; otherwise whether {@code
+     *     flag} matches one of its comma-separated tokens exactly.
+     * @throws IllegalArgumentException if {@code flag} is {@code null} or blank.
+     */
+    public boolean hasFlag(String flag) {
+        if (flag == null || flag.isBlank()) {
+            throw new IllegalArgumentException("flag must not be null or blank");
+        }
+        if (qualityFlag == null) {
+            return false;
+        }
+        return Arrays.stream(qualityFlag.split(",")).anyMatch(flag::equals);
+    }
 }
