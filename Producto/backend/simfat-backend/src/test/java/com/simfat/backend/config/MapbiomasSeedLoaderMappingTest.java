@@ -116,6 +116,46 @@ class MapbiomasSeedLoaderMappingTest {
     }
 
     @Test
+    void mapRawRecord_burnedFractionPctPresent_mapsToFireField() throws Exception {
+        // S1b3: design D1/D3's burnedFractionPct (empirical percentile rank across the 86
+        // comunas), added to the pipeline output (see mb_pipeline/build_stats.py
+        // add_burned_fraction_pct). Jackson's automatic field mapping (treeToValue) must pick
+        // it up with no loader code change once the Fire model gains the field.
+        String raw = "{\"comunaId\":\"CHL.6.1.1_1\",\"landCover\":null,\"fire\":{\"available\":true,"
+            + "\"coverageFraction\":1.0,\"burnedHaByYear\":{\"2017\":0.0},"
+            + "\"burnedFractionByYear\":{\"2017\":0.0},\"frequencyMean\":0.0687,"
+            + "\"frequencyMax\":2,\"yearLastFire\":2016,\"yearsSinceLastFire\":1,\"reason\":null,"
+            + "\"burnedFractionPct\":0.0},"
+            + "\"provenance\":{\"sources\":[],\"scope\":\"2017\",\"downloadDate\":\"2026-09-24\"},"
+            + "\"computedAt\":\"2026-09-24T01:24:03.953445Z\",\"partial\":true}";
+        JsonNode node = objectMapper.readTree(raw);
+        ComunaInfo info = comunaInfo("CHL.6.1.1_1", "Arauco", "biobio");
+
+        ComunaMapbiomasStats result = MapbiomasSeedLoader.mapRawRecord(node, info, "fuego-col1@2017-partial", objectMapper);
+
+        assertThat(result.getFire().getBurnedFractionPct()).isEqualTo(0.0);
+    }
+
+    @Test
+    void mapRawRecord_burnedFractionPctAbsent_mapsToNullNotZero() throws Exception {
+        // A comuna with fire.available=false has no rank (excluded from
+        // percentile_rank_burned_fraction) -- the field is simply absent from that JSON line,
+        // and must map to null, never a silent 0.0.
+        String raw = "{\"comunaId\":\"CHL.6.9.9_1\",\"landCover\":null,\"fire\":{\"available\":false,"
+            + "\"coverageFraction\":0.42,\"burnedHaByYear\":{},\"burnedFractionByYear\":{},"
+            + "\"frequencyMean\":null,\"frequencyMax\":null,\"yearLastFire\":null,\"yearsSinceLastFire\":null,"
+            + "\"reason\":\"coverageFraction 0.4200 below threshold 0.8\"},"
+            + "\"provenance\":{\"sources\":[],\"scope\":\"2017\",\"downloadDate\":\"2026-09-24\"},"
+            + "\"computedAt\":\"2026-09-24T01:24:03.953445Z\",\"partial\":true}";
+        JsonNode node = objectMapper.readTree(raw);
+        ComunaInfo info = comunaInfo("CHL.6.9.9_1", "Ejemplo", "biobio");
+
+        ComunaMapbiomasStats result = MapbiomasSeedLoader.mapRawRecord(node, info, "fuego-col1@2017-partial", objectMapper);
+
+        assertThat(result.getFire().getBurnedFractionPct()).isNull();
+    }
+
+    @Test
     void mapRawRecord_differentComunaAndVersion_producesDifferentDeterministicId() throws Exception {
         String raw = "{"
             + "\"comunaId\":\"CHL.6.1.2_1\","
