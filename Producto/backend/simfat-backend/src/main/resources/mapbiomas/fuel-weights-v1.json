@@ -1,0 +1,51 @@
+{
+  "tableId": "fuel-weights-v1",
+  "classWeights": {
+    "9": 1.00,
+    "66": 0.80,
+    "12": 0.60,
+    "15": 0.50,
+    "3": 0.40,
+    "59": 0.40,
+    "60": 0.40,
+    "67": 0.40,
+    "18": 0.30,
+    "63": 0.30,
+    "11": 0.10,
+    "29": 0.05,
+    "24": 0.00,
+    "33": 0.00,
+    "34": 0.00,
+    "25": 0.00,
+    "23": 0.00,
+    "61": 0.00
+  },
+  "excludedClasses": ["27"],
+  "provenance": {
+    "method": "literature ordinal, evidence-strength labeled, NOT empirically calibrated",
+    "calibratedOnSeasons": null,
+    "reviewers": [],
+    "source": "Project literature review (engram sdd/mapbiomas-integration/literature-review, obs 729): Bowman 2018 Ambio (PMC6411810) 2017 burned-area shares by class; McWethy 2018 PLoS ONE (PMC6104937) resource-selection ratios 2001-2017; Gomez-Gonzalez 2019 Forest Ecology and Management (abstract); MapBiomas Fuego Chile (uchile.cl news release, silviculture ~50% of burned surface 2013-2025). See sdd/mapbiomas-integration/decisions-q8 and decisions-q9 for the calibration-pending decision.",
+    "notes": "Ordinal placeholders pending empirical calibration (decision Q9). Class 67 (dwarf forest) has NO distinct literature evidence and is weighted the same as classes 3/59/60 (parent/primary/secondary forest) as a documented simplification, not a claim of equivalence. Class 29 (rocky outcrop / non-vegetated) uses the upper bound (0.05) of the 0.00-0.05 range cited for 'moderate evidence for non-vegetated' categories. Class 27 (not observed / unobserved) is intentionally NOT a weighted class: it is excluded from the fuel weighted sum entirely (see excludedClasses) rather than assigned an implicit weight of 0, because its area share must not be silently folded into 'classified area with zero fuel' -- it means 'we do not know what is there'.",
+    "evidenceStrength": {
+      "9": "STRONG",
+      "66": "MODERATE",
+      "12": "WEAK",
+      "3": "MODERATE (lower than plantations) / WEAK (exact number)",
+      "59": "MODERATE (lower than plantations) / WEAK (exact number)",
+      "60": "MODERATE (lower than plantations) / WEAK (exact number)",
+      "67": "NONE (no distinct evidence; treated as forest 3/59/60)",
+      "15": "WEAK, conflicting",
+      "18": "WEAK, conflicting",
+      "63": "NONE",
+      "11": "NONE",
+      "29": "MODERATE for non-vegetated category",
+      "24": "NONE (exposure, not fuel)",
+      "33": "logical (water)",
+      "34": "logical (ice)",
+      "25": "logical (other non-vegetated)",
+      "23": "logical (beach/dune)",
+      "61": "logical (salt flat)"
+    }
+  }
+}
