@@ -190,6 +190,12 @@ def generate(raster_dir: Path | None = None, data_dir: Path | None = None) -> tu
             row[f"yearLastFireThrough{as_of_year}"] = fire_section["yearLastFire"]
             csv_rows.append(row)
 
+    # design D1/D3: burnedFractionPct is a CROSS-comuna statistic (the
+    # empirical percentile rank of the burned fraction across all comunas in
+    # this batch), so it is computed once over every doc here, after the
+    # per-comuna loop above, never per-comuna.
+    build_stats.add_burned_fraction_pct(docs)
+
     coverage_report_path = data_dir / "coverage_report.csv"
     seed_path = data_dir / f"fire_stats_{as_of_year}_partial.jsonl"
     build_stats.write_coverage_report(coverage_report_path, csv_rows)

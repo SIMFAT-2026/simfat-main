@@ -130,6 +130,45 @@ def frequency_stats(freq: ZonalResult) -> dict:
     }
 
 
+def select_burned_fraction_for_pct(fire: Mapping) -> float | None:
+    """Pick the burned-fraction value design D3's ``burnedFractionPct`` should rank.
+
+    Prefers the cumulative/union ``burnedFraction`` field (the union of all
+    Fuego years over mapped area) once multiple years are merged. This S1b3
+    partial dataset only has one Fuego year (2017) and no cumulative field
+    yet, so it falls back to that single available year's
+    ``burnedFractionByYear`` value -- with one year of data, "the union" and
+    "that year's fraction" are the same number.
+
+    Returns ``None`` when the comuna has no usable fire data at all
+    (``available`` is not ``True``), so it is excluded from
+    ``build_stats.percentile_rank_burned_fraction`` (MCS-8: ``available=False``
+    never hides the underlying numbers, but it does mean "not usable" for
+    ranking against comunas that ARE usable).
+
+    Raises ``ValueError`` if more than one year is present in
+    ``burnedFractionByYear`` and no cumulative ``burnedFraction`` field
+    exists: summing or averaging partial per-year fractions without a real
+    union computation would silently double-count pixels that burned in more
+    than one of those years, so this fails loudly instead of guessing.
+    """
+    if not fire.get("available"):
+        return None
+    cumulative = fire.get("burnedFraction")
+    if cumulative is not None:
+        return cumulative
+    by_year = fire.get("burnedFractionByYear") or {}
+    if len(by_year) == 1:
+        return next(iter(by_year.values()))
+    if len(by_year) > 1:
+        raise ValueError(
+            "multiple Fuego years present in burnedFractionByYear but no cumulative "
+            "'burnedFraction' field -- add the real union burned fraction before "
+            "computing burnedFractionPct instead of guessing which year to rank"
+        )
+    return None
+
+
 def year_last_fire_stats(ylf: ZonalResult, *, no_fire_value: int = NO_FIRE_VALUE) -> dict:
     """Most recent burn year present in a ``year_last_fire_v1`` window, or None."""
     burned_years = [year for year in ylf.value_pixels if year != no_fire_value]

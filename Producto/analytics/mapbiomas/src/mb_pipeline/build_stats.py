@@ -21,7 +21,9 @@ from __future__ import annotations
 import csv
 import json
 from pathlib import Path
-from typing import Mapping, Sequence
+from typing import Mapping, MutableMapping, Sequence
+
+from . import fire_stats
 
 BP_TOTAL = 10_000
 
@@ -111,6 +113,71 @@ def build_comuna_document(
     if partial is not None:
         doc["partial"] = partial
     return doc
+
+
+def percentile_rank_burned_fraction(values: Mapping[str, float | None]) -> dict[str, float | None]:
+    """Empirical percentile rank of a burned-fraction value across all comunas (design D3).
+
+    ``values`` maps ``comunaId -> the burned-fraction value to rank`` (see
+    ``fire_stats.select_burned_fraction_for_pct``), or ``None`` for a comuna
+    excluded from the ranking (no usable fire data for that comuna).
+
+    Definition (frozen with ``dataVersion`` once computed -- design D1/D3):
+
+    - A comuna mapped to ``None`` is excluded entirely: it does not count
+      toward N (the number of ranked comunas) and its own result is ``None``.
+    - Among the remaining N comunas, each value receives the standard 1-based
+      "average rank": ties share the mean of the ranks they would occupy if
+      every ranked value were sorted ascending (e.g. two tied values at
+      positions 1 and 2 both get rank 1.5); a unique maximum gets rank N.
+    - The burned-fraction distribution is zero-inflated (most comunas have
+      never burned), so an EXACT zero is a special case: it is PINNED to
+      0.0 regardless of its average rank, rather than sharing the
+      tie-averaged rank of every other zero comuna. Without this pin, a
+      dataset that is mostly zeros would push every zero comuna's rank close
+      to 0.5, which would misrepresent "no fire at all" as "moderate risk".
+    - Every other (non-zero, non-excluded) value's result is its average
+      rank divided by N, so the unique maximum in the dataset is exactly 1.0.
+    """
+    ranked_items = [(comuna_id, value) for comuna_id, value in values.items() if value is not None]
+    result: dict[str, float | None] = {
+        comuna_id: None for comuna_id, value in values.items() if value is None
+    }
+    n = len(ranked_items)
+    if n == 0:
+        return result
+
+    sorted_values = sorted(value for _, value in ranked_items)
+    average_rank_by_value: dict[float, float] = {}
+    i = 0
+    while i < n:
+        j = i
+        while j < n and sorted_values[j] == sorted_values[i]:
+            j += 1
+        # 1-based ranks i+1..j (inclusive) are occupied by this tie group;
+        # their mean is (i+1+j)/2 regardless of how many values tie.
+        average_rank_by_value[sorted_values[i]] = (i + 1 + j) / 2
+        i = j
+
+    for comuna_id, value in ranked_items:
+        result[comuna_id] = 0.0 if value == 0 else average_rank_by_value[value] / n
+    return result
+
+
+def add_burned_fraction_pct(docs: Sequence[MutableMapping]) -> None:
+    """Mutate every doc's ``fire.burnedFractionPct`` in place (design D1/D3).
+
+    The percentile rank is a CROSS-comuna statistic (frozen per
+    ``dataVersion``), so this must be called once with the full batch of
+    comuna documents being written to a single seed -- never per-comuna,
+    which would make every comuna rank 1.0 against itself alone.
+    """
+    values = {
+        doc["comunaId"]: fire_stats.select_burned_fraction_for_pct(doc["fire"]) for doc in docs
+    }
+    pct_by_comuna = percentile_rank_burned_fraction(values)
+    for doc in docs:
+        doc["fire"]["burnedFractionPct"] = pct_by_comuna[doc["comunaId"]]
 
 
 def write_coverage_report(path: Path, rows: Sequence[Mapping]) -> None:

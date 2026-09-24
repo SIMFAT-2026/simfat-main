@@ -217,3 +217,68 @@ def test_write_seed_jsonl_one_document_per_line(tmp_path):
     assert len(lines) == 2
     assert json.loads(lines[0])["comunaId"] == "A"
     assert json.loads(lines[1])["comunaId"] == "B"
+
+
+# --- percentile_rank_burned_fraction: design D3's burnedFractionPct ---------
+#
+# Empirical percentile rank of a burned-fraction value across all comunas,
+# frozen with dataVersion (design D1/D3): ties take the mean rank EXCEPT
+# exact zeros, which are pinned to 0.0 (the distribution is zero-inflated);
+# comunas excluded from the rank (no usable fire data) map to None and do
+# not count toward N.
+
+
+def test_percentile_rank_single_nonzero_max_is_exactly_one():
+    result = build_stats.percentile_rank_burned_fraction({"a": 0.1, "b": 0.5})
+    assert result["b"] == pytest.approx(1.0)
+    assert result["a"] == pytest.approx(0.5)  # unique smaller value: rank 1/2
+
+
+def test_percentile_rank_exact_zeros_are_pinned_to_zero_not_tie_averaged():
+    result = build_stats.percentile_rank_burned_fraction({"a": 0.0, "b": 0.0, "c": 0.5})
+    assert result["a"] == 0.0
+    assert result["b"] == 0.0
+    assert result["c"] == pytest.approx(1.0)  # unique max, rank 3/3
+
+
+def test_percentile_rank_all_zero_are_all_pinned_to_zero():
+    result = build_stats.percentile_rank_burned_fraction({"a": 0.0, "b": 0.0, "c": 0.0})
+    assert result == {"a": 0.0, "b": 0.0, "c": 0.0}
+
+
+def test_percentile_rank_nonzero_ties_share_the_mean_rank():
+    # sorted [0.2, 0.2, 0.6] -> ranks 1,2 average to 1.5 for the tied pair.
+    result = build_stats.percentile_rank_burned_fraction({"a": 0.2, "b": 0.2, "c": 0.6})
+    assert result["a"] == pytest.approx(0.5)  # 1.5 / 3
+    assert result["b"] == pytest.approx(0.5)
+    assert result["c"] == pytest.approx(1.0)  # 3 / 3
+
+
+def test_percentile_rank_none_values_are_excluded_and_do_not_count_toward_n():
+    result = build_stats.percentile_rank_burned_fraction({"a": 0.5, "b": None, "c": 0.5})
+    assert result["b"] is None
+    # a and c tie as the only two ranked comunas (n=2, b excluded): 1.5/2.
+    assert result["a"] == pytest.approx(0.75)
+    assert result["c"] == pytest.approx(0.75)
+
+
+def test_percentile_rank_everything_excluded_returns_all_none():
+    result = build_stats.percentile_rank_burned_fraction({"a": None, "b": None})
+    assert result == {"a": None, "b": None}
+
+
+# --- add_burned_fraction_pct: wires the rank into the fire section ---------
+
+
+def test_add_burned_fraction_pct_mutates_every_docs_fire_section():
+    docs = [
+        {"comunaId": "A", "fire": {"available": True, "burnedFractionByYear": {"2017": 0.0}}},
+        {"comunaId": "B", "fire": {"available": True, "burnedFractionByYear": {"2017": 0.5}}},
+        {"comunaId": "C", "fire": {"available": False, "burnedFractionByYear": {"2017": 0.9}}},
+    ]
+
+    build_stats.add_burned_fraction_pct(docs)
+
+    assert docs[0]["fire"]["burnedFractionPct"] == 0.0
+    assert docs[1]["fire"]["burnedFractionPct"] == pytest.approx(1.0)
+    assert docs[2]["fire"]["burnedFractionPct"] is None
