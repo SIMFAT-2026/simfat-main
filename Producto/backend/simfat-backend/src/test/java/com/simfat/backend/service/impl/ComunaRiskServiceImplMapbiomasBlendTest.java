@@ -1,5 +1,6 @@
 package com.simfat.backend.service.impl;
 
+import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.ArgumentMatchers.any;
@@ -353,5 +354,101 @@ class ComunaRiskServiceImplMapbiomasBlendTest {
 
         verify(mapbiomasService, times(1)).forComunas(anyCollection());
         verify(mapbiomasService, never()).forComuna(any());
+    }
+
+    private record GoldenCase(
+        String comunaId,
+        Double fwiRaw,
+        List<HeatAlertEvent> firmsEvents,
+        int reportsCount,
+        Double ndmi,
+        Double ndvi,
+        double scoreComposite,
+        double componentFwi,
+        double componentFirms,
+        double componentReports,
+        Double componentNdmi,
+        Double componentNdvi,
+        String alertLevel,
+        String mode
+    ) {}
+
+    // Mirrors every fixture and expected literal in ComunaRiskServiceImplMapbiomasGoldenTest
+    // -- duplicated here deliberately (same rationale as #round4 above): the golden file's
+    // expected values must never be edited to make a fix pass, so this test owns its own copy
+    // instead of reaching into that class's private fixtures.
+    private List<GoldenCase> goldenCases() {
+        LocalDateTime notToday = LocalDateTime.now().minusDays(3);
+        LocalDateTime today = LocalDateTime.now(ZoneOffset.UTC);
+        return List.of(
+            new GoldenCase("comuna-std-normal", null, List.of(), 0, null, null,
+                0.0, 0.0, 0.0, 0.0, null, null, "NORMAL", "STANDARD"),
+            new GoldenCase("comuna-std-preventivo", 15.0,
+                List.of(firmsEvent(notToday, 50.0), firmsEvent(notToday, 50.0), firmsEvent(notToday, 50.0)), 3,
+                null, null, 0.5073, 0.156, 0.2013, 0.15, null, null, "PREVENTIVO", "STANDARD"),
+            new GoldenCase("comuna-std-alto", 25.0, List.of(firmsEvent(notToday, 10.0)), 1,
+                null, null, 0.3661, 0.26, 0.0561, 0.05, null, null, "ALTO", "STANDARD"),
+            new GoldenCase("comuna-std-critico", 48.0, List.of(firmsEvent(notToday, 10.0)), 1,
+                null, null, 0.6053, 0.4992, 0.0561, 0.05, null, null, "CRITICO", "STANDARD"),
+            new GoldenCase("comuna-enh-normal", null, List.of(), 0,
+                0.4, 0.1, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, "NORMAL", "ENHANCED"),
+            new GoldenCase("comuna-enh-alto", 25.0, List.of(firmsEvent(notToday, 10.0)), 1,
+                -0.1, 0.4, 0.4057, 0.19, 0.0306, 0.0133, 0.1375, 0.0343, "ALTO", "ENHANCED"),
+            new GoldenCase("comuna-enh-critico", null, List.of(firmsEvent(today, 5.0)), 0,
+                0.4, 0.1, 0.0261, 0.0, 0.0261, 0.0, 0.0, 0.0, "CRITICO", "ENHANCED")
+        );
+    }
+
+    /**
+     * Finding: "MapBiomas present + wM = 0" is the REAL post-merge production state (the
+     * config default is {@code wM=0} while a {@code comuna_mapbiomas_stats} document already
+     * exists for most comunas) -- yet {@link ComunaRiskServiceImplMapbiomasGoldenTest} only
+     * ever stubs {@code forComuna} to {@code Optional.empty()} (the "no document at all"
+     * case). This re-runs every one of that class's golden scenarios with a non-trivial
+     * PRESENT {@link MapbiomasSusceptibility} result and asserts the exact same golden values
+     * still hold, proving {@code wEff=0} is a true no-op regardless of whether the underlying
+     * document is absent or simply not yet weighted in -- plus the pass-through fields
+     * ({@code mapbiomasWeight}, {@code componentMapbiomas}, {@code fuelIndex/historyIndex/
+     * dataVersion}) that a caller reading the snapshot would rely on.
+     */
+    @Test
+    void wM0_reproducesGoldenValues_forEveryScenario() {
+        service.setMapbiomasWeight(0.0);
+        for (GoldenCase c : goldenCases()) {
+            ComunaInfo comuna = comunaInfo(c.comunaId());
+            when(comunaRepository.findById(comuna.getId())).thenReturn(Optional.of(comuna));
+            stubWeather(comuna, c.fwiRaw());
+            stubFirms(comuna, c.firmsEvents());
+            stubReports(comuna, c.reportsCount());
+            if (c.ndmi() != null) {
+                stubCopernicus(comuna, c.ndmi(), c.ndvi());
+            } else {
+                stubNoCopernicus(comuna);
+            }
+            // Non-trivial PRESENT result -- the real post-merge production state once a
+            // comuna_mapbiomas_stats document exists but wM is still 0.0 (config default).
+            when(mapbiomasService.forComuna(comuna.getId())).thenReturn(Optional.of(
+                new MapbiomasSusceptibility(0.9, 0.8, 0.7, "fuego-col1@2017-partial", null, 0.0)
+            ));
+
+            ComunaRiskSnapshot snapshot = service.recomputeByComuna(comuna.getId());
+
+            String ctx = c.comunaId();
+            assertAll(ctx,
+                () -> assertEquals(c.scoreComposite(), snapshot.getScoreComposite(), 0.0, ctx + " scoreComposite"),
+                () -> assertEquals(c.componentFwi(), snapshot.getComponentFwi(), 0.0, ctx + " componentFwi"),
+                () -> assertEquals(c.componentFirms(), snapshot.getComponentFirms(), 0.0, ctx + " componentFirms"),
+                () -> assertEquals(c.componentReports(), snapshot.getComponentReports(), 0.0, ctx + " componentReports"),
+                () -> assertEquals(c.componentNdmi(), snapshot.getComponentNdmi(), ctx + " componentNdmi"),
+                () -> assertEquals(c.componentNdvi(), snapshot.getComponentNdvi(), ctx + " componentNdvi"),
+                () -> assertEquals(c.alertLevel(), snapshot.getAlertLevel(), ctx + " alertLevel"),
+                () -> assertEquals(c.mode(), snapshot.getMode(), ctx + " mode"),
+                () -> assertEquals(0.0, snapshot.getMapbiomasWeight(), ctx + " mapbiomasWeight"),
+                () -> assertEquals(0.0, snapshot.getComponentMapbiomas(), ctx + " componentMapbiomas"),
+                () -> assertEquals(0.8, snapshot.getMapbiomasFuelIndex(), ctx + " mapbiomasFuelIndex"),
+                () -> assertEquals(0.7, snapshot.getMapbiomasHistoryIndex(), ctx + " mapbiomasHistoryIndex"),
+                () -> assertEquals("fuego-col1@2017-partial", snapshot.getMapbiomasDataVersion(), ctx + " mapbiomasDataVersion")
+            );
+        }
     }
 }
