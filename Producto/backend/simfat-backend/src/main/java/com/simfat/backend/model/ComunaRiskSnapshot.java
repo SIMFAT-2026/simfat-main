@@ -46,6 +46,19 @@ public class ComunaRiskSnapshot {
     private Double ndmiRaw;
     private Double ndviRaw;
 
+    // MapBiomas blend fields (S2a2, design D3). New and separately named -- componentLoss
+    // (above) means forest loss and is unrelated; these read as null on documents computed
+    // before this change.
+    private Double componentMapbiomas;   // wEff * S_mapbiomas (the persisted contribution)
+    private Double mapbiomasFuelIndex;   // MapbiomasSusceptibility.fuelIndex, pass-through
+    private Double mapbiomasHistoryIndex; // MapbiomasSusceptibility.historyIndex, pass-through
+    private Double mapbiomasWeight;      // wEff actually used for THIS snapshot, not the raw config wM
+    private String mapbiomasDataVersion; // MapbiomasSusceptibility.dataVersion, for audit
+    // MapbiomasSusceptibility.qualityFlag, kept in its OWN field rather than overloading the
+    // pre-existing `qualityFlag` (Copernicus-only today) so neither domain's flag can silently
+    // clobber the other's.
+    private String mapbiomasQualityFlag;
+
     public String getId() { return id; }
     public void setId(String id) { this.id = id; }
 
@@ -111,4 +124,22 @@ public class ComunaRiskSnapshot {
 
     public Double getNdviRaw() { return ndviRaw; }
     public void setNdviRaw(Double ndviRaw) { this.ndviRaw = ndviRaw; }
+
+    public Double getComponentMapbiomas() { return componentMapbiomas; }
+    public void setComponentMapbiomas(Double componentMapbiomas) { this.componentMapbiomas = componentMapbiomas; }
+
+    public Double getMapbiomasFuelIndex() { return mapbiomasFuelIndex; }
+    public void setMapbiomasFuelIndex(Double mapbiomasFuelIndex) { this.mapbiomasFuelIndex = mapbiomasFuelIndex; }
+
+    public Double getMapbiomasHistoryIndex() { return mapbiomasHistoryIndex; }
+    public void setMapbiomasHistoryIndex(Double mapbiomasHistoryIndex) { this.mapbiomasHistoryIndex = mapbiomasHistoryIndex; }
+
+    public Double getMapbiomasWeight() { return mapbiomasWeight; }
+    public void setMapbiomasWeight(Double mapbiomasWeight) { this.mapbiomasWeight = mapbiomasWeight; }
+
+    public String getMapbiomasDataVersion() { return mapbiomasDataVersion; }
+    public void setMapbiomasDataVersion(String mapbiomasDataVersion) { this.mapbiomasDataVersion = mapbiomasDataVersion; }
+
+    public String getMapbiomasQualityFlag() { return mapbiomasQualityFlag; }
+    public void setMapbiomasQualityFlag(String mapbiomasQualityFlag) { this.mapbiomasQualityFlag = mapbiomasQualityFlag; }
 }
