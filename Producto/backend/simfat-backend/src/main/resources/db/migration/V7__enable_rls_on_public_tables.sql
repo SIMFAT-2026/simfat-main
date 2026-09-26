@@ -10,6 +10,14 @@
 -- (Documentacion/Informes/seguridad-supabase-rls-2026-04-22.md). They are repeated here
 -- so that any fresh environment gets the same state from the migrations alone. Every
 -- statement is idempotent.
+--
+-- Precondition: the role that runs Flyway must own every listed table (true when all of
+-- them were created by these migrations over the same datasource). Otherwise the first
+-- ALTER fails with "must be owner", the migration rolls back and startup stops.
+--
+-- Deliberately untouched: service_role (full trust, used by the backend's Storage
+-- client) and USAGE on schema public (anon/authenticated can still see the schema
+-- but get "permission denied" on every table).
 
 ALTER TABLE public.flyway_schema_history ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.app_users ENABLE ROW LEVEL SECURITY;
