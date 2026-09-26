@@ -16,6 +16,7 @@ import com.simfat.backend.repository.OpenEoIndicatorObservationRepository;
 import com.simfat.backend.repository.TerritoryWeatherObservationRepository;
 import com.simfat.backend.service.NotificationService;
 import com.simfat.backend.service.OpenWeatherFwiService;
+import com.simfat.backend.service.mapbiomas.MapbiomasSusceptibilityService;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -52,6 +53,8 @@ class ComunaRiskServiceImplTest {
     private OpenEoServiceClient openEoServiceClient;
     @Mock
     private FirmsAttributionRouter firmsAttributionRouter;
+    @Mock
+    private MapbiomasSusceptibilityService mapbiomasService;
 
     private ComunaRiskServiceImpl service;
 
@@ -66,7 +69,8 @@ class ComunaRiskServiceImplTest {
             openEoObsRepository,
             notificationService,
             openEoServiceClient,
-            firmsAttributionRouter
+            firmsAttributionRouter,
+            mapbiomasService
         );
         when(snapshotRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         when(snapshotRepository.findTopByComunaIdOrderByComputedAtDesc(any())).thenReturn(Optional.empty());
@@ -99,7 +103,11 @@ class ComunaRiskServiceImplTest {
         ComunaInfo comuna = comunaInfo(comunaId, "region-A");
         when(comunaRepository.findById(comunaId)).thenReturn(Optional.of(comuna));
 
-        LocalDateTime notToday = LocalDateTime.now().minusHours(20);
+        // minusDays(3), not minusHours(20): discovered during S2a2 that isToday() treats the
+        // LocalDateTime as if it were UTC and reinterprets it in America/Santiago, so on a
+        // machine whose default zone IS America/Santiago, a 20h offset can round-trip back to
+        // "today" depending on wall-clock time at test run. A multi-day margin is robust.
+        LocalDateTime notToday = LocalDateTime.now().minusDays(3);
         HeatAlertEvent foco = firmsEvent(notToday, 30.0);
         when(firmsAttributionRouter.resolveForComuna(eq(comuna), any())).thenReturn(List.of(foco));
 
@@ -126,7 +134,7 @@ class ComunaRiskServiceImplTest {
         ComunaInfo comuna = comunaInfo(comunaId, "region-A");
         when(comunaRepository.findById(comunaId)).thenReturn(Optional.of(comuna));
 
-        LocalDateTime notToday = LocalDateTime.now().minusHours(20);
+        LocalDateTime notToday = LocalDateTime.now().minusDays(3); // see comment above
         List<HeatAlertEvent> events = List.of(
             firmsEvent(notToday, 10.0),
             firmsEvent(notToday, 10.0),
@@ -146,7 +154,7 @@ class ComunaRiskServiceImplTest {
         ComunaInfo comuna = comunaInfo(comunaId, "region-A");
         when(comunaRepository.findById(comunaId)).thenReturn(Optional.of(comuna));
 
-        LocalDateTime notToday = LocalDateTime.now().minusHours(20);
+        LocalDateTime notToday = LocalDateTime.now().minusDays(3); // see comment above
         List<HeatAlertEvent> events = List.of(firmsEvent(notToday, 60.0));
         when(firmsAttributionRouter.resolveForComuna(eq(comuna), any())).thenReturn(events);
 
@@ -161,7 +169,7 @@ class ComunaRiskServiceImplTest {
         ComunaInfo comuna = comunaInfo(comunaId, "region-A");
         when(comunaRepository.findById(comunaId)).thenReturn(Optional.of(comuna));
 
-        LocalDateTime notToday = LocalDateTime.now().minusHours(20);
+        LocalDateTime notToday = LocalDateTime.now().minusDays(3); // see comment above
         List<HeatAlertEvent> events = List.of(
             firmsEvent(notToday, 50.0),
             firmsEvent(notToday, 50.0),
