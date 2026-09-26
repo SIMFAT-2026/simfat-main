@@ -14,8 +14,10 @@ import com.simfat.backend.model.OpenEoIndicatorObservation;
 import com.simfat.backend.model.TerritoryRiskSnapshot;
 import com.simfat.backend.model.TerritoryWeatherObservation;
 import com.simfat.backend.model.ComunaInfo;
+import com.simfat.backend.model.ComunaMapbiomasStats;
 import com.simfat.backend.repository.CitizenReportRepository;
 import com.simfat.backend.repository.ComunaInfoRepository;
+import com.simfat.backend.repository.ComunaMapbiomasStatsRepository;
 import com.simfat.backend.repository.ForestLossRecordRepository;
 import com.simfat.backend.repository.HeatAlertEventRepository;
 import com.simfat.backend.repository.OpenEoIndicatorObservationRepository;
@@ -25,6 +27,8 @@ import com.simfat.backend.service.NasaFirmsService;
 import com.simfat.backend.service.OpenWeatherFwiService;
 import com.simfat.backend.service.TerritoryRiskService;
 import com.simfat.backend.web.CoordinateRounding;
+import com.simfat.backend.web.MapbiomasBurnedLayerBuilder;
+import com.simfat.backend.web.MapbiomasYear;
 import com.simfat.backend.web.PublicQueryWindow;
 import org.springframework.data.domain.PageRequest;
 import java.time.LocalDate;
@@ -43,6 +47,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.http.MediaType;
 import org.springframework.data.domain.PageRequest;
@@ -63,7 +68,7 @@ public class TerritoryController {
     private static final int PUBLIC_LAYER_DEFAULT_DAYS = 7;
     private static final List<String> VALID_INDICATORS =
         List.of("NDVI", "NDMI", "LOSS", "ALERTS", "REPORTS", "FIRMS", "RISK_SCORE",
-            "WIND", "HUMIDITY", "AIR_TEMP", "SOIL_TEMP");
+            "WIND", "HUMIDITY", "AIR_TEMP", "SOIL_TEMP", "BURNED");
 
     private final HeatAlertEventRepository heatAlertRepository;
     private final CitizenReportRepository citizenReportRepository;
@@ -76,11 +81,24 @@ public class TerritoryController {
     private final ComunaRiskService comunaRiskService;
     private final ComunaInfoRepository comunaInfoRepository;
     private final TerritoryWeatherObservationRepository weatherObservationRepository;
+    private final ComunaMapbiomasStatsRepository mapbiomasStatsRepository;
 
     // Comunas con un sync de Copernicus en curso. El endpoint es fire-and-forget
     // (~2 min de duración real) y sin esto un segundo POST para la misma comuna
     // dispara un INSERT concurrente que choca con el índice único en Mongo.
     private final Set<String> copernicusSyncInFlight = ConcurrentHashMap.newKeySet();
+
+    // Task 2b2a.2 (design D5 caching note): lazily built, keyed (dataVersion, indicator, year,
+    // regionId), invalidated implicitly on restart because mapbiomasDataVersion is a @Value
+    // property -- there is no live "swap dataVersion without redeploy" path yet, so an explicit
+    // eviction listener would be premature (documented rather than silently added). Bounded by
+    // construction: only BURNED populates it today (3 regions x 13 years = 39 entries max).
+    private final Map<String, Map<String, Object>> mapbiomasLayerCache = new ConcurrentHashMap<>();
+
+    // Config property, not a code literal, mirroring MapbiomasSusceptibilityServiceImpl's
+    // dataVersion field so both read the same pinned version (design D1 "Collection refresh").
+    @Value("${mapbiomas.stats.data-version:fuego-col1@2017-partial}")
+    private String mapbiomasDataVersion;
 
     public TerritoryController(
         HeatAlertEventRepository heatAlertRepository,
@@ -93,7 +111,8 @@ public class TerritoryController {
         OpenWeatherFwiService openWeatherFwiService,
         ComunaRiskService comunaRiskService,
         ComunaInfoRepository comunaInfoRepository,
-        TerritoryWeatherObservationRepository weatherObservationRepository
+        TerritoryWeatherObservationRepository weatherObservationRepository,
+        ComunaMapbiomasStatsRepository mapbiomasStatsRepository
     ) {
         this.heatAlertRepository = heatAlertRepository;
         this.citizenReportRepository = citizenReportRepository;
@@ -106,6 +125,14 @@ public class TerritoryController {
         this.comunaRiskService = comunaRiskService;
         this.comunaInfoRepository = comunaInfoRepository;
         this.weatherObservationRepository = weatherObservationRepository;
+        this.mapbiomasStatsRepository = mapbiomasStatsRepository;
+    }
+
+    // Test seam: @Value fields are only set by Spring; a test constructing this controller
+    // directly (no Spring context, e.g. a future pure MockMvc-less unit test) can override the
+    // pinned dataVersion, same idiom as MapbiomasSusceptibilityServiceImpl#setDataVersion.
+    void setMapbiomasDataVersion(String mapbiomasDataVersion) {
+        this.mapbiomasDataVersion = mapbiomasDataVersion;
     }
 
     @GetMapping("/bounds")
@@ -135,9 +162,10 @@ public class TerritoryController {
         @RequestParam String regionId,
         @RequestParam(required = false) String indicators,
         @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
-        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to
+        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+        @RequestParam(required = false) String year
     ) {
-        return buildLayersResponse(regionId, indicators, from, to, false);
+        return buildLayersResponse(regionId, indicators, from, to, year, false);
     }
 
     // Publico/anonimo: sin login, para el demo de portafolio en /monitoreo. Reusa exactamente
@@ -149,13 +177,14 @@ public class TerritoryController {
         @RequestParam String regionId,
         @RequestParam(required = false) String indicators,
         @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
-        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to
+        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+        @RequestParam(required = false) String year
     ) {
-        return buildLayersResponse(regionId, indicators, from, to, true);
+        return buildLayersResponse(regionId, indicators, from, to, year, true);
     }
 
     private ResponseEntity<ApiResponse<TerritoryLayersResponseDTO>> buildLayersResponse(
-        String regionId, String indicators, LocalDate from, LocalDate to, boolean anonymizeReports
+        String regionId, String indicators, LocalDate from, LocalDate to, String year, boolean anonymizeReports
     ) {
         LocalDateTime fromDate = from != null ? from.atStartOfDay() : LocalDate.now().minusDays(7).atStartOfDay();
         LocalDateTime toDate = to != null ? to.atTime(23, 59, 59) : LocalDate.now().atTime(23, 59, 59);
@@ -186,6 +215,13 @@ public class TerritoryController {
         }
         if (requestedIndicators.contains("RISK_SCORE")) {
             layers.put("RISK_SCORE", riskScoreLayer(regionId, geometry));
+        }
+        if (requestedIndicators.contains("BURNED")) {
+            // Task 2b2a.2 / design D5: `year` is validated ONLY when a MapBiomas indicator is
+            // actually requested, so the other 11 indicators stay byte-identical whether `year`
+            // is present, absent or malformed (spec TL-1i).
+            MapbiomasYear resolvedYear = MapbiomasYear.resolve(MapbiomasYear.Indicator.BURNED, year);
+            layers.put("BURNED", burnedLayer(regionId, resolvedYear));
         }
         boolean needsClimateLayers = requestedIndicators.contains("WIND")
             || requestedIndicators.contains("HUMIDITY")
@@ -615,6 +651,35 @@ public class TerritoryController {
         props.put("computedAt", computedAt);
 
         return featureCollection(List.of(pointFeature("risk-" + regionId, geometry.centerLng, geometry.centerLat, props)));
+    }
+
+    /**
+     * BURNED value map for a single validated {@code year} (task 2b2a.2, design D5). One bulk
+     * read of {@code comuna_mapbiomas_stats} per cache miss (NFR-7/TL-1e; never per comuna), then
+     * delegates to the pure {@link MapbiomasBurnedLayerBuilder}. Cached by
+     * {@code (dataVersion, indicator, year, regionId)} -- see {@link #mapbiomasLayerCache}'s
+     * Javadoc for the bounded-size and invalidation rationale.
+     *
+     * <p>LANDCOVER is deliberately NOT wired here yet: {@link ComunaMapbiomasStats.LandCover}
+     * only stores a single {@code referenceYear} + {@code sharesByClass}, with no per-year
+     * series field, so a genuine year-selectable LANDCOVER value map has no data source in the
+     * current model/seed. Wiring it would require first adding a {@code sharesByYear} field
+     * (design D1's {@code landCover.sharesByYear}) and populating it from the pipeline -- that is
+     * S1b-shaped scope, not this unit's. Flagged for the orchestrator rather than silently
+     * built against non-existent per-year land-cover data.
+     */
+    private Map<String, Object> burnedLayer(String regionId, MapbiomasYear resolvedYear) {
+        String cacheKey = mapbiomasDataVersion + "|BURNED|" + resolvedYear.year() + "|" + regionId;
+        return mapbiomasLayerCache.computeIfAbsent(cacheKey, key -> {
+            List<ComunaInfo> comunas = comunaInfoRepository.findByRegionId(regionId);
+            Map<String, ComunaMapbiomasStats> statsByComunaId = new LinkedHashMap<>();
+            for (ComunaMapbiomasStats stats : mapbiomasStatsRepository.findByDataVersion(mapbiomasDataVersion)) {
+                statsByComunaId.put(stats.getComunaId(), stats);
+            }
+            return MapbiomasBurnedLayerBuilder.build(
+                comunas, statsByComunaId, resolvedYear.year(),
+                resolvedYear.minYear(), resolvedYear.maxYear(), mapbiomasDataVersion);
+        });
     }
 
     /**
