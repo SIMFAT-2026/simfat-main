@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import time
 import urllib.request
 from dataclasses import dataclass
@@ -52,18 +53,27 @@ def download_file(
     ``opener`` must be a callable ``(url, timeout) -> context manager`` whose
     ``__enter__`` result exposes ``.read(n)``. Defaults to
     ``urllib.request.urlopen``, which also handles ``file://`` URLs.
+
+    Writes go to a temp file in ``dest``'s own directory first and are only
+    moved onto ``dest`` (via ``os.replace``, atomic on both POSIX and
+    Windows) once the transfer has fully and successfully completed. This
+    means a failing download -- including a re-download of a file that
+    already has a good, previously-verified copy at ``dest`` -- NEVER
+    truncates or deletes that existing copy; only the temp file is removed
+    on failure.
     """
     if retries < 1:
         raise ValueError("retries must be >= 1")
     opener = opener or _default_opener
     dest = Path(dest)
     dest.parent.mkdir(parents=True, exist_ok=True)
+    tmp_dest = dest.with_name(dest.name + ".tmp")
     last_exc: Exception | None = None
     for attempt in range(1, retries + 1):
         try:
             hasher = hashlib.sha256()
             size = 0
-            with opener(url, timeout) as response, open(dest, "wb") as out:
+            with opener(url, timeout) as response, open(tmp_dest, "wb") as out:
                 while True:
                     chunk = response.read(1 << 20)
                     if not chunk:
@@ -71,14 +81,15 @@ def download_file(
                     out.write(chunk)
                     hasher.update(chunk)
                     size += len(chunk)
+            os.replace(tmp_dest, dest)
             return DownloadResult(path=dest, sha256=hasher.hexdigest(), bytes=size)
         except Exception as exc:  # retried below; wrapped and re-raised once exhausted
             last_exc = exc
             if attempt < retries:
                 sleep(retry_backoff * attempt)
-    # All retries exhausted: don't leave a partial/corrupt file at dest for a
-    # caller to mistake for a complete download.
-    dest.unlink(missing_ok=True)
+    # All retries exhausted: remove only the temp file. A pre-existing,
+    # verified copy at dest (if any) was never touched and must survive.
+    tmp_dest.unlink(missing_ok=True)
     raise DownloadError(f"Failed to download {url} after {retries} attempts") from last_exc
 
 
