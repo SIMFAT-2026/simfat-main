@@ -108,7 +108,18 @@ class TerritoryControllerMapbiomasYearTest extends MongoFreeWebTestSupport {
             .andExpect(status().isOk())
             .andReturn().getResponse().getContentAsString();
 
-        org.assertj.core.api.Assertions.assertThat(withMalformedYear).isEqualTo(withoutYear);
+        // timestamp and generatedAt are per-request clocks; everything else must be identical.
+        // (Assertions below remove both before comparing.)
+        com.fasterxml.jackson.databind.ObjectMapper json = new com.fasterxml.jackson.databind.ObjectMapper();
+        com.fasterxml.jackson.databind.node.ObjectNode expected =
+            (com.fasterxml.jackson.databind.node.ObjectNode) json.readTree(withoutYear);
+        com.fasterxml.jackson.databind.node.ObjectNode actual =
+            (com.fasterxml.jackson.databind.node.ObjectNode) json.readTree(withMalformedYear);
+        ((com.fasterxml.jackson.databind.node.ObjectNode) expected.get("data")).remove("generatedAt");
+        ((com.fasterxml.jackson.databind.node.ObjectNode) actual.get("data")).remove("generatedAt");
+        expected.remove("timestamp");
+        actual.remove("timestamp");
+        org.assertj.core.api.Assertions.assertThat(actual).isEqualTo(expected);
     }
 
     @Test
