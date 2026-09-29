@@ -50,22 +50,90 @@ def to_basis_points(shares_ha: Mapping[int, float]) -> dict[int, int]:
     return floored
 
 
+def shares_by_year_bp(
+    by_year: Mapping[int, Mapping[int, float]], *, first_year: int, last_year: int
+) -> dict:
+    """Class-major, sparse, per-year basis-point series (design D1 rev2).
+
+    Returns ``{firstYear, lastYear, unit: "bp", classes: {code: [int, ...]}}``
+    where ``classes[code][i]`` is the basis-point share of ``code`` in year
+    ``first_year + i``. Each year's bp values (across every class present
+    that year, via ``to_basis_points``) sum to EXACTLY 10000 -- the same
+    largest-remainder rounding used by ``land_cover_section``, applied
+    independently per year. A class absent from a given year (zero hectares,
+    dropped by ``to_basis_points``) reads 0 at that year's index rather than
+    being missing from the array (fixed-length arrays: length ==
+    ``last_year - first_year + 1``). A class that never has a non-zero share
+    in ANY year in range is not a key in ``classes`` at all (sparse).
+    """
+    n_years = last_year - first_year + 1
+    classes: dict[int, list[int]] = {}
+    for year in range(first_year, last_year + 1):
+        idx = year - first_year
+        year_bp = to_basis_points(by_year.get(year, {}))
+        for code, bp in year_bp.items():
+            classes.setdefault(code, [0] * n_years)[idx] = bp
+    return {"firstYear": first_year, "lastYear": last_year, "unit": "bp", "classes": classes}
+
+
+class ShareSumError(ValueError):
+    """Raised when a comuna-year's classified total drifts from its reference year (MCS-3e)."""
+
+
+def validate_comuna_year_shares(
+    by_year: Mapping[int, Mapping[int, float]],
+    *,
+    comuna_id: str,
+    reference_year: int,
+    tolerance: float = 0.005,
+) -> None:
+    """Hard gate (design D2, MCS-3e): abort if any comuna-year's classified
+    total hectares drifts by more than ``tolerance`` (relative) from the
+    SAME comuna's reference-year total.
+
+    A comuna's classified area is physically stable across years (verified
+    against the real xlsx, S1b4: every one of the 86 target comunas' yearly
+    total is stable to a fraction of a hectare across 1999-2024), so this
+    catches genuine per-year data problems (e.g. a missing class/row for one
+    year) rather than being a cosmetic rounding check. Names ``(comuna_id,
+    year)`` in the raised error, never renormalizes silently.
+    """
+    reference_total = sum(by_year[reference_year].values())
+    for year, classes in by_year.items():
+        total = sum(classes.values())
+        fraction = (total / reference_total) if reference_total else 0.0
+        if abs(fraction - 1.0) > tolerance:
+            raise ShareSumError(
+                f"comuna={comuna_id!r} year={year}: classified total {total} ha is "
+                f"{fraction:.4f}x the reference year {reference_year}'s total "
+                f"{reference_total} ha (tolerance {tolerance})"
+            )
+
+
 def land_cover_section(
     by_year: Mapping[int, Mapping[int, float]],
     *,
     reference_year: int,
     mean_years: Sequence[int],
+    first_year: int | None = None,
+    last_year: int | None = None,
 ) -> dict:
     """Build the ``landCover`` section for one comuna from its per-year hectares.
 
     ``sharesByClass`` (the reference year's shares) and ``sharesByClassMean5y``
-    (the mean of ``mean_years`` hectares) are FRACTIONS summing to ~1.0 (design
-    D1) -- basis points are reserved for ``sharesByYear.classes`` only (not
-    implemented in this slice). Internally the largest-remainder bp rounding
-    (``to_basis_points``) is still used so the emitted fractions are exact
-    multiples of 1/10000, deterministic and reproducible, then divided by
-    ``BP_TOTAL`` before being returned.
+    (the mean of ``mean_years`` hectares) are FRACTIONS summing to ~1.0
+    (design D1) -- basis points are reserved for ``sharesByYear.classes``
+    (design D1 rev2, ``shares_by_year_bp``, spanning ``first_year..last_year``
+    inclusive, defaulting to the full range of years present in ``by_year``
+    when not given explicitly). Internally the largest-remainder bp rounding
+    (``to_basis_points``) is used for BOTH representations so the emitted
+    fractions are exact multiples of 1/10000, deterministic, reproducible,
+    and never drift from the bp series (MCS-1d reference-year consistency).
     """
+    if first_year is None:
+        first_year = min(by_year)
+    if last_year is None:
+        last_year = max(by_year)
     reference_bp = to_basis_points(by_year[reference_year])
 
     total_ha_by_class: dict[int, float] = {}
@@ -79,6 +147,7 @@ def land_cover_section(
         "referenceYear": reference_year,
         "sharesByClass": {code: bp / BP_TOTAL for code, bp in reference_bp.items()},
         "sharesByClassMean5y": {code: bp / BP_TOTAL for code, bp in mean_bp.items()},
+        "sharesByYear": shares_by_year_bp(by_year, first_year=first_year, last_year=last_year),
     }
 
 

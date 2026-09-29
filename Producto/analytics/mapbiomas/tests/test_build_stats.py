@@ -109,6 +109,132 @@ def test_land_cover_section_fractions_are_exact_bp_over_10000():
         assert section["sharesByClass"][code] == bp / build_stats.BP_TOTAL
 
 
+# --- shares_by_year_bp: per-year class-major sparse bp series (design D1, S1b4) ---
+
+
+def test_shares_by_year_bp_class_major_sparse_int_arrays():
+    by_year = {
+        1999: {59: 90.0, 60: 10.0},
+        2000: {59: 80.0, 60: 20.0},
+    }
+    series = build_stats.shares_by_year_bp(by_year, first_year=1999, last_year=2000)
+    assert series["firstYear"] == 1999
+    assert series["lastYear"] == 2000
+    assert series["unit"] == "bp"
+    assert series["classes"][59] == [9000, 8000]
+    assert series["classes"][60] == [1000, 2000]
+
+
+def test_shares_by_year_bp_every_year_sums_to_exactly_10000():
+    by_year = {
+        1999: {59: 33.333, 60: 33.333, 15: 33.334},
+        2000: {59: 100.0},
+    }
+    series = build_stats.shares_by_year_bp(by_year, first_year=1999, last_year=2000)
+    for i in range(2):
+        year_total = sum(values[i] for values in series["classes"].values())
+        assert year_total == 10000
+
+
+def test_shares_by_year_bp_class_absent_from_a_year_is_zero_not_missing():
+    # class 15 only appears in 1999; the 2000 slot must still exist, as 0,
+    # not be missing from the array (fixed-length arrays, index = year offset).
+    by_year = {
+        1999: {59: 90.0, 15: 10.0},
+        2000: {59: 100.0},
+    }
+    series = build_stats.shares_by_year_bp(by_year, first_year=1999, last_year=2000)
+    assert series["classes"][15] == [1000, 0]
+
+
+def test_shares_by_year_bp_class_never_present_in_any_year_is_absent_sparse():
+    by_year = {1999: {59: 100.0}, 2000: {59: 100.0}}
+    series = build_stats.shares_by_year_bp(by_year, first_year=1999, last_year=2000)
+    assert 15 not in series["classes"]
+
+
+def test_shares_by_year_bp_year_with_no_data_at_all_is_all_zero_that_year():
+    # A year missing entirely from by_year (e.g. gap in the source) must not
+    # crash -- every known class gets a 0 at that index, and the year still
+    # sums to 0 (not silently skipped -- caller-level gates decide what a
+    # zero-total year means, this function just encodes what it is given).
+    by_year = {1999: {59: 100.0}}
+    series = build_stats.shares_by_year_bp(by_year, first_year=1999, last_year=2000)
+    assert series["classes"][59] == [10000, 0]
+
+
+def test_shares_by_year_bp_real_length_matches_1999_2024_range():
+    by_year = {year: {59: 100.0} for year in range(1999, 2025)}
+    series = build_stats.shares_by_year_bp(by_year, first_year=1999, last_year=2024)
+    assert len(series["classes"][59]) == 26
+
+
+# --- validate_comuna_year_shares: per comuna-YEAR hard gate (design D2, MCS-3e) ---
+#
+# The gate compares each year's total classified hectares against the SAME
+# comuna's reference-year (2024) total: a real comuna's classified area is
+# physically stable year to year (verified against the real xlsx, S1b4 --
+# every one of the 86 target comunas' yearly total is stable to within a
+# fraction of a hectare across 1999-2024), so a year whose total drifts by
+# more than 0.5% from the reference year is a genuine data problem (e.g. a
+# missing row/class for that year), not a rounding artifact.
+
+
+def test_validate_comuna_year_shares_passes_when_totals_are_stable():
+    by_year = {2020: {59: 60.0, 60: 40.0}, 2024: {59: 55.0, 60: 45.0}}  # both sum to 100.0
+    build_stats.validate_comuna_year_shares(by_year, comuna_id="CHL.6.1.1_1", reference_year=2024)
+
+
+def test_validate_comuna_year_shares_fails_loudly_and_names_comuna_and_year():
+    by_year = {2024: {59: 60.0, 60: 40.0}, 2020: {59: 60.0, 60: 30.0}}  # 2020 totals 90 vs ref 100
+    with pytest.raises(build_stats.ShareSumError, match=r"CHL\.6\.1\.1_1.*2020"):
+        build_stats.validate_comuna_year_shares(by_year, comuna_id="CHL.6.1.1_1", reference_year=2024)
+
+
+def test_validate_comuna_year_shares_tolerance_is_half_a_percentage_point():
+    # 99.4/100 = 0.994 -> off by 0.006, just OUTSIDE the 0.005 tolerance -> fails.
+    with pytest.raises(build_stats.ShareSumError):
+        build_stats.validate_comuna_year_shares(
+            {2024: {59: 100.0}, 2020: {59: 99.4}}, comuna_id="X", reference_year=2024
+        )
+    # 99.6/100 = 0.996 -> off by 0.004, INSIDE tolerance -> passes.
+    build_stats.validate_comuna_year_shares(
+        {2024: {59: 100.0}, 2020: {59: 99.6}}, comuna_id="X", reference_year=2024
+    )
+
+
+def test_validate_comuna_year_shares_checks_every_year_independently():
+    # 2021 is fine, 2020 is broken -- the error must name 2020, not 2021.
+    by_year = {2024: {59: 100.0}, 2021: {59: 100.0}, 2020: {59: 50.0}}
+    with pytest.raises(build_stats.ShareSumError, match="2020"):
+        build_stats.validate_comuna_year_shares(by_year, comuna_id="X", reference_year=2024)
+
+
+# --- land_cover_section: sharesByYear integration (design D1 rev2, S1b4) ----
+
+
+def test_land_cover_section_includes_shares_by_year():
+    section = build_stats.land_cover_section(
+        _by_year(), reference_year=2024, mean_years=range(2020, 2025), first_year=2020, last_year=2024
+    )
+    assert "sharesByYear" in section
+    assert section["sharesByYear"]["firstYear"] == 2020
+    assert section["sharesByYear"]["lastYear"] == 2024
+
+
+def test_land_cover_section_reference_year_consistency_with_shares_by_year():
+    """sharesByClass[code] must equal sharesByYear.classes[code][idx(2024)]/10000
+    within 1e-4 (design D1/MCS-1d) -- the two representations of the SAME
+    reference year must never drift apart."""
+    section = build_stats.land_cover_section(
+        _by_year(), reference_year=2024, mean_years=range(2020, 2025), first_year=2020, last_year=2024
+    )
+    idx_2024 = 2024 - section["sharesByYear"]["firstYear"]
+    for code, fraction in section["sharesByClass"].items():
+        bp_2024 = section["sharesByYear"]["classes"][code][idx_2024]
+        assert fraction == pytest.approx(bp_2024 / build_stats.BP_TOTAL, abs=1e-4)
+
+
 # --- build_comuna_document: assembles landCover + fire + provenance --------
 
 
