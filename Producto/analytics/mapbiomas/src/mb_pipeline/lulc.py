@@ -138,6 +138,20 @@ def join_coverage(
     (``LulcError``) if a row's (region, comuna) does not match the index, or
     if the matched comunaIds are not exactly ``expected_comuna_ids``.
 
+    Multiple rows for the SAME (comunaId, year, class) are SUMMED (real-data
+    evidence, S1b4, 2026-09-28): the real COVERAGE sheet reports up to 4
+    rows for one (region, comuna, class) key -- e.g. La Araucanía/Galvarino/
+    class 9 has row ID 147 (y1999=20,229.95 ha) and a separate row ID 455
+    (y1999=3.38 ha) that both belong to the same comuna (its per-class total
+    is stable across years, confirming they are complementary polygon
+    fragments -- likely disjoint slivers/exclaves reported as their own
+    zonal-stats row by MapBiomas' political-level export -- not conflicting
+    duplicate re-reads of one row). Across every multi-row group found in
+    our 3 target regions the smaller value never exceeded ~2.3% of the
+    larger one, so summing is safe; it was previously treated as a fail-
+    loud conflict before this evidence existed (see the amended test in
+    test_lulc.py for the full investigation).
+
     For every (comunaId, year), the set of class codes present is checked
     with ``legend.assert_disjoint`` before being returned: if a class code
     and one of its legend ancestors (e.g. 3 "Forest" and 59 "Primary
@@ -159,18 +173,10 @@ def join_coverage(
         by_year = matched.setdefault(comuna_id, {})
         for year, hectares in row["years"].items():
             by_class = by_year.setdefault(year, {})
-            if row["class"] in by_class:
-                existing = by_class[row["class"]]
-                # Exact float equality: rows re-reading the same cell must be
-                # bit-identical; anything else is a genuine data conflict,
-                # not a rounding artifact, and must fail loudly rather than
-                # silently keep whichever row happened to come last.
-                if existing != hectares:
-                    raise LulcError(
-                        f"Conflicting duplicate rows for comuna={comuna_id!r} "
-                        f"year={year} class={row['class']}: {existing!r} != {hectares!r}"
-                    )
-            by_class[row["class"]] = hectares
+            # SUM rows sharing the same (comunaId, year, class) key -- see
+            # the docstring above for the real-data evidence that this is a
+            # legitimate multi-fragment merge, not a conflicting duplicate.
+            by_class[row["class"]] = by_class.get(row["class"], 0.0) + hectares
 
     expected = set(expected_comuna_ids)
     got = set(matched)

@@ -165,21 +165,52 @@ def test_join_coverage_fails_loudly_when_not_all_expected_comunas_matched():
         lulc.join_coverage(rows, index, expected_comuna_ids={"CHL.6.1.1_1", "CHL.6.1.2_1"})
 
 
-def test_join_coverage_fails_loudly_on_conflicting_duplicate_rows():
-    """Two rows for the same (comuna, year, class) with different hectare
-    values must not silently last-write-win -- that would hide a data
-    problem instead of failing loudly, like the rest of this module does."""
+def test_join_coverage_sums_multiple_rows_for_the_same_comuna_year_class():
+    """Two (or more) rows for the same (comuna, year, class) with DIFFERENT
+    hectare values must be SUMMED, not treated as a conflict.
+
+    AMENDED after real S1b4 data evidence (2026-09-28, full workbook
+    download): the real COVERAGE sheet reports 454 such multi-row
+    (region, comuna, class) groups within our 3 target regions alone (82
+    triples, 19 quadruples -- see the S1b4 apply-progress for the full
+    investigation). Example: La Araucanía/Galvarino/class 9 has row ID 147
+    with y1999=20229.95 ha and a SEPARATE row ID 455 with y1999=3.38 ha --
+    both belong to the same real administrative comuna (its per-class total
+    is stable across years, ~56,778 ha every year for Galvarino, confirming
+    the rows are complementary fragments of one polygon set, not duplicate
+    re-reads of one row). Across every multi-row group found in our 3
+    regions the smaller value never exceeds ~2.3% of the larger one,
+    consistent with a small disjoint sliver/exclave being reported as its
+    own zonal-stats row by MapBiomas' own political-level export -- never
+    with a >50% magnitude split that would suggest a genuine conflicting
+    duplicate. The previous behaviour (fail loudly on any value mismatch)
+    was a defensible default BEFORE this evidence existed, but summing is
+    the only join that reproduces the real, stable per-comuna area total."""
     rows = [
         _row("Biobío", "Arauco", 59, {2020: 100.0}),
         _row("Biobío", "Arauco", 59, {2020: 250.0}),
     ]
     index = {("Biobío", "ARAUCO"): "CHL.6.1.1_1"}
 
-    with pytest.raises(
-        lulc.LulcError,
-        match=r"CHL\.6\.1\.1_1.*2020.*59.*100(\.0)?.*250(\.0)?",
-    ):
-        lulc.join_coverage(rows, index, expected_comuna_ids={"CHL.6.1.1_1"})
+    joined = lulc.join_coverage(rows, index, expected_comuna_ids={"CHL.6.1.1_1"})
+
+    assert joined["CHL.6.1.1_1"][2020] == {59: 350.0}
+
+
+def test_join_coverage_sums_more_than_two_rows_for_the_same_key():
+    """Real data has up to 4 rows for one (comuna, class) key (e.g. Biobío's
+    Nacimiento/class 9) -- summing must not be limited to exactly 2 rows."""
+    rows = [
+        _row("Biobío", "Arauco", 59, {2020: 10.0}),
+        _row("Biobío", "Arauco", 59, {2020: 0.0}),
+        _row("Biobío", "Arauco", 59, {2020: 5.0}),
+        _row("Biobío", "Arauco", 59, {2020: 0.0}),
+    ]
+    index = {("Biobío", "ARAUCO"): "CHL.6.1.1_1"}
+
+    joined = lulc.join_coverage(rows, index, expected_comuna_ids={"CHL.6.1.1_1"})
+
+    assert joined["CHL.6.1.1_1"][2020] == {59: 15.0}
 
 
 def test_join_coverage_fails_loudly_on_unmatched_row_name():
