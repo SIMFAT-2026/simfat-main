@@ -38,7 +38,7 @@ import org.springframework.core.io.ClassPathResource;
 class MapbiomasSeedLoaderIntegrationTest {
 
     private static final String SEED_RESOURCE_PATH =
-        "seed/mapbiomas/comuna-mapbiomas-stats.fuego-col1-2017-partial.jsonl";
+        "seed/mapbiomas/comuna-mapbiomas-stats.lulc-col2+fuego-col1-2017-partial.jsonl";
     private static final int EXPECTED_DOCUMENT_COUNT = 86;
 
     @Autowired
@@ -70,7 +70,7 @@ class MapbiomasSeedLoaderIntegrationTest {
 
         loader = new MapbiomasSeedLoader(statsRepository, comunaInfoRepository, objectMapper);
         loader.setSeedEnabled(true);
-        loader.setDataVersion("fuego-col1@2017-partial");
+        loader.setDataVersion("lulc-col2+fuego-col1@2017-partial");
     }
 
     private List<String> readSeedComunaIds() throws Exception {
@@ -96,7 +96,7 @@ class MapbiomasSeedLoaderIntegrationTest {
         List<ComunaMapbiomasStats> all = statsRepository.findAll();
         assertThat(all).hasSize(EXPECTED_DOCUMENT_COUNT);
         assertThat(all).allSatisfy(doc ->
-            assertThat(doc.getId()).isEqualTo(doc.getComunaId() + "|fuego-col1@2017-partial"));
+            assertThat(doc.getId()).isEqualTo(doc.getComunaId() + "|lulc-col2+fuego-col1@2017-partial"));
     }
 
     @Test
@@ -127,7 +127,7 @@ class MapbiomasSeedLoaderIntegrationTest {
         loader.loadSeed();
 
         ComunaMapbiomasStats doc = statsRepository
-            .findByComunaIdAndDataVersion(seedComunaIds.get(0), "fuego-col1@2017-partial")
+            .findByComunaIdAndDataVersion(seedComunaIds.get(0), "lulc-col2+fuego-col1@2017-partial")
             .orElseThrow();
 
         assertThat(doc.getLandCover()).isNull();

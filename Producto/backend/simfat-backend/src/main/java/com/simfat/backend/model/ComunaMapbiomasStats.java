@@ -19,10 +19,14 @@ import org.springframework.data.mongodb.core.mapping.Document;
  * "{comunaId}|{dataVersion}"} (see {@link #buildId}) so re-loading the same seed is an
  * idempotent upsert — never duplicates, safe to re-run on every boot.
  *
- * <p>Honesty note: as of the first loaded seed (dataVersion {@code fuego-col1@2017-partial}),
- * only Fuego Colección 1 (2017 fire-only) data exists — {@link #landCover} is {@code null}
- * with {@link #landCoverReason} explaining why, and {@link #partial} is {@code true}. The
- * shape supports a future merged LULC+Fuego seed without a schema migration.
+ * <p>History note: the FIRST loaded seed (dataVersion {@code fuego-col1@2017-partial})
+ * had only Fuego Colección 1 (2017 fire-only) data — {@link #landCover} was {@code null}
+ * with {@link #landCoverReason} explaining why. S1b4 (dataVersion {@code
+ * lulc-col2+fuego-col1@2017-partial}) merged in REAL MapBiomas Chile Colección 2 land-cover
+ * shares for all 86 comunas, years 1999-2024 ({@link LandCover#sharesByYear}); {@link
+ * #landCover} is no longer {@code null} and {@link #landCoverReason} is no longer set. Fuego
+ * itself is STILL 2017-only (partial) — see {@link #fireReason} — so {@link #partial} stays
+ * {@code true} for that reason alone.
  */
 @Document(collection = "comuna_mapbiomas_stats")
 @CompoundIndexes({
@@ -95,12 +99,48 @@ public class ComunaMapbiomasStats {
     public static class LandCover {
         private Integer referenceYear;
         private Map<String, Double> sharesByClass;
+        private Map<String, Double> sharesByClassMean5y;
+        private SharesByYear sharesByYear;
 
         public Integer getReferenceYear() { return referenceYear; }
         public void setReferenceYear(Integer referenceYear) { this.referenceYear = referenceYear; }
 
         public Map<String, Double> getSharesByClass() { return sharesByClass; }
         public void setSharesByClass(Map<String, Double> sharesByClass) { this.sharesByClass = sharesByClass; }
+
+        public Map<String, Double> getSharesByClassMean5y() { return sharesByClassMean5y; }
+        public void setSharesByClassMean5y(Map<String, Double> sharesByClassMean5y) { this.sharesByClassMean5y = sharesByClassMean5y; }
+
+        public SharesByYear getSharesByYear() { return sharesByYear; }
+        public void setSharesByYear(SharesByYear sharesByYear) { this.sharesByYear = sharesByYear; }
+    }
+
+    /**
+     * Per-year, class-major, sparse basis-point series (design D1 rev2, S1b4): {@code
+     * classes.get(code)[i]} is the basis-point share (0-10000) of {@code code} in year {@code
+     * firstYear + i}. Every array has length {@code lastYear - firstYear + 1}; a class absent
+     * from a given year reads 0 at that index; a class never present in ANY year in range is
+     * not a key at all (sparse). {@code sharesByClass}/{@code sharesByClassMean5y} on the
+     * enclosing {@link LandCover} are FRACTIONS (0-1), never basis points — only this field is
+     * bp (design D1's unit distinction, fixed in S1b3 after obs 774's bp-vs-fraction finding).
+     */
+    public static class SharesByYear {
+        private Integer firstYear;
+        private Integer lastYear;
+        private String unit;
+        private Map<String, int[]> classes;
+
+        public Integer getFirstYear() { return firstYear; }
+        public void setFirstYear(Integer firstYear) { this.firstYear = firstYear; }
+
+        public Integer getLastYear() { return lastYear; }
+        public void setLastYear(Integer lastYear) { this.lastYear = lastYear; }
+
+        public String getUnit() { return unit; }
+        public void setUnit(String unit) { this.unit = unit; }
+
+        public Map<String, int[]> getClasses() { return classes; }
+        public void setClasses(Map<String, int[]> classes) { this.classes = classes; }
     }
 
     /** Embedded Fuego statistics, matches the shape emitted by mb_pipeline/build_stats.py. */

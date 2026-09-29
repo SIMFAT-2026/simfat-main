@@ -36,14 +36,14 @@ class ComunaRiskSnapshotMapbiomasFieldsTest {
         snapshot.setMapbiomasFuelIndex(0.41);
         snapshot.setMapbiomasHistoryIndex(0.18);
         snapshot.setMapbiomasWeight(0.35);
-        snapshot.setMapbiomasDataVersion("fuego-col1@2017-partial");
+        snapshot.setMapbiomasDataVersion("lulc-col2+fuego-col1@2017-partial");
         snapshot.setMapbiomasQualityFlag("MAPBIOMAS_FUEL_UNAVAILABLE");
 
         assertThat(snapshot.getComponentMapbiomas()).isEqualTo(0.2415);
         assertThat(snapshot.getMapbiomasFuelIndex()).isEqualTo(0.41);
         assertThat(snapshot.getMapbiomasHistoryIndex()).isEqualTo(0.18);
         assertThat(snapshot.getMapbiomasWeight()).isEqualTo(0.35);
-        assertThat(snapshot.getMapbiomasDataVersion()).isEqualTo("fuego-col1@2017-partial");
+        assertThat(snapshot.getMapbiomasDataVersion()).isEqualTo("lulc-col2+fuego-col1@2017-partial");
         assertThat(snapshot.getMapbiomasQualityFlag()).isEqualTo("MAPBIOMAS_FUEL_UNAVAILABLE");
         // componentLoss is untouched by this change -- still independently settable.
         snapshot.setComponentLoss(1.5);

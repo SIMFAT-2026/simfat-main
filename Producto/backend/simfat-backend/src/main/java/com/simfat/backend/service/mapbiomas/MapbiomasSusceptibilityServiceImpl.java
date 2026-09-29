@@ -70,7 +70,7 @@ public class MapbiomasSusceptibilityServiceImpl implements MapbiomasSusceptibili
 
     // Config property, not a code literal, so a future collection refresh (a new dataVersion)
     // is a config change, not a code change (design D1 "Collection refresh" open question).
-    @Value("${mapbiomas.stats.data-version:fuego-col1@2017-partial}")
+    @Value("${mapbiomas.stats.data-version:lulc-col2+fuego-col1@2017-partial}")
     private String dataVersion;
 
     // design D3 recency multiplier: recency = 1 + R_MAX * exp(-yearsSinceLastFire / TAU).

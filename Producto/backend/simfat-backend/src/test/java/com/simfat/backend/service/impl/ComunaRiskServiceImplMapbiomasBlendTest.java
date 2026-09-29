@@ -181,7 +181,7 @@ class ComunaRiskServiceImplMapbiomasBlendTest {
         stubNoCopernicus(comuna);
         // sDyn = 0.156 (STANDARD, fwi only)
         when(mapbiomasService.forComuna(comuna.getId())).thenReturn(Optional.of(
-            new MapbiomasSusceptibility(0.9, 0.8, 0.6, "fuego-col1@2017-partial", null, 0.0)
+            new MapbiomasSusceptibility(0.9, 0.8, 0.6, "lulc-col2+fuego-col1@2017-partial", null, 0.0)
         ));
         service.setMapbiomasWeight(0.35);
 
@@ -194,7 +194,7 @@ class ComunaRiskServiceImplMapbiomasBlendTest {
         assertEquals(0.35, snapshot.getMapbiomasWeight());
         assertEquals(0.8, snapshot.getMapbiomasFuelIndex());
         assertEquals(0.6, snapshot.getMapbiomasHistoryIndex());
-        assertEquals("fuego-col1@2017-partial", snapshot.getMapbiomasDataVersion());
+        assertEquals("lulc-col2+fuego-col1@2017-partial", snapshot.getMapbiomasDataVersion());
     }
 
     @Test
@@ -224,7 +224,7 @@ class ComunaRiskServiceImplMapbiomasBlendTest {
         stubReports(comuna, 0);
         stubNoCopernicus(comuna);
         when(mapbiomasService.forComuna(comuna.getId())).thenReturn(Optional.of(
-            new MapbiomasSusceptibility(0.0, null, null, "fuego-col1@2017-partial", MapbiomasSusceptibility.MAPBIOMAS_UNAVAILABLE, null)
+            new MapbiomasSusceptibility(0.0, null, null, "lulc-col2+fuego-col1@2017-partial", MapbiomasSusceptibility.MAPBIOMAS_UNAVAILABLE, null)
         ));
         service.setMapbiomasWeight(0.35);
 
@@ -244,7 +244,7 @@ class ComunaRiskServiceImplMapbiomasBlendTest {
         stubReports(comuna, 0);
         stubNoCopernicus(comuna);
         when(mapbiomasService.forComuna(comuna.getId())).thenReturn(Optional.of(
-            new MapbiomasSusceptibility(0.9, 0.8, 0.6, "fuego-col1@2017-partial", null, 0.0)
+            new MapbiomasSusceptibility(0.9, 0.8, 0.6, "lulc-col2+fuego-col1@2017-partial", null, 0.0)
         ));
         service.setMapbiomasWeight(0.35);
 
@@ -284,7 +284,7 @@ class ComunaRiskServiceImplMapbiomasBlendTest {
         stubReports(comuna, 0);
         stubCopernicus(comuna, fixture.ndmi(), fixture.ndvi());
         when(mapbiomasService.forComuna(comuna.getId())).thenReturn(Optional.of(
-            new MapbiomasSusceptibility(0.9, 0.8, 0.6, "fuego-col1@2017-partial", null, 0.0)
+            new MapbiomasSusceptibility(0.9, 0.8, 0.6, "lulc-col2+fuego-col1@2017-partial", null, 0.0)
         ));
         service.setMapbiomasWeight(fixture.wM());
 
@@ -307,7 +307,7 @@ class ComunaRiskServiceImplMapbiomasBlendTest {
         stubReports(comuna, 0);
         stubNoCopernicus(comuna);
         when(mapbiomasService.forComuna(comuna.getId())).thenReturn(Optional.of(
-            new MapbiomasSusceptibility(0.0, 0.0, 0.0, "fuego-col1@2017-partial", null, 0.0)
+            new MapbiomasSusceptibility(0.0, 0.0, 0.0, "lulc-col2+fuego-col1@2017-partial", null, 0.0)
         ));
         service.setMapbiomasWeight(wM);
 
@@ -428,7 +428,7 @@ class ComunaRiskServiceImplMapbiomasBlendTest {
             // Non-trivial PRESENT result -- the real post-merge production state once a
             // comuna_mapbiomas_stats document exists but wM is still 0.0 (config default).
             when(mapbiomasService.forComuna(comuna.getId())).thenReturn(Optional.of(
-                new MapbiomasSusceptibility(0.9, 0.8, 0.7, "fuego-col1@2017-partial", null, 0.0)
+                new MapbiomasSusceptibility(0.9, 0.8, 0.7, "lulc-col2+fuego-col1@2017-partial", null, 0.0)
             ));
 
             ComunaRiskSnapshot snapshot = service.recomputeByComuna(comuna.getId());
@@ -447,7 +447,7 @@ class ComunaRiskServiceImplMapbiomasBlendTest {
                 () -> assertEquals(0.0, snapshot.getComponentMapbiomas(), ctx + " componentMapbiomas"),
                 () -> assertEquals(0.8, snapshot.getMapbiomasFuelIndex(), ctx + " mapbiomasFuelIndex"),
                 () -> assertEquals(0.7, snapshot.getMapbiomasHistoryIndex(), ctx + " mapbiomasHistoryIndex"),
-                () -> assertEquals("fuego-col1@2017-partial", snapshot.getMapbiomasDataVersion(), ctx + " mapbiomasDataVersion")
+                () -> assertEquals("lulc-col2+fuego-col1@2017-partial", snapshot.getMapbiomasDataVersion(), ctx + " mapbiomasDataVersion")
             );
         }
     }
