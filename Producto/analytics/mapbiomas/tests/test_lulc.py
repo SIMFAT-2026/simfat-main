@@ -178,23 +178,30 @@ def test_join_coverage_sums_multiple_rows_for_the_same_comuna_year_class():
     both belong to the same real administrative comuna (its per-class total
     is stable across years, ~56,778 ha every year for Galvarino, confirming
     the rows are complementary fragments of one polygon set, not duplicate
-    re-reads of one row). Across every multi-row group found in our 3
-    regions the smaller value never exceeds ~2.3% of the larger one,
+    re-reads of one row). Across every one of the 454 multi-row groups found
+    in our 3 regions and their full 1999-2024 timeseries (11,804 group-years
+    total), the worst single second-largest/largest ratio is 3.96%
+    (Ñuble/Ñiquén/class 33, year 2005); the median is 0.015%. This is
     consistent with a small disjoint sliver/exclave being reported as its
     own zonal-stats row by MapBiomas' own political-level export -- never
-    with a >50% magnitude split that would suggest a genuine conflicting
-    duplicate. The previous behaviour (fail loudly on any value mismatch)
-    was a defensible default BEFORE this evidence existed, but summing is
-    the only join that reproduces the real, stable per-comuna area total."""
+    a near-equal magnitude split that would suggest a genuine conflicting
+    duplicate (see test_join_coverage_rejects_a_near_equal_duplicate_row
+    below for that failure mode, and
+    ``assert_duplicate_rows_are_small_fragments`` for the ratio gate this
+    passes through). The previous behaviour (fail loudly on any value
+    mismatch) was a defensible default BEFORE this evidence existed, but
+    summing is the only join that reproduces the real, stable per-comuna
+    area total. Values below use a realistic small ratio (3%), not the
+    arbitrary near-equal split this test used before the gate existed."""
     rows = [
-        _row("Biobío", "Arauco", 59, {2020: 100.0}),
         _row("Biobío", "Arauco", 59, {2020: 250.0}),
+        _row("Biobío", "Arauco", 59, {2020: 7.5}),  # 3% of 250 -- a plausible sliver
     ]
     index = {("Biobío", "ARAUCO"): "CHL.6.1.1_1"}
 
     joined = lulc.join_coverage(rows, index, expected_comuna_ids={"CHL.6.1.1_1"})
 
-    assert joined["CHL.6.1.1_1"][2020] == {59: 350.0}
+    assert joined["CHL.6.1.1_1"][2020] == {59: 257.5}
 
 
 def test_join_coverage_sums_more_than_two_rows_for_the_same_key():
@@ -203,14 +210,49 @@ def test_join_coverage_sums_more_than_two_rows_for_the_same_key():
     rows = [
         _row("Biobío", "Arauco", 59, {2020: 10.0}),
         _row("Biobío", "Arauco", 59, {2020: 0.0}),
-        _row("Biobío", "Arauco", 59, {2020: 5.0}),
+        _row("Biobío", "Arauco", 59, {2020: 0.3}),  # 3% of 10 -- a plausible sliver
         _row("Biobío", "Arauco", 59, {2020: 0.0}),
     ]
     index = {("Biobío", "ARAUCO"): "CHL.6.1.1_1"}
 
     joined = lulc.join_coverage(rows, index, expected_comuna_ids={"CHL.6.1.1_1"})
 
-    assert joined["CHL.6.1.1_1"][2020] == {59: 15.0}
+    assert joined["CHL.6.1.1_1"][2020] == {59: 10.3}
+
+
+def test_join_coverage_rejects_a_near_equal_duplicate_row():
+    """A genuine conflicting duplicate (e.g. the same measurement re-exported
+    twice) looks nothing like a real disjoint fragment: its second-largest
+    value is near-equal to the largest, not a small minority of it. This
+    must fail loudly, naming (region, comuna, class, year), instead of
+    silently summing and doubling the comuna's area for that class."""
+    rows = [
+        _row("Biobío", "Arauco", 9, {2020: 100.0}),
+        _row("Biobío", "Arauco", 9, {2020: 100.0}),  # near-equal -> looks like a re-export
+    ]
+    index = {("Biobío", "ARAUCO"): "CHL.6.1.1_1"}
+
+    with pytest.raises(
+        lulc.DuplicateRowRatioError, match=r"Arauco.*class=9.*year=2020"
+    ):
+        lulc.join_coverage(rows, index, expected_comuna_ids={"CHL.6.1.1_1"})
+
+
+def test_join_coverage_duplicate_ratio_threshold_is_fifteen_percent():
+    index = {("Biobío", "ARAUCO"): "CHL.6.1.1_1"}
+    # 1499/10000 = 14.99% -> just INSIDE the 15% tolerance -> passes.
+    ok_rows = [
+        _row("Biobío", "Arauco", 59, {2020: 10000.0}),
+        _row("Biobío", "Arauco", 59, {2020: 1499.0}),
+    ]
+    lulc.join_coverage(ok_rows, index, expected_comuna_ids={"CHL.6.1.1_1"})
+    # 1501/10000 = 15.01% -> just OUTSIDE -> fails.
+    bad_rows = [
+        _row("Biobío", "Arauco", 59, {2020: 10000.0}),
+        _row("Biobío", "Arauco", 59, {2020: 1501.0}),
+    ]
+    with pytest.raises(lulc.DuplicateRowRatioError):
+        lulc.join_coverage(bad_rows, index, expected_comuna_ids={"CHL.6.1.1_1"})
 
 
 def test_join_coverage_fails_loudly_on_unmatched_row_name():
@@ -221,23 +263,44 @@ def test_join_coverage_fails_loudly_on_unmatched_row_name():
         lulc.join_coverage(rows, index, expected_comuna_ids={"CHL.6.1.1_1"})
 
 
-def test_join_coverage_rejects_ancestor_and_descendant_class_in_same_comuna_year():
+def test_join_coverage_rejects_a_non_leaf_class_even_alongside_its_children():
     """The BLOCKING QUESTION from S1a1, resolved empirically in S1a2: in the
     real xlsx, class 3 (Forest, the legend PARENT of 59/60/67) never appears
     for the same comuna+year as its children in our 3 regions (Biobío, Ñuble,
     La Araucanía) -- see test_real_evidence_our_regions_never_mix_class_3_with_children
     below for the captured real rows. Nationally it CAN happen (verified by
     downloading the real workbook: 19 comunas outside our 3 regions report
-    both). join_coverage must not guess how to reconcile 3 with 59/60/67; it
-    must fail loudly via legend.assert_disjoint, exactly like a bare
-    aggregation would."""
+    both).
+
+    AMENDED for leaf-only enforcement (design D1, S1b4 review): join_coverage
+    now rejects class 3 outright as soon as it sees it, via
+    ``legend.is_leaf`` -- it never even gets to comparing it against 59,
+    because a non-leaf class is invalid on its own, not just when mixed with
+    a descendant. This is a strictly stronger guard than the old
+    ancestor/descendant-only check (``legend.assert_disjoint``, which stays
+    in place as defense-in-depth for a legend where two LEAVES could
+    otherwise be ancestor/descendant -- not possible in the current tree,
+    since every ancestor has children and is therefore never a leaf, but
+    the check is cheap and guards against a future legend edit)."""
     rows = [
         _row("RegionX", "Comuna Ambigua", 3, {2020: 50.0}),
         _row("RegionX", "Comuna Ambigua", 59, {2020: 30.0}),
     ]
     index = {("RegionX", "COMUNAAMBIGUA"): "X-1"}
 
-    with pytest.raises(legend.LegendError, match="Class 3 is an ancestor of class 59"):
+    with pytest.raises(legend.LegendError, match=r"class 3 \('Forest'\) is not a LEAF"):
+        lulc.join_coverage(rows, index, expected_comuna_ids={"X-1"})
+
+
+def test_join_coverage_rejects_a_non_leaf_class_alone():
+    """RED case for leaf-only enforcement on its own (design D1): a single
+    non-leaf class with no descendant present at all must still be
+    rejected -- D1 requires LEAF classes only, not just "no ancestor next
+    to its own descendant"."""
+    rows = [_row("RegionX", "Comuna Sola", 3, {2020: 50.0})]
+    index = {("RegionX", "COMUNASOLA"): "X-1"}
+
+    with pytest.raises(legend.LegendError, match=r"class 3 \('Forest'\) is not a LEAF"):
         lulc.join_coverage(rows, index, expected_comuna_ids={"X-1"})
 
 
