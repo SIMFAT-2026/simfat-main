@@ -210,6 +210,45 @@ def test_validate_comuna_year_shares_checks_every_year_independently():
         build_stats.validate_comuna_year_shares(by_year, comuna_id="X", reference_year=2024)
 
 
+# --- validate_comuna_polygon_area_ratio: independent double-count gate (D2) ----
+#
+# validate_comuna_year_shares (above) can ONLY detect a drift that is
+# unstable ACROSS years for the SAME comuna -- it cannot catch a double
+# count that is stable across every year (e.g. one class's rows summed
+# twice in every year alike). This gate is independent: it compares the
+# LULC classified total against that SAME comuna's own GeoJSON polygon
+# area (a source that has nothing to do with the xlsx), so a double count
+# shows up as a ratio far from 1.0 regardless of year-to-year stability.
+# Tolerance (15%) and its rationale are documented on the function itself.
+
+
+def test_validate_comuna_polygon_area_ratio_passes_within_tolerance():
+    ratio = build_stats.validate_comuna_polygon_area_ratio(
+        9500.0, 10000.0, comuna_id="CHL.6.1.1_1"
+    )
+    assert ratio == pytest.approx(0.95)
+
+
+def test_validate_comuna_polygon_area_ratio_fails_loudly_and_names_comuna():
+    with pytest.raises(build_stats.AreaRatioError, match="CHL.6.1.1_1"):
+        build_stats.validate_comuna_polygon_area_ratio(
+            19500.0, 10000.0, comuna_id="CHL.6.1.1_1"  # ~1.95x -> looks like a doubled class
+        )
+
+
+def test_validate_comuna_polygon_area_ratio_tolerance_is_fifteen_percent():
+    # 8501/10000 = 0.8501 -> just INSIDE the 15% tolerance -> passes.
+    build_stats.validate_comuna_polygon_area_ratio(8501.0, 10000.0, comuna_id="X")
+    # 8499/10000 = 0.8499 -> just OUTSIDE -> fails.
+    with pytest.raises(build_stats.AreaRatioError):
+        build_stats.validate_comuna_polygon_area_ratio(8499.0, 10000.0, comuna_id="X")
+
+
+def test_validate_comuna_polygon_area_ratio_rejects_non_positive_polygon_area():
+    with pytest.raises(build_stats.AreaRatioError, match="X"):
+        build_stats.validate_comuna_polygon_area_ratio(100.0, 0.0, comuna_id="X")
+
+
 # --- land_cover_section: sharesByYear integration (design D1 rev2, S1b4) ----
 
 

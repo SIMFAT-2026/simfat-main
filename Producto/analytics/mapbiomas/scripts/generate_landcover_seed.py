@@ -38,7 +38,7 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
-from mb_pipeline import build_stats, download, lulc
+from mb_pipeline import area, build_stats, download, lulc
 
 _ROOT = Path(__file__).resolve().parents[1]
 _DATA_DIR = _ROOT / "data"
@@ -113,10 +113,30 @@ def generate(data_dir: Path | None = None) -> Path:
     lulc.write_name_mapping(_ROOT / "fixtures" / "comuna_name_mapping.json", name_mapping)
 
     # D2 hard gate: per-comuna-year classified-total drift, aborts loudly
-    # (never renormalizes) naming (comunaId, year) on failure.
+    # (never renormalizes) naming (comunaId, year) on failure. This alone
+    # cannot catch a double count stable across every year -- see the
+    # independent area gate right below.
     for comuna_id, by_year in joined.items():
         build_stats.validate_comuna_year_shares(
             by_year, comuna_id=comuna_id, reference_year=REFERENCE_YEAR
+        )
+
+    # D2 independent hard gate (S1b4 review): the LULC classified total
+    # (reference year, all classes including 27) must be close to that SAME
+    # comuna's own GeoJSON polygon area -- a source with no dependency on
+    # the xlsx, so it catches a double count that is stable across years
+    # (see validate_comuna_polygon_area_ratio's docstring for the full
+    # rationale and the real ratio distribution).
+    comuna_geometry = {
+        feature["properties"]["comunaId"]: feature["geometry"]
+        for feats in region_features.values()
+        for feature in feats
+    }
+    for comuna_id, by_year in joined.items():
+        lulc_total_ha = sum(by_year[REFERENCE_YEAR].values())
+        polygon_ha = area.polygon_area_ha(comuna_geometry[comuna_id])
+        build_stats.validate_comuna_polygon_area_ratio(
+            lulc_total_ha, polygon_ha, comuna_id=comuna_id
         )
 
     fire_only_docs = _load_fire_only_docs()
