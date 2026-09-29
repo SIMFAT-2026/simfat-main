@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Map;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Component;
 
@@ -41,6 +42,8 @@ public class FwiThresholdTable {
 
     private final Map<String, FwiThresholds> thresholdsByMethod;
 
+    // Two constructors: Spring needs @Autowired to pick this one (see ComunaFwiStateService).
+    @Autowired
     public FwiThresholdTable(ObjectMapper objectMapper) {
         this(objectMapper, DEFAULT_RESOURCE_PATH);
     }
