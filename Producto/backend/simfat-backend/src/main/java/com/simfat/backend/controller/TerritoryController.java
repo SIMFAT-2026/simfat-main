@@ -110,6 +110,14 @@ public class TerritoryController {
     @Value("${mapbiomas.stats.data-version:fuego-col1@2017-partial}")
     private String mapbiomasDataVersion;
 
+    // Judgment-day finding #2 (WARNING, fixed): design D5 requires a `citation` field on the
+    // BURNED payload; MapbiomasBurnedLayerBuilder omitted it. Config-driven (not a code literal)
+    // so it can be corrected without a redeploy. The default text below is PROVISIONAL: design D6
+    // marks this attribution as UNVERIFIED/ADAPTED pending confirmation from MapBiomas Chile's own
+    // citation template -- do not treat this string as final/legally reviewed.
+    @Value("${mapbiomas.citation:MapBiomas Chile - Coleccion 2 de Cobertura y Uso del Suelo (1999-2024) y Coleccion 1 de Fuego (2013-2025). Licencia CC BY 4.0.}")
+    private String mapbiomasCitation;
+
     public TerritoryController(
         HeatAlertEventRepository heatAlertRepository,
         CitizenReportRepository citizenReportRepository,
@@ -699,7 +707,7 @@ public class TerritoryController {
             }
             return MapbiomasBurnedLayerBuilder.build(
                 comunas, statsByComunaId, resolvedYear.year(),
-                resolvedYear.minYear(), resolvedYear.maxYear(), mapbiomasDataVersion);
+                resolvedYear.minYear(), resolvedYear.maxYear(), mapbiomasDataVersion, mapbiomasCitation);
         });
     }
 

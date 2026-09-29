@@ -32,6 +32,10 @@ import java.util.Map;
  *
  * <p>A comuna with no {@code comuna_mapbiomas_stats} document at all is treated the same as
  * {@code available=false} -- there is no signal to report, never an exception.
+ *
+ * <p><b>Citation</b> (design D5 payload contract, judgment-day finding #2): the envelope also
+ * carries {@code citation}, threaded through by the caller exactly like {@code dataVersion} --
+ * this class stays a pure formatter and does not know where the text comes from.
  */
 public final class MapbiomasBurnedLayerBuilder {
 
@@ -44,7 +48,8 @@ public final class MapbiomasBurnedLayerBuilder {
         int year,
         int minYear,
         int maxYear,
-        String dataVersion
+        String dataVersion,
+        String citation
     ) {
         String yearKey = Integer.toString(year);
         Map<String, Object> values = new LinkedHashMap<>();
@@ -61,6 +66,7 @@ public final class MapbiomasBurnedLayerBuilder {
         result.put("minYear", minYear);
         result.put("maxYear", maxYear);
         result.put("dataVersion", dataVersion);
+        result.put("citation", citation);
         result.put("values", values);
         return result;
     }

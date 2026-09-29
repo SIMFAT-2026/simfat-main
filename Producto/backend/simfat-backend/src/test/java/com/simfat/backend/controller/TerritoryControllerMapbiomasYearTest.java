@@ -139,6 +139,21 @@ class TerritoryControllerMapbiomasYearTest extends MongoFreeWebTestSupport {
 
     @Test
     @WithMockUser(authorities = "ROLE_VERIFIED_USER")
+    void getLayers_burnedIncludesConfiguredCitation() throws Exception {
+        // Judgment-day finding #2 (WARNING): design D5 requires `citation` on the BURNED payload.
+        when(comunaInfoRepository.findByRegionId("biobio")).thenReturn(List.of());
+        when(comunaMapbiomasStatsRepository.findByRegionIdAndDataVersion(eq("biobio"), any())).thenReturn(List.of());
+
+        mockMvc.perform(get("/api/territory/layers")
+                .param("regionId", "biobio")
+                .param("indicators", "BURNED")
+                .param("year", "2020"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.layers.BURNED.citation").exists());
+    }
+
+    @Test
+    @WithMockUser(authorities = "ROLE_VERIFIED_USER")
     void getPublicLayers_garbageRegionId_returnsTheSamePayloadAsTheCanonicalDefaultRegion() throws Exception {
         // Judgment-day finding #1 (CRITICAL): a raw, unauthenticated regionId must normalize to
         // the same default region ("biobio") as an explicit request for it -- never mint a new
