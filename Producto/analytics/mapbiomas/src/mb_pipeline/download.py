@@ -124,3 +124,39 @@ def write_manifest(manifest_path: Path, entry: Mapping) -> list[dict]:
     manifest_path.parent.mkdir(parents=True, exist_ok=True)
     manifest_path.write_text(json.dumps(entries, indent=2) + "\n", encoding="utf-8")
     return entries
+
+
+def write_manifest_batch(manifest_path: Path, entries: list[Mapping]) -> list[dict]:
+    """Upsert every entry in ``entries`` into the manifest, guarded.
+
+    This is the S1b5 jd-fix guard for the CRITICAL provenance-loss bug: the
+    original run downloaded 13 distinct ``annual_burned_v1`` rasters (one
+    per year) but called ``write_manifest`` for every one of them under the
+    exact SAME dataset key, so each call silently overwrote the previous
+    year's provenance and only the last (2025) survived.
+
+    Before writing anything, this function validates the WHOLE batch: if two
+    entries share a ``dataset`` key but have different ``fileName`` values,
+    it raises ``ValueError`` naming the offending key -- each physically
+    distinct source file must get its own dataset key (e.g. suffix it with
+    the year). Entries that legitimately share both the same dataset key
+    and the same fileName (e.g. a re-download that refreshes one file's
+    hash/timestamp) are not an error.
+    """
+    seen: dict[str, str] = {}
+    for entry in entries:
+        dataset = entry["dataset"]
+        file_name = entry["fileName"]
+        if dataset in seen and seen[dataset] != file_name:
+            raise ValueError(
+                f"write_manifest_batch: dataset key {dataset!r} reused for two "
+                f"different files ({seen[dataset]!r} and {file_name!r}) in the "
+                "same batch -- give each distinct file its own dataset key "
+                "(e.g. suffix it with the year)."
+            )
+        seen[dataset] = file_name
+
+    result: list[dict] = []
+    for entry in entries:
+        result = write_manifest(manifest_path, entry)
+    return result
