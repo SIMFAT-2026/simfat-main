@@ -18,10 +18,23 @@ import java.util.regex.Pattern;
  * always surfaces as a {@link BadRequestException} (same style as {@link PublicQueryWindow}),
  * never a 500.
  *
- * <p>{@code null} (the parameter genuinely absent from the request) resolves to the latest
- * available year for the indicator. An EMPTY string (the parameter present but blank, e.g.
- * {@code ?year=}) is NOT treated as omitted -- it is malformed and rejected, exactly like any
- * other value that fails the strict pattern.
+ * <p>{@code null} (the parameter genuinely absent from the request) resolves to a default year
+ * for the indicator -- see {@link #resolve(Indicator, String, int)}. An EMPTY string (the
+ * parameter present but blank, e.g. {@code ?year=}) is NOT treated as omitted -- it is malformed
+ * and rejected, exactly like any other value that fails the strict pattern.
+ *
+ * <p><b>Decision Q28</b> (engram {@code sdd/mapbiomas-integration/decisions-q28}): for BURNED,
+ * the omitted-{@code year} default is no longer the fixed {@link #BURNED_MAX_YEAR} constant --
+ * it is the LATEST year that actually has burned data in the loaded {@code dataVersion},
+ * computed by the caller ({@code TerritoryController}, via {@code MapbiomasBurnedDefaultYearResolver})
+ * over the whole dataVersion (all regions, so switching regions never shifts the default) and
+ * passed in here. This class stays pure and dependency-free: it never reads stats itself, it
+ * only validates that the caller-provided default still lies within the indicator's own range.
+ * LANDCOVER is untouched by Q28 and keeps defaulting to {@link #LANDCOVER_MAX_YEAR} (2024).
+ * <b>Tradeoff accepted</b>: a URL saved without {@code ?year=} will show a different BURNED year
+ * once more Fuego years are processed into the seed -- the frontend should always send an
+ * explicit {@code year} once one has been shown or selected (design D6: legend/tooltip always
+ * print the resolved year).
  */
 public final class MapbiomasYear {
 
@@ -49,18 +62,44 @@ public final class MapbiomasYear {
     }
 
     /**
-     * Resolves and validates a raw {@code year} query value for the given indicator.
+     * Resolves and validates a raw {@code year} query value for the given indicator, defaulting
+     * to {@link #maxYear(Indicator)} when {@code rawYear} is omitted. Equivalent to
+     * {@code resolve(indicator, rawYear, maxYear(indicator))} -- kept as the LANDCOVER-shaped
+     * convenience overload since LANDCOVER's default (Q28) stays the fixed max year.
      *
      * @param indicator the MapBiomas indicator the year is validated against
      * @param rawYear the raw request parameter; {@code null} means the parameter was omitted
      * @throws BadRequestException if {@code rawYear} is present but malformed or out of range
      */
     public static MapbiomasYear resolve(Indicator indicator, String rawYear) {
+        return resolve(indicator, rawYear, maxYear(indicator));
+    }
+
+    /**
+     * Resolves and validates a raw {@code year} query value for the given indicator, defaulting
+     * to {@code defaultYear} when {@code rawYear} is omitted (Decision Q28 -- the caller computes
+     * a data-derived default for BURNED; LANDCOVER callers keep passing {@link #maxYear(Indicator)}).
+     *
+     * @param indicator the MapBiomas indicator the year is validated against
+     * @param rawYear the raw request parameter; {@code null} means the parameter was omitted
+     * @param defaultYear the year to use when {@code rawYear} is omitted; MUST lie within
+     *     {@code [minYear(indicator), maxYear(indicator)]}
+     * @throws BadRequestException if {@code rawYear} is present but malformed or out of range
+     * @throws IllegalArgumentException if {@code defaultYear} itself lies outside the
+     *     indicator's own range -- a caller/programming defect, never a user-facing 400
+     */
+    public static MapbiomasYear resolve(Indicator indicator, String rawYear, int defaultYear) {
         int min = minYear(indicator);
         int max = maxYear(indicator);
 
+        if (defaultYear < min || defaultYear > max) {
+            throw new IllegalArgumentException(
+                "defaultYear " + defaultYear + " is outside the " + indicator
+                    + " range (" + min + "-" + max + ")");
+        }
+
         if (rawYear == null) {
-            return new MapbiomasYear(indicator, max);
+            return new MapbiomasYear(indicator, defaultYear);
         }
 
         if (!STRICT_YEAR.matcher(rawYear).matches()) {
