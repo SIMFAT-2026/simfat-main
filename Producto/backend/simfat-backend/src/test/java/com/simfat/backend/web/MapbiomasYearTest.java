@@ -88,4 +88,30 @@ class MapbiomasYearTest {
         assertThatThrownBy(() -> MapbiomasYear.resolve(Indicator.BURNED, "999999999999999999999"))
             .isInstanceOf(BadRequestException.class);
     }
+
+    // Decision Q28 (engram sdd/mapbiomas-integration/decisions-q28): BURNED's omitted-year
+    // default is data-derived by the caller (TerritoryController), not the fixed max year
+    // anymore -- MapbiomasYear stays pure and simply accepts the caller's computed default,
+    // as long as it still lies within the indicator's own range.
+    @Test
+    void omittedYearUsesTheCallerProvidedDefaultWhenGiven() {
+        MapbiomasYear burned = MapbiomasYear.resolve(Indicator.BURNED, null, 2017);
+        assertThat(burned.year()).isEqualTo(2017);
+        assertThat(burned.minYear()).isEqualTo(2013);
+        assertThat(burned.maxYear()).isEqualTo(2025);
+    }
+
+    @Test
+    void explicitYearIgnoresTheCallerProvidedDefault() {
+        MapbiomasYear burned = MapbiomasYear.resolve(Indicator.BURNED, "2020", 2017);
+        assertThat(burned.year()).isEqualTo(2020);
+    }
+
+    @Test
+    void aDataDerivedDefaultOutsideTheIndicatorRangeIsRejected() {
+        assertThatThrownBy(() -> MapbiomasYear.resolve(Indicator.BURNED, null, 2012))
+            .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> MapbiomasYear.resolve(Indicator.BURNED, null, 2026))
+            .isInstanceOf(IllegalArgumentException.class);
+    }
 }

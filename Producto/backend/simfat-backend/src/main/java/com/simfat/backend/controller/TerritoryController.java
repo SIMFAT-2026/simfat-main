@@ -27,6 +27,7 @@ import com.simfat.backend.service.NasaFirmsService;
 import com.simfat.backend.service.OpenWeatherFwiService;
 import com.simfat.backend.service.TerritoryRiskService;
 import com.simfat.backend.web.CoordinateRounding;
+import com.simfat.backend.web.MapbiomasBurnedDefaultYearResolver;
 import com.simfat.backend.web.MapbiomasBurnedLayerBuilder;
 import com.simfat.backend.web.MapbiomasLayerCache;
 import com.simfat.backend.web.MapbiomasYear;
@@ -105,9 +106,21 @@ public class TerritoryController {
     // future edit keeps normalizing correctly.
     private final MapbiomasLayerCache mapbiomasLayerCache = new MapbiomasLayerCache(64);
 
+    // Decision Q28: the BURNED omitted-year default is data-derived (latest year with actual
+    // burned data in the loaded dataVersion) rather than a fixed constant. It is immutable per
+    // dataVersion, so it is computed via MapbiomasBurnedDefaultYearResolver AT MOST ONCE per
+    // dataVersion (one findByDataVersion read, across ALL regions so switching regions never
+    // changes the default) and cached in these two fields -- not the bounded
+    // mapbiomasLayerCache, since this is a single scalar keyed by dataVersion, not a per-request
+    // payload keyed by (dataVersion, indicator, year, regionId).
+    private volatile String cachedBurnedDefaultYearDataVersion;
+    private volatile Integer cachedBurnedDefaultYear;
+
     /** Test seam: the controller is a singleton, so cached payloads outlive a single test. */
     void clearMapbiomasLayerCache() {
         mapbiomasLayerCache.clear();
+        cachedBurnedDefaultYearDataVersion = null;
+        cachedBurnedDefaultYear = null;
     }
 
     // Config property, not a code literal, mirroring MapbiomasSusceptibilityServiceImpl's
@@ -243,7 +256,15 @@ public class TerritoryController {
             // Task 2b2a.2 / design D5: `year` is validated ONLY when a MapBiomas indicator is
             // actually requested, so the other 11 indicators stay byte-identical whether `year`
             // is present, absent or malformed (spec TL-1i).
-            MapbiomasYear resolvedYear = MapbiomasYear.resolve(MapbiomasYear.Indicator.BURNED, year);
+            //
+            // Decision Q28: the omitted-year default is data-derived, not the fixed
+            // BURNED_MAX_YEAR constant -- but that default is only ever READ when `year` is
+            // actually omitted, so an explicit `year` never pays for the extra Mongo read.
+            int burnedDefaultYear = year == null
+                ? resolveBurnedDefaultYear()
+                : MapbiomasYear.maxYear(MapbiomasYear.Indicator.BURNED);
+            MapbiomasYear resolvedYear =
+                MapbiomasYear.resolve(MapbiomasYear.Indicator.BURNED, year, burnedDefaultYear);
             layers.put("BURNED", burnedLayer(regionId, resolvedYear));
         }
         boolean needsClimateLayers = requestedIndicators.contains("WIND")
@@ -700,6 +721,30 @@ public class TerritoryController {
      * S1b-shaped scope, not this unit's. Flagged for the orchestrator rather than silently
      * built against non-existent per-year land-cover data.
      */
+    /**
+     * Decision Q28 (engram {@code sdd/mapbiomas-integration/decisions-q28}): the BURNED
+     * omitted-{@code year} default is the latest year that actually has burned data in the
+     * loaded {@code dataVersion}, computed once over the WHOLE dataVersion (every region, not
+     * just the requested one) so that switching regions never changes the default year shown.
+     * Immutable per dataVersion -- cached in {@link #cachedBurnedDefaultYear} and invalidated by
+     * {@link #clearMapbiomasLayerCache()} (test seam) or a dataVersion change (no live "swap
+     * dataVersion without redeploy" path exists yet, same as {@link #mapbiomasLayerCache}).
+     *
+     * <p><b>Tradeoff accepted</b>: a URL saved without {@code ?year=} shifts to a later year once
+     * more Fuego years are processed into the seed -- mitigated by the frontend always sending an
+     * explicit {@code year} once one has been shown or selected (design D6).
+     */
+    private synchronized int resolveBurnedDefaultYear() {
+        if (cachedBurnedDefaultYear != null && mapbiomasDataVersion.equals(cachedBurnedDefaultYearDataVersion)) {
+            return cachedBurnedDefaultYear;
+        }
+        List<ComunaMapbiomasStats> allStats = mapbiomasStatsRepository.findByDataVersion(mapbiomasDataVersion);
+        int resolved = MapbiomasBurnedDefaultYearResolver.resolve(allStats);
+        cachedBurnedDefaultYearDataVersion = mapbiomasDataVersion;
+        cachedBurnedDefaultYear = resolved;
+        return resolved;
+    }
+
     private Map<String, Object> burnedLayer(String regionId, MapbiomasYear resolvedYear) {
         String normalizedRegionId = RegionGeometry.fromRegion(regionId).id();
         String cacheKey = mapbiomasDataVersion + "|BURNED|" + resolvedYear.year() + "|" + normalizedRegionId;
