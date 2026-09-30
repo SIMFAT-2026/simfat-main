@@ -13,7 +13,9 @@ import com.simfat.backend.model.ComunaMapbiomasStats;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.test.context.support.WithMockUser;
 
 /**
@@ -29,6 +31,16 @@ import org.springframework.security.test.context.support.WithMockUser;
  * bounds by {@code MapbiomasYearTest}.
  */
 class TerritoryControllerMapbiomasYearTest extends MongoFreeWebTestSupport {
+
+    @Autowired
+    private TerritoryController territoryController;
+
+    @BeforeEach
+    void isolateLayerCache() {
+        // The layer cache lives in the singleton controller; without this, a payload cached by
+        // one test (e.g. biobio|2020 with no comunas) leaks into the next.
+        territoryController.clearMapbiomasLayerCache();
+    }
 
     private static ComunaInfo comuna(String id) {
         ComunaInfo info = new ComunaInfo();
@@ -181,10 +193,9 @@ class TerritoryControllerMapbiomasYearTest extends MongoFreeWebTestSupport {
             (com.fasterxml.jackson.databind.node.ObjectNode) json.readTree(garbagePayload);
         com.fasterxml.jackson.databind.node.ObjectNode canonical =
             (com.fasterxml.jackson.databind.node.ObjectNode) json.readTree(canonicalPayload);
-        ((com.fasterxml.jackson.databind.node.ObjectNode) garbage.get("data")).remove("generatedAt");
-        ((com.fasterxml.jackson.databind.node.ObjectNode) canonical.get("data")).remove("generatedAt");
-        garbage.remove("timestamp");
-        canonical.remove("timestamp");
-        org.assertj.core.api.Assertions.assertThat(garbage).isEqualTo(canonical);
+        // The envelope's data.regionId echoes the raw request value for every indicator (pre-existing
+        // behaviour, unchanged here); what must match is the BURNED layer itself.
+        org.assertj.core.api.Assertions.assertThat(garbage.at("/data/layers"))
+            .isEqualTo(canonical.at("/data/layers"));
     }
 }

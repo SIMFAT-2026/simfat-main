@@ -105,6 +105,11 @@ public class TerritoryController {
     // future edit keeps normalizing correctly.
     private final MapbiomasLayerCache mapbiomasLayerCache = new MapbiomasLayerCache(64);
 
+    /** Test seam: the controller is a singleton, so cached payloads outlive a single test. */
+    void clearMapbiomasLayerCache() {
+        mapbiomasLayerCache.clear();
+    }
+
     // Config property, not a code literal, mirroring MapbiomasSusceptibilityServiceImpl's
     // dataVersion field so both read the same pinned version (design D1 "Collection refresh").
     @Value("${mapbiomas.stats.data-version:fuego-col1@2017-partial}")
