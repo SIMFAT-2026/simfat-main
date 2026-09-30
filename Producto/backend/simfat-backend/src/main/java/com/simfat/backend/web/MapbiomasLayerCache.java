@@ -49,4 +49,9 @@ public final class MapbiomasLayerCache {
     public synchronized int size() {
         return entries.size();
     }
+
+    /** Drops every cached payload (e.g. after a seed reload, or between isolated tests). */
+    public synchronized void clear() {
+        entries.clear();
+    }
 }
