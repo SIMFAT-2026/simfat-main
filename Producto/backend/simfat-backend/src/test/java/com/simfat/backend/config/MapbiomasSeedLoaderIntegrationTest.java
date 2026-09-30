@@ -123,14 +123,24 @@ class MapbiomasSeedLoaderIntegrationTest {
     }
 
     @Test
-    void loadSeed_landCoverNullRecord_roundTripsCorrectlyAsFireOnlyPartial() {
+    void loadSeed_realSeedRecord_roundTripsLandCoverAndFire() {
         loader.loadSeed();
 
         ComunaMapbiomasStats doc = statsRepository
             .findByComunaIdAndDataVersion(seedComunaIds.get(0), "lulc-col2+fuego-col1@2017-partial")
             .orElseThrow();
 
-        assertThat(doc.getLandCover()).isNull();
+        // S1b4: the seed now carries real MapBiomas LULC Col 2 land cover for every comuna.
+        assertThat(doc.getLandCover()).isNotNull();
+        assertThat(doc.getLandCover().getReferenceYear()).isEqualTo(2024);
+        assertThat(doc.getLandCover().getSharesByClass().values().stream()
+            .mapToDouble(Double::doubleValue).sum()).isCloseTo(1.0, org.assertj.core.data.Offset.offset(1e-6));
+        ComunaMapbiomasStats.SharesByYear byYear = doc.getLandCover().getSharesByYear();
+        assertThat(byYear).isNotNull();
+        assertThat(byYear.getFirstYear()).isEqualTo(1999);
+        assertThat(byYear.getLastYear()).isEqualTo(2024);
+        assertThat(byYear.getClasses()).isNotEmpty()
+            .allSatisfy((code, bp) -> assertThat(bp).hasSize(26));
         assertThat(doc.isPartial()).isTrue();
         assertThat(doc.getFire()).isNotNull();
         assertThat(doc.getFire().getAvailable()).isTrue();
