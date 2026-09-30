@@ -37,8 +37,9 @@ class TerritoryControllerMapbiomasYearTest extends MongoFreeWebTestSupport {
 
     @BeforeEach
     void isolateLayerCache() {
-        // The layer cache lives in the singleton controller; without this, a payload cached by
-        // one test (e.g. biobio|2020 with no comunas) leaks into the next.
+        // The layer cache -- and, since Q28, the cached data-derived BURNED default year --
+        // lives in the singleton controller; without this, a payload (or default year) cached
+        // by one test (e.g. biobio|2020 with no comunas) leaks into the next.
         territoryController.clearMapbiomasLayerCache();
     }
 
@@ -80,6 +81,32 @@ class TerritoryControllerMapbiomasYearTest extends MongoFreeWebTestSupport {
             .andExpect(jsonPath("$.data.layers.BURNED.minYear", is(2013)))
             .andExpect(jsonPath("$.data.layers.BURNED.maxYear", is(2025)))
             .andExpect(jsonPath("$.data.layers.BURNED.values.c1.available", is(true)))
+            .andExpect(jsonPath("$.data.layers.BURNED.values.c1.burnedFraction", is(0.05)));
+    }
+
+    @Test
+    @WithMockUser(authorities = "ROLE_VERIFIED_USER")
+    void getLayers_burnedOmittedYear_defaultsToTheLatestYearWithData() throws Exception {
+        // Decision Q28: with year omitted, the default is data-derived -- the latest year that
+        // actually has burned data in the loaded dataVersion (here 2017), never the fixed
+        // BURNED_MAX_YEAR constant (2025), which would render an empty map against the real,
+        // still-partial seed.
+        when(comunaInfoRepository.findByRegionId("biobio")).thenReturn(List.of(comuna("c1")));
+        Map<String, Double> byYear = new LinkedHashMap<>();
+        byYear.put("2015", 0.01);
+        byYear.put("2017", 0.05);
+        when(comunaMapbiomasStatsRepository.findByRegionIdAndDataVersion(eq("biobio"), any()))
+            .thenReturn(List.of(statsWithFire("c1", byYear)));
+        when(comunaMapbiomasStatsRepository.findByDataVersion(any()))
+            .thenReturn(List.of(statsWithFire("c1", byYear)));
+
+        mockMvc.perform(get("/api/territory/layers")
+                .param("regionId", "biobio")
+                .param("indicators", "BURNED"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.layers.BURNED.year", is(2017)))
+            .andExpect(jsonPath("$.data.layers.BURNED.minYear", is(2013)))
+            .andExpect(jsonPath("$.data.layers.BURNED.maxYear", is(2025)))
             .andExpect(jsonPath("$.data.layers.BURNED.values.c1.burnedFraction", is(0.05)));
     }
 
