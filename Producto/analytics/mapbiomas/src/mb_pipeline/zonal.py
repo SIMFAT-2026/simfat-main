@@ -108,6 +108,79 @@ def _validate_raster(src, band: int) -> None:
         raise ValueError(f"Raster CRS must be EPSG:4326, got {src.crs}")
 
 
+def union_zonal_stats(
+    raster_paths, geometry: dict, *, band: int = 1, union_value: int = 1
+) -> ZonalResult:
+    """Pixel-level union ('value == union_value in ANY of ``raster_paths``')
+    zonal stats across multiple rasters that share an IDENTICAL grid (same
+    transform) -- e.g. the 13 MapBiomas Fuego Collection 1 ``annual_burned_v1``
+    rasters for 2013..2025 (verified same origin/size/pixel-size for 2013,
+    2017 and 2025, S1b5).
+
+    A pixel that is ``union_value`` in MORE THAN ONE raster counts ONCE, never
+    summed -- this is what makes it a real pixel-level union rather than
+    ``sum(zonal_stats(year).value_area_ha[union_value] for year in years)``,
+    which double-counts any pixel that burned more than once (design D1/MCS-10:
+    ``max(annual) <= union <= sum(annual)``).
+
+    Raises ``ValueError`` if the rasters do not share an identical transform:
+    OR-ing misaligned pixel grids would silently produce a meaningless result.
+    """
+    geometry = _as_polygonal(geometry)
+    reference_transform = None
+    mask = None
+    pixel_ha = None
+    ever = None
+
+    for path in raster_paths:
+        with rasterio.open(path) as src:
+            _validate_raster(src, band)
+            if reference_transform is None:
+                reference_transform = src.transform
+            elif tuple(src.transform)[:6] != tuple(reference_transform)[:6]:
+                raise ValueError(
+                    f"raster grid mismatch: {path} has a different transform than "
+                    "the first raster -- union_zonal_stats requires an identical grid"
+                )
+            window = _window_for(src, geometry)
+            if window is None or window.width < 1 or window.height < 1:
+                return ZonalResult()
+            data = src.read(band, window=window, masked=False)
+            transform = src.window_transform(window)
+
+        if mask is None:
+            mask = geometry_mask(
+                [geometry], out_shape=data.shape, transform=transform, all_touched=False, invert=True
+            )
+            if not mask.any():
+                return ZonalResult()
+            areas_ha = (
+                row_pixel_areas_m2(transform.f, transform.a, -transform.e, data.shape[0]) / M2_PER_HA
+            )
+            pixel_ha = np.broadcast_to(areas_ha[:, None], data.shape)[mask]
+            ever = np.zeros(pixel_ha.shape, dtype=bool)
+        elif data.shape != mask.shape:
+            raise ValueError(
+                f"raster grid mismatch: {path} has a different shape than the first raster"
+            )
+
+        ever |= data[mask] == union_value
+
+    if ever is None:
+        return ZonalResult()
+
+    total_pixels = int(mask.sum())
+    total_ha = float(pixel_ha.sum())
+    burned_pixels = int(ever.sum())
+    burned_ha = float(pixel_ha[ever].sum())
+    return ZonalResult(
+        pixel_count=total_pixels,
+        area_ha=total_ha,
+        value_pixels={0: total_pixels - burned_pixels, union_value: burned_pixels},
+        value_area_ha={0: total_ha - burned_ha, union_value: burned_ha},
+    )
+
+
 def zonal_stats(raster_path, geometry: dict, band: int = 1) -> ZonalResult:
     """Pixel counts and corrected area per raster value inside ``geometry``."""
     geometry = _as_polygonal(geometry)
