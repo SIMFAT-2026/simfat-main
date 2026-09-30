@@ -23,12 +23,13 @@ import java.util.Map;
  *   <li>{@code fire.available=false} (no Fuego coverage for the comuna at all): every year reads
  *       {@code available=false}.</li>
  *   <li>{@code fire.available=true} but the requested year has no entry in
- *       {@code burnedFractionByYear}/{@code burnedHaByYear} -- the honest state of the REAL
- *       current seed ({@code lulc-col2+fuego-col1@2017-partial}, whose fire section still only
- *       populates a 2017 entry -- see S1b4 apply-progress): the
- *       comuna reads {@code available=true} (coverage exists) with {@code burnedFraction=null}
- *       and {@code burnedHa=null} for that specific year (not computed yet), distinct from a
- *       real, computed {@code 0.0}.</li>
+ *       {@code burnedFractionByYear}/{@code burnedHaByYear} -- since S1b5 the current seed
+ *       ({@code lulc-col2+fuego-col1@2013-2025}) populates every year 2013-2025 for every
+ *       {@code available=true} comuna, so this branch is now only reachable for a year OUTSIDE
+ *       that range (already rejected at the controller by {@code MapbiomasYear}) or a future
+ *       collection refresh that narrows coverage again: the comuna reads {@code available=true}
+ *       (coverage exists) with {@code burnedFraction=null} and {@code burnedHa=null} for that
+ *       specific year, distinct from a real, computed {@code 0.0}.</li>
  * </ul>
  *
  * <p>A comuna with no {@code comuna_mapbiomas_stats} document at all is treated the same as

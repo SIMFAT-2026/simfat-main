@@ -28,17 +28,17 @@ import org.springframework.core.io.ClassPathResource;
  * (same pattern as {@code BackfillComunaIdRunnerIntegrationTest#backfill()}) instead of
  * through a full application context, so this stays a focused slice test.
  *
- * <p>Fixture strategy: the real shipped seed resource (86 fire-only 2017 documents) is
- * read directly in {@link #setUp} to discover the exact comunaIds it contains, and a
- * minimal {@link ComunaInfo} is created for each one — mirroring production, where
- * {@code MonitoredComunasConfig} has already seeded every real comuna by the time this
- * loader's event fires.
+ * <p>Fixture strategy: the real shipped seed resource (86 documents, land cover 1999-2024 +
+ * full Fuego fire history 2013-2025 since S1b5) is read directly in {@link #setUp} to
+ * discover the exact comunaIds it contains, and a minimal {@link ComunaInfo} is created for
+ * each one — mirroring production, where {@code MonitoredComunasConfig} has already seeded
+ * every real comuna by the time this loader's event fires.
  */
 @DataMongoTest
 class MapbiomasSeedLoaderIntegrationTest {
 
     private static final String SEED_RESOURCE_PATH =
-        "seed/mapbiomas/comuna-mapbiomas-stats.lulc-col2+fuego-col1-2017-partial.jsonl";
+        "seed/mapbiomas/comuna-mapbiomas-stats.lulc-col2+fuego-col1-2013-2025.jsonl";
     private static final int EXPECTED_DOCUMENT_COUNT = 86;
 
     @Autowired
@@ -70,7 +70,7 @@ class MapbiomasSeedLoaderIntegrationTest {
 
         loader = new MapbiomasSeedLoader(statsRepository, comunaInfoRepository, objectMapper);
         loader.setSeedEnabled(true);
-        loader.setDataVersion("lulc-col2+fuego-col1@2017-partial");
+        loader.setDataVersion("lulc-col2+fuego-col1@2013-2025");
     }
 
     private List<String> readSeedComunaIds() throws Exception {
@@ -96,7 +96,7 @@ class MapbiomasSeedLoaderIntegrationTest {
         List<ComunaMapbiomasStats> all = statsRepository.findAll();
         assertThat(all).hasSize(EXPECTED_DOCUMENT_COUNT);
         assertThat(all).allSatisfy(doc ->
-            assertThat(doc.getId()).isEqualTo(doc.getComunaId() + "|lulc-col2+fuego-col1@2017-partial"));
+            assertThat(doc.getId()).isEqualTo(doc.getComunaId() + "|lulc-col2+fuego-col1@2013-2025"));
     }
 
     @Test
@@ -127,10 +127,10 @@ class MapbiomasSeedLoaderIntegrationTest {
         loader.loadSeed();
 
         ComunaMapbiomasStats doc = statsRepository
-            .findByComunaIdAndDataVersion(seedComunaIds.get(0), "lulc-col2+fuego-col1@2017-partial")
+            .findByComunaIdAndDataVersion(seedComunaIds.get(0), "lulc-col2+fuego-col1@2013-2025")
             .orElseThrow();
 
-        // S1b4: the seed now carries real MapBiomas LULC Col 2 land cover for every comuna.
+        // S1b4: the seed carries real MapBiomas LULC Col 2 land cover for every comuna.
         assertThat(doc.getLandCover()).isNotNull();
         assertThat(doc.getLandCover().getReferenceYear()).isEqualTo(2024);
         assertThat(doc.getLandCover().getSharesByClass().values().stream()
@@ -141,13 +141,18 @@ class MapbiomasSeedLoaderIntegrationTest {
         assertThat(byYear.getLastYear()).isEqualTo(2024);
         assertThat(byYear.getClasses()).isNotEmpty()
             .allSatisfy((code, bp) -> assertThat(bp).hasSize(26));
-        assertThat(doc.isPartial()).isTrue();
+        assertThat(doc.isPartial()).isFalse();
         assertThat(doc.getFire()).isNotNull();
         assertThat(doc.getFire().getAvailable()).isTrue();
         // S1b3: design D1/D3's burnedFractionPct, regenerated into the real committed seed
         // (mb_pipeline/build_stats.py::add_burned_fraction_pct); every comuna with
         // available=true must round-trip a non-null rank, never silently drop to null.
         assertThat(doc.getFire().getBurnedFractionPct()).isNotNull();
+        // S1b5: the cumulative (2013-2025 union) burnedFraction and the log1p+p95-clip
+        // burnedFractionLog variant must both round-trip for every available=true comuna.
+        assertThat(doc.getFire().getBurnedFraction()).isNotNull();
+        assertThat(doc.getFire().getBurnedFractionLog()).isNotNull();
+        assertThat(doc.getFire().getBurnedHaByYear()).containsKeys("2013", "2025");
     }
 
     @Test
