@@ -180,23 +180,38 @@ suite):
     lulc.write_name_mapping(Path('fixtures/comuna_name_mapping.json'), mapping)
     "
 
-To reproduce the real Fuego Collection 1 numbers (manual step; the GCS
-object listing API is `https://storage.googleapis.com/storage/v1/b/mapbiomas-public/o?prefix=initiatives/chile/fire/collection1/<dataset>/`,
-list it to get each year's `mediaLink`, then download with `download.py`
-into a directory outside the repo, e.g. `%TEMP%\mb_fire_col1`, matching the
-file names `test_build_stats_real.py` expects; S1b5 downloads all 13
-`annual_burned_v1` years 2013-2025, `frequency_burned_v1` 2013-2025,
-`year_last_fire_v1` 2025, and `accumulated_burned_v1` 2013-2025 for the
-cross-check -- direct object download at
-`https://storage.googleapis.com/mapbiomas-public/<object-path>` works for
-this public bucket). With `MB_FIRE_RASTER_DIR` set (or the files placed at
-`%TEMP%\mb_fire_col1`), run `pytest tests/test_build_stats_real.py` to
-exercise the real path, and run `scripts/generate_fire_report_2017.py` to
-(re)generate `data/coverage_report.csv` and
-`data/fire_stats_<as-of-year>_partial.jsonl` (`2025` with the full raster
-set) for real, for all 86 target comunas -- this is the actual, committed
-script that produced the files in this repo (generic over whatever fire
-years are present in the raster directory, not hardcoded to any one year):
+To reproduce the real Fuego Collection 1 numbers, run the committed,
+idempotent `scripts/download_fuego_col1.py` (S1b5 jd-fix: this REPLACES the
+old ad hoc manual-download process, whose single unsuffixed manifest key
+for all 13 annual years silently lost the provenance of 12 of them -- see
+`download.write_manifest_batch`'s docstring for the guard that now hard-aborts
+if that recurs). It downloads all 16 real files -- `annual_burned_v1` for
+every year 2013-2025, `frequency_burned_v1` 2013-2025, `year_last_fire_v1`
+2025, and `accumulated_burned_v1` 2013-2025 (cross-check only) -- via direct
+object download at `https://storage.googleapis.com/mapbiomas-public/<object-path>`
+(this public bucket needs no auth), into a directory outside the repo
+(default `%TEMP%\mb_fire_col1`, override with `MB_FIRE_RASTER_DIR`, matching
+the file names `test_build_stats_real.py` expects), and records honest,
+per-file provenance (url/sha256/bytes/downloadedAt) in `data/manifest.json`:
+
+    cd Producto/analytics/mapbiomas
+    MB_FIRE_RASTER_DIR=/path/to/mb_fire_col1 PYTHONPATH=src python scripts/download_fuego_col1.py
+
+(or omit `MB_FIRE_RASTER_DIR` to use the default `%TEMP%\mb_fire_col1`). It
+is idempotent and safe to re-run: every file is re-downloaded and its sha256
+compared against whatever was already cached at that path; if a re-download
+fails but a previously-verified cached copy exists, that copy's sha256/bytes
+are kept (never invented) and the manifest entry gets an explicit `note`
+saying so, with `downloadedAt` set to the cache file's own mtime.
+
+With `MB_FIRE_RASTER_DIR` set (or the files placed at `%TEMP%\mb_fire_col1`),
+run `pytest tests/test_build_stats_real.py` to exercise the real path, and
+run `scripts/generate_fire_report_2017.py` to (re)generate
+`data/coverage_report.csv` and `data/fire_stats_<as-of-year>_partial.jsonl`
+(`2025` with the full raster set) for real, for all 86 target comunas --
+this is the actual, committed script that produced the files in this repo
+(generic over whatever fire years are present in the raster directory, not
+hardcoded to any one year):
 
     cd Producto/analytics/mapbiomas
     MB_FIRE_RASTER_DIR=/path/to/mb_fire_col1 PYTHONPATH=src python scripts/generate_fire_report_2017.py
