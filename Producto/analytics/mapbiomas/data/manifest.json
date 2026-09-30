@@ -1,5 +1,37 @@
 [
   {
+    "dataset": "mapbiomas_fire_chile_col1_accumulated_burned_v1_2013_2025",
+    "url": "https://storage.googleapis.com/mapbiomas-public/initiatives/chile/fire/collection1/accumulated_burned_v1/mapbiomas_fire_chile_col1_accumulated_burned_2013_2025.tif",
+    "fileName": "mapbiomas_fire_chile_col1_accumulated_burned_2013_2025.tif",
+    "sha256": "1b0d5aa3240639b211d99a42b160efa73cb07615771f079c8aa341e2dca5d8ce",
+    "bytes": 3268507,
+    "downloadedAt": "2026-09-30T22:00:41+00:00"
+  },
+  {
+    "dataset": "mapbiomas_fire_chile_col1_annual_burned_v1",
+    "url": "https://storage.googleapis.com/mapbiomas-public/initiatives/chile/fire/collection1/annual_burned_v1/mapbiomas_fire_chile_col1_annual_burned_2025.tif",
+    "fileName": "mapbiomas_fire_chile_col1_annual_burned_2025.tif",
+    "sha256": "ce66ae13bd6d990007a0a6bf35ccaa74b780926ee9a080824fb7485a11e89a65",
+    "bytes": 7785965,
+    "downloadedAt": "2026-09-30T22:00:34+00:00"
+  },
+  {
+    "dataset": "mapbiomas_fire_chile_col1_frequency_burned_v1_2013_2025",
+    "url": "https://storage.googleapis.com/mapbiomas-public/initiatives/chile/fire/collection1/frequency_burned_v1/mapbiomas_fire_chile_col1_frequency_burned_2013_2025.tif",
+    "fileName": "mapbiomas_fire_chile_col1_frequency_burned_2013_2025.tif",
+    "sha256": "fbd46d45b04d80dd631ee45f2b0bf707d1bac61fb2b16b3eec924c97f8758bfe",
+    "bytes": 3452205,
+    "downloadedAt": "2026-09-30T22:00:37+00:00"
+  },
+  {
+    "dataset": "mapbiomas_fire_chile_col1_year_last_fire_v1_2025",
+    "url": "https://storage.googleapis.com/mapbiomas-public/initiatives/chile/fire/collection1/year_last_fire_v1/mapbiomas_fire_chile_col1_year_last_fire_2025.tif",
+    "fileName": "mapbiomas_fire_chile_col1_year_last_fire_2025.tif",
+    "sha256": "5ac15486ebd035bc42c07ef9d16ced64e8ee2f09dc1bfafe3a537393f4eaf6d1",
+    "bytes": 13939590,
+    "downloadedAt": "2026-09-30T22:00:39+00:00"
+  },
+  {
     "dataset": "mapbiomas_lulc_col2_coverage",
     "url": "https://chile.mapbiomas.org/wp-content/uploads/sites/7/2026/08/statistics_lulc_chile_col2_political_level_234.xlsx",
     "fileName": "statistics_lulc_chile_col2_political_level_234.xlsx",
