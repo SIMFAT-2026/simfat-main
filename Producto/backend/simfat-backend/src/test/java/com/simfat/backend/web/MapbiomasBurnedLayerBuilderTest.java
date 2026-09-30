@@ -49,9 +49,9 @@ class MapbiomasBurnedLayerBuilderTest {
         ComunaMapbiomasStats stats = statsWithFire("c1", true, fractionByYear, haByYear);
 
         Map<String, Object> map2019 = MapbiomasBurnedLayerBuilder.build(
-            List.of(comuna("c1")), Map.of("c1", stats), 2019, 2013, 2025, "test-version");
+            List.of(comuna("c1")), Map.of("c1", stats), 2019, 2013, 2025, "test-version", "test-citation");
         Map<String, Object> map2018 = MapbiomasBurnedLayerBuilder.build(
-            List.of(comuna("c1")), Map.of("c1", stats), 2018, 2013, 2025, "test-version");
+            List.of(comuna("c1")), Map.of("c1", stats), 2018, 2013, 2025, "test-version", "test-citation");
 
         Map<String, Object> entry2019 = entryFor(map2019, "c1");
         Map<String, Object> entry2018 = entryFor(map2018, "c1");
@@ -67,9 +67,9 @@ class MapbiomasBurnedLayerBuilderTest {
         ComunaMapbiomasStats stats = statsWithFire("c2", false, null, null);
 
         Map<String, Object> map2013 = MapbiomasBurnedLayerBuilder.build(
-            List.of(comuna("c2")), Map.of("c2", stats), 2013, 2013, 2025, "test-version");
+            List.of(comuna("c2")), Map.of("c2", stats), 2013, 2013, 2025, "test-version", "test-citation");
         Map<String, Object> map2025 = MapbiomasBurnedLayerBuilder.build(
-            List.of(comuna("c2")), Map.of("c2", stats), 2025, 2013, 2025, "test-version");
+            List.of(comuna("c2")), Map.of("c2", stats), 2025, 2013, 2025, "test-version", "test-citation");
 
         for (Map<String, Object> map : List.of(map2013, map2025)) {
             Map<String, Object> entry = entryFor(map, "c2");
@@ -82,7 +82,7 @@ class MapbiomasBurnedLayerBuilderTest {
     @Test
     void noStatsDocumentAtAll_isTreatedAsNoData_neverThrows() {
         Map<String, Object> map = MapbiomasBurnedLayerBuilder.build(
-            List.of(comuna("unknown")), Map.of(), 2020, 2013, 2025, "test-version");
+            List.of(comuna("unknown")), Map.of(), 2020, 2013, 2025, "test-version", "test-citation");
 
         Map<String, Object> entry = entryFor(map, "unknown");
         assertThat((Boolean) entry.get("available")).isFalse();
@@ -97,7 +97,7 @@ class MapbiomasBurnedLayerBuilderTest {
         ComunaMapbiomasStats stats = statsWithFire("c3", true, onlyTwentySeventeen, onlyTwentySeventeen);
 
         Map<String, Object> map2025 = MapbiomasBurnedLayerBuilder.build(
-            List.of(comuna("c3")), Map.of("c3", stats), 2025, 2013, 2025, "test-version");
+            List.of(comuna("c3")), Map.of("c3", stats), 2025, 2013, 2025, "test-version", "test-citation");
 
         Map<String, Object> entry = entryFor(map2025, "c3");
         assertThat((Boolean) entry.get("available")).isTrue();
@@ -108,7 +108,7 @@ class MapbiomasBurnedLayerBuilderTest {
     @Test
     void envelopeCarriesIndicatorUnitYearAndBounds() {
         Map<String, Object> map = MapbiomasBurnedLayerBuilder.build(
-            List.of(), Map.of(), 2019, 2013, 2025, "test-version");
+            List.of(), Map.of(), 2019, 2013, 2025, "test-version", "test-citation");
 
         assertThat(map.get("indicator")).isEqualTo("BURNED");
         assertThat(map.get("unit")).isEqualTo("%");
@@ -116,6 +116,18 @@ class MapbiomasBurnedLayerBuilderTest {
         assertThat(map.get("minYear")).isEqualTo(2013);
         assertThat(map.get("maxYear")).isEqualTo(2025);
         assertThat(map.get("dataVersion")).isEqualTo("test-version");
+    }
+
+    @Test
+    void envelopeCarriesTheConfiguredCitation() {
+        // Judgment-day finding #2 (WARNING, fixed): design D5 requires a `citation` field on the
+        // BURNED payload; it was missing entirely. Threaded through exactly like dataVersion.
+        Map<String, Object> map = MapbiomasBurnedLayerBuilder.build(
+            List.of(), Map.of(), 2019, 2013, 2025, "test-version",
+            "MapBiomas Chile - Coleccion 2 de Cobertura y Uso del Suelo (1999-2024) y Coleccion 1 de Fuego (2013-2025). Licencia CC BY 4.0.");
+
+        assertThat(map.get("citation")).isEqualTo(
+            "MapBiomas Chile - Coleccion 2 de Cobertura y Uso del Suelo (1999-2024) y Coleccion 1 de Fuego (2013-2025). Licencia CC BY 4.0.");
     }
 
     @SuppressWarnings("unchecked")

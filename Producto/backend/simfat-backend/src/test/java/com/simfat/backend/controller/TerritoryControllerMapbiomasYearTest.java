@@ -2,6 +2,7 @@ package com.simfat.backend.controller;
 
 import static org.hamcrest.Matchers.is;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -55,7 +56,7 @@ class TerritoryControllerMapbiomasYearTest extends MongoFreeWebTestSupport {
         Map<String, Double> byYear = new LinkedHashMap<>();
         byYear.put("2017", 0.05);
         byYear.put("2019", 0.0);
-        when(comunaMapbiomasStatsRepository.findByDataVersion(any()))
+        when(comunaMapbiomasStatsRepository.findByRegionIdAndDataVersion(eq("biobio"), any()))
             .thenReturn(List.of(statsWithFire("c1", byYear)));
 
         mockMvc.perform(get("/api/territory/layers")
@@ -126,7 +127,7 @@ class TerritoryControllerMapbiomasYearTest extends MongoFreeWebTestSupport {
     @WithMockUser(authorities = "ROLE_VERIFIED_USER")
     void getPublicLayers_burnedIndicator_sameShapeAsAuthenticated() throws Exception {
         when(comunaInfoRepository.findByRegionId("biobio")).thenReturn(List.of(comuna("c1")));
-        when(comunaMapbiomasStatsRepository.findByDataVersion(any())).thenReturn(List.of());
+        when(comunaMapbiomasStatsRepository.findByRegionIdAndDataVersion(eq("biobio"), any())).thenReturn(List.of());
 
         mockMvc.perform(get("/api/territory/public/layers")
                 .param("regionId", "biobio")
@@ -134,5 +135,56 @@ class TerritoryControllerMapbiomasYearTest extends MongoFreeWebTestSupport {
                 .param("year", "2020"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.layers.BURNED.values.c1.available", is(false)));
+    }
+
+    @Test
+    @WithMockUser(authorities = "ROLE_VERIFIED_USER")
+    void getLayers_burnedIncludesConfiguredCitation() throws Exception {
+        // Judgment-day finding #2 (WARNING): design D5 requires `citation` on the BURNED payload.
+        when(comunaInfoRepository.findByRegionId("biobio")).thenReturn(List.of());
+        when(comunaMapbiomasStatsRepository.findByRegionIdAndDataVersion(eq("biobio"), any())).thenReturn(List.of());
+
+        mockMvc.perform(get("/api/territory/layers")
+                .param("regionId", "biobio")
+                .param("indicators", "BURNED")
+                .param("year", "2020"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.layers.BURNED.citation").exists());
+    }
+
+    @Test
+    @WithMockUser(authorities = "ROLE_VERIFIED_USER")
+    void getPublicLayers_garbageRegionId_returnsTheSamePayloadAsTheCanonicalDefaultRegion() throws Exception {
+        // Judgment-day finding #1 (CRITICAL): a raw, unauthenticated regionId must normalize to
+        // the same default region ("biobio") as an explicit request for it -- never mint a new
+        // cache key/Mongo scan per garbage value.
+        when(comunaInfoRepository.findByRegionId("biobio")).thenReturn(List.of(comuna("c1")));
+        when(comunaMapbiomasStatsRepository.findByRegionIdAndDataVersion(eq("biobio"), any()))
+            .thenReturn(List.of());
+
+        String garbagePayload = mockMvc.perform(get("/api/territory/public/layers")
+                .param("regionId", "totally-unknown-garbage-region")
+                .param("indicators", "BURNED")
+                .param("year", "2020"))
+            .andExpect(status().isOk())
+            .andReturn().getResponse().getContentAsString();
+
+        String canonicalPayload = mockMvc.perform(get("/api/territory/public/layers")
+                .param("regionId", "biobio")
+                .param("indicators", "BURNED")
+                .param("year", "2020"))
+            .andExpect(status().isOk())
+            .andReturn().getResponse().getContentAsString();
+
+        com.fasterxml.jackson.databind.ObjectMapper json = new com.fasterxml.jackson.databind.ObjectMapper();
+        com.fasterxml.jackson.databind.node.ObjectNode garbage =
+            (com.fasterxml.jackson.databind.node.ObjectNode) json.readTree(garbagePayload);
+        com.fasterxml.jackson.databind.node.ObjectNode canonical =
+            (com.fasterxml.jackson.databind.node.ObjectNode) json.readTree(canonicalPayload);
+        ((com.fasterxml.jackson.databind.node.ObjectNode) garbage.get("data")).remove("generatedAt");
+        ((com.fasterxml.jackson.databind.node.ObjectNode) canonical.get("data")).remove("generatedAt");
+        garbage.remove("timestamp");
+        canonical.remove("timestamp");
+        org.assertj.core.api.Assertions.assertThat(garbage).isEqualTo(canonical);
     }
 }

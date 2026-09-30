@@ -28,6 +28,7 @@ import com.simfat.backend.service.OpenWeatherFwiService;
 import com.simfat.backend.service.TerritoryRiskService;
 import com.simfat.backend.web.CoordinateRounding;
 import com.simfat.backend.web.MapbiomasBurnedLayerBuilder;
+import com.simfat.backend.web.MapbiomasLayerCache;
 import com.simfat.backend.web.MapbiomasYear;
 import com.simfat.backend.web.PublicQueryWindow;
 import org.springframework.data.domain.PageRequest;
@@ -91,14 +92,31 @@ public class TerritoryController {
     // Task 2b2a.2 (design D5 caching note): lazily built, keyed (dataVersion, indicator, year,
     // regionId), invalidated implicitly on restart because mapbiomasDataVersion is a @Value
     // property -- there is no live "swap dataVersion without redeploy" path yet, so an explicit
-    // eviction listener would be premature (documented rather than silently added). Bounded by
-    // construction: only BURNED populates it today (3 regions x 13 years = 39 entries max).
-    private final Map<String, Map<String, Object>> mapbiomasLayerCache = new ConcurrentHashMap<>();
+    // eviction listener would be premature (documented rather than silently added).
+    //
+    // Judgment-day finding #1 (CRITICAL, fixed): regionId is normalized via
+    // RegionGeometry.fromRegion(...).id() BEFORE it reaches this key, so under normal operation
+    // this stays bounded by construction (3 known regions x 13 BURNED years = 39 entries max).
+    // The comment above previously claimed this bound without the normalization actually being
+    // applied to the key -- a raw, unauthenticated regionId query param reached the key directly,
+    // so distinct garbage values each created a permanent entry (memory exhaustion) and forced a
+    // Mongo scan (load amplification) on /api/territory/public/layers. MapbiomasLayerCache now
+    // also enforces a hard cap (see its Javadoc) as defense in depth, independent of whether a
+    // future edit keeps normalizing correctly.
+    private final MapbiomasLayerCache mapbiomasLayerCache = new MapbiomasLayerCache(64);
 
     // Config property, not a code literal, mirroring MapbiomasSusceptibilityServiceImpl's
     // dataVersion field so both read the same pinned version (design D1 "Collection refresh").
     @Value("${mapbiomas.stats.data-version:lulc-col2+fuego-col1@2017-partial}")
     private String mapbiomasDataVersion;
+
+    // Judgment-day finding #2 (WARNING, fixed): design D5 requires a `citation` field on the
+    // BURNED payload; MapbiomasBurnedLayerBuilder omitted it. Config-driven (not a code literal)
+    // so it can be corrected without a redeploy. The default text below is PROVISIONAL: design D6
+    // marks this attribution as UNVERIFIED/ADAPTED pending confirmation from MapBiomas Chile's own
+    // citation template -- do not treat this string as final/legally reviewed.
+    @Value("${mapbiomas.citation:MapBiomas Chile - Coleccion 2 de Cobertura y Uso del Suelo (1999-2024) y Coleccion 1 de Fuego (2013-2025). Licencia CC BY 4.0.}")
+    private String mapbiomasCitation;
 
     public TerritoryController(
         HeatAlertEventRepository heatAlertRepository,
@@ -660,6 +678,15 @@ public class TerritoryController {
      * {@code (dataVersion, indicator, year, regionId)} -- see {@link #mapbiomasLayerCache}'s
      * Javadoc for the bounded-size and invalidation rationale.
      *
+     * <p><b>Judgment-day finding #1 (CRITICAL, fixed):</b> {@code regionId} is a raw,
+     * unauthenticated request parameter on {@code /api/territory/public/layers}. It is normalized
+     * via {@link RegionGeometry#fromRegion} to one of the three known regions BEFORE it is used
+     * for both the cache key and the {@code comunaInfoRepository.findByRegionId} query -- the same
+     * normalization every other indicator already gets through {@code geometry}. This is
+     * behavior-preserving for the 11 other indicators (they already called
+     * {@code RegionGeometry.fromRegion(regionId)} for their own geometry) and closes the
+     * unbounded-cache-key / per-request-Mongo-scan hole for BURNED specifically.
+     *
      * <p>LANDCOVER is deliberately NOT wired here yet: {@link ComunaMapbiomasStats.LandCover}
      * only stores a single {@code referenceYear} + {@code sharesByClass}, with no per-year
      * series field, so a genuine year-selectable LANDCOVER value map has no data source in the
@@ -669,16 +696,18 @@ public class TerritoryController {
      * built against non-existent per-year land-cover data.
      */
     private Map<String, Object> burnedLayer(String regionId, MapbiomasYear resolvedYear) {
-        String cacheKey = mapbiomasDataVersion + "|BURNED|" + resolvedYear.year() + "|" + regionId;
-        return mapbiomasLayerCache.computeIfAbsent(cacheKey, key -> {
-            List<ComunaInfo> comunas = comunaInfoRepository.findByRegionId(regionId);
+        String normalizedRegionId = RegionGeometry.fromRegion(regionId).id();
+        String cacheKey = mapbiomasDataVersion + "|BURNED|" + resolvedYear.year() + "|" + normalizedRegionId;
+        return mapbiomasLayerCache.computeIfAbsent(cacheKey, () -> {
+            List<ComunaInfo> comunas = comunaInfoRepository.findByRegionId(normalizedRegionId);
             Map<String, ComunaMapbiomasStats> statsByComunaId = new LinkedHashMap<>();
-            for (ComunaMapbiomasStats stats : mapbiomasStatsRepository.findByDataVersion(mapbiomasDataVersion)) {
+            for (ComunaMapbiomasStats stats :
+                mapbiomasStatsRepository.findByRegionIdAndDataVersion(normalizedRegionId, mapbiomasDataVersion)) {
                 statsByComunaId.put(stats.getComunaId(), stats);
             }
             return MapbiomasBurnedLayerBuilder.build(
                 comunas, statsByComunaId, resolvedYear.year(),
-                resolvedYear.minYear(), resolvedYear.maxYear(), mapbiomasDataVersion);
+                resolvedYear.minYear(), resolvedYear.maxYear(), mapbiomasDataVersion, mapbiomasCitation);
         });
     }
 
@@ -848,7 +877,9 @@ public class TerritoryController {
         );
     }
 
-    private record RegionGeometry(String id, String label, double centerLat, double centerLng, double minLat, double minLng, double maxLat, double maxLng, int zoom) {
+    // Package-private (not private) so TerritoryControllerRegionNormalizationTest can exercise
+    // the garbage-input -> canonical-id normalization directly, without Spring/Mongo.
+    record RegionGeometry(String id, String label, double centerLat, double centerLng, double minLat, double minLng, double maxLat, double maxLng, int zoom) {
         static RegionGeometry fromRegion(String regionId) {
             String normalized = regionId == null ? "" : regionId.trim().toLowerCase(Locale.ROOT);
             if ("araucania".equals(normalized)) {
