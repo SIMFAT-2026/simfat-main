@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import csv
 import json
+import math
 from pathlib import Path
 from typing import Mapping, MutableMapping, Sequence
 
@@ -310,6 +311,83 @@ def add_burned_fraction_pct(docs: Sequence[MutableMapping]) -> None:
     pct_by_comuna = percentile_rank_burned_fraction(values)
     for doc in docs:
         doc["fire"]["burnedFractionPct"] = pct_by_comuna[doc["comunaId"]]
+
+
+def _linear_interpolation_percentile(sorted_values: Sequence[float], q: float) -> float:
+    """The q-th percentile (0<=q<=1) of an already-sorted sequence, linear
+    interpolation between closest ranks (numpy's default ``'linear'``
+    method) -- used by ``log1p_p95_clip_burned_fraction`` for the p95 cut
+    point. No numpy dependency: this pipeline's other modules are
+    numpy-free by design (build_stats.py's own module docstring).
+    """
+    n = len(sorted_values)
+    if n == 1:
+        return sorted_values[0]
+    idx = q * (n - 1)
+    lo = int(idx)
+    hi = min(lo + 1, n - 1)
+    frac = idx - lo
+    return sorted_values[lo] + frac * (sorted_values[hi] - sorted_values[lo])
+
+
+def log1p_p95_clip_burned_fraction(
+    values: Mapping[str, float | None], *, p: float = 0.95
+) -> dict[str, float | None]:
+    """``log1p`` + p95-clip variant of the burned-fraction normalization
+    (design D1/D3's ``burnedFractionLog``, a config-switchable alternative
+    to ``percentile_rank_burned_fraction`` that the pre-registered backtest
+    may select instead).
+
+    Definition: ``log1p`` every ranked (non-excluded) comuna's value, take
+    the empirical p-th percentile (linear interpolation, default p=0.95) of
+    the LOGGED values, then return ``min(logged, p_value) / p_value`` for
+    every ranked comuna -- so the p-th-percentile comuna (and anything
+    above it) maps to exactly 1.0, and the mapping is monotonic in the raw
+    fraction. Comunas mapped to ``None`` in ``values`` (no usable fire data,
+    see ``fire_stats.select_burned_fraction_for_pct``) are excluded from
+    the percentile computation entirely and themselves map to ``None`` --
+    mirrors ``percentile_rank_burned_fraction``'s exclusion rule exactly, so
+    the same ``values`` mapping can feed either function.
+
+    When every ranked value is exactly 0.0 (an all-zero batch), the p-value
+    is 0.0 and every ranked comuna maps to 0.0 rather than dividing by zero.
+    """
+    ranked_items = [(comuna_id, value) for comuna_id, value in values.items() if value is not None]
+    result: dict[str, float | None] = {
+        comuna_id: None for comuna_id, value in values.items() if value is None
+    }
+    if not ranked_items:
+        return result
+
+    logged = {comuna_id: math.log1p(value) for comuna_id, value in ranked_items}
+    p_value = _linear_interpolation_percentile(sorted(logged.values()), p)
+    if p_value <= 0:
+        for comuna_id in logged:
+            result[comuna_id] = 0.0
+        return result
+
+    for comuna_id, logged_value in logged.items():
+        result[comuna_id] = min(logged_value, p_value) / p_value
+    return result
+
+
+def add_burned_fraction_log(docs: Sequence[MutableMapping]) -> None:
+    """Mutate every doc's ``fire.burnedFractionLog`` in place (design D1/D3).
+
+    Uses the SAME underlying value as ``add_burned_fraction_pct``
+    (``fire_stats.select_burned_fraction_for_pct`` -- the cumulative/union
+    fraction once available, per S1b5), so both normalizations describe the
+    same physical quantity through different transforms. A CROSS-comuna
+    statistic (the p95 cut point), so this must be called once with the
+    full batch being written to a single seed, same rule as
+    ``add_burned_fraction_pct``.
+    """
+    values = {
+        doc["comunaId"]: fire_stats.select_burned_fraction_for_pct(doc["fire"]) for doc in docs
+    }
+    log_by_comuna = log1p_p95_clip_burned_fraction(values)
+    for doc in docs:
+        doc["fire"]["burnedFractionLog"] = log_by_comuna[doc["comunaId"]]
 
 
 def write_coverage_report(path: Path, rows: Sequence[Mapping]) -> None:

@@ -447,3 +447,59 @@ def test_add_burned_fraction_pct_mutates_every_docs_fire_section():
     assert docs[0]["fire"]["burnedFractionPct"] == 0.0
     assert docs[1]["fire"]["burnedFractionPct"] == pytest.approx(1.0)
     assert docs[2]["fire"]["burnedFractionPct"] is None
+
+
+# --- log1p_p95_clip_burned_fraction: design D1's burnedFractionLog variant --
+#
+# D3: "log1p + p95 clip" -- a config-switchable alternative to the percentile
+# rank, kept in the seed for the backtest to compare. log1p(value), clipped
+# at the empirical (linear-interpolation) 95th percentile of the logged
+# values across the ranked (non-excluded) comunas, normalized so the p95
+# value itself maps to exactly 1.0 -- mirrors percentile_rank_burned_fraction's
+# None-exclusion rule exactly.
+
+
+def test_log1p_p95_clip_matches_a_hand_computed_fixture():
+    result = build_stats.log1p_p95_clip_burned_fraction({"a": 0.0, "b": 0.1, "c": 0.5})
+    assert result["a"] == pytest.approx(0.0)
+    assert result["b"] == pytest.approx(0.2545340572285547)
+    assert result["c"] == pytest.approx(1.0)  # above p95 -> clipped to exactly 1.0
+
+
+def test_log1p_p95_clip_all_zero_is_all_zero():
+    result = build_stats.log1p_p95_clip_burned_fraction({"a": 0.0, "b": 0.0, "c": 0.0})
+    assert result == {"a": 0.0, "b": 0.0, "c": 0.0}
+
+
+def test_log1p_p95_clip_none_values_are_excluded_and_do_not_count_toward_p95():
+    result = build_stats.log1p_p95_clip_burned_fraction({"a": 0.5, "b": None, "c": 0.5})
+    assert result["b"] is None
+    assert result["a"] == pytest.approx(1.0)
+    assert result["c"] == pytest.approx(1.0)
+
+
+def test_log1p_p95_clip_everything_excluded_returns_all_none():
+    result = build_stats.log1p_p95_clip_burned_fraction({"a": None, "b": None})
+    assert result == {"a": None, "b": None}
+
+
+def test_log1p_p95_clip_is_monotonic_in_the_raw_fraction():
+    result = build_stats.log1p_p95_clip_burned_fraction({"a": 0.01, "b": 0.05, "c": 0.5, "d": 0.9})
+    assert result["a"] < result["b"] < result["c"] <= result["d"]
+
+
+# --- add_burned_fraction_log: wires the log1p+p95 variant into the fire section
+
+
+def test_add_burned_fraction_log_mutates_every_docs_fire_section():
+    docs = [
+        {"comunaId": "A", "fire": {"available": True, "burnedFraction": 0.0}},
+        {"comunaId": "B", "fire": {"available": True, "burnedFraction": 0.1}},
+        {"comunaId": "C", "fire": {"available": False, "burnedFraction": 0.9}},
+    ]
+
+    build_stats.add_burned_fraction_log(docs)
+
+    assert docs[0]["fire"]["burnedFractionLog"] == pytest.approx(0.0)
+    assert docs[1]["fire"]["burnedFractionLog"] == pytest.approx(1.0)
+    assert docs[2]["fire"]["burnedFractionLog"] is None
