@@ -4,6 +4,17 @@ Every function here takes ``zonal.ZonalResult`` (or plain dicts derived from
 one) and returns plain dicts -- no raster I/O, no filesystem access -- so the
 aggregation rules are unit-testable without a single GeoTIFF.
 
+LEAKAGE WARNING FOR THE VALIDATION STUDY (design D7): the seed-level fire
+aggregates -- ``burnedFraction`` (the 2013-2025 union), ``burnedFractionPct``,
+``burnedFractionLog``, ``frequencyMean``/``frequencyMax``, ``yearLastFire`` and
+``yearsSinceLastFire`` -- are computed ONCE over the full 2013-2025 window,
+anchored at as-of year 2025. Production scoring may use them (D7 allows the
+full history), but the pre-registered backtest MUST NOT reuse them: for each
+test season s it must recompute them from ``burnedHaByYear`` /
+``burnedFractionByYear`` restricted to years <= s-2. ``yearLastFire`` is the
+pixel-level max of ``year_last_fire_v1`` inside the comuna, reconciled
+(``max``) with the latest year that has annual burned area.
+
 Denominator rule (MCS-6b, AMENDED after real-data evidence): the Fuego
 rasters carry no nodata sentinel, so a pixel value of 0 in
 ``annual_burned_v1`` is real data ("not burned"), not "unmapped" -- burned

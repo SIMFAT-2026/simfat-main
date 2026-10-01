@@ -84,9 +84,12 @@ class RealSeedRegressionTest {
             0.78615, 0.38460352096670414, 0.6456087323383464
         );
 
-        // CHL.13.1.1_1 (Bulnes, Ñuble): agriculture-dominant (class 18 ~53%). S1b5: burned in
-        // 2014, 2016, 2017 and 2018 (yearLastFire=2018) -- S1b4's "no fire signal" claim was
-        // an artifact of the 2017-only partial seed (Bulnes did not burn in 2017 itself).
+        // CHL.13.1.1_1 (Bulnes, Ñuble): agriculture-dominant (class 18 ~53%). Burned in 2014,
+        // 2016, 2017 and 2018 (yearLastFire=2018); 2017 is its largest fire year (1051 ha, 2.47%).
+        // Its history index fell from 0.518 (S1b4) to 0.261 because of a percentile-population
+        // shift, not a missing fire: burnedFractionPct went from 0.860 (ranking the 2017-only
+        // fraction, when only ~38 comunas burned) to 0.430 (ranking the 2013-2025 union, where
+        // Florida, Santa Juana and Tome exceed 50%).
         assertComunaBusinessValues(
             lines, service, "CHL.13.1.1_1",
             0.4716, 0.26055864156585223, 0.39776152454804825
