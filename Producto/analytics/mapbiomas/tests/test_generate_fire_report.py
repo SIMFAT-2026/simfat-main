@@ -119,7 +119,7 @@ def test_generate_full_history_writes_86_comunas_with_union_and_cross_check(tmp_
             doc = json.loads(line)
             docs[doc["comunaId"]] = doc
     assert len(docs) == 86
-    assert seed_path.name == "fire_stats_2025_partial.jsonl"
+    assert seed_path.name == "fire_stats_2013_2025_fireonly.jsonl"
 
     # every year 2013..2025 is present for every comuna.
     for doc in docs.values():

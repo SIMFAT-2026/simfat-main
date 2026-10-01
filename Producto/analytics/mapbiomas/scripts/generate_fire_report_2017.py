@@ -6,9 +6,12 @@ rasters from a directory (never committed -- see README), calls the
 corrected ``fire_stats``/``build_stats`` functions, and writes:
 
 - ``data/coverage_report.csv`` (the Biobio-gate artifact)
-- ``data/fire_stats_<as-of-year>_partial.jsonl`` (fire-only per-comuna
-  seed; ``landCover`` is null with a stated reason, since the LULC join is
-  out of scope for this slice)
+- ``data/fire_stats_<first-year>_<as-of-year>_fireonly.jsonl`` (fire-only
+  per-comuna seed; ``landCover`` is null with a stated reason, since the
+  LULC join is out of scope for this slice -- S1b5 jd-fix: renamed from
+  the ``..._<as-of-year>_partial.jsonl`` pattern, which read as a partial
+  fire HISTORY rather than what it actually is, the full discovered fire
+  history with no land-cover join yet)
 
 This is a real, runnable reproduction of the committed data files -- it is
 the WARNING-2/3 fix from the S1b jd-fix review: previously no committed
@@ -113,6 +116,7 @@ def _discover_rasters(raster_dir: Path) -> dict:
 
     return {
         "as_of_year": as_of_year,
+        "first_year": first_year,
         "annual_years": sorted(annual_years),
         "annual_paths": annual_years,
         "coverage_paths": coverage_years,
@@ -267,8 +271,21 @@ def generate(raster_dir: Path | None = None, data_dir: Path | None = None) -> tu
     build_stats.add_burned_fraction_pct(docs)
     build_stats.add_burned_fraction_log(docs)
 
+    # S1b5 jd-fix (SUGGESTION-4): named for what this file actually is -- the
+    # fire-ONLY intermediate (landCover is null; "partial" in the old name
+    # was easy to misread as a partial fire HISTORY, when it is really the
+    # full discovered fire history with no land-cover join yet). Generic
+    # over whatever year range is present: a single-year run (e.g. the
+    # original 2017-only one) collapses to one year instead of a redundant
+    # "2017_2017".
+    first_year = raster_info["first_year"]
+    fire_seed_stem = (
+        f"fire_stats_{first_year}_fireonly"
+        if first_year == as_of_year
+        else f"fire_stats_{first_year}_{as_of_year}_fireonly"
+    )
     coverage_report_path = data_dir / "coverage_report.csv"
-    seed_path = data_dir / f"fire_stats_{as_of_year}_partial.jsonl"
+    seed_path = data_dir / f"{fire_seed_stem}.jsonl"
     build_stats.write_coverage_report(coverage_report_path, csv_rows)
     build_stats.write_seed_jsonl(seed_path, docs)
     return coverage_report_path, seed_path
