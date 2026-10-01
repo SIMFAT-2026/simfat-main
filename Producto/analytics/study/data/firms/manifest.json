@@ -1,0 +1,15 @@
+[
+  {
+    "dataset": "nasa_firms_viirs_snpp_sv_c2_archive",
+    "fileName": "DL_FIRE_SV-C2_809648.zip",
+    "contents": ["fire_archive_SV-C2_809648.csv", "Readme.txt"],
+    "source": "NASA FIRMS archive download (https://firms.modaps.eosdis.nasa.gov/download/), request 809648",
+    "product": "VIIRS S-NPP 375 m active fire, Collection 2 standard (science) quality, version 2",
+    "sha256": "f9b8f6b21196b385f3be33a3df3571c49c574d74111f2fbf8637cfc7c6ecc862",
+    "bytes": 3746098,
+    "downloadedAt": "2026-09-20T18:10:00-03:00",
+    "downloadedAtSource": "modification time of the downloaded zip on the author's machine (local time, Chile)",
+    "metadataInspected": "Only column names, value domains and the date range were read before pre-registration: 208,890 rows, acq_date 2012-01-20 to 2025-12-31, satellite/instrument SNPP, version 2, confidence {l,n,h}, type {0,1,2,3}. No detection counts per comuna or season were computed.",
+    "attribution": "NASA FIRMS. We acknowledge the use of data and/or imagery from NASA's Fire Information for Resource Management System (FIRMS) (https://www.earthdata.nasa.gov/data/tools/firms), part of NASA's Earth Science Data and Information System (ESDIS)."
+  }
+]
