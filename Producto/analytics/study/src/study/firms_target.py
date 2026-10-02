@@ -79,7 +79,7 @@ N_THRESHOLDS = (1, 3, 5)
 WINDOWS: dict[str, "callable"] = {"primary": standard_window, "sensitivity": sensitivity_window}
 FILTERS: tuple[str, ...] = ("type0", "notype")
 
-CSV_HEADER = ["comunaId", "season", "window", "filter", "count", "y_n1", "y_n3", "y_n5"]
+CSV_HEADER = ["comunaId", "season", "window", "filter", "count"] + [f"y_n{n}" for n in N_THRESHOLDS]
 
 
 class FirmsTargetGateError(ValueError):
@@ -278,9 +278,7 @@ def build_counts(
                             "window": window_name,
                             "filter": filter_name,
                             "count": count,
-                            "y_n1": int(count >= 1),
-                            "y_n3": int(count >= 3),
-                            "y_n5": int(count >= 5),
+                            **{f"y_n{n}": int(count >= n) for n in N_THRESHOLDS},
                         }
                     )
     return rows

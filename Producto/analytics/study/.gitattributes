@@ -1,3 +1,5 @@
 PREREGISTRATION.md text eol=lf
 data/era5/*.csv.gz binary linguist-generated
 data/features/season_fwi.csv linguist-generated
+data/features/firms_target.csv linguist-generated
+data/features/season_mapbiomas.csv linguist-generated
