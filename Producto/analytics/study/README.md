@@ -18,16 +18,20 @@ archive and never computes any quantity relating a predictor (FWI,
 
 ```
 src/study/
-  config.py       # verifies PREREGISTRATION.md's sha256 against the lock file; every entry point calls this
-  fwi.py          # pure-Python parity port of CanadianFwiCalculator.java (Van Wagner & Pickett 1985)
-  era5.py         # representative comuna points + Open-Meteo Archive (ERA5) fetch + noon-input derivation
-  season_fwi.py   # per-season chain (Sep 1 of s-1 startup) + S_dynamic mean aggregation (standard + sensitivity windows)
+  config.py            # verifies PREREGISTRATION.md's sha256 against the lock file; every entry point calls this
+  fwi.py               # pure-Python parity port of CanadianFwiCalculator.java (Van Wagner & Pickett 1985)
+  era5.py              # representative comuna points / full geometries + Open-Meteo Archive (ERA5) fetch + noon-input derivation
+  season_fwi.py        # per-season chain (Sep 1 of s-1 startup) + S_dynamic mean aggregation (standard + sensitivity windows)
+  firms_target.py      # FIRMS target: comuna assignment, UTC->local date, N_FIRMS/window/filter counting, gates
+  season_mapbiomas.py  # leakage-safe per-season Fuego/land-cover features + S_mapbiomas Java-parity port
 scripts/
-  download_era5.py    # fetches ERA5 hourly weather for all 86 comunas, writes data/era5/
-  build_season_fwi.py # builds data/features/season_fwi.csv from the committed noon-input table
-tests/            # pytest, network-free (fake openers for HTTP, synthetic fixtures for geometry)
+  download_era5.py          # fetches ERA5 hourly weather for all 86 comunas, writes data/era5/
+  build_season_fwi.py       # builds data/features/season_fwi.csv from the committed noon-input table
+  build_firms_target.py     # builds data/features/firms_target.csv from the committed FIRMS archive
+  build_season_mapbiomas.py # builds data/features/season_mapbiomas.csv from the verified Fuego rasters + seed
+tests/            # pytest, network-free (fake openers for HTTP, synthetic fixtures for geometry/rasters)
 data/era5/        # committed: noon_inputs_<start>_<end>.csv.gz + manifest.json
-data/features/    # committed: season_fwi.csv
+data/features/    # committed: season_fwi.csv, firms_target.csv, season_mapbiomas.csv
 ```
 
 ### `fwi.py`: Van Wagner FWI parity port
@@ -101,6 +105,121 @@ aborts loudly on a sha256 mismatch against `PREREGISTRATION.lock.json`
 (Section 17). The comparison normalizes CRLF to LF before hashing, since
 the recorded hash is of the git-stored (LF) content.
 
+## S4b1b: FIRMS target and MapBiomas season features (this slice)
+
+**Scope: INPUTS ONLY**, same blinding rule as S4b1a, enforced across TWO
+separate output files that are never joined: `firms_target.csv` (the
+target) and `season_mapbiomas.csv` (predictors). Neither file, nor this
+slice's code or tests, computes a quantity relating one to the other.
+
+### `firms_target.py` + `scripts/build_firms_target.py`
+
+Builds `data/features/firms_target.csv` (PREREGISTRATION.md Section 6)
+directly from the committed FIRMS archive (`data/firms/DL_FIRE_SV-C2_809648.zip`,
+no network). One row per `(comunaId, season, window, filter)` -- 86 x 9 x
+2 x 2 = 3096 rows, zero counts included explicitly -- with `count`,
+`y_n1`, `y_n3`, `y_n5` (`y_nK = 1` iff `count >= K`).
+
+**Comuna assignment (implementation detail, not fixed by the
+pre-registration).** Each detection's `(latitude, longitude)` is tested by
+point-in-polygon against every monitored comuna's GeoJSON geometry
+(`comunaId` property = the GADM GID_3 code), checking every
+`MultiPolygon` part and excluding holes. A detection inside no comuna's
+polygon is dropped and counted (18,083 of 208,890 real rows, mostly
+offshore/outside-region detections), never assigned to the nearest
+comuna.
+
+**UTC -> local date, and a real environment gotcha (disclosed as a
+candidate deviation).** `acq_date`/`acq_time` are UTC; season-window
+membership is defined in LOCAL (Chile) calendar dates, so every
+detection's timestamp is converted before any window check. The launch
+prompt asked for `zoneinfo`, but this sandboxed Windows environment has
+no system IANA time-zone database, and installing the `tzdata` package
+(the usual fix) is outside the "stdlib + numpy + rasterio, no installs"
+dependency constraint -- even `zoneinfo.ZoneInfo("UTC")` fails to resolve
+here. As a disclosed substitute, Chile's mainland DST rule stable since
+the 2016 decree (DST from the first Sunday of September through the day
+before the first Sunday of April, UTC-3; UTC-4 otherwise) is implemented
+directly in stdlib `datetime` (`firms_target.is_dst_chile`), not
+independently re-verified against an official source here (no internet
+access either). None of this study's window boundaries fall within hours
+of a transition instant (Nov 1 is deep in DST; Apr 30 is always well
+after the April transition), so the two approaches should agree for
+every date this study needs -- swap in real `zoneinfo` if an environment
+with `tzdata` becomes available.
+
+**Windows and filters.** `primary` = Dec 1 (s-1)..Mar 31 (s); `sensitivity`
+= Nov 1 (s-1)..Apr 30 (s) (reusing `season_fwi.standard_window`/
+`sensitivity_window` -- the pre-registered boundaries are identical).
+`type0` = `type == 0` AND `confidence` in `{n, h}`; `notype` = same
+confidence filter, no `type` restriction. **Gates**: every
+comuna-season-window-filter row present; non-negative integer counts;
+`sensitivity >= primary` (same filter); `notype >= type0` (same window).
+
+### `season_mapbiomas.py` + `scripts/build_season_mapbiomas.py`
+
+Builds `data/features/season_mapbiomas.csv` (PREREGISTRATION.md Section 7
+leakage rules, Section 8.2 formula): one row per comuna-season (86 x 9 =
+774 rows) with `fuel`, `burned_union`, `burned_pct`, `burned_log`,
+`frequency_mean`, `recurrence_norm`, `history`, `s_mapbiomas`,
+`history_log`, `s_mapbiomas_log`.
+
+**Leakage-safe recomputation.** For test season `s`, Fuego inputs use
+ONLY years `2013..(s-2)` -- never the committed seed's full 2013-2025
+aggregates, which are anchored at 2025. Every cached annual raster's
+sha256 is verified against `Producto/analytics/mapbiomas/data/manifest.json`
+before use; a missing manifest entry or a mismatch aborts loudly.
+`s=2017` uses exactly years 2013-2015 (3 years, the thinnest history, a
+disclosed consequence of the leakage rule). Land-cover shares come from
+the committed seed's `sharesByYear` for year `s-1` (no leakage).
+
+**`frequencyMean` without a per-season frequency raster (implementation
+note).** Production's `frequencyMean` is a pixel-count-weighted mean of a
+`frequency_burned_v1` raster. No per-season frequency raster is cached
+(only the full 2013-2025 one, explicitly off-limits here), so this module
+reproduces the identical definition from the per-year `annual_burned_v1`
+rasters via an exact identity: summing each pixel's "years burned" count
+over the whole mask equals summing each YEAR's burned-pixel COUNT over
+all years, regardless of which pixels overlap across years. See
+`frequency_mean_from_zonal_results`'s docstring.
+
+**`yearLastFire`/`yearsSinceLastFire` (implementation note).** Derived
+purely from the annual-burned evidence restricted to `<= s-2` (never from
+any `year_last_fire_v1` raster, whose only cached windows end in 2017 or
+2025 and would leak most seasons). Computed and documented, per the
+launch prompt, but with no effect on `history`/`S_mapbiomas` (recency is
+disabled, `R_MAX=0`, per Section 8.2) and not persisted to the CSV (whose
+header is fixed by the launch prompt without these two columns).
+
+**S_mapbiomas Java parity.** `fuel`/`history`/`S_mapbiomas` mirror
+`MapbiomasSusceptibilityServiceImpl.java` exactly (weights 0.65/0.35,
+0.60/0.40, `FREQUENCY_CAP=5.0`, class 27 excluded from the fuel sum,
+clamp01 everywhere, recency fixed at 1.0). A dedicated parity test
+(`tests/test_season_mapbiomas.py::test_s_mapbiomas_parity_against_real_pinned_seed_values`)
+feeds the real committed seed's full-window inputs for the three comunas
+pinned in `RealSeedRegressionTest.java` and checks `history`/`s_mapbiomas`
+match within `1e-6`. `fuel` for `CHL.13.1.1_1` is checked at `1e-4`
+instead: the Java source's `0.4716` literal is a short, evidently
+human-rounded transcription (the real value is `0.47164`), while the
+other two comunas' `fuel` literals (`0.78615`, `0.89208`) and every
+`history`/`score` literal carry full double precision.
+
+**`burnedFractionPct`/`burnedFractionLog` (Q27)** are recomputed PER
+SEASON over the 86 comunas (never reused across seasons), via the same
+production functions (`mb_pipeline.build_stats.percentile_rank_burned_fraction`
+/ `log1p_p95_clip_burned_fraction`). `burned_pct` is the primary
+`burnedNorm`; `burned_log` is the pre-declared, decision-free sensitivity.
+
+**Gates**: `s=2017` uses exactly Fuego years 2013-2015; `burned_union` is
+non-decreasing in `s` for every comuna (a growing year range can only add
+burned pixels to the union); every `[0, 1]`-bounded field actually is.
+**The s=2019 independent cross-check** (union area vs. the area with
+`frequency > 0` in the cached `..._frequency_burned_2013_2017.tif`) is
+**skipped with an explicit note**: that file has no `manifest.json`
+entry (it predates the manifest's current 17-entry set), so its sha256
+cannot be verified -- the launch prompt explicitly sanctions skipping in
+that case rather than using an unverified raster.
+
 ## Running
 
 ```
@@ -108,8 +227,10 @@ cd Producto/analytics/study
 python -m pip install -r requirements.txt
 python -m pytest                       # all tests, network-free
 
-python scripts/download_era5.py         # real network calls, ~20 min, writes data/era5/
-python scripts/build_season_fwi.py      # writes data/features/season_fwi.csv
+python scripts/download_era5.py           # real network calls, ~20 min, writes data/era5/
+python scripts/build_season_fwi.py        # writes data/features/season_fwi.csv
+python scripts/build_firms_target.py      # writes data/features/firms_target.csv
+python scripts/build_season_mapbiomas.py  # writes data/features/season_mapbiomas.csv
 ```
 
 ## Date range note
