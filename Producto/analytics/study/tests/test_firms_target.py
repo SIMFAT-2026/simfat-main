@@ -50,21 +50,9 @@ def test_to_local_date_uses_standard_offset_in_late_april():
     assert firms_target.to_local_date(dt_utc) == date(2024, 4, 19)
 
 
-def test_is_dst_chile_true_in_december_false_in_august():
-    assert firms_target.is_dst_chile(date(2024, 12, 15)) is True
-    assert firms_target.is_dst_chile(date(2024, 8, 15)) is False
-
-
-def test_is_dst_chile_false_on_and_after_first_sunday_of_april():
-    first_sunday = firms_target._nth_weekday_of_month(2024, 4, 6, 1)
-    assert firms_target.is_dst_chile(first_sunday) is False
-    assert firms_target.is_dst_chile(first_sunday - timedelta(days=1)) is True
-
-
-def test_is_dst_chile_true_on_and_after_first_sunday_of_september():
-    first_sunday = firms_target._nth_weekday_of_month(2024, 9, 6, 1)
-    assert firms_target.is_dst_chile(first_sunday) is True
-    assert firms_target.is_dst_chile(first_sunday - timedelta(days=1)) is False
+def test_utc_offset_is_dst_in_december_and_standard_in_august():
+    assert firms_target.utc_offset_hours(datetime(2024, 12, 15, 12, tzinfo=timezone.utc)) == -3
+    assert firms_target.utc_offset_hours(datetime(2024, 8, 15, 12, tzinfo=timezone.utc)) == -4
 
 
 # ---- point-in-polygon comuna assignment ------------------------------------
@@ -218,3 +206,26 @@ def test_write_csv_writes_header_and_rows(tmp_path):
         ]
         written_rows = list(reader)
     assert len(written_rows) == len(rows)
+
+
+# Transition instants (UTC) verified against the Windows time-zone database
+# ("Pacific SA Standard Time"), 2026-10-02: Chile left DST in mid-May in
+# 2016-2018 and in early April from 2019; in 2022 DST started on Sep 11.
+def test_to_local_date_keeps_dst_until_mid_may_in_2017():
+    # 2017-05-01 03:30 UTC is 00:30 local on May 1 (still UTC-3 until May 14).
+    dt_utc = datetime(2017, 5, 1, 3, 30, tzinfo=timezone.utc)
+    assert firms_target.to_local_date(dt_utc) == date(2017, 5, 1)
+
+
+def test_to_local_date_starts_dst_on_sep_11_in_2022():
+    # 2022-09-05 03:30 UTC is 23:30 local on Sep 4 (still UTC-4 until Sep 11).
+    dt_utc = datetime(2022, 9, 5, 3, 30, tzinfo=timezone.utc)
+    assert firms_target.to_local_date(dt_utc) == date(2022, 9, 4)
+
+
+def test_utc_offset_matches_every_verified_transition():
+    for start_utc, end_utc in firms_target.CHILE_DST_INTERVALS_UTC:
+        assert firms_target.utc_offset_hours(start_utc) == -3
+        assert firms_target.utc_offset_hours(start_utc - timedelta(minutes=1)) == -4
+        assert firms_target.utc_offset_hours(end_utc - timedelta(minutes=1)) == -3
+        assert firms_target.utc_offset_hours(end_utc) == -4

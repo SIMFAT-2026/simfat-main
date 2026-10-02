@@ -137,16 +137,14 @@ prompt asked for `zoneinfo`, but this sandboxed Windows environment has
 no system IANA time-zone database, and installing the `tzdata` package
 (the usual fix) is outside the "stdlib + numpy + rasterio, no installs"
 dependency constraint -- even `zoneinfo.ZoneInfo("UTC")` fails to resolve
-here. As a disclosed substitute, Chile's mainland DST rule stable since
-the 2016 decree (DST from the first Sunday of September through the day
-before the first Sunday of April, UTC-3; UTC-4 otherwise) is implemented
-directly in stdlib `datetime` (`firms_target.is_dst_chile`), not
-independently re-verified against an official source here (no internet
-access either). None of this study's window boundaries fall within hours
-of a transition instant (Nov 1 is deep in DST; Apr 30 is always well
-after the April transition), so the two approaches should agree for
-every date this study needs -- swap in real `zoneinfo` if an environment
-with `tzdata` becomes available.
+here. As a disclosed substitute, the exact Chile DST transition instants
+for 2016-2026 were read from the Windows time-zone database ("Pacific SA
+Standard Time") and hard-coded in `firms_target.CHILE_DST_INTERVALS_UTC`
+(used by `utc_offset_hours`). A weekday rule ("first Sunday of September to
+first Sunday of April") was tried first and was wrong for this range: Chile
+left DST in mid-May in 2016-2018 and started it on Sep 11 in 2022. Swap in
+`zoneinfo` if an environment with `tzdata` becomes available; the two must
+agree for every instant from May 2016 to Sep 2026.
 
 **Windows and filters.** `primary` = Dec 1 (s-1)..Mar 31 (s); `sensitivity`
 = Nov 1 (s-1)..Apr 30 (s) (reusing `season_fwi.standard_window`/

@@ -35,17 +35,15 @@ pre-registration, documented here per the launch prompt):
   disallowed by the launch prompt's dependency constraint (stdlib + numpy +
   rasterio only, no installs) -- so Python's ``zoneinfo.ZoneInfo("America/
   Santiago")`` cannot resolve here (``ZoneInfoNotFoundError``), even though
-  it is stdlib. As a disclosed substitute, Chile's mainland DST rule stable
-  since the 2016 decree (DST from the first Sunday of September through
-  the day before the first Sunday of April the following year, UTC-3;
-  UTC-4 otherwise) is implemented directly in stdlib ``datetime`` (see
-  ``is_dst_chile``). This was NOT independently re-verified against an
-  official source in this environment (no internet access here either);
-  it is this module's best-effort reproduction of the publicly documented
-  rule. **Candidate deviation from the literal launch-prompt instruction
+  it is stdlib. As a disclosed substitute, the exact DST transition instants for
+  2016-2026 were read from the Windows time-zone database ("Pacific SA
+  Standard Time") and hard-coded in ``CHILE_DST_INTERVALS_UTC`` (see
+  ``utc_offset_hours``). A simple weekday rule was tried first and was WRONG
+  for this range: Chile left DST in mid-May in 2016-2018 (not early April)
+  and started it on Sep 11 in 2022. **Candidate deviation from the literal launch-prompt instruction
   ("use zoneinfo")**, reported rather than silently worked around -- if an
   environment with ``tzdata`` installed (or a live system clock database)
-  is available later, swap ``is_dst_chile``/``to_local_date`` for
+  is available later, swap ``utc_offset_hours``/``to_local_date`` for
   ``zoneinfo.ZoneInfo("America/Santiago")`` and the two should agree for
   every date in this study's range (Nov 2016 .. Apr 2025), since none of
   the pre-registered window boundaries fall within a few hours of a
@@ -95,25 +93,47 @@ class FirmsTargetGateError(ValueError):
 # ---------------------------------------------------------------------------
 
 
-def _nth_weekday_of_month(year: int, month: int, weekday: int, n: int) -> date:
-    """The n-th (1-based) occurrence of ``weekday`` (Mon=0..Sun=6) in
-    ``year-month``."""
-    first_of_month = date(year, month, 1)
-    offset = (weekday - first_of_month.weekday()) % 7
-    first_occurrence = first_of_month + timedelta(days=offset)
-    return first_occurrence + timedelta(weeks=n - 1)
+# Chile mainland DST (UTC-3) intervals as [start, end) UTC instants. Taken from
+# the Windows time-zone database ("Pacific SA Standard Time") on 2026-10-02,
+# because this environment has no IANA tzdata for zoneinfo. Chile left DST in
+# mid-May in 2016-2018 and in early April from 2019, and the start date moved
+# too (e.g. Sep 11 in 2022), so no single weekday rule is correct for the range.
+CHILE_DST_INTERVALS_UTC: tuple[tuple[datetime, datetime], ...] = tuple(
+    (datetime(*a, 4, 0, tzinfo=timezone.utc), datetime(*b, 3, 0, tzinfo=timezone.utc))
+    for a, b in (
+        ((2016, 8, 14), (2017, 5, 14)),
+        ((2017, 8, 13), (2018, 5, 13)),
+        ((2018, 8, 12), (2019, 4, 7)),
+        ((2019, 9, 8), (2020, 4, 5)),
+        ((2020, 9, 6), (2021, 4, 4)),
+        ((2021, 9, 5), (2022, 4, 3)),
+        ((2022, 9, 11), (2023, 4, 2)),
+        ((2023, 9, 3), (2024, 4, 7)),
+        ((2024, 9, 8), (2025, 4, 6)),
+        ((2025, 9, 7), (2026, 4, 5)),
+    )
+)
+TABLE_COVERS_UTC = (datetime(2016, 5, 15, 3, 0, tzinfo=timezone.utc),
+                    datetime(2026, 9, 6, 4, 0, tzinfo=timezone.utc))
 
 
-def is_dst_chile(d: date) -> bool:
-    """Chile mainland DST rule stable since 2016: DST (UTC-3) from the first
-    Sunday of September through the day before the first Sunday of the
-    following April; UTC-4 (standard) otherwise. See the module docstring's
-    IMPLEMENTATION NOTE for why this is implemented directly instead of via
-    ``zoneinfo``."""
-    SUNDAY = 6
-    dst_start = _nth_weekday_of_month(d.year, 9, SUNDAY, 1)
-    dst_end = _nth_weekday_of_month(d.year, 4, SUNDAY, 1)
-    return d >= dst_start or d < dst_end
+def utc_offset_hours(dt_utc: datetime) -> int:
+    """Chile mainland UTC offset (-3 in DST, -4 otherwise) at a UTC instant.
+
+    Exact inside ``TABLE_COVERS_UTC`` (May 2016 - Sep 2026), which contains
+    every pre-registered season window (Nov 2016 - Apr 2025). Instants outside
+    it get -4: they are months away from any window, so a one-hour error
+    there cannot move a detection into or out of a window.
+    """
+    for start, end in CHILE_DST_INTERVALS_UTC:
+        if start <= dt_utc < end:
+            return -3
+    return -4
+
+
+def to_local_date(dt_utc: datetime) -> date:
+    """UTC datetime -> America/Santiago local CALENDAR date."""
+    return (dt_utc + timedelta(hours=utc_offset_hours(dt_utc))).date()
 
 
 def parse_acq_datetime_utc(acq_date: str, acq_time: str) -> datetime:
@@ -123,21 +143,6 @@ def parse_acq_datetime_utc(acq_date: str, acq_time: str) -> datetime:
     hour, minute = int(hhmm[:2]), int(hhmm[2:])
     d = date.fromisoformat(acq_date)
     return datetime(d.year, d.month, d.day, hour, minute, tzinfo=UTC)
-
-
-def to_local_date(dt_utc: datetime) -> date:
-    """UTC datetime -> America/Santiago local CALENDAR date.
-
-    Two-pass fixed point: the DST regime is first guessed from the UTC
-    calendar date, then re-derived from the resulting candidate local date,
-    closing the narrow one-day gap that can occur right at the Sept/April
-    transition instants (irrelevant to this study's actual season windows,
-    see the module docstring, but kept correct regardless).
-    """
-    candidate_offset = -3 if is_dst_chile(dt_utc.date()) else -4
-    candidate_local = (dt_utc + timedelta(hours=candidate_offset)).date()
-    offset = -3 if is_dst_chile(candidate_local) else -4
-    return (dt_utc + timedelta(hours=offset)).date()
 
 
 # ---------------------------------------------------------------------------
