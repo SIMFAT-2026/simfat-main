@@ -153,7 +153,8 @@ public class MapbiomasSusceptibilityServiceImpl implements MapbiomasSusceptibili
             score = clamp01(FUEL_WEIGHT * fuelIndex + HISTORY_WEIGHT * historyIndex);
             baseFlag = null;
         } else if (fireAvailable) {
-            // landCover missing (decision Q26, today's reality for all 86 comunas): the score
+            // landCover missing (decision Q26; since S1b4 every seeded comuna has land cover,
+            // so this is a defensive fallback for a future or partial seed): the score
             // is the history component ALONE, never 0.65*0 + 0.35*history -- that would
             // silently penalize the score by the fuel weight for having no fuel data, which is
             // worse than not having a fuel signal at all.
