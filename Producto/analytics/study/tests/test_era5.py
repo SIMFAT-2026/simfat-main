@@ -85,6 +85,17 @@ def test_representative_point_multipolygon_picks_the_largest_part():
     assert era5.point_in_polygon(point, small_island, []) is False
 
 
+def test_load_comuna_geometries_covers_all_86_comunas_and_returns_raw_geometry():
+    geometries = era5.load_comuna_geometries(GEOJSON_DIR)
+
+    assert len(geometries) == 86
+    for path in GEOJSON_DIR.glob("comunas-*.geojson"):
+        data = json.loads(path.read_text(encoding="utf-8"))
+        for feature in data["features"]:
+            comuna_id = feature["properties"]["comunaId"]
+            assert geometries[comuna_id] == feature["geometry"]
+
+
 def test_load_comuna_points_covers_all_86_comunas_and_every_point_is_inside_its_polygon():
     points = era5.load_comuna_points(GEOJSON_DIR)
 

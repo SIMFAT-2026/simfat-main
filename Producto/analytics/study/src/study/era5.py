@@ -150,6 +150,23 @@ def representative_point(geometry: dict) -> tuple[float, float]:
     return (pts[0][0], pts[0][1])
 
 
+def load_comuna_geometries(geojson_dir: Path) -> dict[str, dict]:
+    """Reads every ``comunas-*.geojson`` in ``geojson_dir`` and returns
+    ``{comunaId: geometry}`` (the raw GeoJSON Polygon/MultiPolygon, unlike
+    ``load_comuna_points``, which reduces each geometry to one representative
+    point). Used by callers that need the full polygon, e.g.
+    ``study.firms_target``'s point-in-polygon assignment and
+    ``study.season_mapbiomas``'s zonal stats."""
+    geojson_dir = Path(geojson_dir)
+    geometries: dict[str, dict] = {}
+    for path in sorted(geojson_dir.glob("comunas-*.geojson")):
+        data = json.loads(path.read_text(encoding="utf-8"))
+        for feature in data["features"]:
+            comuna_id = feature["properties"]["comunaId"]
+            geometries[comuna_id] = feature["geometry"]
+    return geometries
+
+
 def load_comuna_points(geojson_dir: Path) -> dict[str, tuple[float, float]]:
     """Reads every ``comunas-*.geojson`` in ``geojson_dir`` and returns
     ``{comunaId: (lon, lat)}`` for all monitored comunas."""
