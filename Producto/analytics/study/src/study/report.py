@@ -335,7 +335,8 @@ def _cell(v):
 
 def degeneracy_warnings(result: BacktestResult, params: config.StudyParameters) -> list:
     """Human-readable warnings for every analysis whose ``n_redrawn`` or
-    ``n_auc_undefined`` exceeds 1% of B (N14)."""
+    ``n_auc_undefined`` exceeds 1% of B (N14), for every failed analysis, and for
+    every season whose confidence interval is single-class or bootstrap-failed (N17)."""
     limit = 0.01 * params.n_boot
     out = []
     for res in _all_pooled(result):
@@ -352,6 +353,11 @@ def degeneracy_warnings(result: BacktestResult, params: config.StudyParameters) 
         if key in seen:
             continue
         seen.add(key)
+        status = row.get("ci_status", "ok")
+        if status == "single-class":
+            out.append(f"season {key}: ci_status=single-class (no confidence interval)")
+        elif status == "bootstrap-failed":
+            out.append(f"season {key}: ci_status=bootstrap-failed ({row.get('ci_error', '')})")
         for field in ("n_redrawn", "n_auc_undefined"):
             value = row.get(field, 0)
             if value > limit:

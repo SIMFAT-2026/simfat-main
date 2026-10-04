@@ -290,6 +290,23 @@ def test_degeneracy_warning_fires_above_one_percent_of_b_and_names_the_analysis(
     assert any("t" in m and "n_auc_undefined" in m for m in msgs)
 
 
+def test_single_class_and_bootstrap_failed_seasons_are_warned_about_once_per_season():
+    res = report.pooled_analysis(_few_negatives_dataset(), "t", "primary", PARAMS, with_secondary=True)
+    quiet = dataclasses.replace(res, n_redrawn=0, n_auc_undefined=0)
+    rows = []
+    for season, status, error in ((2017, "single-class", ""), (2018, "bootstrap-failed", "gave up"),
+                                  (2019, "ok", "")):
+        for w in (0.0, 0.5):
+            rows.append({"season": season, "wm": w, "ci_status": status, "ci_error": error,
+                         "n_redrawn": 0, "n_auc_undefined": 0})
+    out = report.BacktestResult(primary=quiet, per_season=rows, loso=[], sensitivities=[])
+    msgs = report.degeneracy_warnings(out, PARAMS)
+    assert [m for m in msgs if "2017" in m] == ["season 2017: ci_status=single-class (no confidence interval)"]
+    assert len([m for m in msgs if "2018" in m]) == 1
+    assert "bootstrap-failed" in next(m for m in msgs if "2018" in m) and "gave up" in next(m for m in msgs if "2018" in m)
+    assert not any("2019" in m for m in msgs)
+
+
 def test_degeneracy_warning_is_silent_at_or_below_one_percent():
     res = report.pooled_analysis(_few_negatives_dataset(), "t", "primary", PARAMS, with_secondary=True)
     quiet = dataclasses.replace(res, n_redrawn=PARAMS.n_boot // 100, n_auc_undefined=PARAMS.n_boot // 100)
