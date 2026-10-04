@@ -227,8 +227,8 @@ computed on the real inputs. The real run happens once, after review.
 src/study/
   metrics.py        # AUC-PR (average precision, ties grouped), ROC AUC, Spearman, Brier; numpy only
   scores.py         # season prediction (1-wM)*sdyn_mean + wM*S_mapbiomas; asserts the bounds that make the clamp inert
-  dataset.py        # strict join of the three input tables; validate_keys for the keys-only dry run
-  bootstrap.py      # comuna-clustered, paired, seeded percentile bootstrap; degenerate resamples redrawn and counted
+  dataset.py        # strict join of the three input tables; balanced-panel checks; validate_keys for the keys-only dry run
+  bootstrap.py      # comuna-clustered, paired, seeded percentile bootstrap; resamples without positives redrawn and counted
   decision_rule.py  # Section 10 rule (largest wM with CI lower bound >= -0.02) and Section 12 claim rule
   report.py         # pooled, per-season, leave-one-season-out, sensitivities; CSV tables and decision.json
 scripts/run_backtest.py   # gated entry point
@@ -238,7 +238,15 @@ scripts/run_backtest.py   # gated entry point
 `tests/test_config.py` cross-checks each against the text of
 `PREREGISTRATION.md`, and `config.load_parameters` verifies the hash first.
 Every choice the contract leaves open is recorded in `DEVIATIONS.md` as N6 to
-N12.
+N16 (N13 to N15 supersede parts of N9 and N11 without editing them).
+
+**Deferred, NOT part of this engine.** The engine covers Section 10's decision
+rule, Section 12's Table 2 and Table 2b (pooled, per-season and
+leave-one-season-out grids with AUC-PR, ROC AUC, Spearman and Brier, each with a
+95% CI) and the Section 13 sensitivity. The following are left to later units:
+Table 1 and the H3 class-selectivity analysis, Table 3 (alert-level
+distribution per `wM`), the three figures, the Section 14 threshold
+recalibration and H1.
 
 ### Running the backtest
 
@@ -250,7 +258,31 @@ python scripts/run_backtest.py --confirm-preregistered-run    # the real run, on
 Without `--confirm-preregistered-run` the script refuses the real inputs (by
 path or by content). The real run writes `outputs/tables/pooled_grid.csv`,
 `per_season.csv`, `decisions.csv` and `outputs/decision.json` (pre-registration
-hash, inputs' sha256, git sha, every decision).
+hash, inputs' sha256, git sha and dirty flags, every decision).
+
+Guards on the single real run:
+
+- **Run once.** It refuses to start if `outputs/decision.json` exists, unless
+  `--allow-overwrite` is also passed; the overwrite is then recorded in
+  `decision.json` (`overwrote_previous`, `previous_decision_sha256`).
+- **Provenance (Section 17).** It refuses to start unless the pre-registration
+  commit from the lock is an ancestor of HEAD (`git merge-base --is-ancestor`;
+  an unanswerable check also refuses). `decision.json` records whether the
+  working tree was dirty (`git_dirty`, and `git_dirty_study_dir` for this
+  directory only).
+- **Completeness.** Every analysis dataset must be a balanced panel: exactly 86
+  comunas x its expected seasons, no duplicate keys, and the same comuna-season
+  set across windows and filters.
+- **Fault tolerance.** The primary pooled result and the per-season table are
+  written before any rerun starts. Each leave-one-season-out run and each
+  sensitivity then runs in its own guard: a failure is recorded as
+  `status: failed` with its error in the tables and `decision.json` (and a
+  stderr warning) while the rest continue. The primary analysis aborts loudly.
+- **Degenerate resamples.** `n_redrawn` (resamples without positives) and
+  `n_auc_undefined` (kept resamples without negatives, excluded from the ROC AUC
+  CI only) are reported everywhere, with a warning above 1% of B.
+- **Prevalence.** Below 5% and, as a reporting aid only, above 50% are flagged in
+  every table (see N15).
 
 ## Running
 

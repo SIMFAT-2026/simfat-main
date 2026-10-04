@@ -213,3 +213,38 @@ prevalence strictly above 50% (`high_prevalence_warning`) next to the existing
 `decision.json`, together with a note stating that reading. It is a reporting
 addition only: it does not enter the decision rule, the claim rule, any
 interval, or the shipped weight. (`config.StudyParameters.prevalence_high`.)
+
+### N16 — Engine scope and implementation notes (2026-10-03)
+
+- Scope. The S4b2 engine implements the Section 10 decision rule, the Section 12
+  claim rule, Table 2 and Table 2b (pooled, per-season and leave-one-season-out
+  grids, AUC-PR, ROC AUC, Spearman and Brier, each with a 95% CI) and the
+  Section 13 sensitivity. It does NOT implement Table 1 and the H3 class
+  selectivity analysis, Table 3 (alert levels per `wM`), the three figures, the
+  Section 14 threshold recalibration or H1. These are deferred to later units
+  and the absence of their outputs from `outputs/` is expected, not an omission
+  in the engine.
+- Completeness. Every analysis dataset (primary, each season, each
+  leave-one-season-out run, each sensitivity) is asserted to be a balanced panel
+  of exactly 86 comunas x its expected seasons (9 pooled, 8 per
+  leave-one-season-out run, 1 per season) with no duplicate keys, and the
+  comuna-season set must be identical across windows and filters. A violation
+  raises; in a sensitivity or leave-one-season-out run it is recorded as a failed
+  analysis with the error, in the primary analysis it aborts the run.
+- Fault tolerance. The primary pooled result and the per-season table are
+  written to disk before any rerun starts. Each leave-one-season-out run and
+  each sensitivity is guarded: an exception is recorded as `status: failed` with
+  its error in the tables and `decision.json` and the remaining analyses run. The
+  primary analysis is not guarded and aborts loudly. `decision.json` carries
+  `complete: false` until the last analysis finishes.
+- Run-once and provenance. `scripts/run_backtest.py` refuses to start when
+  `outputs/decision.json` exists unless `--allow-overwrite` is passed, in which
+  case `overwrote_previous` and the previous file's sha256 are recorded. It
+  refuses to start unless the pre-registration commit in the lock is an ancestor
+  of HEAD, as Section 17 requires, and `decision.json` records whether the git
+  working tree (and the study directory alone) was dirty.
+- Hardening. The `qualifies` column is read from the decision rule's outcome
+  rather than recomputed in `report.py`, and `StudyParameters` rejects a
+  `decision_sequence` that is not the grid in descending order.
+- The engine remains built and tested on synthetic data only; no metric was
+  computed on the real inputs.
