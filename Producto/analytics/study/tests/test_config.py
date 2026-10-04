@@ -69,3 +69,53 @@ def test_study_root_finds_directory_holding_the_lock_file(tmp_path):
     found = config.study_root(nested)
 
     assert found == tmp_path
+
+
+# ---------------------------------------------------------------- study parameters
+# S4b2: grid, delta, seed and B live in ONE place (config.StudyParameters) and
+# are cross-checked here against the text of the real contract, so a typo in
+# the constants cannot silently diverge from PREREGISTRATION.md.
+
+
+def _real_contract_text():
+    return (config.study_root() / "PREREGISTRATION.md").read_text(encoding="utf-8")
+
+
+def test_load_parameters_verifies_the_preregistration_first(tmp_path):
+    _write_pair(tmp_path, b"body\n", hashlib.sha256(b"something else\n").hexdigest())
+
+    with pytest.raises(config.PreregistrationIntegrityError):
+        config.load_parameters(tmp_path)
+
+
+def test_load_parameters_returns_params_and_the_lock_for_the_real_contract():
+    params, lock = config.load_parameters()
+
+    assert isinstance(params, config.StudyParameters)
+    assert lock["sha256"] == "541b92660db09d53d3f82217a6b23f4981ccdfb0b168903cd4df4a37cc2a4b4b"
+
+
+def test_parameters_match_the_numbers_written_in_the_contract():
+    p = config.PARAMETERS
+    text = _real_contract_text()
+
+    assert p.grid == (0.10, 0.25, 0.35, 0.50)
+    assert "`wM` in `{0.10, 0.25, 0.35, 0.50}`" in text
+    assert p.decision_sequence == (0.50, 0.35, 0.25, 0.10)
+    assert "`0.50 → 0.35 → 0.25 → 0.10`" in text
+    assert p.baseline_wm == 0.0
+    assert p.delta == 0.02
+    assert "`delta = 0.02`" in text
+    assert p.n_boot == 2000 and "`B = 2000`" in text
+    assert p.seed == 20261027 and "seed `20261027`" in text
+    assert p.n_firms_primary == 3 and "`N_FIRMS = 3`" in text
+    assert p.n_firms_sensitivities == (1, 5)
+    assert p.prevalence_warning == 0.05 and "prevalence `< 5%`" in text
+    assert p.seasons == tuple(range(2017, 2026))
+    assert p.ci_level == 0.95
+
+
+def test_decision_sequence_is_the_grid_in_descending_order():
+    p = config.PARAMETERS
+    assert p.decision_sequence == tuple(sorted(p.grid, reverse=True))
+    assert p.all_weights == (0.0,) + tuple(sorted(p.grid))

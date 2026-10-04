@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from dataclasses import dataclass
 from pathlib import Path
 
 PREREGISTRATION_FILENAME = "PREREGISTRATION.md"
@@ -77,3 +78,40 @@ def verify_preregistration(root: Path | None = None) -> dict:
             "own change log, never silently reconciled here."
         )
     return lock
+
+
+@dataclass(frozen=True)
+class StudyParameters:
+    """The fixed numbers of the contract, in one place.
+
+    Every value is copied from PREREGISTRATION.md; ``tests/test_config.py``
+    cross-checks each against the contract text. Nothing in the engine may
+    hard-code these elsewhere.
+    """
+
+    grid: tuple[float, ...] = (0.10, 0.25, 0.35, 0.50)  # Section 8.2
+    decision_sequence: tuple[float, ...] = (0.50, 0.35, 0.25, 0.10)  # Section 10
+    baseline_wm: float = 0.0  # Section 8.2
+    delta: float = 0.02  # Section 10, absolute AUC-PR margin
+    n_boot: int = 2000  # Section 10
+    seed: int = 20261027  # Section 10
+    ci_level: float = 0.95  # Section 9
+    n_firms_primary: int = 3  # Section 6
+    n_firms_sensitivities: tuple[int, ...] = (1, 5)  # Section 6
+    prevalence_warning: float = 0.05  # Section 9
+    seasons: tuple[int, ...] = tuple(range(2017, 2026))  # Section 5
+
+    @property
+    def all_weights(self) -> tuple[float, ...]:
+        """Baseline first, then the grid in ascending order."""
+        return (self.baseline_wm,) + tuple(sorted(self.grid))
+
+
+PARAMETERS = StudyParameters()
+
+
+def load_parameters(root: Path | None = None) -> tuple[StudyParameters, dict]:
+    """Verifies the pre-registration hash, then returns the fixed parameters
+    and the lock record. The single entry point the backtest engine uses."""
+    lock = verify_preregistration(root)
+    return PARAMETERS, lock
