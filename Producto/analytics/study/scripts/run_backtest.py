@@ -18,6 +18,18 @@ touch the real study inputs unless ``--confirm-preregistered-run`` is passed:
         (PREREGISTRATION.md Section 17). decision.json records whether the git
         working tree was dirty.
 
+Exit codes:
+
+    0  success (or a dry run whose join keys are complete)
+    1  dry run: join keys are missing
+    2  refused: real inputs without --confirm-preregistered-run, or an existing
+       outputs/decision.json without --allow-overwrite
+    3  refused: provenance (pre-registration commit not an ancestor of HEAD, or
+       git unavailable)
+    4  the run finished and wrote every output, but an analysis failed or a
+       per-season interval is single-class / bootstrap-failed; the final line
+       lists them
+
 Inputs that are not the real files (any other path, with different bytes) run
 without the flag; that is how the test-suite exercises the whole engine on
 synthetic data.
@@ -161,6 +173,18 @@ def main(argv=None, *, params: config.StudyParameters | None = None) -> int:
     o = result.primary.outcome
     print(f"Primary decision: shipped wM = {o.shipped_wm} ({o.claim})")
     print(f"Wrote {out_dir / 'tables'} and {out_dir / 'decision.json'}")
+
+    # Only after every output is on disk: a failed analysis or an interval-less
+    # season must not look like a clean run to a calling script.
+    problems = [f"{res.name} (failed)" for res in report._all_pooled(result) if res.status == "failed"]
+    flagged = {}
+    for row in result.per_season:
+        if row.get("ci_status") in ("single-class", "bootstrap-failed"):
+            flagged.setdefault(row["season"], row["ci_status"])
+    problems += [f"season {season} ({status})" for season, status in flagged.items()]
+    if problems:
+        print(f"INCOMPLETE: {len(problems)} analysis problem(s): {'; '.join(problems)}. Exit code 4.")
+        return 4
     return 0
 
 

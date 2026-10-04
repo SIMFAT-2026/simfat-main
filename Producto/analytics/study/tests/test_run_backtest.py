@@ -232,11 +232,40 @@ def test_a_failed_secondary_analysis_is_warned_about_but_the_run_completes(monke
 
     code = run_backtest.main(_args(synthetic_files, "--out-dir", str(out_dir)), params=SMALL)
 
-    assert code == 0
-    assert "WARNING: sens_n1: FAILED" in capsys.readouterr().err
+    captured = capsys.readouterr()
+    assert code == 4
+    assert "WARNING: sens_n1: FAILED" in captured.err
+    assert "sens_n1" in captured.out.strip().splitlines()[-1]  # the final summary line names it
     doc = json.loads((out_dir / "decision.json").read_text(encoding="utf-8"))
     assert doc["complete"] is True
     assert next(e for e in doc["sensitivities"] if e["analysis"] == "sens_n1")["status"] == "failed"
+    assert (out_dir / "tables" / "pooled_grid.csv").is_file()  # outputs are on disk before exit 4
+
+
+def test_a_single_class_season_makes_the_run_exit_4_after_writing_everything(synthetic_files, tmp_path, capsys):
+    target = dataset.read_csv_rows(synthetic_files["target"])
+    for t in target:
+        if t["season"] == "2017" and t["window"] == "primary" and t["filter"] == "type0":
+            t["count"], t["y_n1"], t["y_n3"], t["y_n5"] = "9", "1", "1", "1"
+    write_csv(synthetic_files["target"], target)
+    out_dir = tmp_path / "out"
+
+    code = run_backtest.main(_args(synthetic_files, "--out-dir", str(out_dir)), params=SMALL)
+
+    captured = capsys.readouterr()
+    assert code == 4
+    assert "season 2017" in captured.out.strip().splitlines()[-1]
+    assert "single-class" in captured.err
+    doc = json.loads((out_dir / "decision.json").read_text(encoding="utf-8"))
+    assert doc["complete"] is True
+    assert any("season 2017" in w and "single-class" in w for w in doc["warnings"])
+
+
+def test_a_clean_run_exits_0_and_prints_no_failure_summary(synthetic_files, tmp_path, capsys):
+    code = run_backtest.main(_args(synthetic_files, "--out-dir", str(tmp_path / "out")), params=SMALL)
+
+    assert code == 0
+    assert "INCOMPLETE" not in capsys.readouterr().out
 
 
 # ---------------------------------------------------------------- run-once guard

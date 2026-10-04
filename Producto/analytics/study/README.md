@@ -278,6 +278,12 @@ Guards on the single real run:
   sensitivity then runs in its own guard: a failure is recorded as
   `status: failed` with its error in the tables and `decision.json` (and a
   stderr warning) while the rest continue. The primary analysis aborts loudly.
+- **Exit codes.** `0` success; `1` dry run with missing join keys; `2` refused
+  (real inputs without the flag, or an existing `decision.json`); `3` refused
+  on provenance; `4` the run completed and wrote every output, but an analysis
+  failed or a per-season interval is `single-class` / `bootstrap-failed` (the
+  final line lists them, and each is also a stderr warning and in
+  `decision.json`).
 - **Degenerate resamples.** `n_redrawn` (resamples without positives) and
   `n_auc_undefined` (kept resamples without negatives, excluded from the ROC AUC
   CI only) are reported everywhere, with a warning above 1% of B.
