@@ -171,3 +171,33 @@ trusting the identity. (`scores.blend`.)
   relation.
 - The engine was built and tested on synthetic data only. No metric was
   computed on the real inputs before the pre-registered run.
+
+### N13 — Secondary metrics in every table, per Section 12 (2026-10-03)
+
+Supersedes the restriction in N11 that limited ROC AUC, Spearman and Brier to
+the primary pooled analysis. Section 12 defines Table 2b as the same grid by
+AUC-PR/Brier with CIs, per season and leave-one-season-out, and Section 9
+requires every metric to carry its 95% CI and `n`. The tables now follow that
+text: ROC AUC, Spearman (against `log1p(count)`) and Brier are computed with
+percentile CIs from the same paired resamples in the pooled primary, every
+leave-one-season-out rerun, every sensitivity and the per-season table. They
+have no decision power; the rule still reads the AUC-PR difference only, so the
+shipped decision is unchanged by this entry. N11 stays as written.
+
+### N14 — Redraw only resamples without positives (2026-10-03)
+
+Supersedes the "no negatives" condition in N9. A resample without negatives
+leaves AUC-PR (the decision metric) and Brier defined, so redrawing it
+conditioned every interval on the presence of a negative, and the effect grows
+with prevalence (synthetically about 4% of draws at 83 of 86 positives). The
+corrected rule: a resample with no positives (AUC-PR undefined) is discarded and
+redrawn, as in N9, and counted as `n_redrawn`. A resample with no negatives is
+kept; ROC AUC is undefined for it, so that resample is excluded from the ROC AUC
+interval only, the same way a NaN Spearman is, and counted as `n_auc_undefined`.
+AUC-PR, Brier and the paired difference always use all B resamples. Both counters
+are reported in every table and in `decision.json`, and a warning is printed to
+stderr (and stored in `decision.json`) when either exceeds 1% of B. The redraw
+budget (100 x B) and the abort on data without positives are unchanged. A
+per-season analysis is labelled `single-class` only when the season holds no
+positive or no negative; any other bootstrap failure is `bootstrap-failed` with
+its message in `ci_error`, never mislabelled. N9 stays as written.

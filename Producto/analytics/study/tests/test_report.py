@@ -12,7 +12,7 @@ import numpy as np
 import pytest
 from synthetic import SEASONS, make_inputs
 
-from study import config, dataset, report
+from study import config, dataset, metrics, report
 
 PARAMS = dataclasses.replace(config.PARAMETERS, n_boot=200)
 
@@ -90,10 +90,24 @@ def test_pooled_rows_cover_baseline_and_grid_with_cis_and_secondary_metrics(stro
     assert base["diff"] == 0.0 and base["diff_lo"] == 0.0 and base["diff_hi"] == 0.0
 
 
-def test_loso_and_sensitivities_skip_secondary_metrics(strong):
+def test_loso_and_sensitivities_report_secondary_metrics_with_cis(strong):
+    # Section 12: Table 2b is the same grid x metrics with CIs, leave-one-season-out included;
+    # Section 9: every metric carries its 95% CI.
     _, out = strong
-    assert math.isnan(out.loso[0].rows[0]["auc"])
-    assert math.isnan(out.sensitivities[0].rows[0]["brier"])
+    for res in [*out.loso, *out.sensitivities]:
+        for r in res.rows:
+            for m in ("auc", "spearman", "brier"):
+                assert not math.isnan(r[m]), (res.name, m)
+                assert r[f"{m}_lo"] <= r[f"{m}_hi"], (res.name, m)
+
+
+def test_secondary_metrics_never_change_the_decision_or_the_ap_intervals():
+    ds = _few_negatives_dataset()
+    with_sec = report.pooled_analysis(ds, "t", "loso", PARAMS, with_secondary=True)
+    without = report.pooled_analysis(ds, "t", "loso", PARAMS, with_secondary=False)
+    assert with_sec.outcome == without.outcome
+    for a, b in zip(with_sec.rows, without.rows):
+        assert (a["ap"], a["ap_lo"], a["ap_hi"], a["diff_lo"]) == (b["ap"], b["ap_lo"], b["ap_hi"], b["diff_lo"])
 
 
 def test_spearman_is_computed_against_log1p_count():
@@ -191,6 +205,40 @@ def test_per_season_ci_status_flags_a_single_class_season_instead_of_crashing():
     rows = [r for r in out.per_season if r["season"] == 2017]
     assert all(r["ci_status"] == "single-class" for r in rows)
     assert all(math.isnan(r["ap_lo"]) for r in rows)
+
+
+def test_per_season_rows_carry_brier_roc_auc_and_spearman_with_cis(strong):
+    _, out = strong
+    for r in out.per_season:
+        assert r["ci_status"] == "ok"
+        for m in ("auc", "spearman", "brier"):
+            assert not math.isnan(r[m]), m
+            assert r[f"{m}_lo"] <= r[f"{m}_hi"], m
+        assert r["n_auc_undefined"] == 0  # 30 comunas, mixed classes: every resample keeps both
+
+
+def test_per_season_point_estimates_match_the_metric_functions(strong):
+    (target, fwi, mb), out = strong
+    ds = dataset.build_dataset(target, fwi, mb, n_threshold=3, window="primary",
+                               type_filter="type0", variant="pct")
+    sub = ds.subset(ds.season == 2017)
+    row = next(r for r in out.per_season if r["season"] == 2017 and r["wm"] == 0.25)
+    s = (1 - 0.25) * sub.sdyn + 0.25 * sub.smap
+    assert row["auc"] == pytest.approx(metrics.roc_auc(sub.y, s))
+    assert row["brier"] == pytest.approx(metrics.brier(sub.y, s))
+    assert row["spearman"] == pytest.approx(metrics.spearman(s, np.log1p(sub.count.astype(float))))
+
+
+def test_per_season_counts_resamples_without_negatives_as_n_auc_undefined():
+    # a season with 2 negatives among 40 comunas: some resamples hold none
+    y = [0, 0] + [1] * 38
+    rng = np.random.default_rng(1)
+    n = 40
+    ds = _manual_dataset(rng.random(n) * 0.5, rng.random(n), y, season=[2017] * n)
+    rows = report.per_season_table(ds, PARAMS)
+    assert rows[0]["ci_status"] == "ok"
+    assert rows[0]["n_auc_undefined"] > 0
+    assert not math.isnan(rows[0]["auc_lo"])
 
 
 def test_per_season_all_positive_season_is_single_class_too():
@@ -291,6 +339,13 @@ def test_write_tables_writes_the_three_csvs(strong, tmp_path):
     analyses = {r["analysis"] for r in rows}
     assert "primary" in analyses and "loso_drop_2017" in analyses and "sens_n1" in analyses
     assert len(rows) == (1 + 9 + 5) * 5
+    with open(tmp_path / "tables" / "per_season.csv", encoding="utf-8", newline="") as f:
+        per_season = list(csv.DictReader(f))
+    assert len(per_season) == 9 * 5
+    for col in ("auc", "auc_lo", "spearman_hi", "brier", "brier_lo", "ci_error", "n_auc_undefined"):
+        assert col in per_season[0]
+    assert all(r["brier"] != "" for r in per_season)
+    assert all(r["auc"] != "" for r in rows)  # leave-one-season-out and sensitivities too
     with open(tmp_path / "tables" / "decisions.csv", encoding="utf-8", newline="") as f:
         decisions = list(csv.DictReader(f))
     assert len(decisions) == 1 + 9 + 5

@@ -36,13 +36,11 @@ def average_ranks(x) -> np.ndarray:
     order = np.argsort(x, kind="mergesort")
     sorted_x = x[order]
     n = len(x)
-    ranks_sorted = np.empty(n, dtype=float)
     # Boundaries of runs of equal values in sorted order.
     boundaries = np.flatnonzero(np.diff(sorted_x) != 0) + 1
     starts = np.concatenate(([0], boundaries))
     ends = np.concatenate((boundaries, [n]))
-    for start, end in zip(starts, ends):
-        ranks_sorted[start:end] = (start + 1 + end) / 2.0
+    ranks_sorted = np.repeat((starts + 1 + ends) / 2.0, ends - starts)
     ranks = np.empty(n, dtype=float)
     ranks[order] = ranks_sorted
     return ranks

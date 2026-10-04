@@ -13,8 +13,9 @@ re-derived here.
   replace it and never change it.
 
 Secondary metrics (ROC AUC, Spearman against ``log1p(count)``, Brier) are
-bootstrapped for the primary analysis only; every other analysis reports
-AUC-PR and the paired difference, which is all the decision rule needs.
+bootstrapped, with percentile CIs from the same paired resamples, in EVERY
+analysis and in the per-season table (Sections 9 and 12, Table 2b). They have no
+decision power: the rule reads the AUC-PR difference only.
 """
 from __future__ import annotations
 
@@ -138,40 +139,68 @@ def pooled_analysis(
 
 
 def per_season_table(ds: dataset.Dataset, params: config.StudyParameters) -> list:
-    """AUC-PR, prevalence, n and a per-season comuna-bootstrap CI for every weight."""
+    """Every Section 9 metric (AUC-PR, ROC AUC, Spearman, Brier), prevalence, n
+    and the paired difference, each with a per-season comuna-bootstrap CI, for
+    every weight. Each season holds one row per comuna, so the cluster bootstrap
+    is a plain bootstrap over the comunas."""
     weights = params.all_weights
     base_w = params.baseline_wm
     out = []
     for season in sorted(set(int(s) for s in ds.season)):
         sub = ds.subset(ds.season == season)
         by_wm = scores.scores_by_wm(sub.sdyn, sub.smap, weights)
+        log_count = np.log1p(sub.count.astype(float))
         prevalence = float(sub.y.mean())
         n_pos = int(sub.y.sum())
-        point = {w: (metrics.average_precision(sub.y, by_wm[w]) if n_pos > 0 else NAN) for w in weights}
-        boot, status, error, n_redrawn = None, "ok", "", 0
-        if n_pos in (0, len(sub)):
+        single_class = n_pos in (0, len(sub))
+
+        def evaluate(idx, sub=sub, by_wm=by_wm, log_count=log_count):
+            yy = sub.y[idx]
+            vals = {}
+            for w in weights:
+                s_w = by_wm[w][idx]
+                vals[f"ap|{_fmt(w)}"] = metrics.average_precision(yy, s_w)
+                vals[f"auc|{_fmt(w)}"] = _auc_or_nan(yy, s_w)
+                vals[f"spearman|{_fmt(w)}"] = metrics.spearman(s_w, log_count[idx])
+                vals[f"brier|{_fmt(w)}"] = metrics.brier(yy, s_w)
+            return vals
+
+        boot, status, error, n_redrawn, n_auc_undefined = None, "ok", "", 0, 0
+        if single_class:
             status = "single-class"
         else:
             try:
-                boot = bootstrap.cluster_bootstrap(
-                    sub.y, sub.comuna,
-                    lambda idx: {f"ap|{_fmt(w)}": metrics.average_precision(sub.y[idx], by_wm[w][idx])
-                                 for w in weights},
-                    B=params.n_boot, seed=params.seed,
-                )
+                boot = bootstrap.cluster_bootstrap(sub.y, sub.comuna, evaluate,
+                                                   B=params.n_boot, seed=params.seed)
                 n_redrawn = boot.n_redrawn
+                n_auc_undefined = _count_nan(boot.values[f"auc|{_fmt(base_w)}"])
             except bootstrap.BootstrapError as exc:
                 status, error = "bootstrap-failed", str(exc)
+
+        point_ap = {w: (metrics.average_precision(sub.y, by_wm[w]) if n_pos > 0 else NAN) for w in weights}
         for w in weights:
             row = {"season": season, "wm": w, "n": len(sub), "n_pos": n_pos,
                    "prevalence": prevalence,
                    "prevalence_warning": bool(prevalence < params.prevalence_warning),
-                   "ap": point[w], "diff": point[w] - point[base_w],
-                   "ci_status": status, "ci_error": error, "n_redrawn": n_redrawn}
+                   "ap": point_ap[w], "diff": point_ap[w] - point_ap[base_w],
+                   "ci_status": status, "ci_error": error, "n_redrawn": n_redrawn,
+                   "n_auc_undefined": n_auc_undefined}
+            points = {
+                "auc": NAN if single_class else metrics.roc_auc(sub.y, by_wm[w]),
+                "spearman": metrics.spearman(by_wm[w], log_count),
+                "brier": metrics.brier(sub.y, by_wm[w]),
+            }
+            for m in ("ap", "auc", "spearman", "brier"):
+                if m != "ap":
+                    row[m] = points[m]
+                if boot is None:
+                    row[f"{m}_lo"] = row[f"{m}_hi"] = NAN
+                else:
+                    row[f"{m}_lo"], row[f"{m}_hi"], _ = bootstrap.percentile_ci(
+                        boot.values[f"{m}|{_fmt(w)}"], params.ci_level)
             if boot is None:
-                row.update(ap_lo=NAN, ap_hi=NAN, diff_lo=NAN, diff_hi=NAN)
+                row["diff_lo"] = row["diff_hi"] = NAN
             else:
-                row["ap_lo"], row["ap_hi"], _ = bootstrap.percentile_ci(boot.values[f"ap|{_fmt(w)}"], params.ci_level)
                 d = boot.values[f"ap|{_fmt(w)}"] - boot.values[f"ap|{_fmt(base_w)}"]
                 row["diff_lo"], row["diff_hi"], _ = bootstrap.percentile_ci(d, params.ci_level)
             out.append(row)
@@ -205,7 +234,7 @@ def run_backtest(
     loso = []
     for season in params.seasons:
         sub = primary_ds.subset(primary_ds.season != season)
-        loso.append(pooled_analysis(sub, f"loso_drop_{season}", "loso", params, with_secondary=False))
+        loso.append(pooled_analysis(sub, f"loso_drop_{season}", "loso", params, with_secondary=True))
 
     sens_specs = [(f"sens_n{n}", dict(n_threshold=n, window="primary", type_filter="type0", variant="pct"))
                   for n in params.n_firms_sensitivities]
@@ -218,7 +247,7 @@ def run_backtest(
                                  type_filter="type0", variant="log")),
     ]
     sensitivities = [
-        pooled_analysis(build(**spec), name, "sensitivity", params, with_secondary=False)
+        pooled_analysis(build(**spec), name, "sensitivity", params, with_secondary=True)
         for name, spec in sens_specs
     ]
     return BacktestResult(primary, per_season, loso, sensitivities)
@@ -234,7 +263,9 @@ POOLED_COLUMNS = (
 )
 PER_SEASON_COLUMNS = [
     "season", "wm", "n", "n_pos", "prevalence", "prevalence_warning",
-    "ap", "ap_lo", "ap_hi", "diff", "diff_lo", "diff_hi", "ci_status", "ci_error", "n_redrawn",
+    "ap", "ap_lo", "ap_hi", "diff", "diff_lo", "diff_hi",
+    *[f"{m}{suffix}" for m in SECONDARY for suffix in ("", "_lo", "_hi")],
+    "ci_status", "ci_error", "n_redrawn", "n_auc_undefined",
 ]
 
 
