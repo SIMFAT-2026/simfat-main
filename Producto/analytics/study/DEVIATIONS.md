@@ -248,3 +248,22 @@ interval, or the shipped weight. (`config.StudyParameters.prevalence_high`.)
   `decision_sequence` that is not the grid in descending order.
 - The engine remains built and tested on synthetic data only; no metric was
   computed on the real inputs.
+
+### N17 — Last hardening guards before the single real run (2026-10-03)
+
+Implementation notes; no change to the pre-registered analysis.
+
+- Exit code 4. After every table and `decision.json` are on disk,
+  `scripts/run_backtest.py` returns 4 (and prints a final `INCOMPLETE:` line
+  listing them) if any analysis has `status: failed` or any per-season row has
+  `ci_status` of `single-class` or `bootstrap-failed`. Codes 2 (refused) and 3
+  (provenance) are unchanged; all codes are documented in the script docstring
+  and the README.
+- Dirty study directory. A real run (`--confirm-preregistered-run`) refuses to
+  start with exit 3 if `git status --porcelain` for `Producto/analytics/study/`
+  is non-empty or git cannot answer (fail closed), so the recorded git sha
+  describes the code that ran. Changes outside the study directory do not block
+  and are still recorded as `git_dirty`. Synthetic runs are unaffected.
+- Per-season warnings. `degeneracy_warnings` now also names every season whose
+  `ci_status` is `single-class` or `bootstrap-failed` (once per season), so it is
+  printed to stderr and stored in `decision.json`.
