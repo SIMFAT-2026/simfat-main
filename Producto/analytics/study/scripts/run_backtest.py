@@ -107,20 +107,25 @@ def main(argv=None, *, params: config.StudyParameters | None = None) -> int:
         return 0 if rep.ok else 1
 
     effective = params if params is not None else config.PARAMETERS
-    result = report.run_backtest(target_rows, fwi_rows, mb_rows, effective)
+    out_dir = Path(args.out_dir)
+    input_hashes = {INPUT_NAMES[k]: dataset.file_sha256(p) for k, p in paths.items()}
+    git_sha = report.current_git_sha(STUDY_ROOT)
+
+    def write_outputs(result, warnings=()):
+        report.write_tables(result, out_dir / "tables")
+        report.write_decision_json(
+            result, out_dir / "decision.json", lock=lock, input_hashes=input_hashes,
+            git_sha=git_sha, params=effective, warnings=warnings,
+        )
+
+    # The primary result and the per-season table reach the disk before any
+    # rerun starts, so a late failure cannot lose them or invite a second run.
+    result = report.run_backtest(target_rows, fwi_rows, mb_rows, effective, checkpoint=write_outputs)
 
     warnings = report.degeneracy_warnings(result, effective)
     for message in warnings:
         print(f"WARNING: {message}", file=sys.stderr)
-
-    out_dir = Path(args.out_dir)
-    report.write_tables(result, out_dir / "tables")
-    report.write_decision_json(
-        result, out_dir / "decision.json", lock=lock,
-        input_hashes={INPUT_NAMES[k]: dataset.file_sha256(p) for k, p in paths.items()},
-        git_sha=report.current_git_sha(STUDY_ROOT), params=effective,
-        warnings=warnings,
-    )
+    write_outputs(result, warnings)
     o = result.primary.outcome
     print(f"Primary decision: shipped wM = {o.shipped_wm} ({o.claim})")
     print(f"Wrote {out_dir / 'tables'} and {out_dir / 'decision.json'}")

@@ -154,6 +154,104 @@ def test_the_backtest_expects_the_configured_number_of_comunas():
         report.run_backtest(target, fwi, mb, wrong)
 
 
+# ---------------------------------------------------------------- qualifies comes from the rule
+
+
+def test_qualifies_column_comes_from_the_decision_rule_not_a_second_comparison(monkeypatch):
+    real = report.decision_rule.apply_rule
+
+    def fake(cis, *, root=None):
+        out = real(cis, root=root)
+        return dataclasses.replace(out, qualifying=(0.25,))
+
+    monkeypatch.setattr(report.decision_rule, "apply_rule", fake)
+    res = report.pooled_analysis(_few_negatives_dataset(), "t", "primary", PARAMS, with_secondary=False)
+    assert {r["wm"]: r["qualifies"] for r in res.rows} == {
+        0.0: None, 0.10: False, 0.25: True, 0.35: False, 0.50: False}
+
+
+# ---------------------------------------------------------------- fault tolerance
+
+
+def _fail_on(monkeypatch, *names, exc=RuntimeError("boom")):
+    real = report.pooled_analysis
+
+    def flaky(ds, name, kind, params, **kw):
+        if name in names:
+            raise exc
+        return real(ds, name, kind, params, **kw)
+
+    monkeypatch.setattr(report, "pooled_analysis", flaky)
+
+
+def test_a_failing_leave_one_season_out_run_is_recorded_and_the_rest_continue(monkeypatch):
+    target, fwi, mb = make_inputs("mb_strong")
+    _fail_on(monkeypatch, "loso_drop_2019")
+    out = report.run_backtest(target, fwi, mb, PARAMS)
+    by = {r.name: r for r in out.loso}
+    assert len(out.loso) == 9 and len(out.sensitivities) == 5
+    assert by["loso_drop_2019"].status == "failed"
+    assert "RuntimeError: boom" in by["loso_drop_2019"].error
+    assert by["loso_drop_2019"].outcome is None and by["loso_drop_2019"].rows == []
+    assert all(r.status == "ok" for r in [*out.loso, *out.sensitivities] if r.name != "loso_drop_2019")
+    assert out.primary.status == "ok"
+
+
+def test_a_sensitivity_with_an_incomplete_panel_is_recorded_as_failed_not_hidden():
+    target, fwi, mb = make_inputs("mb_strong")
+    target = [t for t in target if not (t["comunaId"] == "C003" and t["season"] == "2020"
+                                        and t["filter"] == "notype" and t["window"] == "primary")]
+    out = report.run_backtest(target, fwi, mb, PARAMS)
+    failed = [r for r in out.sensitivities if r.status == "failed"]
+    assert [r.name for r in failed] == ["sens_no_type_filter"]
+    assert "PanelError" in failed[0].error
+    assert out.primary.status == "ok" and len(out.sensitivities) == 5
+
+
+def test_the_primary_analysis_still_aborts_loudly(monkeypatch):
+    target, fwi, mb = make_inputs("mb_strong")
+    _fail_on(monkeypatch, "primary")
+    with pytest.raises(RuntimeError, match="boom"):
+        report.run_backtest(target, fwi, mb, PARAMS)
+
+
+def test_the_primary_and_per_season_results_are_handed_to_the_checkpoint_before_the_rest(monkeypatch):
+    target, fwi, mb = make_inputs("mb_strong")
+    seen = []
+    _fail_on(monkeypatch, "loso_drop_2017", exc=KeyboardInterrupt())
+    with pytest.raises(KeyboardInterrupt):
+        report.run_backtest(target, fwi, mb, PARAMS, checkpoint=seen.append)
+    assert len(seen) == 1
+    partial = seen[0]
+    assert partial.complete is False and partial.loso == [] and partial.sensitivities == []
+    assert partial.primary.status == "ok" and len(partial.per_season) == 9 * 5
+
+
+def test_failed_analyses_appear_in_the_tables_and_in_decision_json(monkeypatch, tmp_path):
+    target, fwi, mb = make_inputs("mb_strong")
+    _fail_on(monkeypatch, "loso_drop_2019", "sens_n5")
+    out = report.run_backtest(target, fwi, mb, PARAMS)
+    report.write_tables(out, tmp_path / "tables")
+    with open(tmp_path / "tables" / "decisions.csv", encoding="utf-8", newline="") as f:
+        decisions = {r["analysis"]: r for r in csv.DictReader(f)}
+    assert decisions["loso_drop_2019"]["status"] == "failed"
+    assert "boom" in decisions["loso_drop_2019"]["error"]
+    assert decisions["primary"]["status"] == "ok" and decisions["primary"]["error"] == ""
+    with open(tmp_path / "tables" / "pooled_grid.csv", encoding="utf-8", newline="") as f:
+        pooled = list(csv.DictReader(f))
+    assert [r["status"] for r in pooled if r["analysis"] == "sens_n5"] == ["failed"]
+    path = report.write_decision_json(
+        out, tmp_path / "decision.json", lock={"sha256": "a", "commit": "b"},
+        input_hashes={}, git_sha="x", params=PARAMS)
+    doc = json.loads(path.read_text(encoding="utf-8"))
+    assert doc["complete"] is True
+    entry = next(e for e in doc["leave_one_season_out"] if e["analysis"] == "loso_drop_2019")
+    assert entry["status"] == "failed" and "boom" in entry["error"]
+    assert next(e for e in doc["sensitivities"] if e["analysis"] == "sens_n5")["status"] == "failed"
+    assert doc["primary"]["status"] == "ok"
+    assert any("loso_drop_2019" in w and "FAILED" in w for w in report.degeneracy_warnings(out, PARAMS))
+
+
 # ---------------------------------------------------------------- degenerate resamples (N14)
 
 

@@ -168,6 +168,49 @@ def test_degeneracy_warnings_are_printed_loudly_and_recorded(monkeypatch, synthe
     assert doc["warnings"] == ["primary: n_redrawn=99 exceeds 1% of B=30"]
 
 
+def test_an_interrupted_run_has_already_written_the_primary_result_and_the_per_season_table(
+        monkeypatch, synthetic_files, tmp_path):
+    real = report.pooled_analysis
+
+    def flaky(ds, name, kind, params, **kw):
+        if name == "loso_drop_2017":
+            raise KeyboardInterrupt()
+        return real(ds, name, kind, params, **kw)
+
+    monkeypatch.setattr(report, "pooled_analysis", flaky)
+    out_dir = tmp_path / "out"
+
+    with pytest.raises(KeyboardInterrupt):
+        run_backtest.main(_args(synthetic_files, "--out-dir", str(out_dir)), params=SMALL)
+
+    assert (out_dir / "tables" / "per_season.csv").is_file()
+    assert (out_dir / "tables" / "pooled_grid.csv").is_file()
+    doc = json.loads((out_dir / "decision.json").read_text(encoding="utf-8"))
+    assert doc["complete"] is False and doc["primary"]["status"] == "ok"
+    assert doc["leave_one_season_out"] == []
+
+
+def test_a_failed_secondary_analysis_is_warned_about_but_the_run_completes(monkeypatch, synthetic_files,
+                                                                          tmp_path, capsys):
+    real = report.pooled_analysis
+
+    def flaky(ds, name, kind, params, **kw):
+        if name == "sens_n1":
+            raise RuntimeError("boom")
+        return real(ds, name, kind, params, **kw)
+
+    monkeypatch.setattr(report, "pooled_analysis", flaky)
+    out_dir = tmp_path / "out"
+
+    code = run_backtest.main(_args(synthetic_files, "--out-dir", str(out_dir)), params=SMALL)
+
+    assert code == 0
+    assert "WARNING: sens_n1: FAILED" in capsys.readouterr().err
+    doc = json.loads((out_dir / "decision.json").read_text(encoding="utf-8"))
+    assert doc["complete"] is True
+    assert next(e for e in doc["sensitivities"] if e["analysis"] == "sens_n1")["status"] == "failed"
+
+
 def test_the_default_output_directory_is_the_study_outputs_folder():
     assert run_backtest.DEFAULT_OUT_DIR.name == "outputs"
     assert run_backtest.DEFAULT_OUT_DIR.parent == run_backtest.STUDY_ROOT

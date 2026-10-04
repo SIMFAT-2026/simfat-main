@@ -25,7 +25,7 @@ import math
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Mapping, Sequence
+from typing import Callable, Mapping, Sequence
 
 import numpy as np
 
@@ -44,9 +44,21 @@ class PooledResult:
     prevalence: float
     prevalence_warning: bool
     rows: list  # one dict per weight, baseline first
-    outcome: decision_rule.RuleOutcome
+    outcome: decision_rule.RuleOutcome | None  # None only for a failed analysis
     n_redrawn: int  # resamples without positives, redrawn (AUC-PR undefined)
     n_auc_undefined: int = 0  # kept resamples without negatives: out of the ROC AUC CI only
+    status: str = "ok"  # ok | failed
+    error: str = ""
+
+
+def failed_result(name: str, kind: str, exc: BaseException) -> PooledResult:
+    """A leave-one-season-out or sensitivity analysis that raised: reported in
+    every output with its error, never dropped."""
+    return PooledResult(
+        name=name, kind=kind, n=0, n_pos=0, prevalence=NAN, prevalence_warning=False,
+        rows=[], outcome=None, n_redrawn=0, n_auc_undefined=0,
+        status="failed", error=f"{type(exc).__name__}: {exc}",
+    )
 
 
 @dataclass(frozen=True)
@@ -55,6 +67,7 @@ class BacktestResult:
     per_season: list  # one dict per (season, weight)
     loso: list  # PooledResult per dropped season
     sensitivities: list  # PooledResult per sensitivity
+    complete: bool = True  # False for the checkpoint written before the reruns
 
 
 def _fmt(w: float) -> str:
@@ -103,6 +116,13 @@ def pooled_analysis(
 
     point_ap = {w: metrics.average_precision(ds.y, by_wm[w]) for w in weights}
     diff_cis = {}
+    for w in weights:
+        if w != base_w:
+            diff_values = boot.values[f"ap|{_fmt(w)}"] - boot.values[f"ap|{_fmt(base_w)}"]
+            d_lo, d_hi, _ = bootstrap.percentile_ci(diff_values, params.ci_level)
+            diff_cis[w] = (d_lo, d_hi)
+    outcome = decision_rule.apply_rule(diff_cis)
+
     rows = []
     for w in weights:
         row = {"wm": w, "n": len(ds), "n_pos": int(ds.y.sum()), "prevalence": float(ds.y.mean())}
@@ -111,11 +131,8 @@ def pooled_analysis(
         d_lo, d_hi, _ = bootstrap.percentile_ci(diff_values, params.ci_level)
         row.update(ap=point_ap[w], ap_lo=ap_lo, ap_hi=ap_hi,
                    diff=point_ap[w] - point_ap[base_w], diff_lo=d_lo, diff_hi=d_hi)
-        if w != base_w:
-            diff_cis[w] = (d_lo, d_hi)
-            row["qualifies"] = bool(d_lo >= -params.delta)
-        else:
-            row["qualifies"] = None
+        # Straight from the rule: no second implementation of the comparison here.
+        row["qualifies"] = None if w == base_w else bool(w in outcome.qualifying)
         for m, fn in (("auc", _auc_or_nan), ("spearman", None), ("brier", metrics.brier)):
             if with_secondary:
                 if m == "spearman":
@@ -128,7 +145,6 @@ def pooled_analysis(
             row.update({m: point, f"{m}_lo": lo, f"{m}_hi": hi})
         rows.append(row)
 
-    outcome = decision_rule.apply_rule(diff_cis)
     prevalence = float(ds.y.mean())
     return PooledResult(
         name=name, kind=kind, n=len(ds), n_pos=int(ds.y.sum()), prevalence=prevalence,
@@ -212,8 +228,17 @@ def run_backtest(
     fwi_rows: Sequence[Mapping],
     mapbiomas_rows: Sequence[Mapping],
     params: config.StudyParameters | None = None,
+    *,
+    checkpoint: Callable[[BacktestResult], None] | None = None,
 ) -> BacktestResult:
     """Every analysis of Sections 10-13. Verifies the pre-registration first.
+
+    The primary pooled result and the per-season table are computed first and
+    handed to ``checkpoint`` (the entry point writes them to disk) before any
+    rerun starts. A failure in the primary analysis or in the per-season panel
+    check aborts loudly. Each leave-one-season-out rerun and each sensitivity
+    then runs inside its own guard: a failure is recorded in the result with its
+    error (``status="failed"``) and the remaining analyses continue.
 
     ``params`` exists so tests can shrink ``n_boot``; the entry point never
     passes it.
@@ -239,12 +264,24 @@ def run_backtest(
     for season in params.seasons:
         check(primary_ds.subset(primary_ds.season == season), f"primary season {season}", seasons=[season])
     per_season = per_season_table(primary_ds, params)
+    if checkpoint is not None:
+        checkpoint(BacktestResult(primary, per_season, [], [], complete=False))
 
-    loso = []
-    for season in params.seasons:
-        sub = check(primary_ds.subset(primary_ds.season != season), f"loso_drop_{season}",
-                    seasons=[s for s in params.seasons if s != season])
-        loso.append(pooled_analysis(sub, f"loso_drop_{season}", "loso", params, with_secondary=True))
+    def guarded(name, kind, make_dataset):
+        try:
+            return pooled_analysis(make_dataset(), name, kind, params, with_secondary=True)
+        except Exception as exc:  # reported in every output, never hidden
+            return failed_result(name, kind, exc)
+
+    loso = [
+        guarded(
+            f"loso_drop_{season}", "loso",
+            lambda season=season: check(
+                primary_ds.subset(primary_ds.season != season), f"loso_drop_{season}",
+                seasons=[s for s in params.seasons if s != season]),
+        )
+        for season in params.seasons
+    ]
 
     sens_specs = [(f"sens_n{n}", dict(n_threshold=n, window="primary", type_filter="type0", variant="pct"))
                   for n in params.n_firms_sensitivities]
@@ -257,8 +294,8 @@ def run_backtest(
                                  type_filter="type0", variant="log")),
     ]
     sensitivities = [
-        pooled_analysis(check(build(**spec), name, reference=primary_ds), name, "sensitivity", params,
-                        with_secondary=True)
+        guarded(name, "sensitivity",
+                lambda name=name, spec=spec: check(build(**spec), name, reference=primary_ds))
         for name, spec in sens_specs
     ]
     return BacktestResult(primary, per_season, loso, sensitivities)
@@ -270,7 +307,7 @@ POOLED_COLUMNS = (
     ["analysis", "kind", "wm", "n", "n_pos", "prevalence", "prevalence_warning"]
     + ["ap", "ap_lo", "ap_hi", "diff", "diff_lo", "diff_hi", "qualifies"]
     + [f"{m}{suffix}" for m in SECONDARY for suffix in ("", "_lo", "_hi")]
-    + ["n_redrawn", "n_auc_undefined"]
+    + ["n_redrawn", "n_auc_undefined", "status", "error"]
 )
 PER_SEASON_COLUMNS = [
     "season", "wm", "n", "n_pos", "prevalence", "prevalence_warning",
@@ -292,6 +329,9 @@ def degeneracy_warnings(result: BacktestResult, params: config.StudyParameters) 
     limit = 0.01 * params.n_boot
     out = []
     for res in _all_pooled(result):
+        if res.status == "failed":
+            out.append(f"{res.name}: FAILED ({res.error})")
+            continue
         for field in ("n_redrawn", "n_auc_undefined"):
             value = getattr(res, field)
             if value > limit:
@@ -321,9 +361,13 @@ def write_tables(result: BacktestResult, out_dir: Path) -> None:
         w = csv.writer(f)
         w.writerow(POOLED_COLUMNS)
         for res in _all_pooled(result):
+            if res.status == "failed":
+                merged = {"analysis": res.name, "kind": res.kind, "status": res.status, "error": res.error}
+                w.writerow([_cell(merged.get(c)) for c in POOLED_COLUMNS])
+                continue
             for row in res.rows:
                 merged = {**row, "analysis": res.name, "kind": res.kind, "n_redrawn": res.n_redrawn,
-                          "n_auc_undefined": res.n_auc_undefined,
+                          "n_auc_undefined": res.n_auc_undefined, "status": res.status, "error": res.error,
                           "prevalence_warning": res.prevalence_warning}
                 w.writerow([_cell(merged[c]) for c in POOLED_COLUMNS])
 
@@ -337,13 +381,17 @@ def write_tables(result: BacktestResult, out_dir: Path) -> None:
     with open(out_dir / "decisions.csv", "w", encoding="utf-8", newline="") as f:
         w = csv.writer(f)
         w.writerow(["analysis", "kind", "shipped_wm", "claim", "qualifying", "n", "prevalence",
-                    "prevalence_warning", "n_redrawn", "n_auc_undefined"]
+                    "prevalence_warning", "n_redrawn", "n_auc_undefined", "status", "error"]
                    + [f"diff_lo_{_fmt(g)}" for g in grid])
         for res in _all_pooled(result):
             o = res.outcome
+            if res.status == "failed":
+                w.writerow([res.name, res.kind, "", "", "", "", "", "", "", "", res.status, res.error]
+                           + [""] * len(grid))
+                continue
             w.writerow([res.name, res.kind, o.shipped_wm, o.claim,
                         " ".join(_fmt(q) for q in o.qualifying), res.n, res.prevalence,
-                        res.prevalence_warning, res.n_redrawn, res.n_auc_undefined]
+                        res.prevalence_warning, res.n_redrawn, res.n_auc_undefined, res.status, res.error]
                        + [o.lowers[g] for g in grid])
 
 
@@ -359,9 +407,12 @@ def current_git_sha(cwd: Path | None = None) -> str:
 
 
 def _decision_entry(res: PooledResult, primary: PooledResult) -> dict:
+    if res.status == "failed":
+        return {"analysis": res.name, "status": "failed", "error": res.error}
     o = res.outcome
     return {
         "analysis": res.name,
+        "status": res.status,
         "shipped_wm": o.shipped_wm,
         "claim": o.claim,
         "qualifying": list(o.qualifying),
@@ -392,6 +443,7 @@ def write_decision_json(
                             "version": lock.get("version")},
         "inputs_sha256": dict(input_hashes),
         "git_sha": git_sha,
+        "complete": bool(result.complete),
         "warnings": list(warnings),
         "parameters": {
             "grid": list(params.grid), "decision_sequence": list(params.decision_sequence),
