@@ -118,32 +118,47 @@ def test_degenerate_resamples_are_redrawn_and_counted_without_changing_b():
 
     res = bootstrap.cluster_bootstrap(y, clusters, ev, B=500, seed=10)
     assert len(res.values["n_pos"]) == 500
-    assert all(0 < v.sum() < len(v) for v in kept)  # no degenerate resample ever reaches evaluate
+    assert all(v.sum() > 0 for v in kept)  # no positive-free resample ever reaches evaluate
     # Expected redraws ~ B * p / (1 - p) = 500 * .316 / .684 ~ 231
     assert 120 < res.n_redrawn < 380
     again = bootstrap.cluster_bootstrap(y, clusters, ev, B=500, seed=10)
     assert again.n_redrawn == res.n_redrawn  # the rule is deterministic given the seed
 
 
-def test_all_positive_resamples_are_degenerate_too():
+def test_resamples_without_negatives_are_kept_not_redrawn():
+    # Only the first cluster holds a negative. A resample that misses it has no
+    # negatives (ROC AUC undefined) but AUC-PR is perfectly defined, so redrawing
+    # it would silently condition the interval on the presence of a negative.
     clusters = np.repeat(np.arange(4), 2).astype(str)
-    y = np.array([0, 0, 1, 1, 1, 1, 1, 1])  # only the first cluster has negatives
-    res = bootstrap.cluster_bootstrap(y, clusters, lambda idx: {"n_neg": float((y[idx] == 0).sum())},
-                                      B=200, seed=11)
-    assert np.all(res.values["n_neg"] > 0)
-    assert res.n_redrawn > 0
+    y = np.array([0, 0, 1, 1, 1, 1, 1, 1])
+    n_neg = []
+
+    def ev(idx):
+        n_neg.append(int((y[idx] == 0).sum()))
+        return {"n_neg": float(n_neg[-1])}
+
+    res = bootstrap.cluster_bootstrap(y, clusters, ev, B=400, seed=11)
+    assert res.n_redrawn == 0
+    assert len(n_neg) == 400
+    assert 0 in n_neg  # some kept resamples hold no negatives at all
 
 
-def test_data_with_a_single_class_cannot_be_bootstrapped():
+def test_data_without_positives_cannot_be_bootstrapped():
     clusters = np.array(["a", "b"])
     with pytest.raises(bootstrap.BootstrapError):
-        bootstrap.cluster_bootstrap(np.array([1, 1]), clusters, lambda idx: {"x": 0.0}, B=10, seed=1)
+        bootstrap.cluster_bootstrap(np.array([0, 0]), clusters, lambda idx: {"x": 0.0}, B=10, seed=1)
+
+
+def test_data_without_negatives_can_still_be_bootstrapped_for_auc_pr():
+    clusters = np.array(["a", "b"])
+    res = bootstrap.cluster_bootstrap(np.array([1, 1]), clusters, lambda idx: {"x": 1.0}, B=10, seed=1)
+    assert len(res.values["x"]) == 10 and res.n_redrawn == 0
 
 
 def test_redraw_budget_is_enforced():
     clusters = np.repeat(np.arange(4), 2).astype(str)
     y = np.array([1, 0, 0, 0, 0, 0, 0, 0])
-    with pytest.raises(bootstrap.BootstrapError, match="degenerate"):
+    with pytest.raises(bootstrap.BootstrapError, match="without positives"):
         bootstrap.cluster_bootstrap(y, clusters, lambda idx: {"x": 0.0}, B=300, seed=10, max_attempts=300)
 
 

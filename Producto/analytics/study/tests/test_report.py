@@ -122,6 +122,51 @@ def test_prevalence_exactly_five_percent_is_not_flagged():
     assert res.prevalence_warning is False  # the contract flags prevalence < 5%
 
 
+# ---------------------------------------------------------------- degenerate resamples (N14)
+
+
+def _few_negatives_dataset():
+    # 40 comunas, 2 negatives: a resample misses both with probability
+    # (38/40)^40 ~ 0.13, so it holds no negatives (ROC AUC undefined) but always
+    # holds positives (AP defined).
+    y = [0, 0] + [1] * 38
+    rng = np.random.default_rng(1)
+    return _manual_dataset(rng.random(40) * 0.5, rng.random(40), y)
+
+
+def test_a_resample_without_negatives_is_not_redrawn_and_only_drops_out_of_the_roc_auc_ci():
+    res = report.pooled_analysis(_few_negatives_dataset(), "t", "primary", PARAMS, with_secondary=True)
+    assert res.n_redrawn == 0  # positives are always present: nothing to redraw
+    assert res.n_auc_undefined > 0
+    assert res.n_auc_undefined < PARAMS.n_boot
+    row = _row(res, 0.0)
+    assert not math.isnan(row["auc_lo"]) and not math.isnan(row["auc_hi"])
+    assert not math.isnan(row["ap_lo"]) and not math.isnan(row["brier_lo"])
+
+
+def test_a_resample_without_positives_is_redrawn_and_counted():
+    y = [1] + [0] * 39
+    rng = np.random.default_rng(2)
+    ds = _manual_dataset(rng.random(40) * 0.5, rng.random(40), y)
+    res = report.pooled_analysis(ds, "t", "primary", PARAMS, with_secondary=True)
+    assert res.n_redrawn > 0
+    assert res.n_auc_undefined == 0  # the lone positive is present in every kept resample, negatives too
+
+
+def test_degeneracy_warning_fires_above_one_percent_of_b_and_names_the_analysis():
+    res = report.pooled_analysis(_few_negatives_dataset(), "t", "primary", PARAMS, with_secondary=True)
+    out = report.BacktestResult(primary=res, per_season=[], loso=[], sensitivities=[])
+    msgs = report.degeneracy_warnings(out, PARAMS)
+    assert any("t" in m and "n_auc_undefined" in m for m in msgs)
+
+
+def test_degeneracy_warning_is_silent_at_or_below_one_percent():
+    res = report.pooled_analysis(_few_negatives_dataset(), "t", "primary", PARAMS, with_secondary=True)
+    quiet = dataclasses.replace(res, n_redrawn=PARAMS.n_boot // 100, n_auc_undefined=PARAMS.n_boot // 100)
+    out = report.BacktestResult(primary=quiet, per_season=[], loso=[], sensitivities=[])
+    assert report.degeneracy_warnings(out, PARAMS) == []
+
+
 # ---------------------------------------------------------------- per-season, LOSO, sensitivities
 
 
@@ -146,6 +191,39 @@ def test_per_season_ci_status_flags_a_single_class_season_instead_of_crashing():
     rows = [r for r in out.per_season if r["season"] == 2017]
     assert all(r["ci_status"] == "single-class" for r in rows)
     assert all(math.isnan(r["ap_lo"]) for r in rows)
+
+
+def test_per_season_all_positive_season_is_single_class_too():
+    target, fwi, mb = make_inputs("mb_strong")
+    for t in target:
+        if t["season"] == "2018" and t["window"] == "primary" and t["filter"] == "type0":
+            t["count"], t["y_n1"], t["y_n3"], t["y_n5"] = "9", "1", "1", "1"
+    out = report.run_backtest(target, fwi, mb, PARAMS)
+    rows = [r for r in out.per_season if r["season"] == 2018]
+    assert all(r["ci_status"] == "single-class" for r in rows)
+
+
+def test_per_season_redraw_budget_exhaustion_is_never_labelled_single_class(monkeypatch):
+    target, fwi, mb = make_inputs("mb_strong")
+    real = report.bootstrap.cluster_bootstrap
+
+    def flaky(y, clusters, evaluate, **kw):
+        if len(y) == 30 and report_state["season_calls"] == 0:
+            report_state["season_calls"] += 1
+            raise report.bootstrap.BootstrapError("gave up after 99 draws: too many degenerate resamples")
+        return real(y, clusters, evaluate, **kw)
+
+    report_state = {"season_calls": 0}
+    ds = dataset.build_dataset(target, fwi, mb, n_threshold=3, window="primary",
+                               type_filter="type0", variant="pct")
+    monkeypatch.setattr(report.bootstrap, "cluster_bootstrap", flaky)
+    rows = report.per_season_table(ds, PARAMS)
+    first = [r for r in rows if r["season"] == 2017]
+    assert all(r["ci_status"] == "bootstrap-failed" for r in first)
+    assert all("too many degenerate resamples" in r["ci_error"] for r in first)
+    assert all(math.isnan(r["ap_lo"]) for r in first)
+    others = [r for r in rows if r["season"] != 2017]
+    assert all(r["ci_status"] == "ok" and r["ci_error"] == "" for r in others)
 
 
 def test_leave_one_season_out_runs_nine_reruns_and_never_changes_the_primary(strong):

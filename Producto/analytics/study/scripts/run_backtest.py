@@ -109,12 +109,17 @@ def main(argv=None, *, params: config.StudyParameters | None = None) -> int:
     effective = params if params is not None else config.PARAMETERS
     result = report.run_backtest(target_rows, fwi_rows, mb_rows, effective)
 
+    warnings = report.degeneracy_warnings(result, effective)
+    for message in warnings:
+        print(f"WARNING: {message}", file=sys.stderr)
+
     out_dir = Path(args.out_dir)
     report.write_tables(result, out_dir / "tables")
     report.write_decision_json(
         result, out_dir / "decision.json", lock=lock,
         input_hashes={INPUT_NAMES[k]: dataset.file_sha256(p) for k, p in paths.items()},
         git_sha=report.current_git_sha(STUDY_ROOT), params=effective,
+        warnings=warnings,
     )
     o = result.primary.outcome
     print(f"Primary decision: shipped wM = {o.shipped_wm} ({o.claim})")

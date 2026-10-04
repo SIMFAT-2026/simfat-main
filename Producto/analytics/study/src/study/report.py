@@ -44,7 +44,8 @@ class PooledResult:
     prevalence_warning: bool
     rows: list  # one dict per weight, baseline first
     outcome: decision_rule.RuleOutcome
-    n_redrawn: int
+    n_redrawn: int  # resamples without positives, redrawn (AUC-PR undefined)
+    n_auc_undefined: int = 0  # kept resamples without negatives: out of the ROC AUC CI only
 
 
 @dataclass(frozen=True)
@@ -57,6 +58,19 @@ class BacktestResult:
 
 def _fmt(w: float) -> str:
     return repr(float(w))
+
+
+def _auc_or_nan(y, score) -> float:
+    """ROC AUC, or NaN for a resample without both classes (N14): the resample
+    stays in the AP and Brier intervals and drops out of the ROC AUC one."""
+    try:
+        return metrics.roc_auc(y, score)
+    except metrics.DegenerateLabelsError:
+        return NAN
+
+
+def _count_nan(values) -> int:
+    return int(np.isnan(np.asarray(values, dtype=float)).sum())
 
 
 def pooled_analysis(
@@ -79,7 +93,7 @@ def pooled_analysis(
             s = by_wm[w][idx]
             out[f"ap|{_fmt(w)}"] = metrics.average_precision(yy, s)
             if with_secondary:
-                out[f"auc|{_fmt(w)}"] = metrics.roc_auc(yy, s)
+                out[f"auc|{_fmt(w)}"] = _auc_or_nan(yy, s)
                 out[f"spearman|{_fmt(w)}"] = metrics.spearman(s, log_count[idx])
                 out[f"brier|{_fmt(w)}"] = metrics.brier(yy, s)
         return out
@@ -101,7 +115,7 @@ def pooled_analysis(
             row["qualifies"] = bool(d_lo >= -params.delta)
         else:
             row["qualifies"] = None
-        for m, fn in (("auc", metrics.roc_auc), ("spearman", None), ("brier", metrics.brier)):
+        for m, fn in (("auc", _auc_or_nan), ("spearman", None), ("brier", metrics.brier)):
             if with_secondary:
                 if m == "spearman":
                     point = metrics.spearman(by_wm[w], log_count)
@@ -119,6 +133,7 @@ def pooled_analysis(
         name=name, kind=kind, n=len(ds), n_pos=int(ds.y.sum()), prevalence=prevalence,
         prevalence_warning=bool(prevalence < params.prevalence_warning),
         rows=rows, outcome=outcome, n_redrawn=boot.n_redrawn,
+        n_auc_undefined=_count_nan(boot.values[f"auc|{_fmt(base_w)}"]) if with_secondary else 0,
     )
 
 
@@ -133,22 +148,26 @@ def per_season_table(ds: dataset.Dataset, params: config.StudyParameters) -> lis
         prevalence = float(sub.y.mean())
         n_pos = int(sub.y.sum())
         point = {w: (metrics.average_precision(sub.y, by_wm[w]) if n_pos > 0 else NAN) for w in weights}
-        try:
-            boot = bootstrap.cluster_bootstrap(
-                sub.y, sub.comuna,
-                lambda idx: {f"ap|{_fmt(w)}": metrics.average_precision(sub.y[idx], by_wm[w][idx])
-                             for w in weights},
-                B=params.n_boot, seed=params.seed,
-            )
-            status, n_redrawn = "ok", boot.n_redrawn
-        except bootstrap.BootstrapError:
-            boot, status, n_redrawn = None, "single-class", 0
+        boot, status, error, n_redrawn = None, "ok", "", 0
+        if n_pos in (0, len(sub)):
+            status = "single-class"
+        else:
+            try:
+                boot = bootstrap.cluster_bootstrap(
+                    sub.y, sub.comuna,
+                    lambda idx: {f"ap|{_fmt(w)}": metrics.average_precision(sub.y[idx], by_wm[w][idx])
+                                 for w in weights},
+                    B=params.n_boot, seed=params.seed,
+                )
+                n_redrawn = boot.n_redrawn
+            except bootstrap.BootstrapError as exc:
+                status, error = "bootstrap-failed", str(exc)
         for w in weights:
             row = {"season": season, "wm": w, "n": len(sub), "n_pos": n_pos,
                    "prevalence": prevalence,
                    "prevalence_warning": bool(prevalence < params.prevalence_warning),
                    "ap": point[w], "diff": point[w] - point[base_w],
-                   "ci_status": status, "n_redrawn": n_redrawn}
+                   "ci_status": status, "ci_error": error, "n_redrawn": n_redrawn}
             if boot is None:
                 row.update(ap_lo=NAN, ap_hi=NAN, diff_lo=NAN, diff_hi=NAN)
             else:
@@ -211,11 +230,11 @@ POOLED_COLUMNS = (
     ["analysis", "kind", "wm", "n", "n_pos", "prevalence", "prevalence_warning"]
     + ["ap", "ap_lo", "ap_hi", "diff", "diff_lo", "diff_hi", "qualifies"]
     + [f"{m}{suffix}" for m in SECONDARY for suffix in ("", "_lo", "_hi")]
-    + ["n_redrawn"]
+    + ["n_redrawn", "n_auc_undefined"]
 )
 PER_SEASON_COLUMNS = [
     "season", "wm", "n", "n_pos", "prevalence", "prevalence_warning",
-    "ap", "ap_lo", "ap_hi", "diff", "diff_lo", "diff_hi", "ci_status", "n_redrawn",
+    "ap", "ap_lo", "ap_hi", "diff", "diff_lo", "diff_hi", "ci_status", "ci_error", "n_redrawn",
 ]
 
 
@@ -223,6 +242,29 @@ def _cell(v):
     if v is None:
         return ""
     return v
+
+
+def degeneracy_warnings(result: BacktestResult, params: config.StudyParameters) -> list:
+    """Human-readable warnings for every analysis whose ``n_redrawn`` or
+    ``n_auc_undefined`` exceeds 1% of B (N14)."""
+    limit = 0.01 * params.n_boot
+    out = []
+    for res in _all_pooled(result):
+        for field in ("n_redrawn", "n_auc_undefined"):
+            value = getattr(res, field)
+            if value > limit:
+                out.append(f"{res.name}: {field}={value} exceeds 1% of B={params.n_boot}")
+    seen = set()
+    for row in result.per_season:
+        key = row["season"]
+        if key in seen:
+            continue
+        seen.add(key)
+        for field in ("n_redrawn", "n_auc_undefined"):
+            value = row.get(field, 0)
+            if value > limit:
+                out.append(f"season {key}: {field}={value} exceeds 1% of B={params.n_boot}")
+    return out
 
 
 def _all_pooled(result: BacktestResult) -> list:
@@ -239,6 +281,7 @@ def write_tables(result: BacktestResult, out_dir: Path) -> None:
         for res in _all_pooled(result):
             for row in res.rows:
                 merged = {**row, "analysis": res.name, "kind": res.kind, "n_redrawn": res.n_redrawn,
+                          "n_auc_undefined": res.n_auc_undefined,
                           "prevalence_warning": res.prevalence_warning}
                 w.writerow([_cell(merged[c]) for c in POOLED_COLUMNS])
 
@@ -252,12 +295,14 @@ def write_tables(result: BacktestResult, out_dir: Path) -> None:
     with open(out_dir / "decisions.csv", "w", encoding="utf-8", newline="") as f:
         w = csv.writer(f)
         w.writerow(["analysis", "kind", "shipped_wm", "claim", "qualifying", "n", "prevalence",
-                    "prevalence_warning", "n_redrawn"] + [f"diff_lo_{_fmt(g)}" for g in grid])
+                    "prevalence_warning", "n_redrawn", "n_auc_undefined"]
+                   + [f"diff_lo_{_fmt(g)}" for g in grid])
         for res in _all_pooled(result):
             o = res.outcome
             w.writerow([res.name, res.kind, o.shipped_wm, o.claim,
                         " ".join(_fmt(q) for q in o.qualifying), res.n, res.prevalence,
-                        res.prevalence_warning, res.n_redrawn] + [o.lowers[g] for g in grid])
+                        res.prevalence_warning, res.n_redrawn, res.n_auc_undefined]
+                       + [o.lowers[g] for g in grid])
 
 
 def current_git_sha(cwd: Path | None = None) -> str:
@@ -283,6 +328,7 @@ def _decision_entry(res: PooledResult, primary: PooledResult) -> dict:
         "prevalence": res.prevalence,
         "prevalence_warning": res.prevalence_warning,
         "n_redrawn": res.n_redrawn,
+        "n_auc_undefined": res.n_auc_undefined,
         "agrees_with_primary": o.shipped_wm == primary.outcome.shipped_wm,
     }
 
@@ -295,6 +341,7 @@ def write_decision_json(
     input_hashes: Mapping[str, str],
     git_sha: str,
     params: config.StudyParameters,
+    warnings: Sequence[str] = (),
 ) -> Path:
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -303,6 +350,7 @@ def write_decision_json(
                             "version": lock.get("version")},
         "inputs_sha256": dict(input_hashes),
         "git_sha": git_sha,
+        "warnings": list(warnings),
         "parameters": {
             "grid": list(params.grid), "decision_sequence": list(params.decision_sequence),
             "delta": params.delta, "n_boot": params.n_boot, "seed": params.seed,

@@ -156,6 +156,18 @@ def test_synthetic_run_writes_tables_and_a_complete_decision_json(synthetic_file
     assert "shipped wM = 0.5" in capsys.readouterr().out
 
 
+def test_degeneracy_warnings_are_printed_loudly_and_recorded(monkeypatch, synthetic_files, tmp_path, capsys):
+    monkeypatch.setattr(report, "degeneracy_warnings", lambda result, params: ["primary: n_redrawn=99 exceeds 1% of B=30"])
+    out_dir = tmp_path / "out"
+
+    code = run_backtest.main(_args(synthetic_files, "--out-dir", str(out_dir)), params=SMALL)
+
+    assert code == 0
+    assert "WARNING: primary: n_redrawn=99 exceeds 1% of B=30" in capsys.readouterr().err
+    doc = json.loads((out_dir / "decision.json").read_text(encoding="utf-8"))
+    assert doc["warnings"] == ["primary: n_redrawn=99 exceeds 1% of B=30"]
+
+
 def test_the_default_output_directory_is_the_study_outputs_folder():
     assert run_backtest.DEFAULT_OUT_DIR.name == "outputs"
     assert run_backtest.DEFAULT_OUT_DIR.parent == run_backtest.STUDY_ROOT

@@ -10,10 +10,13 @@ which is what makes differences paired.
 Implementation choices left open by the contract (see DEVIATIONS.md):
 - RNG: ``numpy.random.default_rng(seed)`` (PCG64); clusters are indexed in
   sorted order so a seed reproduces the same resamples on any machine.
-- Degenerate resamples (no positives or no negatives among the sampled rows;
-  AUC-PR is undefined without positives and ROC AUC without both classes) are
-  REDRAWN, not kept and not skipped, so exactly ``B`` usable resamples are
-  returned. The number of discarded draws is reported as ``n_redrawn``.
+- A resample with NO POSITIVES (AUC-PR, the decision metric, is undefined) is
+  REDRAWN, so exactly ``B`` usable resamples are returned. The number of
+  discarded draws is reported as ``n_redrawn``. A resample with no negatives is
+  NOT redrawn: AUC-PR and Brier are defined for it, and redrawing it would
+  condition every interval on the presence of a negative. ROC AUC is undefined
+  there, so the caller returns NaN for it and ``percentile_ci`` excludes it
+  (the caller counts those as ``n_auc_undefined``).
 - Confidence intervals use the percentile method (``numpy.percentile``,
   linear interpolation).
 """
@@ -26,13 +29,13 @@ import numpy as np
 
 
 class BootstrapError(RuntimeError):
-    """Raised when the bootstrap cannot produce B non-degenerate resamples."""
+    """Raised when the bootstrap cannot produce B resamples holding a positive."""
 
 
 @dataclass(frozen=True)
 class BootstrapResult:
     values: Mapping[str, np.ndarray]  # name -> array of length B
-    n_redrawn: int  # degenerate draws discarded to reach B
+    n_redrawn: int  # draws without positives discarded to reach B
 
 
 def cluster_bootstrap(
@@ -48,8 +51,8 @@ def cluster_bootstrap(
     clusters = np.asarray(clusters)
     if y.shape != clusters.shape or y.ndim != 1:
         raise ValueError("y and clusters must be 1-D with equal length")
-    if y.sum() == 0 or y.sum() == len(y):
-        raise BootstrapError("the data holds a single class; no resample can be non-degenerate")
+    if y.sum() == 0:
+        raise BootstrapError("the data holds no positives; AUC-PR is undefined for every resample")
     max_attempts = max_attempts if max_attempts is not None else 100 * B
 
     unique_clusters, inverse = np.unique(clusters, return_inverse=True)
@@ -64,14 +67,13 @@ def cluster_bootstrap(
     while n_done < B:
         if attempts >= max_attempts:
             raise BootstrapError(
-                f"gave up after {attempts} draws: too many degenerate resamples "
+                f"gave up after {attempts} draws: too many resamples without positives "
                 f"({n_redrawn} discarded, {n_done} of {B} kept)"
             )
         attempts += 1
         picks = rng.integers(0, n_clusters, size=n_clusters)
         idx = np.concatenate([rows_of[k] for k in picks])
-        n_pos = int(y[idx].sum())
-        if n_pos == 0 or n_pos == len(idx):
+        if y[idx].sum() == 0:
             n_redrawn += 1
             continue
         for name, value in evaluate(idx).items():
