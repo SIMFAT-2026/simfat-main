@@ -24,8 +24,9 @@ Exit codes:
     1  dry run: join keys are missing
     2  refused: real inputs without --confirm-preregistered-run, or an existing
        outputs/decision.json without --allow-overwrite
-    3  refused: provenance (pre-registration commit not an ancestor of HEAD, or
-       git unavailable)
+    3  refused: provenance (pre-registration commit not an ancestor of HEAD, git
+       unavailable, or, with --confirm-preregistered-run, uncommitted changes
+       under Producto/analytics/study/)
     4  the run finished and wrote every output, but an analysis failed or a
        per-season interval is single-class / bootstrap-failed; the final line
        lists them
@@ -133,6 +134,20 @@ def main(argv=None, *, params: config.StudyParameters | None = None) -> int:
             print(f"REFUSED: {exc} (PREREGISTRATION.md Section 17).", file=sys.stderr)
             return 3
 
+    # The real run must come from committed code: uncommitted study changes (or
+    # an unanswerable git) would make the recorded git sha a false provenance.
+    git_dirty_study_dir = None
+    if not args.dry_run:
+        git_dirty_study_dir = report.git_dirty(STUDY_ROOT, study_dir_only=True)
+        if args.confirm_preregistered_run and git_dirty_study_dir is not False:
+            reason = "has uncommitted changes" if git_dirty_study_dir else "cannot be checked (git unavailable or failed)"
+            print(
+                f"REFUSED: the study directory {reason}. Commit or stash changes under "
+                "Producto/analytics/study/ first (PREREGISTRATION.md Section 17).",
+                file=sys.stderr,
+            )
+            return 3
+
     target_rows = dataset.read_csv_rows(paths["target"])
     fwi_rows = dataset.read_csv_rows(paths["fwi"])
     mb_rows = dataset.read_csv_rows(paths["mapbiomas"])
@@ -151,7 +166,6 @@ def main(argv=None, *, params: config.StudyParameters | None = None) -> int:
     input_hashes = {INPUT_NAMES[k]: dataset.file_sha256(p) for k, p in paths.items()}
     git_sha = report.current_git_sha(STUDY_ROOT)
     git_dirty = report.git_dirty(STUDY_ROOT)
-    git_dirty_study_dir = report.git_dirty(STUDY_ROOT, study_dir_only=True)
 
     def write_outputs(result, warnings=()):
         report.write_tables(result, out_dir / "tables")

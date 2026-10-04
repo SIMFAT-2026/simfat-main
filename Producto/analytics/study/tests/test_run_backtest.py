@@ -372,6 +372,59 @@ def test_a_missing_git_binary_refuses_instead_of_skipping_the_check(monkeypatch,
     assert run_backtest.main(_args(synthetic_files, "--out-dir", str(tmp_path / "out")), params=SMALL) == 3
 
 
+def _confirmed(files, out_dir):
+    return _args(files, "--confirm-preregistered-run", "--out-dir", str(out_dir))
+
+
+def test_a_real_run_refuses_a_dirty_study_directory(monkeypatch, synthetic_files, tmp_path, capsys):
+    monkeypatch.setattr(run_backtest, "REAL_INPUTS", dict(synthetic_files))
+    monkeypatch.setattr(report, "_run_git", fake_git(dirty=" M Producto/analytics/study/x.py\n",
+                                                     study_dirty=" M x.py\n"))
+    _forbid_everything(monkeypatch)
+    out_dir = tmp_path / "out"
+
+    code = run_backtest.main(_confirmed(synthetic_files, out_dir), params=SMALL)
+
+    err = capsys.readouterr().err
+    assert code == 3
+    assert "commit or stash" in err.lower() and "Producto/analytics/study/" in err
+    assert not out_dir.exists()
+
+
+def test_a_real_run_refuses_when_git_cannot_say_whether_the_study_directory_is_dirty(
+        monkeypatch, synthetic_files, tmp_path):
+    monkeypatch.setattr(run_backtest, "REAL_INPUTS", dict(synthetic_files))
+    base = fake_git()
+
+    def flaky(args, cwd):
+        if args[0] == "status":
+            return subprocess.CompletedProcess(list(args), 128, "", "fatal")
+        return base(args, cwd)
+
+    monkeypatch.setattr(report, "_run_git", flaky)
+    _forbid_everything(monkeypatch)
+
+    assert run_backtest.main(_confirmed(synthetic_files, tmp_path / "out"), params=SMALL) == 3
+
+
+def test_changes_outside_the_study_directory_do_not_block_a_real_run(monkeypatch, synthetic_files, tmp_path):
+    monkeypatch.setattr(run_backtest, "REAL_INPUTS", dict(synthetic_files))
+    monkeypatch.setattr(report, "_run_git", fake_git(dirty=" M Documentacion/notes.md\n", study_dirty=""))
+    out_dir = tmp_path / "out"
+
+    code = run_backtest.main(_confirmed(synthetic_files, out_dir), params=SMALL)
+
+    assert code == 0
+    doc = json.loads((out_dir / "decision.json").read_text(encoding="utf-8"))
+    assert doc["git_dirty"] is True and doc["git_dirty_study_dir"] is False
+
+
+def test_a_synthetic_run_ignores_a_dirty_study_directory(monkeypatch, synthetic_files, tmp_path):
+    monkeypatch.setattr(report, "_run_git", fake_git(dirty=" M x.py\n", study_dirty=" M x.py\n"))
+
+    assert run_backtest.main(_args(synthetic_files, "--out-dir", str(tmp_path / "out")), params=SMALL) == 0
+
+
 def test_the_dry_run_does_not_need_git(monkeypatch, synthetic_files, tmp_path):
     monkeypatch.setattr(report, "_run_git", lambda *a, **k: pytest.fail("git consulted in a dry run"))
 

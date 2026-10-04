@@ -267,9 +267,11 @@ Guards on the single real run:
   `decision.json` (`overwrote_previous`, `previous_decision_sha256`).
 - **Provenance (Section 17).** It refuses to start unless the pre-registration
   commit from the lock is an ancestor of HEAD (`git merge-base --is-ancestor`;
-  an unanswerable check also refuses). `decision.json` records whether the
-  working tree was dirty (`git_dirty`, and `git_dirty_study_dir` for this
-  directory only).
+  an unanswerable check also refuses). A real run (`--confirm-preregistered-run`)
+  also refuses, with exit 3, if `Producto/analytics/study/` has uncommitted
+  changes or git cannot say: commit or stash them first. Changes elsewhere do
+  not block. `decision.json` records whether the working tree was dirty
+  (`git_dirty`, and `git_dirty_study_dir` for this directory only).
 - **Completeness.** Every analysis dataset must be a balanced panel: exactly 86
   comunas x its expected seasons, no duplicate keys, and the same comuna-season
   set across windows and filters.
