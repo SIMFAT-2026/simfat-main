@@ -29,6 +29,10 @@ class JoinError(ValueError):
     """Raised when the inputs cannot be joined one-to-one."""
 
 
+class PanelError(JoinError):
+    """Raised when an analysis dataset is not a complete balanced panel."""
+
+
 def read_csv_rows(path: Path) -> list[dict]:
     with open(path, encoding="utf-8", newline="") as f:
         return list(csv.DictReader(f))
@@ -127,6 +131,42 @@ def build_dataset(
         sdyn=np.array([r[4] for r in records], dtype=float),
         smap=np.array([r[5] for r in records], dtype=float),
     )
+
+
+def panel_keys(ds: Dataset) -> set:
+    return {(str(c), int(s)) for c, s in zip(ds.comuna, ds.season)}
+
+
+def assert_balanced_panel(ds: Dataset, *, n_comunas: int, seasons: Sequence[int], label: str) -> None:
+    """Every analysis dataset must be exactly ``n_comunas`` comunas x ``seasons``,
+    one row per comuna-season. ``build_dataset`` keeps whatever target rows it
+    finds, so a comuna-season missing from the target would otherwise shrink an
+    analysis silently."""
+    expected_seasons = sorted(int(s) for s in seasons)
+    pairs = list(zip((str(c) for c in ds.comuna), (int(s) for s in ds.season)))
+    if len(pairs) != len(set(pairs)):
+        raise PanelError(f"{label}: duplicate comuna-season keys")
+    comunas = {c for c, _ in pairs}
+    if len(comunas) != n_comunas:
+        raise PanelError(f"{label}: expected {n_comunas} comunas, found {len(comunas)}")
+    found_seasons = sorted({s for _, s in pairs})
+    if found_seasons != expected_seasons:
+        raise PanelError(f"{label}: expected seasons {expected_seasons}, found {found_seasons}")
+    expected_rows = n_comunas * len(expected_seasons)
+    if len(pairs) != expected_rows:
+        raise PanelError(f"{label}: expected {expected_rows} comuna-season rows, found {len(pairs)}")
+    by_comuna: dict = {}
+    for c, s in pairs:
+        by_comuna.setdefault(c, set()).add(s)
+    short = sorted(c for c, ss in by_comuna.items() if sorted(ss) != expected_seasons)
+    if short:
+        raise PanelError(f"{label}: comunas without the full season set: {short[:5]}")
+
+
+def assert_same_panel(ds: Dataset, reference: Dataset, *, label: str) -> None:
+    """The comuna-season set must not change across windows and filters."""
+    if panel_keys(ds) != panel_keys(reference):
+        raise PanelError(f"{label}: different comuna-season set than the primary analysis")
 
 
 @dataclass(frozen=True)

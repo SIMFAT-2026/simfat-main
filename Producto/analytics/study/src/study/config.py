@@ -100,6 +100,15 @@ class StudyParameters:
     n_firms_sensitivities: tuple[int, ...] = (1, 5)  # Section 6
     prevalence_warning: float = 0.05  # Section 9
     seasons: tuple[int, ...] = tuple(range(2017, 2026))  # Section 5
+    n_comunas: int = 86  # Section 4: monitored comunas, the balanced-panel size
+
+    def __post_init__(self) -> None:
+        expected = tuple(sorted((w for w in self.grid if w != self.baseline_wm), reverse=True))
+        if tuple(self.decision_sequence) != expected:
+            raise ValueError(
+                f"decision_sequence {tuple(self.decision_sequence)} must be the grid without "
+                f"{self.baseline_wm} in descending order {expected} (Section 10)"
+            )
 
     @property
     def all_weights(self) -> tuple[float, ...]:

@@ -164,3 +164,64 @@ def test_read_csv_rows_returns_dicts(tmp_path):
     p = tmp_path / "x.csv"
     p.write_text("a,b\n1,2\n3,4\n", encoding="utf-8")
     assert dataset.read_csv_rows(p) == [{"a": "1", "b": "2"}, {"a": "3", "b": "4"}]
+
+
+# ---------------------------------------------------------------- balanced panel (completeness)
+
+
+def _ds(comunas=COMUNAS, seasons=SEASONS, **kw):
+    return dataset.build_dataset(_target(comunas=comunas, seasons=seasons), _fwi(comunas=comunas, seasons=seasons),
+                                 _mb(comunas=comunas, seasons=seasons), n_threshold=3, window="primary",
+                                 type_filter="type0", variant="pct", seasons=seasons, **kw)
+
+
+def test_a_complete_panel_passes_the_balanced_panel_check():
+    dataset.assert_balanced_panel(_ds(), n_comunas=3, seasons=SEASONS, label="t")
+
+
+def test_a_target_row_missing_from_the_join_is_an_error_not_a_silent_drop():
+    target = [r for r in _target() if not (r["comunaId"] == "B" and r["season"] == "2018")]
+    ds = dataset.build_dataset(target, _fwi(), _mb(), n_threshold=3, window="primary",
+                               type_filter="type0", variant="pct", seasons=SEASONS)
+    assert len(ds) == 5  # build_dataset alone keeps what it finds ...
+    with pytest.raises(dataset.PanelError, match="6"):  # ... the panel check refuses it
+        dataset.assert_balanced_panel(ds, n_comunas=3, seasons=SEASONS, label="t")
+
+
+def test_a_missing_comuna_is_an_error():
+    ds = _ds(comunas=["A", "B"])
+    with pytest.raises(dataset.PanelError, match="comunas"):
+        dataset.assert_balanced_panel(ds, n_comunas=3, seasons=SEASONS, label="t")
+
+
+def test_an_unexpected_season_set_is_an_error():
+    ds = _ds(seasons=[2017])
+    with pytest.raises(dataset.PanelError, match="seasons"):
+        dataset.assert_balanced_panel(ds, n_comunas=3, seasons=SEASONS, label="t")
+
+
+def test_duplicate_comuna_season_keys_are_an_error():
+    ds = _ds()
+    dup = dataset.Dataset(
+        comuna=np.concatenate([ds.comuna, ds.comuna[:1]]), season=np.concatenate([ds.season, ds.season[:1]]),
+        count=np.concatenate([ds.count, ds.count[:1]]), y=np.concatenate([ds.y, ds.y[:1]]),
+        sdyn=np.concatenate([ds.sdyn, ds.sdyn[:1]]), smap=np.concatenate([ds.smap, ds.smap[:1]]),
+    )
+    with pytest.raises(dataset.PanelError, match="duplicate"):
+        dataset.assert_balanced_panel(dup, n_comunas=3, seasons=SEASONS, label="t")
+
+
+def test_every_comuna_must_hold_every_season_even_when_the_total_matches():
+    ds = _ds()
+    # right total (6) and no duplicates, but comuna C holds 2019 instead of 2018
+    skewed = dataset.Dataset(ds.comuna, np.array([2017, 2018, 2017, 2018, 2017, 2019]), ds.count, ds.y,
+                             ds.sdyn, ds.smap)
+    with pytest.raises(dataset.PanelError):
+        dataset.assert_balanced_panel(skewed, n_comunas=3, seasons=SEASONS, label="t")
+
+
+def test_same_panel_across_windows_and_filters():
+    a = _ds()
+    dataset.assert_same_panel(a, a.subset(np.ones(len(a), dtype=bool)), label="t")
+    with pytest.raises(dataset.PanelError, match="different comuna-season"):
+        dataset.assert_same_panel(a, a.subset(a.comuna != "B"), label="t")

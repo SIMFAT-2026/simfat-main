@@ -227,13 +227,23 @@ def run_backtest(
             type_filter=type_filter, variant=variant, seasons=params.seasons,
         )
 
-    primary_ds = build(params.n_firms_primary, "primary", "type0", "pct")
+    def check(ds, label, seasons=None, reference=None):
+        dataset.assert_balanced_panel(ds, n_comunas=params.n_comunas,
+                                      seasons=seasons if seasons is not None else params.seasons, label=label)
+        if reference is not None:
+            dataset.assert_same_panel(ds, reference, label=label)
+        return ds
+
+    primary_ds = check(build(params.n_firms_primary, "primary", "type0", "pct"), "primary")
     primary = pooled_analysis(primary_ds, "primary", "primary", params, with_secondary=True)
+    for season in params.seasons:
+        check(primary_ds.subset(primary_ds.season == season), f"primary season {season}", seasons=[season])
     per_season = per_season_table(primary_ds, params)
 
     loso = []
     for season in params.seasons:
-        sub = primary_ds.subset(primary_ds.season != season)
+        sub = check(primary_ds.subset(primary_ds.season != season), f"loso_drop_{season}",
+                    seasons=[s for s in params.seasons if s != season])
         loso.append(pooled_analysis(sub, f"loso_drop_{season}", "loso", params, with_secondary=True))
 
     sens_specs = [(f"sens_n{n}", dict(n_threshold=n, window="primary", type_filter="type0", variant="pct"))
@@ -247,7 +257,8 @@ def run_backtest(
                                  type_filter="type0", variant="log")),
     ]
     sensitivities = [
-        pooled_analysis(build(**spec), name, "sensitivity", params, with_secondary=True)
+        pooled_analysis(check(build(**spec), name, reference=primary_ds), name, "sensitivity", params,
+                        with_secondary=True)
         for name, spec in sens_specs
     ]
     return BacktestResult(primary, per_season, loso, sensitivities)

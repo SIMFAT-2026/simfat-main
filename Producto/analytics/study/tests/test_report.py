@@ -14,7 +14,7 @@ from synthetic import SEASONS, make_inputs
 
 from study import config, dataset, metrics, report
 
-PARAMS = dataclasses.replace(config.PARAMETERS, n_boot=200)
+PARAMS = dataclasses.replace(config.PARAMETERS, n_boot=200, n_comunas=30)
 
 
 def _manual_dataset(sdyn, smap, y, count=None, comuna=None, season=None):
@@ -134,6 +134,24 @@ def test_prevalence_exactly_five_percent_is_not_flagged():
     res = report.pooled_analysis(ds, "t", "primary", PARAMS, with_secondary=False)
     assert res.prevalence == pytest.approx(0.05)
     assert res.prevalence_warning is False  # the contract flags prevalence < 5%
+
+
+# ---------------------------------------------------------------- completeness
+
+
+def test_the_backtest_aborts_when_the_primary_target_misses_a_comuna_season():
+    target, fwi, mb = make_inputs("mb_strong")
+    target = [t for t in target if not (t["comunaId"] == "C007" and t["season"] == "2019"
+                                        and t["window"] == "primary" and t["filter"] == "type0")]
+    with pytest.raises(dataset.PanelError, match="expected 270"):
+        report.run_backtest(target, fwi, mb, PARAMS)
+
+
+def test_the_backtest_expects_the_configured_number_of_comunas():
+    target, fwi, mb = make_inputs("mb_strong")  # 30 comunas, but the contract says 86
+    wrong = dataclasses.replace(PARAMS, n_comunas=86)
+    with pytest.raises(dataset.PanelError, match="expected 86 comunas"):
+        report.run_backtest(target, fwi, mb, wrong)
 
 
 # ---------------------------------------------------------------- degenerate resamples (N14)

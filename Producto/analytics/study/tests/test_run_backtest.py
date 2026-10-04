@@ -17,7 +17,7 @@ from synthetic import make_inputs, write_csv
 import run_backtest
 from study import config, dataset, report
 
-SMALL = dataclasses.replace(config.PARAMETERS, n_boot=30)
+SMALL = dataclasses.replace(config.PARAMETERS, n_boot=30, n_comunas=12)
 
 
 @pytest.fixture

@@ -119,3 +119,16 @@ def test_decision_sequence_is_the_grid_in_descending_order():
     p = config.PARAMETERS
     assert p.decision_sequence == tuple(sorted(p.grid, reverse=True))
     assert p.all_weights == (0.0,) + tuple(sorted(p.grid))
+
+
+def test_decision_sequence_that_disagrees_with_the_grid_is_rejected_at_construction():
+    with pytest.raises(ValueError, match="decision_sequence"):
+        config.StudyParameters(decision_sequence=(0.50, 0.25, 0.35, 0.10))
+    with pytest.raises(ValueError, match="decision_sequence"):
+        config.StudyParameters(grid=(0.10, 0.20), decision_sequence=(0.50, 0.35, 0.25, 0.10))
+    config.StudyParameters(grid=(0.10, 0.20), decision_sequence=(0.20, 0.10))  # consistent: accepted
+
+
+def test_expected_comunas_match_the_contract():
+    assert config.PARAMETERS.n_comunas == 86
+    assert "86 monitored comunas" in _real_contract_text()
