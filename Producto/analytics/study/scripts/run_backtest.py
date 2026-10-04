@@ -10,6 +10,13 @@ touch the real study inputs unless ``--confirm-preregistered-run`` is passed:
 
     python scripts/run_backtest.py --confirm-preregistered-run
         the real run: writes outputs/tables/*.csv and outputs/decision.json.
+        The primary result and the per-season table are written first; each
+        rerun is guarded and a failure is recorded, not hidden. The run refuses
+        to start if outputs/decision.json already exists (add --allow-overwrite
+        to override; the overwrite and the previous file's sha256 are recorded)
+        or if the pre-registration commit is not an ancestor of HEAD
+        (PREREGISTRATION.md Section 17). decision.json records whether the git
+        working tree was dirty.
 
 Inputs that are not the real files (any other path, with different bytes) run
 without the flag; that is how the test-suite exercises the whole engine on
@@ -19,7 +26,7 @@ Usage (from Producto/analytics/study):
 
     python scripts/run_backtest.py [--target P] [--fwi P] [--mapbiomas P]
                                    [--out-dir D] [--dry-run]
-                                   [--confirm-preregistered-run]
+                                   [--confirm-preregistered-run] [--allow-overwrite]
 """
 from __future__ import annotations
 
@@ -70,6 +77,8 @@ def _parse(argv):
                    help="validate file shapes and join keys only; compute no metric")
     p.add_argument("--confirm-preregistered-run", action="store_true",
                    help="required to run on the real study inputs")
+    p.add_argument("--allow-overwrite", action="store_true",
+                   help="run even though outputs/decision.json already exists; the overwrite is recorded")
     return p.parse_args(argv)
 
 
@@ -92,6 +101,26 @@ def main(argv=None, *, params: config.StudyParameters | None = None) -> int:
             )
             return 2
 
+    out_dir = Path(args.out_dir)
+    decision_path = out_dir / "decision.json"
+    previous_sha256 = None
+    if not args.dry_run and decision_path.exists():
+        if not args.allow_overwrite:
+            print(
+                f"REFUSED: {decision_path} already exists. The pre-registered run happens exactly once; "
+                "pass --allow-overwrite to run again (the overwrite is recorded in decision.json).",
+                file=sys.stderr,
+            )
+            return 2
+        previous_sha256 = dataset.file_sha256(decision_path)
+
+    if not args.dry_run:
+        try:
+            report.verify_preregistration_ancestry(lock["commit"], STUDY_ROOT)
+        except report.ProvenanceError as exc:
+            print(f"REFUSED: {exc} (PREREGISTRATION.md Section 17).", file=sys.stderr)
+            return 3
+
     target_rows = dataset.read_csv_rows(paths["target"])
     fwi_rows = dataset.read_csv_rows(paths["fwi"])
     mb_rows = dataset.read_csv_rows(paths["mapbiomas"])
@@ -107,15 +136,18 @@ def main(argv=None, *, params: config.StudyParameters | None = None) -> int:
         return 0 if rep.ok else 1
 
     effective = params if params is not None else config.PARAMETERS
-    out_dir = Path(args.out_dir)
     input_hashes = {INPUT_NAMES[k]: dataset.file_sha256(p) for k, p in paths.items()}
     git_sha = report.current_git_sha(STUDY_ROOT)
+    git_dirty = report.git_dirty(STUDY_ROOT)
+    git_dirty_study_dir = report.git_dirty(STUDY_ROOT, study_dir_only=True)
 
     def write_outputs(result, warnings=()):
         report.write_tables(result, out_dir / "tables")
         report.write_decision_json(
             result, out_dir / "decision.json", lock=lock, input_hashes=input_hashes,
             git_sha=git_sha, params=effective, warnings=warnings,
+            git_dirty=git_dirty, git_dirty_study_dir=git_dirty_study_dir,
+            overwrote_previous=previous_sha256 is not None, previous_decision_sha256=previous_sha256,
         )
 
     # The primary result and the per-season table reach the disk before any

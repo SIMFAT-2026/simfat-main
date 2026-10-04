@@ -395,15 +395,53 @@ def write_tables(result: BacktestResult, out_dir: Path) -> None:
                        + [o.lowers[g] for g in grid])
 
 
+class ProvenanceError(RuntimeError):
+    """Raised when the git history cannot show that the pre-registration commit
+    is an ancestor of HEAD (Section 17)."""
+
+
+def _run_git(args: Sequence[str], cwd: Path) -> subprocess.CompletedProcess:
+    """The one place git is invoked, so tests can replace it."""
+    return subprocess.run(["git", *args], cwd=str(cwd), capture_output=True, text=True, timeout=30)
+
+
 def current_git_sha(cwd: Path | None = None) -> str:
     try:
-        out = subprocess.run(
-            ["git", "rev-parse", "HEAD"], cwd=str(cwd or config.study_root()),
-            capture_output=True, text=True, check=True, timeout=30,
-        )
-        return out.stdout.strip() or "unknown"
+        out = _run_git(["rev-parse", "HEAD"], cwd or config.study_root())
     except (OSError, subprocess.SubprocessError):
         return "unknown"
+    return out.stdout.strip() or "unknown" if out.returncode == 0 else "unknown"
+
+
+def git_dirty(cwd: Path | None = None, *, study_dir_only: bool = False) -> bool | None:
+    """True if ``git status --porcelain`` lists anything (the whole working tree,
+    or only the study directory); None if git cannot answer."""
+    args = ["status", "--porcelain"] + (["--", "."] if study_dir_only else [])
+    try:
+        out = _run_git(args, cwd or config.study_root())
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if out.returncode != 0:
+        return None
+    return bool(out.stdout.strip())
+
+
+def verify_preregistration_ancestry(commit: str, cwd: Path | None = None) -> None:
+    """Section 17: the pre-registration commit must be an ancestor of every
+    commit adding backtest outputs. Fails closed: an unverifiable answer refuses
+    the run just like a negative one."""
+    try:
+        out = _run_git(["merge-base", "--is-ancestor", commit, "HEAD"], cwd or config.study_root())
+    except (OSError, subprocess.SubprocessError) as exc:
+        raise ProvenanceError(f"cannot run git to verify that {commit} is an ancestor of HEAD: {exc}") from exc
+    if out.returncode == 0:
+        return
+    if out.returncode == 1:
+        raise ProvenanceError(f"the pre-registration commit {commit} is not an ancestor of HEAD")
+    raise ProvenanceError(
+        f"cannot verify that {commit} is an ancestor of HEAD (git exited {out.returncode}): "
+        f"{(out.stderr or '').strip()}"
+    )
 
 
 def _decision_entry(res: PooledResult, primary: PooledResult) -> dict:
@@ -435,6 +473,10 @@ def write_decision_json(
     git_sha: str,
     params: config.StudyParameters,
     warnings: Sequence[str] = (),
+    git_dirty: bool | None = None,
+    git_dirty_study_dir: bool | None = None,
+    overwrote_previous: bool = False,
+    previous_decision_sha256: str | None = None,
 ) -> Path:
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -443,6 +485,10 @@ def write_decision_json(
                             "version": lock.get("version")},
         "inputs_sha256": dict(input_hashes),
         "git_sha": git_sha,
+        "git_dirty": git_dirty,
+        "git_dirty_study_dir": git_dirty_study_dir,
+        "overwrote_previous": bool(overwrote_previous),
+        "previous_decision_sha256": previous_decision_sha256,
         "complete": bool(result.complete),
         "warnings": list(warnings),
         "parameters": {

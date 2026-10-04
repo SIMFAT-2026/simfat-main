@@ -8,8 +8,10 @@ every loader to blow up if touched.
 SYNTHETIC ONLY: no real study data is read here.
 """
 import dataclasses
+import hashlib
 import json
 import shutil
+import subprocess
 
 import pytest
 from synthetic import make_inputs, write_csv
@@ -18,6 +20,32 @@ import run_backtest
 from study import config, dataset, report
 
 SMALL = dataclasses.replace(config.PARAMETERS, n_boot=30, n_comunas=12)
+
+
+def fake_git(calls=None, *, dirty="", study_dirty=None, ancestor_rc=0, sha="a" * 40):
+    """Stand-in for ``report._run_git``: no real git repository is consulted."""
+
+    def run(args, cwd):
+        args = list(args)
+        if calls is not None:
+            calls.append(args)
+        if args[:2] == ["merge-base", "--is-ancestor"]:
+            return subprocess.CompletedProcess(args, ancestor_rc, "", "")
+        if args[0] == "status":
+            out = (study_dirty if study_dirty is not None else dirty) if "--" in args else dirty
+            return subprocess.CompletedProcess(args, 0, out, "")
+        if args[0] == "rev-parse":
+            return subprocess.CompletedProcess(args, 0, sha + "\n", "")
+        raise AssertionError(f"unexpected git call {args}")
+
+    return run
+
+
+@pytest.fixture(autouse=True)
+def _clean_git(monkeypatch):
+    """Every test sees a clean tree whose pre-registration commit is an ancestor
+    of HEAD, unless it installs its own fake."""
+    monkeypatch.setattr(report, "_run_git", fake_git())
 
 
 @pytest.fixture
@@ -209,6 +237,116 @@ def test_a_failed_secondary_analysis_is_warned_about_but_the_run_completes(monke
     doc = json.loads((out_dir / "decision.json").read_text(encoding="utf-8"))
     assert doc["complete"] is True
     assert next(e for e in doc["sensitivities"] if e["analysis"] == "sens_n1")["status"] == "failed"
+
+
+# ---------------------------------------------------------------- run-once guard
+
+
+def _write_previous(out_dir, text='{"previous": true}\n'):
+    out_dir.mkdir(parents=True, exist_ok=True)
+    (out_dir / "decision.json").write_bytes(text.encode("utf-8"))  # bytes: no newline translation
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def test_refuses_to_start_when_a_decision_already_exists(monkeypatch, synthetic_files, tmp_path, capsys):
+    monkeypatch.setattr(run_backtest, "REAL_INPUTS", dict(synthetic_files))
+    out_dir = tmp_path / "out"
+    _write_previous(out_dir)
+    _forbid_everything(monkeypatch)
+
+    code = run_backtest.main(_args(synthetic_files, "--confirm-preregistered-run", "--out-dir", str(out_dir)),
+                             params=SMALL)
+
+    assert code == 2
+    assert "--allow-overwrite" in capsys.readouterr().err
+    assert (out_dir / "decision.json").read_bytes() == b'{"previous": true}\n'
+    assert not (out_dir / "tables").exists()
+
+
+def test_allow_overwrite_records_the_overwrite_and_the_previous_hash(monkeypatch, synthetic_files, tmp_path):
+    monkeypatch.setattr(run_backtest, "REAL_INPUTS", dict(synthetic_files))
+    out_dir = tmp_path / "out"
+    previous = _write_previous(out_dir)
+
+    code = run_backtest.main(_args(synthetic_files, "--confirm-preregistered-run", "--allow-overwrite",
+                                   "--out-dir", str(out_dir)), params=SMALL)
+
+    assert code == 0
+    doc = json.loads((out_dir / "decision.json").read_text(encoding="utf-8"))
+    assert doc["overwrote_previous"] is True
+    assert doc["previous_decision_sha256"] == previous
+    assert doc["complete"] is True  # the overwrite note survives the final write
+
+
+def test_a_first_run_records_no_overwrite(synthetic_files, tmp_path):
+    out_dir = tmp_path / "out"
+
+    assert run_backtest.main(_args(synthetic_files, "--out-dir", str(out_dir)), params=SMALL) == 0
+
+    doc = json.loads((out_dir / "decision.json").read_text(encoding="utf-8"))
+    assert doc["overwrote_previous"] is False and doc["previous_decision_sha256"] is None
+
+
+# ---------------------------------------------------------------- provenance (Section 17)
+
+
+def test_decision_json_records_whether_the_working_tree_was_dirty(monkeypatch, synthetic_files, tmp_path):
+    monkeypatch.setattr(report, "_run_git", fake_git(dirty=" M somewhere/else.md\n", study_dirty=""))
+    out_dir = tmp_path / "out"
+
+    assert run_backtest.main(_args(synthetic_files, "--out-dir", str(out_dir)), params=SMALL) == 0
+
+    doc = json.loads((out_dir / "decision.json").read_text(encoding="utf-8"))
+    assert doc["git_dirty"] is True
+    assert doc["git_dirty_study_dir"] is False
+
+
+def test_decision_json_records_a_clean_tree(synthetic_files, tmp_path):
+    out_dir = tmp_path / "out"
+
+    run_backtest.main(_args(synthetic_files, "--out-dir", str(out_dir)), params=SMALL)
+
+    doc = json.loads((out_dir / "decision.json").read_text(encoding="utf-8"))
+    assert doc["git_dirty"] is False and doc["git_dirty_study_dir"] is False
+
+
+def test_refuses_when_the_preregistration_commit_is_not_an_ancestor_of_head(monkeypatch, synthetic_files,
+                                                                           tmp_path, capsys):
+    calls = []
+    monkeypatch.setattr(report, "_run_git", fake_git(calls, ancestor_rc=1))
+    _forbid_everything(monkeypatch)
+    out_dir = tmp_path / "out"
+
+    code = run_backtest.main(_args(synthetic_files, "--out-dir", str(out_dir)), params=SMALL)
+
+    assert code == 3
+    assert "ancestor" in capsys.readouterr().err
+    assert ["merge-base", "--is-ancestor", config.load_lock()["commit"], "HEAD"] in calls
+    assert not out_dir.exists()
+
+
+@pytest.mark.parametrize("rc", [128, 2])
+def test_an_unverifiable_ancestry_also_refuses(monkeypatch, synthetic_files, tmp_path, rc):
+    monkeypatch.setattr(report, "_run_git", fake_git(ancestor_rc=rc))
+    _forbid_everything(monkeypatch)
+
+    assert run_backtest.main(_args(synthetic_files, "--out-dir", str(tmp_path / "out")), params=SMALL) == 3
+
+
+def test_a_missing_git_binary_refuses_instead_of_skipping_the_check(monkeypatch, synthetic_files, tmp_path):
+    def no_git(args, cwd):
+        raise FileNotFoundError("git")
+
+    monkeypatch.setattr(report, "_run_git", no_git)
+    _forbid_everything(monkeypatch)
+
+    assert run_backtest.main(_args(synthetic_files, "--out-dir", str(tmp_path / "out")), params=SMALL) == 3
+
+
+def test_the_dry_run_does_not_need_git(monkeypatch, synthetic_files, tmp_path):
+    monkeypatch.setattr(report, "_run_git", lambda *a, **k: pytest.fail("git consulted in a dry run"))
+
+    assert run_backtest.main(_args(synthetic_files, "--dry-run")) == 0
 
 
 def test_the_default_output_directory_is_the_study_outputs_folder():
