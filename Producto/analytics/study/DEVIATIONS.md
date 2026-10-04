@@ -77,3 +77,97 @@ The planned cross-check of the 2013-2017 union against
 `frequency_burned_2013_2017.tif` was skipped because that file has no
 provenance entry in the manifest. The union method itself matched MapBiomas'
 `accumulated_burned_v1` product in S1b5 (max difference 1.1e-16).
+
+### N6 — AUC-PR is computed as average precision (2026-10-03)
+
+Section 9 names "AUC-PR" without fixing the estimator. It is computed as
+average precision: the non-interpolated step function `sum (R_k - R_{k-1}) *
+P_k` over distinct score thresholds (the scikit-learn definition), not a
+trapezoid under the PR curve, which can be optimistic. Tied scores form one
+threshold, so the value does not depend on row order. (`metrics.average_precision`.)
+
+### N7 — Brier is computed on the raw, uncalibrated score (2026-10-03)
+
+Section 9 asks for a Brier score per `wM`. The blended score is a risk index
+in `[0, 1]`, not a calibrated probability, so the Brier score is the mean
+squared difference between that raw score and the 0/1 target. It is a
+secondary diagnostic with no decision power, and its absolute level should not
+be read as probabilistic accuracy. (`metrics.brier`.)
+
+### N8 — Bootstrap generator, seed, B and interval method (2026-10-03)
+
+Section 10 fixes B = 2000 and seed 20261027 but not the generator or the
+interval. The generator is `numpy.random.default_rng(seed)` (PCG64). Comunas
+are indexed in sorted order, and each resample draws as many comunas as the
+data holds (86 in the pooled analysis), with replacement; every drawn comuna
+brings all its seasons. The 95% interval is the percentile interval: the 2.5th
+and 97.5th percentiles of the resampled statistic (`numpy.percentile`, linear
+interpolation). Every analysis (pooled, per-season, each leave-one-season-out
+rerun, each sensitivity) starts its own generator from the same seed, so each
+one is reproducible on its own and does not depend on the order of the others.
+(`bootstrap.cluster_bootstrap`, `bootstrap.percentile_ci`.)
+
+### N9 — Degenerate resamples are redrawn and counted (2026-10-03)
+
+The contract does not say what to do with a resample that holds no positives
+(AUC-PR is undefined) or no negatives (ROC AUC is undefined). Such a resample
+is discarded and redrawn from the same generator, so exactly B usable
+resamples are always returned and the rule is deterministic for a given seed.
+The number of discarded draws is reported as `n_redrawn` in every table and in
+`decision.json`. The redraw budget is 100 x B draws; exceeding it, or a data
+set holding a single class, aborts the analysis. A single-class season in the
+per-season table is not an abort: its CI columns are NaN and `ci_status` reads
+`single-class`. Redrawing slightly conditions the bootstrap distribution on
+having both classes; with the observed prevalence of 0.70 to 0.92 over 86
+comunas this is expected to be a very rare event, and `n_redrawn` makes any
+departure visible.
+
+### N10 — The clamp never binds, so the stored season mean is used (2026-10-03)
+
+Section 8.2 defines the blend with an outer clamp, and Section 8.1 defines the
+prediction as the season mean of the daily blended score. `S_dynamic(day)` lies
+in `[0, 0.52]` and `S_mapbiomas` in `[0, 1]`, so the blend is a convex
+combination of values in `[0, 1]` (maximum `(1 - wM) * 0.52 + wM <= 1`) and the
+clamp can never bind. The mean of the daily blend therefore equals `(1 - wM) *
+mean(S_dynamic) + wM * S_mapbiomas`, and the engine uses `sdyn_mean` from
+`season_fwi.csv` directly. A test proves the identity on random daily series
+and shows it would fail outside those bounds, so the bounds are also asserted
+at runtime (`scores.ScoreBoundsError`); the run aborts rather than silently
+trusting the identity. (`scores.blend`.)
+
+### N11 — Secondary metrics, per-season and prevalence reporting (2026-10-03)
+
+- ROC AUC, Spearman (blended score against `log1p(count)` of the same filtered
+  detections) and Brier are bootstrapped with the same resamples and reported
+  with percentile CIs for the primary pooled analysis only. The
+  leave-one-season-out reruns and the sensitivities report AUC-PR and the
+  paired difference, which is all the decision rule uses. A NaN Spearman (a
+  constant score in a resample) is excluded from that interval.
+- The per-season table reports AUC-PR, prevalence, `n`, and the paired
+  difference with its own comuna bootstrap CI for every weight. Each season
+  holds one row per comuna, so the cluster bootstrap there is a plain
+  bootstrap over its 86 comunas.
+- The prevalence warning fires when prevalence is strictly below 5%, as written
+  in Section 9 (exactly 5% is not flagged). It is reported per analysis and per
+  season.
+- The shipped decision uses the raw floating-point CI lower bound with the
+  comparison `>= -0.02` and no tolerance.
+
+### N12 — Sensitivities, leave-one-season-out and the entry-point gate (2026-10-03)
+
+- Each pre-declared sensitivity (N = 1, N = 5, Nov-Apr window, no type filter,
+  log burnedNorm) rebuilds its own target and, where relevant, predictor and
+  runs the full rule. The Nov-Apr sensitivity uses the target's `sensitivity`
+  window together with `season_fwi.csv`'s `sensitivity` window. All are
+  reported next to the primary result and none replaces it.
+- Leave-one-season-out drops one season and reruns the pooled decision nine
+  times, with a fresh bootstrap each time; it never alters the primary rule.
+- `scripts/run_backtest.py` refuses to run on the real inputs unless
+  `--confirm-preregistered-run` is passed. A file counts as real if its path
+  resolves to the committed file or its sha256 equals the committed file's, so
+  a renamed copy does not bypass the gate. `--dry-run` loads the three files
+  and reports only row, comuna and season counts and missing-key counts. It
+  computes no metric and prints no value derived from the target-predictor
+  relation.
+- The engine was built and tested on synthetic data only. No metric was
+  computed on the real inputs before the pre-registered run.

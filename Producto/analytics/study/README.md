@@ -218,6 +218,40 @@ entry (it predates the manifest's current 17-entry set), so its sha256
 cannot be verified -- the launch prompt explicitly sanctions skipping in
 that case rather than using an unverified raster.
 
+## S4b2: backtest engine (this slice)
+
+**Scope: the engine, built and tested on SYNTHETIC data only.** No metric was
+computed on the real inputs. The real run happens once, after review.
+
+```
+src/study/
+  metrics.py        # AUC-PR (average precision, ties grouped), ROC AUC, Spearman, Brier; numpy only
+  scores.py         # season prediction (1-wM)*sdyn_mean + wM*S_mapbiomas; asserts the bounds that make the clamp inert
+  dataset.py        # strict join of the three input tables; validate_keys for the keys-only dry run
+  bootstrap.py      # comuna-clustered, paired, seeded percentile bootstrap; degenerate resamples redrawn and counted
+  decision_rule.py  # Section 10 rule (largest wM with CI lower bound >= -0.02) and Section 12 claim rule
+  report.py         # pooled, per-season, leave-one-season-out, sensitivities; CSV tables and decision.json
+scripts/run_backtest.py   # gated entry point
+```
+
+`config.StudyParameters` holds grid, delta, seed and B in one place;
+`tests/test_config.py` cross-checks each against the text of
+`PREREGISTRATION.md`, and `config.load_parameters` verifies the hash first.
+Every choice the contract leaves open is recorded in `DEVIATIONS.md` as N6 to
+N12.
+
+### Running the backtest
+
+```
+python scripts/run_backtest.py --dry-run                      # join keys and counts only, no metric
+python scripts/run_backtest.py --confirm-preregistered-run    # the real run, once, after review
+```
+
+Without `--confirm-preregistered-run` the script refuses the real inputs (by
+path or by content). The real run writes `outputs/tables/pooled_grid.csv`,
+`per_season.csv`, `decisions.csv` and `outputs/decision.json` (pre-registration
+hash, inputs' sha256, git sha, every decision).
+
 ## Running
 
 ```
