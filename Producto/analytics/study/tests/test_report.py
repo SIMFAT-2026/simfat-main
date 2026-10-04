@@ -297,6 +297,55 @@ def test_degeneracy_warning_is_silent_at_or_below_one_percent():
     assert report.degeneracy_warnings(out, PARAMS) == []
 
 
+# ---------------------------------------------------------------- high prevalence (N15)
+
+
+def test_prevalence_above_fifty_percent_is_flagged_and_the_low_flag_is_not():
+    y = [1] * 3 + [0] * 2
+    ds = _manual_dataset([0.1 * (i % 5) for i in range(40)], [0.2] * 40, y * 8)
+    res = report.pooled_analysis(ds, "t", "primary", PARAMS, with_secondary=False)
+    assert res.prevalence == pytest.approx(0.6)
+    assert res.high_prevalence_warning is True
+    assert res.prevalence_warning is False
+
+
+def test_prevalence_exactly_fifty_percent_is_not_flagged_high():
+    ds = _manual_dataset([0.1 * (i % 5) for i in range(40)], [0.2] * 40, [1, 0] * 20)
+    res = report.pooled_analysis(ds, "t", "primary", PARAMS, with_secondary=False)
+    assert res.prevalence == pytest.approx(0.5)
+    assert res.high_prevalence_warning is False
+
+
+def test_the_high_prevalence_flag_never_changes_the_decision():
+    ds = _manual_dataset([0.1 * (i % 5) for i in range(40)], [0.2] * 40, ([1] * 3 + [0] * 2) * 8)
+    flagged = report.pooled_analysis(ds, "t", "primary", PARAMS, with_secondary=False)
+    loose = report.pooled_analysis(ds, "t", "primary", dataclasses.replace(PARAMS, prevalence_high=0.99),
+                                   with_secondary=False)
+    assert loose.high_prevalence_warning is False and flagged.high_prevalence_warning is True
+    assert flagged.outcome == loose.outcome and flagged.rows == loose.rows
+
+
+def test_per_season_rows_and_all_tables_carry_the_high_prevalence_flag(tmp_path):
+    target, fwi, mb = make_inputs("mb_strong")
+    for t in target:  # season 2017: every comuna is a positive except one
+        if t["season"] == "2017" and t["window"] == "primary" and t["filter"] == "type0" and t["comunaId"] != "C000":
+            t["count"], t["y_n1"], t["y_n3"], t["y_n5"] = "9", "1", "1", "1"
+    out = report.run_backtest(target, fwi, mb, PARAMS)
+    flags = {r["season"]: r["high_prevalence_warning"] for r in out.per_season}
+    assert flags[2017] is True
+    report.write_tables(out, tmp_path / "t")
+    for name in ("pooled_grid.csv", "per_season.csv", "decisions.csv"):
+        with open(tmp_path / "t" / name, encoding="utf-8", newline="") as f:
+            assert "high_prevalence_warning" in next(csv.reader(f))
+    path = report.write_decision_json(out, tmp_path / "d.json", lock={"sha256": "a", "commit": "b"},
+                                      input_hashes={}, git_sha="x", params=PARAMS)
+    doc = json.loads(path.read_text(encoding="utf-8"))
+    assert "high_prevalence_warning" in doc["primary"]
+    assert all("high_prevalence_warning" in e for e in doc["sensitivities"])
+    assert "near its ceiling" in doc["high_prevalence_note"]
+    assert "does not change the rule" in doc["high_prevalence_note"]
+
+
 # ---------------------------------------------------------------- per-season, LOSO, sensitivities
 
 

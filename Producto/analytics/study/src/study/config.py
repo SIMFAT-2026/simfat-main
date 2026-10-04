@@ -99,6 +99,7 @@ class StudyParameters:
     n_firms_primary: int = 3  # Section 6
     n_firms_sensitivities: tuple[int, ...] = (1, 5)  # Section 6
     prevalence_warning: float = 0.05  # Section 9
+    prevalence_high: float = 0.5  # reporting flag only (DEVIATIONS N15); not in the contract
     seasons: tuple[int, ...] = tuple(range(2017, 2026))  # Section 5
     n_comunas: int = 86  # Section 4: monitored comunas, the balanced-panel size
 

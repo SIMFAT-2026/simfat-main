@@ -201,3 +201,15 @@ budget (100 x B) and the abort on data without positives are unchanged. A
 per-season analysis is labelled `single-class` only when the season holds no
 positive or no negative; any other bootstrap failure is `bootstrap-failed` with
 its message in `ci_error`, never mislabelled. N9 stays as written.
+
+### N15 — High-prevalence flag, a reporting addition (2026-10-03)
+
+Section 9 flags prevalence below 5%. The contract has no flag for the opposite
+case, but the observed prevalence is expected between 0.70 and 0.92, where
+AUC-PR sits near its ceiling and the non-inferiority margin (`delta = 0.02`) is
+easier to meet than at moderate prevalence. A reporting flag now marks
+prevalence strictly above 50% (`high_prevalence_warning`) next to the existing
+`< 5%` flag in every table (pooled, per-season, decisions) and in
+`decision.json`, together with a note stating that reading. It is a reporting
+addition only: it does not enter the decision rule, the claim rule, any
+interval, or the shipped weight. (`config.StudyParameters.prevalence_high`.)

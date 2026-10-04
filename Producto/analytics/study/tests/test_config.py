@@ -132,3 +132,7 @@ def test_decision_sequence_that_disagrees_with_the_grid_is_rejected_at_construct
 def test_expected_comunas_match_the_contract():
     assert config.PARAMETERS.n_comunas == 86
     assert "86 monitored comunas" in _real_contract_text()
+
+
+def test_high_prevalence_threshold_is_a_reporting_parameter_of_fifty_percent():
+    assert config.PARAMETERS.prevalence_high == 0.5

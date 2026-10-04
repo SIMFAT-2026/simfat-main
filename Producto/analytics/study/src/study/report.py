@@ -49,6 +49,7 @@ class PooledResult:
     n_auc_undefined: int = 0  # kept resamples without negatives: out of the ROC AUC CI only
     status: str = "ok"  # ok | failed
     error: str = ""
+    high_prevalence_warning: bool = False  # prevalence > 50%: reporting flag only (N15)
 
 
 def failed_result(name: str, kind: str, exc: BaseException) -> PooledResult:
@@ -68,6 +69,13 @@ class BacktestResult:
     loso: list  # PooledResult per dropped season
     sensitivities: list  # PooledResult per sensitivity
     complete: bool = True  # False for the checkpoint written before the reruns
+
+
+HIGH_PREVALENCE_NOTE = (
+    "Prevalence above 50% is flagged as a reporting aid only and does not change the rule: "
+    "at high prevalence AUC-PR sits near its ceiling, so the non-inferiority margin "
+    "(delta = 0.02) is easier to meet."
+)
 
 
 def _fmt(w: float) -> str:
@@ -149,6 +157,7 @@ def pooled_analysis(
     return PooledResult(
         name=name, kind=kind, n=len(ds), n_pos=int(ds.y.sum()), prevalence=prevalence,
         prevalence_warning=bool(prevalence < params.prevalence_warning),
+        high_prevalence_warning=bool(prevalence > params.prevalence_high),
         rows=rows, outcome=outcome, n_redrawn=boot.n_redrawn,
         n_auc_undefined=_count_nan(boot.values[f"auc|{_fmt(base_w)}"]) if with_secondary else 0,
     )
@@ -198,6 +207,7 @@ def per_season_table(ds: dataset.Dataset, params: config.StudyParameters) -> lis
             row = {"season": season, "wm": w, "n": len(sub), "n_pos": n_pos,
                    "prevalence": prevalence,
                    "prevalence_warning": bool(prevalence < params.prevalence_warning),
+                   "high_prevalence_warning": bool(prevalence > params.prevalence_high),
                    "ap": point_ap[w], "diff": point_ap[w] - point_ap[base_w],
                    "ci_status": status, "ci_error": error, "n_redrawn": n_redrawn,
                    "n_auc_undefined": n_auc_undefined}
@@ -304,13 +314,13 @@ def run_backtest(
 # ---------------------------------------------------------------- outputs
 
 POOLED_COLUMNS = (
-    ["analysis", "kind", "wm", "n", "n_pos", "prevalence", "prevalence_warning"]
+    ["analysis", "kind", "wm", "n", "n_pos", "prevalence", "prevalence_warning", "high_prevalence_warning"]
     + ["ap", "ap_lo", "ap_hi", "diff", "diff_lo", "diff_hi", "qualifies"]
     + [f"{m}{suffix}" for m in SECONDARY for suffix in ("", "_lo", "_hi")]
     + ["n_redrawn", "n_auc_undefined", "status", "error"]
 )
 PER_SEASON_COLUMNS = [
-    "season", "wm", "n", "n_pos", "prevalence", "prevalence_warning",
+    "season", "wm", "n", "n_pos", "prevalence", "prevalence_warning", "high_prevalence_warning",
     "ap", "ap_lo", "ap_hi", "diff", "diff_lo", "diff_hi",
     *[f"{m}{suffix}" for m in SECONDARY for suffix in ("", "_lo", "_hi")],
     "ci_status", "ci_error", "n_redrawn", "n_auc_undefined",
@@ -368,7 +378,8 @@ def write_tables(result: BacktestResult, out_dir: Path) -> None:
             for row in res.rows:
                 merged = {**row, "analysis": res.name, "kind": res.kind, "n_redrawn": res.n_redrawn,
                           "n_auc_undefined": res.n_auc_undefined, "status": res.status, "error": res.error,
-                          "prevalence_warning": res.prevalence_warning}
+                          "prevalence_warning": res.prevalence_warning,
+                          "high_prevalence_warning": res.high_prevalence_warning}
                 w.writerow([_cell(merged[c]) for c in POOLED_COLUMNS])
 
     with open(out_dir / "per_season.csv", "w", encoding="utf-8", newline="") as f:
@@ -381,18 +392,18 @@ def write_tables(result: BacktestResult, out_dir: Path) -> None:
     with open(out_dir / "decisions.csv", "w", encoding="utf-8", newline="") as f:
         w = csv.writer(f)
         w.writerow(["analysis", "kind", "shipped_wm", "claim", "qualifying", "n", "prevalence",
-                    "prevalence_warning", "n_redrawn", "n_auc_undefined", "status", "error"]
-                   + [f"diff_lo_{_fmt(g)}" for g in grid])
+                    "prevalence_warning", "high_prevalence_warning", "n_redrawn", "n_auc_undefined",
+                    "status", "error"] + [f"diff_lo_{_fmt(g)}" for g in grid])
         for res in _all_pooled(result):
             o = res.outcome
             if res.status == "failed":
-                w.writerow([res.name, res.kind, "", "", "", "", "", "", "", "", res.status, res.error]
+                w.writerow([res.name, res.kind, "", "", "", "", "", "", "", "", "", res.status, res.error]
                            + [""] * len(grid))
                 continue
             w.writerow([res.name, res.kind, o.shipped_wm, o.claim,
                         " ".join(_fmt(q) for q in o.qualifying), res.n, res.prevalence,
-                        res.prevalence_warning, res.n_redrawn, res.n_auc_undefined, res.status, res.error]
-                       + [o.lowers[g] for g in grid])
+                        res.prevalence_warning, res.high_prevalence_warning, res.n_redrawn,
+                        res.n_auc_undefined, res.status, res.error] + [o.lowers[g] for g in grid])
 
 
 class ProvenanceError(RuntimeError):
@@ -458,6 +469,7 @@ def _decision_entry(res: PooledResult, primary: PooledResult) -> dict:
         "n": res.n,
         "prevalence": res.prevalence,
         "prevalence_warning": res.prevalence_warning,
+        "high_prevalence_warning": res.high_prevalence_warning,
         "n_redrawn": res.n_redrawn,
         "n_auc_undefined": res.n_auc_undefined,
         "agrees_with_primary": o.shipped_wm == primary.outcome.shipped_wm,
@@ -490,6 +502,7 @@ def write_decision_json(
         "overwrote_previous": bool(overwrote_previous),
         "previous_decision_sha256": previous_decision_sha256,
         "complete": bool(result.complete),
+        "high_prevalence_note": HIGH_PREVALENCE_NOTE,
         "warnings": list(warnings),
         "parameters": {
             "grid": list(params.grid), "decision_sequence": list(params.decision_sequence),
