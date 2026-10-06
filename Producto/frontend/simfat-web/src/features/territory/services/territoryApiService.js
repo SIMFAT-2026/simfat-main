@@ -1,6 +1,7 @@
 import axiosClient from '../../../api/axiosClient';
 import publicAxiosClient from '../../../api/publicAxiosClient';
 import { extractResponseData, normalizeLayerPayload } from '../utils/layerPayload';
+import { buildMapbiomasParams } from '../utils/mapbiomasLayer';
 
 const TERRITORY_ENDPOINTS = {
   layers: '/api/territory/layers',
@@ -82,6 +83,17 @@ export async function fetchTerritoryLayers({ regionId, indicators, from, to }) {
   });
 
   return normalizeLayerPayload(response.data, regionId);
+}
+
+// Fetches ONE yearly MapBiomas layer (BURNED or LANDCOVER). These are not part
+// of the region bulk load: each year is requested on demand. When year is
+// omitted the backend applies its data-derived default year. Resolves to the
+// layer payload (year, minYear, maxYear, citation, values...) or null.
+export async function fetchMapbiomasLayer(indicator, { regionId, year, publicMode = false, signal } = {}) {
+  const params = buildMapbiomasParams({ regionId, indicator, year });
+  const endpoint = publicMode ? PUBLIC_TERRITORY_ENDPOINTS.layers : TERRITORY_ENDPOINTS.layers;
+  const response = await clientFor(publicMode).get(endpoint, { params, signal });
+  return normalizeLayerPayload(response.data, regionId).layers[indicator] ?? null;
 }
 
 export async function fetchTerritoryBounds(regionId, fallback) {
