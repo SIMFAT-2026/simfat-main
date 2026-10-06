@@ -238,6 +238,30 @@ public class TerritoryController {
         Map<String, Object> layers = new LinkedHashMap<>();
         List<String> requestedIndicators = parseIndicators(indicators);
 
+        // Slice S3-0 / design D5: `year` is validated ONLY when a MapBiomas indicator is actually
+        // requested (the other indicators stay byte-identical whether `year` is present, absent or
+        // malformed, spec TL-1i), and it is validated HERE, before any other layer runs, so an
+        // invalid `year` on the public route costs no repository or service call. LANDCOVER is
+        // resolved before BURNED so a combined request with a year valid only for BURNED (e.g.
+        // 2025) reports LANDCOVER as the offender.
+        //
+        // Decision Q28: each indicator's omitted-year default is data-derived, but it is only
+        // READ when `year` is actually omitted, so an explicit `year` never pays for that read.
+        MapbiomasYear landCoverYear = null;
+        if (requestedIndicators.contains("LANDCOVER")) {
+            int landCoverDefaultYear = year == null
+                ? resolveLandCoverDefaultYear()
+                : MapbiomasYear.maxYear(MapbiomasYear.Indicator.LANDCOVER);
+            landCoverYear = MapbiomasYear.resolve(MapbiomasYear.Indicator.LANDCOVER, year, landCoverDefaultYear);
+        }
+        MapbiomasYear burnedYear = null;
+        if (requestedIndicators.contains("BURNED")) {
+            int burnedDefaultYear = year == null
+                ? resolveBurnedDefaultYear()
+                : MapbiomasYear.maxYear(MapbiomasYear.Indicator.BURNED);
+            burnedYear = MapbiomasYear.resolve(MapbiomasYear.Indicator.BURNED, year, burnedDefaultYear);
+        }
+
         if (requestedIndicators.contains("NDVI")) {
             layers.put("NDVI", ndviLayer(regionId, geometry, fromDate, toDate));
         }
@@ -261,32 +285,11 @@ public class TerritoryController {
         if (requestedIndicators.contains("RISK_SCORE")) {
             layers.put("RISK_SCORE", riskScoreLayer(regionId, geometry));
         }
-        if (requestedIndicators.contains("LANDCOVER")) {
-            // Slice S3-0 / design D5: same bounded `year` contract as BURNED, validated against
-            // LANDCOVER's own range (1999-2024), and BEFORE BURNED so that a combined request with
-            // a year valid only for BURNED (e.g. 2025) reports LANDCOVER as the offender. An
-            // explicit `year` never pays for the default-year read (Q28 applied to land cover).
-            int landCoverDefaultYear = year == null
-                ? resolveLandCoverDefaultYear()
-                : MapbiomasYear.maxYear(MapbiomasYear.Indicator.LANDCOVER);
-            MapbiomasYear resolvedLandCoverYear =
-                MapbiomasYear.resolve(MapbiomasYear.Indicator.LANDCOVER, year, landCoverDefaultYear);
-            layers.put("LANDCOVER", landCoverLayer(regionId, resolvedLandCoverYear));
+        if (landCoverYear != null) {
+            layers.put("LANDCOVER", landCoverLayer(regionId, landCoverYear));
         }
-        if (requestedIndicators.contains("BURNED")) {
-            // Task 2b2a.2 / design D5: `year` is validated ONLY when a MapBiomas indicator is
-            // actually requested, so the other 11 indicators stay byte-identical whether `year`
-            // is present, absent or malformed (spec TL-1i).
-            //
-            // Decision Q28: the omitted-year default is data-derived, not the fixed
-            // BURNED_MAX_YEAR constant -- but that default is only ever READ when `year` is
-            // actually omitted, so an explicit `year` never pays for the extra Mongo read.
-            int burnedDefaultYear = year == null
-                ? resolveBurnedDefaultYear()
-                : MapbiomasYear.maxYear(MapbiomasYear.Indicator.BURNED);
-            MapbiomasYear resolvedYear =
-                MapbiomasYear.resolve(MapbiomasYear.Indicator.BURNED, year, burnedDefaultYear);
-            layers.put("BURNED", burnedLayer(regionId, resolvedYear));
+        if (burnedYear != null) {
+            layers.put("BURNED", burnedLayer(regionId, burnedYear));
         }
         boolean needsClimateLayers = requestedIndicators.contains("WIND")
             || requestedIndicators.contains("HUMIDITY")

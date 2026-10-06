@@ -3,6 +3,7 @@ package com.simfat.backend.controller;
 import static org.hamcrest.Matchers.is;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -301,6 +302,45 @@ class TerritoryControllerMapbiomasYearTest extends MongoFreeWebTestSupport {
                     .andExpect(status().isBadRequest());
             }
         }
+    }
+
+    @Test
+    @WithMockUser(authorities = "ROLE_VERIFIED_USER")
+    void invalidYear_isRejectedBeforeAnyOtherLayerIsComputed_onBothRoutes() throws Exception {
+        for (String route : new String[] {"/api/territory/layers", "/api/territory/public/layers"}) {
+            mockMvc.perform(get(route)
+                    .param("regionId", "biobio")
+                    .param("indicators", "NDVI,NDMI,LOSS,ALERTS,FIRMS,REPORTS,RISK_SCORE,WIND,LANDCOVER,BURNED")
+                    .param("year", "abc"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("LANDCOVER")));
+        }
+
+        verifyNoInteractions(
+            openEoIndicatorObservationRepository,
+            forestLossRecordRepository,
+            heatAlertEventRepository,
+            citizenReportRepository,
+            comunaInfoRepository,
+            comunaMapbiomasStatsRepository,
+            territoryWeatherObservationRepository,
+            territoryRiskService,
+            nasaFirmsService,
+            openWeatherFwiService,
+            comunaRiskService);
+    }
+
+    @Test
+    @WithMockUser(authorities = "ROLE_VERIFIED_USER")
+    void yearValidOnlyForBurned_withBothRequested_namesLandcoverAsTheOffender() throws Exception {
+        mockMvc.perform(get("/api/territory/layers")
+                .param("regionId", "biobio")
+                .param("indicators", "NDVI,BURNED,LANDCOVER")
+                .param("year", "2025"))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("LANDCOVER")));
+
+        verifyNoInteractions(openEoIndicatorObservationRepository, comunaMapbiomasStatsRepository);
     }
 
     @Test
