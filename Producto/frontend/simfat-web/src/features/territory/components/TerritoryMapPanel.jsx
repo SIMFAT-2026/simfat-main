@@ -980,9 +980,19 @@ function BurnedLegend({ state }) {
   return (
     <div className="territory-legend-section">
       <h5>{title}</h5>
-      {!layer && (
+      {!layer && state?.error && !state?.loading && (
+        <div className="territory-meta" role="alert">
+          <p>{state.error}</p>
+          {state.retry && (
+            <button type="button" className="btn btn-secondary" onClick={state.retry}>
+              Reintentar
+            </button>
+          )}
+        </div>
+      )}
+      {!layer && !(state?.error && !state?.loading) && (
         <p className="territory-meta" role="status">
-          {state?.loading ? 'Cargando…' : state?.error || 'Sin datos de Fuego.'}
+          {state?.loading ? 'Cargando…' : 'Sin datos de Fuego.'}
         </p>
       )}
       {layer && (

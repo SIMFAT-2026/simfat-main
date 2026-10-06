@@ -94,9 +94,9 @@ describe('mapbiomasReducer', () => {
       type: 'failure',
       regionId: 'biobio',
       requestedYear: undefined,
-      message: 'boom'
+      message: 'Network Error'
     });
-    expect(failed.error).toBe('boom');
+    expect(failed.error).toBe('No fue posible cargar el área quemada.');
     expect(failed.loading).toBe(false);
     expect(failed.layer).toBeNull();
 

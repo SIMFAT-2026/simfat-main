@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useReducer, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { fetchMapbiomasLayer } from '../services/territoryApiService';
 import { mapbiomasCacheKey } from '../utils/mapbiomasLayer';
 import { initialMapbiomasState, mapbiomasReducer } from '../utils/mapbiomasState';
@@ -20,12 +20,17 @@ function readCache(key) {
 // Loads one MapBiomas indicator on demand: only while `visible`, never as part
 // of the region bulk load. Aborts the in-flight request when the year or region
 // changes, the layer is hidden, or the component unmounts.
+// The selected year is deliberately kept when the region changes: the backend
+// default year is computed over all regions, so it is identical everywhere and
+// keeping it makes regions directly comparable.
 export function useMapbiomasLayer(indicator, { visible, regionId, publicMode }) {
   const [state, dispatch] = useReducer(mapbiomasReducer, initialMapbiomasState);
   const stateRef = useRef(state);
   stateRef.current = state;
 
   const { selectedYear } = state;
+  // Bumping this re-runs the load effect, which retries the same request.
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     if (!visible) {
@@ -63,14 +68,16 @@ export function useMapbiomasLayer(indicator, { visible, regionId, publicMode }) 
       })
       .catch((error) => {
         if (controller.signal.aborted) return;
-        const message = error instanceof Error && error.message ? error.message : 'No fue posible cargar la capa.';
-        dispatch({ type: 'failure', regionId, requestedYear: selectedYear, message });
+        // Technical detail stays out of the UI; the reducer sets a fixed message.
+        console.warn(`MapBiomas ${indicator} layer failed to load`, error);
+        dispatch({ type: 'failure', regionId, requestedYear: selectedYear });
       });
 
     return () => controller.abort();
-  }, [indicator, visible, regionId, publicMode, selectedYear]);
+  }, [indicator, visible, regionId, publicMode, selectedYear, attempt]);
 
   const setYear = useCallback((year) => dispatch({ type: 'select-year', year }), []);
+  const retry = useCallback(() => setAttempt((count) => count + 1), []);
 
   // The effect that requests a new region runs after render, so for one render
   // the state can still describe the previous region: never expose it.
@@ -81,8 +88,9 @@ export function useMapbiomasLayer(indicator, { visible, regionId, publicMode }) 
       layer: matchesRegion ? state.layer : null,
       loading: visible && (!matchesRegion || state.loading),
       error: matchesRegion ? state.error : '',
-      setYear
+      setYear,
+      retry
     }),
-    [state.selectedYear, state.layer, state.loading, state.error, matchesRegion, visible, setYear]
+    [state.selectedYear, state.layer, state.loading, state.error, matchesRegion, visible, setYear, retry]
   );
 }

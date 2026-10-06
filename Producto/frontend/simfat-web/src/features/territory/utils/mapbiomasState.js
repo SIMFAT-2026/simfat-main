@@ -10,6 +10,9 @@ export const initialMapbiomasState = {
   error: ''
 };
 
+// Every failure maps to this fixed Spanish message: raw error text (e.g.
+// "Network Error") never reaches the UI.
+export const LOAD_ERROR_MESSAGE = 'No fue posible cargar el área quemada.';
 const MISSING_LAYER_MESSAGE = 'No hay datos de esta capa para el año y la región seleccionados.';
 
 function isCurrentRequest(state, action) {
@@ -59,7 +62,7 @@ export function mapbiomasReducer(state, action) {
       if (!isCurrentRequest(state, action)) {
         return state;
       }
-      return { ...state, layer: null, loading: false, error: action.message };
+      return { ...state, layer: null, loading: false, error: LOAD_ERROR_MESSAGE };
     }
     default:
       return state;
