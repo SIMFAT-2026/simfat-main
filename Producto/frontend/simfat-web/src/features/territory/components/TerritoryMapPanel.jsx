@@ -10,7 +10,16 @@ import EmptyState from '../../../components/EmptyState';
 import ErrorMessage from '../../../components/ErrorMessage';
 import LoadingSpinner from '../../../components/LoadingSpinner';
 import WeatherSyncButton from '../../dashboard/components/WeatherSyncButton';
-import { ALERT_LEVEL_CONFIG, CLIMATE_SCALES, RISK_SCORE_LEGEND, VEGETATION_SCALES } from '../constants/colorScales';
+import {
+  ALERT_LEVEL_CONFIG,
+  BURNED_SCALE,
+  CLIMATE_SCALES,
+  NEUTRAL_FILL,
+  RISK_SCORE_LEGEND,
+  VEGETATION_SCALES,
+  burnedColorFor
+} from '../constants/colorScales';
+import { burnedLegendNote, burnedTooltipText } from '../utils/mapbiomasLayer';
 import { CLIMATE_INDICATORS } from '../constants/indicators';
 
 // LocalDateTime de Java llega sin 'Z' — JS lo interpreta como hora local del browser.
@@ -43,11 +52,11 @@ const INDICATOR_COLORS = {
   WIND: '#0891b2',
   HUMIDITY: '#2b8cbe',
   AIR_TEMP: '#dc2626',
-  SOIL_TEMP: '#b45309'
+  SOIL_TEMP: '#b45309',
+  BURNED: '#AC4B28'
 };
 
 const INDEX_CHOROPLETH_INDICATORS = ['NDVI', 'NDMI'];
-const NEUTRAL_FILL = '#cbd5e1';
 
 const FIRMS_RECENCY_STYLES = {
   today: {
@@ -193,6 +202,53 @@ const ClimateChoropleth = memo(function ClimateChoropleth({ geoJson, indicator, 
             ? `${Number(entry.value).toFixed(1)} ${entry.unit || entryUnit}`
             : 'Sin datos';
           layer.setTooltipContent(`${nombre}: ${valueLabel}`);
+        });
+      }}
+    />
+  );
+});
+
+// Renders the yearly MapBiomas BURNED layer as a comuna choropleth. Unlike the
+// live layers it is keyed on the layer year, so loading another year rebuilds
+// the polygons and restyles them. While the layer is not loaded (loading or
+// failed) every comuna is neutral and the tooltip says why.
+const BurnedChoropleth = memo(function BurnedChoropleth({ geoJson, layer, loading }) {
+  const layerRef = useRef(layer);
+  layerRef.current = layer;
+  const loadingRef = useRef(loading);
+  loadingRef.current = loading;
+
+  if (!geoJson || !geoJson.features) return null;
+
+  return (
+    <GeoJSON
+      key={`burned-${layer?.year ?? 'none'}`}
+      pane="burned-layer-pane"
+      data={geoJson}
+      style={(feature) => {
+        const comunaId = feature?.properties?.comunaId;
+        const entry = layerRef.current?.values?.[comunaId];
+        return {
+          fillColor: burnedColorFor(entry),
+          fillOpacity: entry?.available === true ? 0.55 : 0.12,
+          color: '#334155',
+          weight: 0.8,
+          opacity: 0.7
+        };
+      }}
+      onEachFeature={(feature, layerGeo) => {
+        const comunaId = feature?.properties?.comunaId;
+        const nombre = feature?.properties?.nombre || comunaId;
+        layerGeo.bindTooltip('', { sticky: true });
+        layerGeo.on('mouseover', () => {
+          const current = layerRef.current;
+          if (!current) {
+            layerGeo.setTooltipContent(`${nombre}: ${loadingRef.current ? 'Cargando…' : 'Sin datos de Fuego'}`);
+            return;
+          }
+          layerGeo.setTooltipContent(
+            burnedTooltipText({ nombre, year: current.year, entry: current.values?.[comunaId] })
+          );
         });
       }}
     />
@@ -493,7 +549,8 @@ const INDICATOR_LABELS = {
   WIND: 'Viento',
   HUMIDITY: 'Humedad rel.',
   AIR_TEMP: 'Temp. del aire',
-  SOIL_TEMP: 'Temp. del suelo'
+  SOIL_TEMP: 'Temp. del suelo',
+  BURNED: 'Área quemada (MapBiomas)'
 };
 
 const INDICATOR_FULL_LABELS = {
@@ -506,7 +563,8 @@ const INDICATOR_FULL_LABELS = {
   WIND: 'Viento',
   HUMIDITY: 'Humedad relativa',
   AIR_TEMP: 'Temperatura del aire',
-  SOIL_TEMP: 'Temperatura del suelo'
+  SOIL_TEMP: 'Temperatura del suelo',
+  BURNED: 'Área quemada (MapBiomas)'
 };
 
 function IndexInfo({ info, label }) {
@@ -604,7 +662,7 @@ const COMPONENT_INFO = {
 
 const VISIBLE_RISK_COMPONENTS = new Set(['fwi', 'ndmi', 'firms', 'ndvi', 'reports']);
 const POINT_LAYER_INDICATORS = ['FIRMS', 'ALERTS', 'REPORTS'];
-const MAP_TOGGLE_INDICATORS = ['RISK_SCORE', 'FIRMS', 'NDVI', 'NDMI', 'ALERTS', 'REPORTS'];
+const MAP_TOGGLE_INDICATORS = ['RISK_SCORE', 'FIRMS', 'NDVI', 'NDMI', 'ALERTS', 'REPORTS', 'BURNED'];
 const ALERT_TOOLTIP_COMPONENTS = ['firms', 'fwi', 'ndmi', 'ndvi'];
 
 function componentScoreParts(component) {
@@ -912,6 +970,53 @@ function ComunaTooltip({ comunaId, nombre, score, pos }) {
   );
 }
 
+// Legend for the BURNED layer. Year, note and source are plain text so colour
+// is never the only channel.
+function BurnedLegend({ state }) {
+  const layer = state?.layer;
+  const title = layer ? `Área quemada ${layer.year} (anual)` : 'Área quemada (anual)';
+  const note = burnedLegendNote(layer);
+
+  return (
+    <div className="territory-legend-section">
+      <h5>{title}</h5>
+      {!layer && (
+        <p className="territory-meta" role="status">
+          {state?.loading ? 'Cargando…' : state?.error || 'Sin datos de Fuego.'}
+        </p>
+      )}
+      {layer && (
+        <>
+          <ul>
+            {BURNED_SCALE.bins.map((bin) => (
+              <li key={bin.label}>
+                <span className="territory-color-dot" style={{ backgroundColor: bin.color }} />
+                <span>{bin.label}</span>
+              </li>
+            ))}
+            <li>
+              <span
+                className="territory-color-dot"
+                style={{ backgroundColor: BURNED_SCALE.zero.color, border: '1px solid #94a3b8' }}
+              />
+              <span>{BURNED_SCALE.zero.label}</span>
+            </li>
+            <li>
+              <span className="territory-color-dot" style={{ backgroundColor: NEUTRAL_FILL }} />
+              <span>Sin datos</span>
+            </li>
+          </ul>
+          {note && <p className="territory-meta">{note}</p>}
+          <p className="territory-meta">
+            Fuente: {layer.citation || 'MapBiomas Fuego Chile (provisional)'}. Colores: rampa oficial de MapBiomas
+            Fuego (tamaño de cicatriz), reutilizada porque no existe una rampa para fracción anual quemada.
+          </p>
+        </>
+      )}
+    </div>
+  );
+}
+
 function TerritoryMapPanel({
   regionOptions,
   selectedRegionId,
@@ -923,6 +1028,7 @@ function TerritoryMapPanel({
   refreshing,
   error,
   onRetry,
+  mapbiomasLayers = {},
   readOnly = false
 }) {
   const comunalGeoJson = regionData?.comunalGeoJson || null;
@@ -1117,6 +1223,17 @@ function TerritoryMapPanel({
               )}
             </Pane>
 
+            <Pane name="burned-layer-pane" style={{ zIndex: 415 }}>
+              {comunalGeoJson && visibleIndicators.includes('BURNED') && (
+                <BurnedChoropleth
+                  key={regionData.regionId}
+                  geoJson={comunalGeoJson}
+                  layer={mapbiomasLayers.BURNED?.layer}
+                  loading={Boolean(mapbiomasLayers.BURNED?.loading)}
+                />
+              )}
+            </Pane>
+
             <Pane name="climate-layer-pane" style={{ zIndex: 420 }}>
               {comunalGeoJson && INDEX_CHOROPLETH_INDICATORS.filter((indicator) => visibleIndicators.includes(indicator)).map((indicator) => (
                 <VegetationChoropleth
@@ -1307,6 +1424,10 @@ function TerritoryMapPanel({
                   </div>
                 );
               })}
+
+              {visibleIndicators.includes('BURNED') && (
+                <BurnedLegend state={mapbiomasLayers.BURNED} />
+              )}
 
               <p className="territory-meta">
                 Fuente: {regionData.source === 'backend' ? 'Backend' : 'Mock local'} | Ultima actualizacion:{' '}
