@@ -27,7 +27,7 @@ from rasterio.windows import Window, from_bounds
 
 from mb_pipeline import fire_stats as mb_fire_stats
 from mb_pipeline import zonal
-from study import firms_target
+from study import bootstrap, firms_target, metrics
 
 MIN_SCAR_HA = 250.0  # Section 2, H1
 BUFFER_M = 375.0  # Section 2, H1: one VIIRS pixel
@@ -573,3 +573,132 @@ def analyse_rasters(
         scars = find_scars(burned, inside, comuna_idx, comuna_ids, grid, min_ha=min_ha)
         rows.extend(_annual_rows(year, scars, grid, data.shape, det))
     return rows
+
+
+# ---------------------------------------------------------------------------
+# Summaries: shares, intervals, Spearman
+# ---------------------------------------------------------------------------
+
+BOOTSTRAP_B = 2000  # Section 10 (the same B and seed as the backtest; see N21)
+BOOTSTRAP_SEED = 20261027
+
+
+def _none_if_nan(x):
+    return None if x is None or (isinstance(x, float) and math.isnan(x)) else x
+
+
+def _share_ci(detected: np.ndarray, clusters, B: int, seed: int) -> dict | None:
+    """Percentile CI of the detected share, resampling whole clusters with
+    replacement (``bootstrap.cluster_bootstrap``, fresh generator from ``seed``).
+    ``None`` with fewer than two clusters (no resampling variability)."""
+    clusters = np.asarray(clusters)
+    n_clusters = len(np.unique(clusters))
+    if n_clusters < 2:
+        return None
+    result = bootstrap.cluster_bootstrap(
+        np.ones(len(detected)), clusters, lambda idx: {"share": float(detected[idx].mean())}, B=B, seed=seed
+    )
+    lower, upper, n_valid = bootstrap.percentile_ci(result.values["share"])
+    return {"lower": lower, "upper": upper, "n_valid": n_valid, "n_clusters": int(n_clusters)}
+
+
+def _share_block(rows: Sequence[Mapping]) -> dict:
+    n = len(rows)
+    n_det = sum(1 for r in rows if r["detected"])
+    return {"n_scars": n, "n_detected": n_det, "share": (n_det / n) if n else None}
+
+
+def summarize_scars(
+    scar_rows: Sequence[Mapping],
+    *,
+    B: int = BOOTSTRAP_B,
+    seed: int = BOOTSTRAP_SEED,
+    years: Sequence[int] = YEARS,
+) -> dict:
+    """PRIMARY H1 result.
+
+    - ``primary``: share of scars with >= 1 filtered detection in the buffer,
+      pooled over all years, with two 95% percentile intervals: ``ci_by_year``
+      (the one to quote: whole YEARS are resampled, because scars of one year
+      share fire weather, season and the same VIIRS overpasses, and large fire
+      complexes split into neighbouring scars) and ``ci_by_scar`` (scars treated
+      as independent; narrower, reported only for contrast).
+    - ``per_year``: share per year, interval from resampling that year's scars.
+    - ``by_area_class``: share per fixed area class, interval clustered by year
+      (``None`` if the class occurs in a single year).
+    - ``excluding_edge_flag``: the same share without scars touching the union
+      edge, descriptive only.
+    """
+    rows = list(scar_rows)
+    detected = np.array([bool(r["detected"]) for r in rows], dtype=float)
+    year_of = np.array([r["year"] for r in rows], dtype=np.int64)
+
+    primary = _share_block(rows)
+    primary["n_edge_flag"] = sum(1 for r in rows if r["edge_flag"])
+    primary["n_truncated"] = sum(1 for r in rows if r["truncated"])
+    if rows:
+        primary["ci_by_year"] = _share_ci(detected, year_of, B, seed)
+        primary["ci_by_scar"] = _share_ci(detected, np.arange(len(rows)), B, seed)
+    else:
+        primary["ci_by_year"] = primary["ci_by_scar"] = None
+
+    per_year = []
+    for y in years:
+        mask = year_of == y
+        block = _share_block([r for r in rows if r["year"] == y])
+        ci = _share_ci(detected[mask], np.arange(int(mask.sum())), B, seed) if mask.any() else None
+        block.update(
+            {"year": y, "ci_lower": ci["lower"] if ci else None, "ci_upper": ci["upper"] if ci else None,
+             "ci_method": "percentile bootstrap, scars resampled"}
+        )
+        per_year.append(block)
+
+    by_class = []
+    for lo, hi, label in AREA_CLASSES:
+        sel = [r for r in rows if lo <= r["area_ha"] < hi]
+        mask = np.array([lo <= r["area_ha"] < hi for r in rows], dtype=bool)
+        block = _share_block(sel)
+        ci = _share_ci(detected[mask], year_of[mask], B, seed) if mask.any() else None
+        block.update(
+            {"class": label, "ci_lower": ci["lower"] if ci else None, "ci_upper": ci["upper"] if ci else None,
+             "ci_method": "percentile bootstrap, years resampled"}
+        )
+        by_class.append(block)
+
+    return {
+        "primary": primary,
+        "per_year": per_year,
+        "by_area_class": by_class,
+        "excluding_edge_flag": _share_block([r for r in rows if not r["edge_flag"]]),
+    }
+
+
+def summarize_secondary(secondary: Sequence[Mapping], *, B: int = BOOTSTRAP_B, seed: int = BOOTSTRAP_SEED) -> dict:
+    """SECONDARY H1 result: Spearman correlation between the annual burned
+    fraction and the filtered FIRMS count over all comuna-year pairs, with a
+    95% percentile CI from the comuna-clustered bootstrap (a comuna's years
+    resample together; the same ``cluster_bootstrap`` as the backtest). A
+    resample whose correlation is undefined (a constant side) is excluded from
+    the interval and counted out of ``n_valid``."""
+    x = np.array([r["burned_fraction"] for r in secondary], dtype=float)
+    y = np.array([r["firms_count"] for r in secondary], dtype=float)
+    comunas = np.array([r["comunaId"] for r in secondary])
+    out = {
+        "n_pairs": int(len(x)),
+        "n_comunas": int(len(np.unique(comunas))),
+        "n_years": int(len(set(r["year"] for r in secondary))),
+        "ci_method": "percentile bootstrap, comunas resampled with all their years",
+        "B": B,
+        "seed": seed,
+    }
+    rho = _none_if_nan(metrics.spearman(x, y)) if len(x) else None
+    out["rho"] = rho
+    if rho is None:
+        out.update({"ci_lower": None, "ci_upper": None, "n_valid": 0})
+        return out
+    result = bootstrap.cluster_bootstrap(
+        np.ones(len(x)), comunas, lambda idx: {"rho": metrics.spearman(x[idx], y[idx])}, B=B, seed=seed
+    )
+    lower, upper, n_valid = bootstrap.percentile_ci(result.values["rho"])
+    out.update({"ci_lower": _none_if_nan(lower), "ci_upper": _none_if_nan(upper), "n_valid": n_valid})
+    return out
