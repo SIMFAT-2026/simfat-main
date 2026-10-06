@@ -104,16 +104,16 @@ def connected_components(rows, cols, width: int) -> np.ndarray:
 # ---------------------------------------------------------------------------
 
 
-def metres_per_degree(lat_deg: float) -> tuple[float, float]:
+def metres_per_degree(lat_deg):
     """``(metres per degree of longitude, metres per degree of latitude)`` on the
     WGS84 ellipsoid at ``lat_deg``: ``N cos(phi) pi/180`` and ``M pi/180`` with
     the same ``M``/``N`` radii of curvature the pipeline's pixel-area formula
-    uses (``mb_pipeline.zonal.row_pixel_areas_m2``)."""
-    phi = math.radians(lat_deg)
-    w = 1.0 - zonal.WGS84_E2 * math.sin(phi) ** 2
+    uses (``mb_pipeline.zonal.row_pixel_areas_m2``). Works on scalars and arrays."""
+    phi = np.radians(lat_deg)
+    w = 1.0 - zonal.WGS84_E2 * np.sin(phi) ** 2
     meridian = zonal.WGS84_A * (1.0 - zonal.WGS84_E2) / w**1.5
-    prime_vertical = zonal.WGS84_A / math.sqrt(w)
-    return prime_vertical * math.cos(phi) * math.pi / 180.0, meridian * math.pi / 180.0
+    prime_vertical = zonal.WGS84_A / np.sqrt(w)
+    return prime_vertical * np.cos(phi) * math.pi / 180.0, meridian * math.pi / 180.0
 
 
 @dataclass(frozen=True)
@@ -215,3 +215,98 @@ def find_scars(burned, inside, comuna_idx, comuna_ids, grid: Grid, *, min_ha: fl
         for i in range(k)
     ]
     return Scars(table=table, rows=rows, cols=cols, scar=scar)
+
+
+# ---------------------------------------------------------------------------
+# Detections within the buffer of a scar
+# ---------------------------------------------------------------------------
+
+BUFFER_TOLERANCE_M = 1e-6  # float slack so a detection built at exactly 375 m is in
+
+
+def detections_in_buffer(
+    scars: Scars,
+    grid: Grid,
+    shape: tuple[int, int],
+    det_lon,
+    det_lat,
+    *,
+    buffer_m: float = BUFFER_M,
+    chunk: int = 1000,
+) -> np.ndarray:
+    """Number of distinct detections within ``buffer_m`` of each scar.
+
+    A detection is within the buffer of a scar iff its Euclidean distance to the
+    nearest burned pixel SQUARE of the scar is ``<= buffer_m`` (distance 0 when
+    it lies inside a burned pixel), i.e. it lies inside the scar polygon
+    buffered by ``buffer_m``. Distances are in local WGS84 metres: degree offsets
+    are scaled by ``metres_per_degree`` at the detection's own latitude, so the
+    buffer is longer in pixels along rows than along columns and shrinks in
+    columns toward the poles.
+
+    Method (exact, no dilation): for every detection the burned pixels of the
+    kept scars in a window of pixels that surely covers the buffer are looked
+    up by binary search on the sorted pixel keys, and the point-to-square
+    distance is computed for each hit. ``shape`` is the (rows, cols) of the grid
+    the scar pixels live in; detections outside it (beyond the buffer) match
+    nothing. ``chunk`` bounds memory only.
+    """
+    k = len(scars.table)
+    counts = np.zeros(k, dtype=np.int64)
+    det_lon = np.asarray(det_lon, dtype=float)
+    det_lat = np.asarray(det_lat, dtype=float)
+    if k == 0 or det_lon.size == 0:
+        return counts
+
+    h, w = shape
+    keys = scars.rows * w + scars.cols
+    order = np.argsort(keys, kind="stable")
+    skeys = keys[order]
+    sscar = scars.scar[order]
+
+    # Window half-sizes in pixels, from the smallest pixel (in metres) of the grid.
+    lat_extreme = max(abs(grid.north), abs(grid.north - h * grid.dlat))
+    mx_edge, _ = metres_per_degree(lat_extreme)
+    _, my_edge = metres_per_degree(0.0)
+    half_c = int(math.ceil(buffer_m / (float(mx_edge) * grid.dlon))) + 1
+    half_r = int(math.ceil(buffer_m / (float(my_edge) * grid.dlat))) + 1
+    dr = np.arange(-half_r, half_r + 1)
+    dc = np.arange(-half_c, half_c + 1)
+
+    for start in range(0, det_lon.size, chunk):
+        lon = det_lon[start:start + chunk]
+        lat = det_lat[start:start + chunk]
+        row0 = np.floor((grid.north - lat) / grid.dlat).astype(np.int64)
+        col0 = np.floor((lon - grid.west) / grid.dlon).astype(np.int64)
+        near = (row0 >= -half_r) & (row0 < h + half_r) & (col0 >= -half_c) & (col0 < w + half_c)
+        if not near.any():
+            continue
+        lon, lat, row0, col0 = lon[near], lat[near], row0[near], col0[near]
+        det_i = np.arange(lon.size)
+
+        rr = row0[:, None, None] + dr[None, :, None]
+        cc = col0[:, None, None] + dc[None, None, :]
+        rr, cc = np.broadcast_arrays(rr, cc)
+        valid = (rr >= 0) & (rr < h) & (cc >= 0) & (cc < w)
+        key = np.where(valid, rr * w + cc, -1)
+        pos = np.searchsorted(skeys, key.ravel())
+        pos_c = np.minimum(pos, skeys.size - 1)
+        hit = (skeys[pos_c] == key.ravel()) & valid.ravel()
+        if not hit.any():
+            continue
+        d_idx = np.broadcast_to(det_i[:, None, None], rr.shape).ravel()[hit]
+        r_hit = rr.ravel()[hit]
+        c_hit = cc.ravel()[hit]
+        scar_hit = sscar[pos_c[hit]]
+
+        mx, my = metres_per_degree(lat[d_idx])
+        cx = grid.west + (c_hit + 0.5) * grid.dlon
+        cy = grid.north - (r_hit + 0.5) * grid.dlat
+        dx = np.maximum(np.abs(lon[d_idx] - cx) - grid.dlon / 2.0, 0.0) * mx
+        dy = np.maximum(np.abs(lat[d_idx] - cy) - grid.dlat / 2.0, 0.0) * my
+        within = np.hypot(dx, dy) <= buffer_m + BUFFER_TOLERANCE_M
+        if not within.any():
+            continue
+        pairs = np.unique(d_idx[within] * k + scar_hit[within])
+        counts += np.bincount(pairs % k, minlength=k)
+    return counts
