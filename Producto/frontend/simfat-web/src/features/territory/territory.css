@@ -555,6 +555,13 @@
   color: #cbd5e1;
 }
 
+.comuna-tooltip-burned {
+  font-size: 0.72rem;
+  color: #fcd34d;
+  border-top: 1px solid rgba(255,255,255,0.15);
+  padding-top: 4px;
+}
+
 /* ── Badge modo STANDARD/ENHANCED ── */
 .comuna-mode-badge {
   font-size: 0.65rem;

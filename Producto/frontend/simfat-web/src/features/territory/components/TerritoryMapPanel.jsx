@@ -19,7 +19,7 @@ import {
   VEGETATION_SCALES,
   burnedColorFor
 } from '../constants/colorScales';
-import { burnedLegendNote, burnedTooltipText } from '../utils/mapbiomasLayer';
+import { burnedLegendNote, burnedLineFor, burnedToggleLabel, burnedTooltipText } from '../utils/mapbiomasLayer';
 import { CLIMATE_INDICATORS } from '../constants/indicators';
 
 // LocalDateTime de Java llega sin 'Z' — JS lo interpreta como hora local del browser.
@@ -212,7 +212,17 @@ const ClimateChoropleth = memo(function ClimateChoropleth({ geoJson, indicator, 
 // live layers it is keyed on the layer year, so loading another year rebuilds
 // the polygons and restyles them. While the layer is not loaded (loading or
 // failed) every comuna is neutral and the tooltip says why.
-const BurnedChoropleth = memo(function BurnedChoropleth({ geoJson, layer, loading }) {
+// When `interactive` is false (RISK_SCORE is visible) the polygons take no
+// pointer events, so hover and click fall through to the risk layer below, which
+// shows the burned line in its own tooltip. `emphasizeOutline` thickens the
+// neutral outline while the layer is the only thing on the map and not loaded.
+const BurnedChoropleth = memo(function BurnedChoropleth({
+  geoJson,
+  layer,
+  loading,
+  interactive = true,
+  emphasizeOutline = false
+}) {
   const layerRef = useRef(layer);
   layerRef.current = layer;
   const loadingRef = useRef(loading);
@@ -222,8 +232,9 @@ const BurnedChoropleth = memo(function BurnedChoropleth({ geoJson, layer, loadin
 
   return (
     <GeoJSON
-      key={`burned-${layer?.year ?? 'none'}`}
+      key={`burned-${layer?.year ?? 'none'}-${interactive ? 'i' : 'n'}-${emphasizeOutline ? 'e' : 'p'}`}
       pane="burned-layer-pane"
+      interactive={interactive}
       data={geoJson}
       style={(feature) => {
         const comunaId = feature?.properties?.comunaId;
@@ -232,11 +243,12 @@ const BurnedChoropleth = memo(function BurnedChoropleth({ geoJson, layer, loadin
           fillColor: burnedColorFor(entry),
           fillOpacity: entry?.available === true ? 0.55 : 0.12,
           color: '#334155',
-          weight: 0.8,
-          opacity: 0.7
+          weight: emphasizeOutline && !entry ? 1.6 : 0.8,
+          opacity: emphasizeOutline && !entry ? 0.95 : 0.7
         };
       }}
       onEachFeature={(feature, layerGeo) => {
+        if (!interactive) return;
         const comunaId = feature?.properties?.comunaId;
         const nombre = feature?.properties?.nombre || comunaId;
         layerGeo.bindTooltip('', { sticky: true });
@@ -900,7 +912,7 @@ function WeatherIllustration({ category, size = 30 }) {
   );
 }
 
-function ComunaTooltip({ comunaId, nombre, score, pos }) {
+function ComunaTooltip({ comunaId, nombre, score, pos, burnedLine = '' }) {
   if (!comunaId || !pos) return null;
   const level = ALERT_LEVEL_CONFIG[score?.alertLevel] || ALERT_LEVEL_CONFIG.NORMAL;
   const pct = typeof score?.scoreComposite === 'number' ? (score.scoreComposite * 100).toFixed(0) : null;
@@ -966,6 +978,7 @@ function ComunaTooltip({ comunaId, nombre, score, pos }) {
           ))}
         </div>
       )}
+      {burnedLine && <div className="comuna-tooltip-burned">{burnedLine}</div>}
     </div>
   );
 }
@@ -1144,7 +1157,11 @@ function TerritoryMapPanel({
                 checked={visibleIndicators.includes(indicator)}
                 onChange={() => toggleIndicator(indicator)}
               />
-              <span>{INDICATOR_LABELS[indicator] || indicator}</span>
+              <span>
+                {indicator === 'BURNED'
+                  ? burnedToggleLabel(mapbiomasLayers.BURNED?.layer)
+                  : INDICATOR_LABELS[indicator] || indicator}
+              </span>
             </label>
           ))}
           {/* Opt-in climate layers (DEC-B): off by default, each with its own
@@ -1240,6 +1257,8 @@ function TerritoryMapPanel({
                   geoJson={comunalGeoJson}
                   layer={mapbiomasLayers.BURNED?.layer}
                   loading={Boolean(mapbiomasLayers.BURNED?.loading)}
+                  interactive={!visibleIndicators.includes('RISK_SCORE')}
+                  emphasizeOutline={!mapbiomasLayers.BURNED?.layer && visibleIndicators.every((indicator) => indicator === 'BURNED')}
                 />
               )}
             </Pane>
@@ -1321,6 +1340,14 @@ function TerritoryMapPanel({
               nombre={hoveredComuna.nombre}
               score={hoveredComuna.score}
               pos={tooltipPos}
+              burnedLine={
+                visibleIndicators.includes('BURNED') && mapbiomasLayers.BURNED?.layer
+                  ? burnedLineFor(
+                      mapbiomasLayers.BURNED.layer.values?.[hoveredComuna.comunaId],
+                      mapbiomasLayers.BURNED.layer.year
+                    )
+                  : ''
+              }
             />
           )}
 
