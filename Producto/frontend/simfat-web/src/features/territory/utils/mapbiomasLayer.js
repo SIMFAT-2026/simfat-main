@@ -8,6 +8,8 @@ const PERCENT_FORMAT = new Intl.NumberFormat('es-CL', {
   maximumFractionDigits: 2
 });
 
+const HECTARES_FORMAT = new Intl.NumberFormat('es-CL', { maximumFractionDigits: 1 });
+
 function isNumber(value) {
   return typeof value === 'number' && Number.isFinite(value);
 }
@@ -42,6 +44,41 @@ export function burnedSummary(layer) {
   });
 
   return summary;
+}
+
+// Q29 legend note, derived from the payload (never tied to a specific year).
+// The selector sentence is only shown once the year control exists.
+export function burnedLegendNote(layer, { hasYearControl = false } = {}) {
+  if (!layer || !isNumber(layer.year)) {
+    return '';
+  }
+  const { burned, unavailable, total } = burnedSummary(layer);
+  const noun = total === 1 ? 'comuna' : 'comunas';
+  let note = `Año ${layer.year} · ${burned} de ${total} ${noun} con área quemada registrada`;
+  if (unavailable > 0) {
+    note += ` (${unavailable} sin datos)`;
+  }
+  note += '.';
+  if (hasYearControl) {
+    note += ' Usa el selector para explorar otros años.';
+  }
+  return note;
+}
+
+// Tooltip text for one comuna of the BURNED choropleth.
+export function burnedTooltipText({ nombre, year, entry }) {
+  const fraction = entry?.burnedFraction;
+  if (entry?.available !== true || !isNumber(fraction)) {
+    return `${nombre}: Sin datos de Fuego`;
+  }
+  if (fraction <= 0) {
+    return `${nombre}: Sin área quemada en ${year}`;
+  }
+  let text = `${nombre}: Área quemada ${year}: ${formatFractionAsPercent(fraction)}`;
+  if (isNumber(entry.burnedHa)) {
+    text += ` · ${HECTARES_FORMAT.format(entry.burnedHa)} ha`;
+  }
+  return text;
 }
 
 // year is part of the key so data for one year can never be served as another;

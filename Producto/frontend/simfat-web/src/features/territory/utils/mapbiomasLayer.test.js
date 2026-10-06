@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildMapbiomasParams,
+  burnedLegendNote,
   burnedSummary,
+  burnedTooltipText,
   formatFractionAsPercent,
   mapbiomasCacheKey
 } from './mapbiomasLayer';
@@ -111,5 +113,89 @@ describe('buildMapbiomasParams', () => {
 
   it('rejects anything that is not a MapBiomas indicator', () => {
     expect(() => buildMapbiomasParams({ regionId: 'CL-BI', indicator: 'WIND' })).toThrow(/MapBiomas/);
+  });
+});
+
+function layerOf(year, fractions) {
+  const values = {};
+  fractions.forEach((fraction, index) => {
+    values[`c${index}`] =
+      fraction === undefined
+        ? { available: false, burnedFraction: null, burnedHa: null }
+        : { available: true, burnedFraction: fraction, burnedHa: 10 };
+  });
+  return { indicator: 'BURNED', year, values };
+}
+
+describe('burnedLegendNote', () => {
+  it('states the displayed year and how many comunas have burned area', () => {
+    const layer = layerOf(2025, [0.1, 0.01, 0, 0]);
+    expect(burnedLegendNote(layer, { hasYearControl: true })).toBe(
+      'Año 2025 · 2 de 4 comunas con área quemada registrada. Usa el selector para explorar otros años.'
+    );
+  });
+
+  it('is never tied to a specific year', () => {
+    const note = burnedLegendNote(layerOf(2017, [0, 0.3]), { hasYearControl: true });
+    expect(note).toContain('Año 2017 · 1 de 2 comunas');
+    expect(note).not.toContain('2025');
+  });
+
+  it('omits the selector sentence while there is no year control', () => {
+    expect(burnedLegendNote(layerOf(2025, [0.1, 0]))).toBe(
+      'Año 2025 · 1 de 2 comunas con área quemada registrada.'
+    );
+  });
+
+  it('mentions comunas without data when there are any', () => {
+    expect(burnedLegendNote(layerOf(2024, [0.1, 0, undefined]))).toBe(
+      'Año 2024 · 1 de 3 comunas con área quemada registrada (1 sin datos).'
+    );
+  });
+
+  it('returns an empty string without a usable layer or year', () => {
+    expect(burnedLegendNote(null)).toBe('');
+    expect(burnedLegendNote({ values: {} })).toBe('');
+  });
+});
+
+describe('burnedTooltipText', () => {
+  it('shows percent and hectares for a burned comuna', () => {
+    expect(
+      burnedTooltipText({
+        nombre: 'Santa Juana',
+        year: 2023,
+        entry: { available: true, burnedFraction: 0.0247, burnedHa: 1234.5 }
+      })
+    ).toBe('Santa Juana: Área quemada 2023: 2,47 % · 1.234,5 ha');
+  });
+
+  it('omits hectares when they are not a number', () => {
+    expect(
+      burnedTooltipText({
+        nombre: 'Tomé',
+        year: 2023,
+        entry: { available: true, burnedFraction: 0.01, burnedHa: null }
+      })
+    ).toBe('Tomé: Área quemada 2023: 1,00 %');
+  });
+
+  it('says there was no burned area for an observed zero', () => {
+    expect(
+      burnedTooltipText({
+        nombre: 'Tomé',
+        year: 2025,
+        entry: { available: true, burnedFraction: 0, burnedHa: 0 }
+      })
+    ).toBe('Tomé: Sin área quemada en 2025');
+  });
+
+  it('says there is no Fuego data when unavailable or missing', () => {
+    const expected = 'Tomé: Sin datos de Fuego';
+    expect(burnedTooltipText({ nombre: 'Tomé', year: 2025, entry: { available: false } })).toBe(expected);
+    expect(burnedTooltipText({ nombre: 'Tomé', year: 2025, entry: undefined })).toBe(expected);
+    expect(
+      burnedTooltipText({ nombre: 'Tomé', year: 2025, entry: { available: true, burnedFraction: null } })
+    ).toBe(expected);
   });
 });
