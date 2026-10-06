@@ -21,16 +21,19 @@ function isValidFraction(value) {
 }
 
 // BURNED values are 0-1 fractions (unit "fraction"): 0.0247 -> "2,47 %".
+// The percent is TRUNCATED (not rounded) to 2 decimals so the displayed value
+// can never cross a legend bin edge (0.00499 shows "0,49 %", not "0,50 %").
 export function formatFractionAsPercent(fraction) {
   if (!isNumber(fraction)) {
     return NO_DATA_LABEL;
   }
-  const percent = fraction * 100;
+  // Hundredths of a percent; the epsilon absorbs binary float error (0.29 * 10000).
+  const hundredths = Math.floor(fraction * 10000 + 1e-6);
   // A real, non-zero burned share must never read as an exact zero.
-  if (percent > 0 && percent < 0.005) {
+  if (fraction > 0 && hundredths < 1) {
     return '< 0,01 %';
   }
-  return `${PERCENT_FORMAT.format(percent)} %`;
+  return `${PERCENT_FORMAT.format(hundredths / 100)} %`;
 }
 
 // Counts behind the Q29 legend note: comunas with burned area, comunas with an

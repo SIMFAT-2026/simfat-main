@@ -15,6 +15,12 @@ describe('formatFractionAsPercent', () => {
     expect(formatFractionAsPercent(1)).toBe('100,00 %');
   });
 
+  it('truncates to 2 decimals so the value never crosses a legend bin edge', () => {
+    expect(formatFractionAsPercent(0.00499)).toBe('0,49 %');
+    expect(formatFractionAsPercent(0.019999)).toBe('1,99 %');
+    expect(formatFractionAsPercent(0.0247)).toBe('2,47 %');
+  });
+
   it('formats an exact zero as 0,00 %', () => {
     expect(formatFractionAsPercent(0)).toBe('0,00 %');
   });
@@ -22,6 +28,7 @@ describe('formatFractionAsPercent', () => {
   it('never rounds a positive fraction down to a misleading 0,00 %', () => {
     expect(formatFractionAsPercent(0.00001)).toBe('< 0,01 %');
     expect(formatFractionAsPercent(0.0001)).toBe('0,01 %');
+    expect(formatFractionAsPercent(0.000099)).toBe('< 0,01 %');
   });
 
   it('returns a no-data label for missing or non-finite values', () => {
