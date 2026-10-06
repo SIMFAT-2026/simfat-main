@@ -21,7 +21,11 @@ from pathlib import Path
 from typing import Mapping, Sequence
 
 import numpy as np
+import rasterio
+from rasterio.features import rasterize
+from rasterio.windows import Window, from_bounds
 
+from mb_pipeline import fire_stats as mb_fire_stats
 from mb_pipeline import zonal
 from study import firms_target
 
@@ -452,4 +456,120 @@ def secondary_rows(
             rows.append(
                 {"comunaId": cid, "year": y, "burned_fraction": fractions[cid][y], "firms_count": counts[(cid, y)]}
             )
+    return rows
+
+
+# ---------------------------------------------------------------------------
+# Area classes (fixed before any H1 code ran; DEVIATIONS N20)
+# ---------------------------------------------------------------------------
+
+AREA_CLASSES: tuple[tuple[float, float, str], ...] = (
+    (250.0, 500.0, "250-500 ha"),
+    (500.0, 1000.0, "500-1,000 ha"),
+    (1000.0, 5000.0, "1,000-5,000 ha"),
+    (5000.0, math.inf, ">= 5,000 ha"),
+)
+
+
+def area_class(area_ha: float) -> str:
+    """Half-open class ``[lo, hi)`` of a scar of at least 250 ha."""
+    for lo, hi, label in AREA_CLASSES:
+        if lo <= area_ha < hi:
+            return label
+    raise ValueError(f"area {area_ha} ha is below the {MIN_SCAR_HA} ha threshold")
+
+
+# ---------------------------------------------------------------------------
+# Rasters: one window over the union of the comunas, scars per year
+# ---------------------------------------------------------------------------
+
+MARGIN_PX = 40  # >= 375 m in columns (~23 m wide at -40 deg) plus the neighbour ring
+
+
+def _union_window(src, polygons: Mapping[str, dict], margin_px: int) -> Window:
+    boxes = [_bbox(g) for g in polygons.values()]
+    x0, y0 = min(b[0] for b in boxes), min(b[1] for b in boxes)
+    x1, y1 = max(b[2] for b in boxes), max(b[3] for b in boxes)
+    exact = from_bounds(x0, y0, x1, y1, transform=src.transform)
+    col0 = math.floor(exact.col_off) - margin_px
+    row0 = math.floor(exact.row_off) - margin_px
+    col1 = math.ceil(exact.col_off + exact.width) + margin_px
+    row1 = math.ceil(exact.row_off + exact.height) + margin_px
+    return Window(col0, row0, col1 - col0, row1 - row0).intersection(Window(0, 0, src.width, src.height))
+
+
+def _annual_rows(
+    year: int, scars: Scars, grid: Grid, shape, det: FilteredDetections
+) -> list[dict]:
+    this_year = det.year == year
+    counts = detections_in_buffer(scars, grid, shape, det.lon[this_year], det.lat[this_year])
+    rows = []
+    for i, (t, n_det) in enumerate(zip(scars.table, counts.tolist()), start=1):
+        rows.append(
+            {
+                "year": year,
+                "scar_id": f"{year}-{i:03d}",
+                "area_ha": t["area_ha"],
+                "n_pixels": t["n_pixels"],
+                "n_detections_in_buffer": int(n_det),
+                "detected": bool(n_det >= 1),
+                "edge_flag": t["edge_flag"],
+                "truncated": t["truncated"],
+                "comunas": t["comunas"],
+                "lat": t["lat"],
+                "lon": t["lon"],
+            }
+        )
+    return rows
+
+
+def analyse_rasters(
+    raster_paths: Mapping[int, Path],
+    polygons: Mapping[str, dict],
+    det: FilteredDetections,
+    *,
+    min_ha: float = MIN_SCAR_HA,
+    margin_px: int = MARGIN_PX,
+) -> list[dict]:
+    """One row per scar of at least ``min_ha`` in every annual raster.
+
+    The comuna mask (pixel centre inside a comuna polygon, holes excluded, the
+    same rule as ``mb_pipeline.zonal``) is rasterised once on a window that
+    covers the union of the comunas plus ``margin_px``; every year must share
+    that grid. For each year the burned pixels (value 1, zero is data) inside the
+    union are labelled, filtered by area and tested against that year's
+    detections. Rows are ordered by year, then by scar position (``scar_id``
+    ``YYYY-NNN``).
+    """
+    comuna_ids = list(polygons)
+    if len(comuna_ids) > 255:
+        raise H1InputError("more than 255 comunas does not fit the uint8 comuna index")
+
+    reference = None
+    inside = comuna_idx = grid = None
+    rows: list[dict] = []
+    for year in sorted(raster_paths):
+        with rasterio.open(raster_paths[year]) as src:
+            zonal._validate_raster(src, 1)
+            if reference is None:
+                window = _union_window(src, polygons, margin_px)
+                reference = (tuple(src.transform)[:6], window.col_off, window.row_off, window.width, window.height)
+            else:
+                same = (tuple(src.transform)[:6], *reference[1:]) == reference and _union_window(
+                    src, polygons, margin_px
+                ) == window
+                if not same:
+                    raise H1InputError(f"raster grid mismatch: {raster_paths[year]} (year {year})")
+            data = src.read(1, window=window, masked=False)
+            transform = src.window_transform(window)
+        if grid is None:
+            grid = Grid(west=transform.c, north=transform.f, dlon=transform.a, dlat=-transform.e)
+            comuna_idx = rasterize(
+                [(g, i + 1) for i, g in enumerate(polygons.values())],
+                out_shape=data.shape, transform=transform, fill=0, all_touched=False, dtype="uint8",
+            )
+            inside = comuna_idx > 0
+        burned = data == mb_fire_stats.BURNED_VALUE
+        scars = find_scars(burned, inside, comuna_idx, comuna_ids, grid, min_ha=min_ha)
+        rows.extend(_annual_rows(year, scars, grid, data.shape, det))
     return rows
