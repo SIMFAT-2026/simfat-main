@@ -97,14 +97,14 @@ public class TerritoryController {
     //
     // Judgment-day finding #1 (CRITICAL, fixed): regionId is normalized via
     // RegionGeometry.fromRegion(...).id() BEFORE it reaches this key, so under normal operation
-    // this stays bounded by construction (3 known regions x 13 BURNED years = 39 entries max).
+    // this stays bounded by construction (3 known regions x (26 LANDCOVER + 13 BURNED years) = 117 entries max; the cap is 128, see MapbiomasLayerCache).
     // The comment above previously claimed this bound without the normalization actually being
     // applied to the key -- a raw, unauthenticated regionId query param reached the key directly,
     // so distinct garbage values each created a permanent entry (memory exhaustion) and forced a
     // Mongo scan (load amplification) on /api/territory/public/layers. MapbiomasLayerCache now
     // also enforces a hard cap (see its Javadoc) as defense in depth, independent of whether a
     // future edit keeps normalizing correctly.
-    private final MapbiomasLayerCache mapbiomasLayerCache = new MapbiomasLayerCache(64);
+    private final MapbiomasLayerCache mapbiomasLayerCache = new MapbiomasLayerCache(MapbiomasLayerCache.DEFAULT_MAX_ENTRIES);
 
     // Decision Q28: the BURNED omitted-year default is data-derived (latest year with actual
     // burned data in the loaded dataVersion) rather than a fixed constant. It is immutable per
