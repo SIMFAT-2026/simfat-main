@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 import {
   buildMapbiomasParams,
   burnedLegendNote,
+  burnedLineFor,
   burnedSummary,
+  burnedToggleLabel,
   burnedTooltipText,
   formatFractionAsPercent,
   mapbiomasCacheKey
@@ -219,5 +221,33 @@ describe('burnedTooltipText', () => {
         entry: { available: true, burnedFraction: -0.5, burnedHa: -3 }
       })
     ).toBe('Tomé: Sin datos de Fuego');
+  });
+});
+
+describe('burnedLineFor', () => {
+  it('builds the line appended to the risk tooltip for a burned comuna', () => {
+    expect(burnedLineFor({ available: true, burnedFraction: 0.0247, burnedHa: 1234.5 }, 2025)).toBe(
+      'Área quemada 2025: 2,47 % · 1.234,5 ha'
+    );
+  });
+
+  it('handles an observed zero and missing or invalid data', () => {
+    expect(burnedLineFor({ available: true, burnedFraction: 0, burnedHa: 0 }, 2025)).toBe(
+      'Sin área quemada en 2025'
+    );
+    expect(burnedLineFor({ available: false }, 2025)).toBe('Sin datos de Fuego');
+    expect(burnedLineFor(undefined, 2025)).toBe('Sin datos de Fuego');
+    expect(burnedLineFor({ available: true, burnedFraction: -1 }, 2025)).toBe('Sin datos de Fuego');
+  });
+});
+
+describe('burnedToggleLabel', () => {
+  it('shows the plain label before a layer is loaded', () => {
+    expect(burnedToggleLabel(null)).toBe('Área quemada (MapBiomas)');
+    expect(burnedToggleLabel({ values: {} })).toBe('Área quemada (MapBiomas)');
+  });
+
+  it('appends the loaded year', () => {
+    expect(burnedToggleLabel({ year: 2025, values: {} })).toBe('Área quemada (MapBiomas) · 2025');
   });
 });

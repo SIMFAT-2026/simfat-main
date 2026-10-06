@@ -74,20 +74,33 @@ export function burnedLegendNote(layer, { hasYearControl = false } = {}) {
   return note;
 }
 
-// Tooltip text for one comuna of the BURNED choropleth.
-export function burnedTooltipText({ nombre, year, entry }) {
+// The burned-area sentence for one comuna, without the comuna name. Shared by
+// the BURNED tooltip and the line appended to the risk tooltip.
+export function burnedLineFor(entry, year) {
   const fraction = entry?.burnedFraction;
   if (entry?.available !== true || !isValidFraction(fraction)) {
-    return `${nombre}: Sin datos de Fuego`;
+    return 'Sin datos de Fuego';
   }
   if (fraction <= 0) {
-    return `${nombre}: Sin área quemada en ${year}`;
+    return `Sin área quemada en ${year}`;
   }
-  let text = `${nombre}: Área quemada ${year}: ${formatFractionAsPercent(fraction)}`;
+  let text = `Área quemada ${year}: ${formatFractionAsPercent(fraction)}`;
   if (isNumber(entry.burnedHa)) {
     text += ` · ${HECTARES_FORMAT.format(entry.burnedHa)} ha`;
   }
   return text;
+}
+
+// Tooltip text for one comuna of the BURNED choropleth.
+export function burnedTooltipText({ nombre, year, entry }) {
+  return `${nombre}: ${burnedLineFor(entry, year)}`;
+}
+
+// Toggle label: keeps the year visible once a layer is loaded, since the legend
+// is replaced by the comuna panel when a comuna is selected.
+export function burnedToggleLabel(layer) {
+  const base = 'Área quemada (MapBiomas)';
+  return layer && isNumber(layer.year) ? `${base} · ${layer.year}` : base;
 }
 
 // year is part of the key so data for one year can never be served as another;
