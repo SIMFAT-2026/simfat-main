@@ -1,11 +1,7 @@
+import { VALUE_MAP_INDICATORS } from '../constants/indicators';
+
 // Pure helpers that turn raw /layers responses into the shape the territory
 // UI consumes. Kept free of axios/env imports so they are unit-testable.
-
-// Climate indicators are exposed as comuna-keyed value maps:
-// { indicator, unit, values: { comunaId: { value, unit, observedAt } } }
-// instead of GeoJSON FeatureCollections — they are joined onto the
-// comunal GeoJSON client-side (see TerritoryMapPanel ClimateChoropleth).
-const CLIMATE_INDICATORS = ['WIND', 'HUMIDITY', 'AIR_TEMP', 'SOIL_TEMP'];
 
 export function extractResponseData(payload) {
   if (payload && typeof payload === 'object' && 'data' in payload) {
@@ -53,7 +49,9 @@ export function normalizeLayerPayload(payload, regionId) {
     RISK_SCORE: toFeatureCollection(layers.RISK_SCORE)
   };
 
-  CLIMATE_INDICATORS.forEach((indicator) => {
+  // Climate and MapBiomas layers are comuna-keyed value maps, not GeoJSON:
+  // joined onto the comunal GeoJSON client-side.
+  VALUE_MAP_INDICATORS.forEach((indicator) => {
     const valueMap = toValueMap(layers[indicator]);
     if (valueMap) {
       normalizedLayers[indicator] = valueMap;
