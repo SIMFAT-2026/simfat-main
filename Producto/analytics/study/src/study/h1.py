@@ -14,16 +14,25 @@ leaves open is recorded in DEVIATIONS.md (N18 onward).
 """
 from __future__ import annotations
 
+import json
 import math
 from dataclasses import dataclass
+from pathlib import Path
+from typing import Mapping, Sequence
 
 import numpy as np
 
 from mb_pipeline import zonal
+from study import firms_target
 
 MIN_SCAR_HA = 250.0  # Section 2, H1
 BUFFER_M = 375.0  # Section 2, H1: one VIIRS pixel
 M2_PER_HA = zonal.M2_PER_HA
+YEARS: tuple[int, ...] = tuple(range(2013, 2026))  # the 13 annual Fuego rasters
+
+
+class H1InputError(ValueError):
+    """An H1 input is missing or inconsistent; the run aborts rather than guess."""
 
 
 # ---------------------------------------------------------------------------
@@ -310,3 +319,137 @@ def detections_in_buffer(
         pairs = np.unique(d_idx[within] * k + scar_hit[within])
         counts += np.bincount(pairs % k, minlength=k)
     return counts
+
+
+# ---------------------------------------------------------------------------
+# FIRMS: filtered detections by LOCAL calendar year, comuna assignment
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class FilteredDetections:
+    """Detections passing the pre-registered filter (type 0, confidence n/h):
+    longitude, latitude and America/Santiago LOCAL calendar year. ``n_rows`` is
+    the size of the archive, ``n_filtered`` the number kept."""
+
+    lon: np.ndarray
+    lat: np.ndarray
+    year: np.ndarray
+    n_rows: int
+    n_filtered: int
+
+
+def read_filtered_detections(zip_path: Path) -> FilteredDetections:
+    """Reads the FIRMS archive and keeps ``type == 0`` and confidence in
+    ``{n, h}`` (the same filter as the backtest target,
+    ``firms_target.PRIMARY_TYPE_VALUES`` / ``CONFIDENCE_FILTER``). The year is the
+    local calendar year after the same UTC -> Chile conversion the target uses
+    (``firms_target.to_local_date``, DEVIATIONS N2). No detection is dropped for
+    lying outside the comunas: the buffer test needs those near the border."""
+    lon: list[float] = []
+    lat: list[float] = []
+    year: list[int] = []
+    n_rows = 0
+    for row in firms_target.iter_firms_rows(Path(zip_path)):
+        n_rows += 1
+        if row["confidence"] not in firms_target.CONFIDENCE_FILTER:
+            continue
+        if int(row["type"]) not in firms_target.PRIMARY_TYPE_VALUES:
+            continue
+        dt_utc = firms_target.parse_acq_datetime_utc(row["acq_date"], row["acq_time"])
+        lon.append(float(row["longitude"]))
+        lat.append(float(row["latitude"]))
+        year.append(firms_target.to_local_date(dt_utc).year)
+    return FilteredDetections(
+        lon=np.asarray(lon, dtype=float),
+        lat=np.asarray(lat, dtype=float),
+        year=np.asarray(year, dtype=np.int64),
+        n_rows=n_rows,
+        n_filtered=len(lon),
+    )
+
+
+def _bbox(geometry: dict) -> tuple[float, float, float, float]:
+    xs, ys = [], []
+    for exterior, _ in firms_target.era5.polygon_rings(geometry):
+        xs.extend(p[0] for p in exterior)
+        ys.extend(p[1] for p in exterior)
+    return min(xs), min(ys), max(xs), max(ys)
+
+
+def assign_comunas(lons, lats, polygons: Mapping[str, dict]) -> list:
+    """``firms_target.assign_comuna`` for many points: the first comuna (in
+    ``polygons`` order) whose polygon contains the point, holes excluded, or
+    ``None``. A bounding-box test skips polygons that cannot contain the point;
+    it never changes the answer (a test compares both on random points)."""
+    boxes = {cid: _bbox(g) for cid, g in polygons.items()}
+    out: list = []
+    for x, y in zip(np.asarray(lons, float).tolist(), np.asarray(lats, float).tolist()):
+        found = None
+        for cid, geometry in polygons.items():
+            x0, y0, x1, y1 = boxes[cid]
+            if x0 <= x <= x1 and y0 <= y <= y1 and firms_target.point_in_geometry((x, y), geometry):
+                found = cid
+                break
+        out.append(found)
+    return out
+
+
+def comuna_year_counts(
+    det: FilteredDetections, polygons: Mapping[str, dict], *, years: Sequence[int] = YEARS
+) -> tuple[dict, int]:
+    """``({(comunaId, year): count}, n_unassigned)`` of filtered detections by
+    local calendar year inside each comuna, zeros included for every comuna and
+    year. Detections of years outside ``years`` are ignored; detections inside no
+    comuna are counted in ``n_unassigned`` (among the in-range years)."""
+    counts = {(cid, y): 0 for cid in polygons for y in years}
+    in_range = np.isin(det.year, np.asarray(list(years)))
+    lons, lats, yrs = det.lon[in_range], det.lat[in_range], det.year[in_range]
+    n_unassigned = 0
+    for cid, y in zip(assign_comunas(lons, lats, polygons), yrs.tolist()):
+        if cid is None:
+            n_unassigned += 1
+        else:
+            counts[(cid, y)] += 1
+    return counts, n_unassigned
+
+
+# ---------------------------------------------------------------------------
+# Burned fractions from the committed seed, and the secondary table
+# ---------------------------------------------------------------------------
+
+
+def load_burned_fraction_by_year(seed_path: Path) -> dict[str, dict[int, float]]:
+    """``{comunaId: {year: burnedFractionByYear}}`` from the committed seed (the
+    same file the backtest's predictors came from)."""
+    out: dict[str, dict[int, float]] = {}
+    with open(seed_path, encoding="utf-8") as f:
+        for line in f:
+            doc = json.loads(line)
+            by_year = (doc.get("fire") or {}).get("burnedFractionByYear")
+            if not by_year:
+                raise H1InputError(f"{doc.get('comunaId')}: seed has no fire.burnedFractionByYear")
+            out[doc["comunaId"]] = {int(y): float(v) for y, v in by_year.items()}
+    return out
+
+
+def secondary_rows(
+    fractions: Mapping[str, Mapping[int, float]],
+    counts: Mapping[tuple, int],
+    *,
+    comuna_ids: Sequence[str],
+    years: Sequence[int] = YEARS,
+) -> list[dict]:
+    """One row per comuna and year: annual burned fraction and filtered FIRMS
+    count. A missing pair is an error, never a silent zero."""
+    rows = []
+    for cid in comuna_ids:
+        for y in years:
+            if cid not in fractions or y not in fractions[cid]:
+                raise H1InputError(f"no burned fraction for {cid} {y}")
+            if (cid, y) not in counts:
+                raise H1InputError(f"no FIRMS count for {cid} {y}")
+            rows.append(
+                {"comunaId": cid, "year": y, "burned_fraction": fractions[cid][y], "firms_count": counts[(cid, y)]}
+            )
+    return rows
