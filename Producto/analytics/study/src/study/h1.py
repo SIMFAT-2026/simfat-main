@@ -14,6 +14,7 @@ leaves open is recorded in DEVIATIONS.md (N18 onward).
 """
 from __future__ import annotations
 
+import csv
 import json
 import math
 from dataclasses import dataclass
@@ -702,3 +703,43 @@ def summarize_secondary(secondary: Sequence[Mapping], *, B: int = BOOTSTRAP_B, s
     lower, upper, n_valid = bootstrap.percentile_ci(result.values["rho"])
     out.update({"ci_lower": _none_if_nan(lower), "ci_upper": _none_if_nan(upper), "n_valid": n_valid})
     return out
+
+
+# ---------------------------------------------------------------------------
+# Writers
+# ---------------------------------------------------------------------------
+
+SCAR_CSV_HEADER = [
+    "year", "scar_id", "area_ha", "area_class", "n_pixels", "n_detections_in_buffer",
+    "detected", "edge_flag", "truncated", "comunas", "lat", "lon",
+]
+SECONDARY_CSV_HEADER = ["comunaId", "year", "burned_fraction", "firms_count"]
+
+
+def write_scars_csv(path: Path, scar_rows: Sequence[Mapping]) -> None:
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "w", encoding="utf-8", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=SCAR_CSV_HEADER)
+        writer.writeheader()
+        for r in scar_rows:
+            writer.writerow(
+                {**{k: r[k] for k in SCAR_CSV_HEADER if k not in ("comunas", "area_class")},
+                 "area_class": area_class(r["area_ha"]), "comunas": ";".join(r["comunas"])}
+            )
+
+
+def write_secondary_csv(path: Path, rows: Sequence[Mapping]) -> None:
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "w", encoding="utf-8", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=SECONDARY_CSV_HEADER)
+        writer.writeheader()
+        for r in rows:
+            writer.writerow({k: r[k] for k in SECONDARY_CSV_HEADER})
+
+
+def write_summary_json(path: Path, summary: Mapping) -> None:
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(summary, indent=2, allow_nan=False) + "\n", encoding="utf-8")
