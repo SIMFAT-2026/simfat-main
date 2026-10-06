@@ -367,3 +367,27 @@ the FIRMS archive and the comuna polygons. It reads none of the backtest inputs
 or outputs and writes only under `outputs/h1/`; the backtest, `outputs/tables/`
 and `outputs/decision.json` are untouched. `h1_summary.json` records the input
 hashes, the git sha, the pre-registration hash and the parameters.
+
+### N23 — Known edges of the H1 run, found in review (2026-10-06)
+
+Both H1 reviewers recomputed the committed outputs from the raw sources and
+confirmed them. They recorded these edges, none of which changes a result:
+
+- **DST table before Aug 2016.** `CHILE_DST_INTERVALS_UTC` starts on
+  2016-08-14, so earlier instants get UTC-4, although Chile was on UTC-3 for
+  most of 2013 to May 2016. For H1 this only matters for a detection at
+  03:00-03:59 UTC on Jan 1 of 2014, 2015 or 2016, which would fall into the
+  previous local year. The archive holds no such filtered detection, so the
+  effect on H1 is zero. The backtest windows start in Nov 2016 and are not
+  affected.
+- **End of the FIRMS archive.** The archive ends at 2025-12-31 UTC, so local
+  Dec 31, 2025 evening detections that fall on Jan 1, 2026 UTC are missing.
+  VIIRS passes over Chile around 01:30 and 13:30 local time, so the effect is
+  negligible.
+- **Interval cross-check.** The primary share 332/337 has a year-clustered
+  percentile interval of [0.969, 0.995]. At the scar level, Wilson gives
+  [0.966, 0.994] and the Clopper-Pearson lower bound is 0.966, so the reported
+  interval is not optimistic. Per-year intervals for years with few scars
+  (for example 4 of 4 in 2013) are degenerate at [1, 1] and uninformative.
+- **Provenance.** `h1_summary.json` records the HEAD at run time (7bb2c2b).
+  The outputs were added in the next commit (14cb427), which adds outputs only.
