@@ -111,7 +111,8 @@ class MapbiomasBurnedLayerBuilderTest {
             List.of(), Map.of(), 2019, 2013, 2025, "test-version", "test-citation");
 
         assertThat(map.get("indicator")).isEqualTo("BURNED");
-        assertThat(map.get("unit")).isEqualTo("%");
+        // Q29/Q30: burnedFraction is a 0-1 FRACTION; the client renders it as a percentage.
+        assertThat(map.get("unit")).isEqualTo("fraction");
         assertThat(map.get("year")).isEqualTo(2019);
         assertThat(map.get("minYear")).isEqualTo(2013);
         assertThat(map.get("maxYear")).isEqualTo(2025);
