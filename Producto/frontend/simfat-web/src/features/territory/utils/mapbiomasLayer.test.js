@@ -53,6 +53,11 @@ describe('burnedSummary', () => {
     expect(burnedSummary(odd)).toEqual({ burned: 0, zero: 0, unavailable: 1, total: 1 });
   });
 
+  it('treats a negative fraction as unavailable, never as zero', () => {
+    const odd = { values: { a: { available: true, burnedFraction: -0.2 } } };
+    expect(burnedSummary(odd)).toEqual({ burned: 0, zero: 0, unavailable: 1, total: 1 });
+  });
+
   it('treats available:true with a non-numeric fraction as unavailable', () => {
     const odd = { values: { a: { available: true, burnedFraction: null } } };
     expect(burnedSummary(odd)).toEqual({ burned: 0, zero: 0, unavailable: 1, total: 1 });
@@ -197,5 +202,15 @@ describe('burnedTooltipText', () => {
     expect(
       burnedTooltipText({ nombre: 'Tomé', year: 2025, entry: { available: true, burnedFraction: null } })
     ).toBe(expected);
+  });
+
+  it('says there is no Fuego data for a negative fraction', () => {
+    expect(
+      burnedTooltipText({
+        nombre: 'Tomé',
+        year: 2025,
+        entry: { available: true, burnedFraction: -0.5, burnedHa: -3 }
+      })
+    ).toBe('Tomé: Sin datos de Fuego');
   });
 });

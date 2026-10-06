@@ -14,6 +14,12 @@ function isNumber(value) {
   return typeof value === 'number' && Number.isFinite(value);
 }
 
+// A burned fraction is valid only when finite and non-negative; anything else
+// is invalid data and must read as "no data", never as zero.
+function isValidFraction(value) {
+  return isNumber(value) && value >= 0;
+}
+
 // BURNED values are 0-1 fractions (unit "fraction"): 0.0247 -> "2,47 %".
 export function formatFractionAsPercent(fraction) {
   if (!isNumber(fraction)) {
@@ -34,7 +40,7 @@ export function burnedSummary(layer) {
   const summary = { burned: 0, zero: 0, unavailable: 0, total: entries.length };
 
   entries.forEach((entry) => {
-    if (!entry || entry.available !== true || !isNumber(entry.burnedFraction)) {
+    if (!entry || entry.available !== true || !isValidFraction(entry.burnedFraction)) {
       summary.unavailable += 1;
     } else if (entry.burnedFraction > 0) {
       summary.burned += 1;
@@ -68,7 +74,7 @@ export function burnedLegendNote(layer, { hasYearControl = false } = {}) {
 // Tooltip text for one comuna of the BURNED choropleth.
 export function burnedTooltipText({ nombre, year, entry }) {
   const fraction = entry?.burnedFraction;
-  if (entry?.available !== true || !isNumber(fraction)) {
+  if (entry?.available !== true || !isValidFraction(fraction)) {
     return `${nombre}: Sin datos de Fuego`;
   }
   if (fraction <= 0) {

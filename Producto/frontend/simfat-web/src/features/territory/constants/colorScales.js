@@ -155,9 +155,10 @@ export const BURNED_SCALE = {
 };
 
 // entry: { available, burnedFraction, burnedHa } from the BURNED value map.
+// A negative or non-finite fraction is invalid data: treated as no data, never zero.
 export function burnedColorFor(entry) {
   const fraction = entry?.burnedFraction;
-  if (entry?.available !== true || typeof fraction !== 'number' || !Number.isFinite(fraction)) {
+  if (entry?.available !== true || typeof fraction !== 'number' || !Number.isFinite(fraction) || fraction < 0) {
     return NEUTRAL_FILL;
   }
   if (fraction <= 0) {

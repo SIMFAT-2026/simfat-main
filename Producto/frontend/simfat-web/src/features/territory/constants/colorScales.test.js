@@ -17,6 +17,7 @@ describe('burnedColorFor', () => {
     expect(burnedColorFor(available(undefined))).toBe(NEUTRAL_FILL);
     expect(burnedColorFor(available(Number.NaN))).toBe(NEUTRAL_FILL);
     expect(burnedColorFor(available(Infinity))).toBe(NEUTRAL_FILL);
+    expect(burnedColorFor(available(-0.1))).toBe(NEUTRAL_FILL);
   });
 
   it('distinguishes an observed zero from no data', () => {
