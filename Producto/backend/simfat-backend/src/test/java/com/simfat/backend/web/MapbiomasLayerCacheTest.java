@@ -69,6 +69,19 @@ class MapbiomasLayerCacheTest {
     }
 
     @Test
+    void boundedKeySpace_isDerivedFromTheYearRangesAndFitsInTheDefaultCap() {
+        // Guard: adding a region or widening a year range must fail the build here instead of
+        // silently pushing the legitimate key space past the cap (which would disable caching).
+        int landCoverYears = MapbiomasYear.LANDCOVER_MAX_YEAR - MapbiomasYear.LANDCOVER_MIN_YEAR + 1;
+        int burnedYears = MapbiomasYear.BURNED_MAX_YEAR - MapbiomasYear.BURNED_MIN_YEAR + 1;
+
+        assertThat(MapbiomasLayerCache.BOUNDED_KEY_SPACE)
+            .isEqualTo(MapbiomasLayerCache.KNOWN_REGIONS * (landCoverYears + burnedYears));
+        assertThat(MapbiomasLayerCache.BOUNDED_KEY_SPACE)
+            .isLessThanOrEqualTo(MapbiomasLayerCache.DEFAULT_MAX_ENTRIES);
+    }
+
+    @Test
     void keysWithinTheCap_areAllRetained() {
         MapbiomasLayerCache cache = new MapbiomasLayerCache(64);
 

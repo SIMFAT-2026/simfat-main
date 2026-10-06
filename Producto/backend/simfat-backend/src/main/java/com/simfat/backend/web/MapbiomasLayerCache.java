@@ -20,7 +20,13 @@ import java.util.function.Supplier;
  */
 public final class MapbiomasLayerCache {
 
-    /** Regions the layers can be served for (RegionGeometry normalizes every request to one). */
+    /**
+     * Regions the layers can be served for (RegionGeometry normalizes every request to one).
+     * Kept as a constant on purpose: {@code RegionGeometry} is a package-private record nested in
+     * {@code TerritoryController} (package {@code controller}, which already depends on this
+     * {@code web} package), so deriving the count from it here would create a dependency cycle.
+     * {@code MapbiomasLayerCacheTest} fails the build if the key space ever outgrows the cap.
+     */
     public static final int KNOWN_REGIONS = 3;
 
     /**
