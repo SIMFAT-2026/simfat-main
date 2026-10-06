@@ -14,7 +14,16 @@ leaves open is recorded in DEVIATIONS.md (N18 onward).
 """
 from __future__ import annotations
 
+import math
+from dataclasses import dataclass
+
 import numpy as np
+
+from mb_pipeline import zonal
+
+MIN_SCAR_HA = 250.0  # Section 2, H1
+BUFFER_M = 375.0  # Section 2, H1: one VIIRS pixel
+M2_PER_HA = zonal.M2_PER_HA
 
 
 # ---------------------------------------------------------------------------
@@ -88,3 +97,121 @@ def connected_components(rows, cols, width: int) -> np.ndarray:
     labels = np.empty(n, dtype=np.int64)
     labels[order] = compact
     return labels
+
+
+# ---------------------------------------------------------------------------
+# Local metric scale and the raster grid
+# ---------------------------------------------------------------------------
+
+
+def metres_per_degree(lat_deg: float) -> tuple[float, float]:
+    """``(metres per degree of longitude, metres per degree of latitude)`` on the
+    WGS84 ellipsoid at ``lat_deg``: ``N cos(phi) pi/180`` and ``M pi/180`` with
+    the same ``M``/``N`` radii of curvature the pipeline's pixel-area formula
+    uses (``mb_pipeline.zonal.row_pixel_areas_m2``)."""
+    phi = math.radians(lat_deg)
+    w = 1.0 - zonal.WGS84_E2 * math.sin(phi) ** 2
+    meridian = zonal.WGS84_A * (1.0 - zonal.WGS84_E2) / w**1.5
+    prime_vertical = zonal.WGS84_A / math.sqrt(w)
+    return prime_vertical * math.cos(phi) * math.pi / 180.0, meridian * math.pi / 180.0
+
+
+@dataclass(frozen=True)
+class Grid:
+    """North-up EPSG:4326 grid: ``west``/``north`` are the outer corner of pixel
+    (0, 0); ``dlon``/``dlat`` are positive pixel sizes in degrees."""
+
+    west: float
+    north: float
+    dlon: float
+    dlat: float
+
+
+# ---------------------------------------------------------------------------
+# Scars: connected burned pixels inside the union of the monitored comunas
+# ---------------------------------------------------------------------------
+
+_NEIGHBOURS = tuple((dr, dc) for dr in (-1, 0, 1) for dc in (-1, 0, 1) if (dr, dc) != (0, 0))
+
+
+@dataclass
+class Scars:
+    """Scars kept by the area filter. ``table`` has one dict per scar; ``rows``,
+    ``cols`` and ``scar`` list the pixels of the kept scars (``scar`` indexes
+    ``table``)."""
+
+    table: list
+    rows: np.ndarray
+    cols: np.ndarray
+    scar: np.ndarray
+
+
+def find_scars(burned, inside, comuna_idx, comuna_ids, grid: Grid, *, min_ha: float = MIN_SCAR_HA) -> Scars:
+    """Labels the 8-connected components of ``burned & inside`` and keeps those
+    whose area is ``>= min_ha``.
+
+    ``comuna_idx`` holds 0 outside every comuna and ``i + 1`` for comuna
+    ``comuna_ids[i]``. A scar that crosses a comuna border stays one scar; the
+    clip is to the union of the monitored comunas only.
+
+    Per scar: ``area_ha`` (sum of the pipeline's WGS84 per-row pixel areas),
+    ``n_pixels``, ``comunas`` (sorted ids touched), ``edge_flag`` (a scar pixel
+    has an 8-neighbour outside the union or outside the window), ``truncated``
+    (a scar pixel has a burned 8-neighbour outside the union, so the true scar
+    continues beyond the clip) and the pixel-mean ``lat``/``lon``.
+    """
+    burned = np.asarray(burned, dtype=bool)
+    inside = np.asarray(inside, dtype=bool)
+    h, w = burned.shape
+    rows, cols = np.nonzero(burned & inside)
+    empty = Scars([], np.zeros(0, dtype=np.int64), np.zeros(0, dtype=np.int64), np.zeros(0, dtype=np.int64))
+    if rows.size == 0:
+        return empty
+
+    labels = connected_components(rows, cols, w)
+    n_labels = int(labels.max()) + 1
+    row_ha = zonal.row_pixel_areas_m2(grid.north, grid.dlon, grid.dlat, h) / M2_PER_HA
+    area = np.bincount(labels, weights=row_ha[rows], minlength=n_labels)
+    keep = area >= min_ha
+    if not keep.any():
+        return empty
+
+    new_id = np.cumsum(keep) - 1
+    pixel_kept = keep[labels]
+    rows, cols = rows[pixel_kept], cols[pixel_kept]
+    scar = new_id[labels[pixel_kept]]
+    k = int(keep.sum())
+
+    edge = np.zeros(k, dtype=bool)
+    truncated = np.zeros(k, dtype=bool)
+    for dr, dc in _NEIGHBOURS:
+        nr, nc = rows + dr, cols + dc
+        in_window = (nr >= 0) & (nr < h) & (nc >= 0) & (nc < w)
+        nr_c, nc_c = np.clip(nr, 0, h - 1), np.clip(nc, 0, w - 1)
+        nb_inside = in_window & inside[nr_c, nc_c]
+        edge[scar[~nb_inside]] = True
+        truncated[scar[in_window & ~inside[nr_c, nc_c] & burned[nr_c, nc_c]]] = True
+
+    pairs = np.unique(scar * 256 + comuna_idx[rows, cols].astype(np.int64))
+    comunas: list[list[str]] = [[] for _ in range(k)]
+    for pair in pairs.tolist():
+        scar_i, idx = divmod(pair, 256)
+        if idx > 0:
+            comunas[scar_i].append(comuna_ids[idx - 1])
+
+    n_pixels = np.bincount(scar, minlength=k)
+    mean_r = np.bincount(scar, weights=rows, minlength=k) / n_pixels
+    mean_c = np.bincount(scar, weights=cols, minlength=k) / n_pixels
+    table = [
+        {
+            "area_ha": float(area[keep][i]),
+            "n_pixels": int(n_pixels[i]),
+            "comunas": sorted(comunas[i]),
+            "edge_flag": bool(edge[i]),
+            "truncated": bool(truncated[i]),
+            "lat": float(grid.north - (mean_r[i] + 0.5) * grid.dlat),
+            "lon": float(grid.west + (mean_c[i] + 0.5) * grid.dlon),
+        }
+        for i in range(k)
+    ]
+    return Scars(table=table, rows=rows, cols=cols, scar=scar)
