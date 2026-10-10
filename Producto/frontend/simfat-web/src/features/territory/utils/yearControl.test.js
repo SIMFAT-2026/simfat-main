@@ -2,9 +2,12 @@ import { describe, expect, it } from 'vitest';
 import {
   YEAR_PAGE_STEP,
   clampYear,
+  latestYearTarget,
   stepYear,
   yearAnnouncement,
   yearControlLabel,
+  yearControlState,
+  yearKeyAction,
   yearOptions
 } from './yearControl';
 
@@ -74,13 +77,72 @@ describe('yearControlLabel', () => {
 
 describe('yearAnnouncement', () => {
   it('announces the loaded year once loading is done', () => {
-    expect(yearAnnouncement({ label: 'Área quemada', year: 2024, loading: false })).toBe(
+    expect(yearAnnouncement({ label: 'Área quemada', year: 2024, layerYear: 2024, loading: false })).toBe(
       'Área quemada: datos del año 2024 cargados.'
     );
   });
 
   it('stays silent while loading or without a year', () => {
-    expect(yearAnnouncement({ label: 'Área quemada', year: 2024, loading: true })).toBe('');
-    expect(yearAnnouncement({ label: 'Área quemada', year: undefined, loading: false })).toBe('');
+    expect(yearAnnouncement({ label: 'Área quemada', year: 2024, layerYear: 2024, loading: true })).toBe('');
+    expect(
+      yearAnnouncement({ label: 'Área quemada', year: undefined, layerYear: undefined, loading: false })
+    ).toBe('');
+  });
+
+  it('stays silent after a failed or empty load (no layer)', () => {
+    expect(yearAnnouncement({ label: 'Área quemada', year: 2024, layerYear: undefined, loading: false })).toBe('');
+  });
+
+  it('stays silent when the loaded layer is for another year', () => {
+    expect(yearAnnouncement({ label: 'Área quemada', year: 2024, layerYear: 2023, loading: false })).toBe('');
+  });
+});
+
+describe('yearControlState', () => {
+  const range = { minYear: 2013, maxYear: 2025 };
+
+  it('uses the pending draft over the loaded year', () => {
+    const state = yearControlState({ draft: 2013, loadedYear: 2020, range, defaultYear: 2025 });
+    expect(state).toEqual({ current: 2013, atMin: true, atMax: false, isDefault: false });
+  });
+
+  it('falls back to the loaded year without a draft', () => {
+    const state = yearControlState({ draft: undefined, loadedYear: 2025, range, defaultYear: 2025 });
+    expect(state).toEqual({ current: 2025, atMin: false, atMax: true, isDefault: true });
+  });
+
+  it('bases isDefault on the loaded year, not the draft', () => {
+    expect(yearControlState({ draft: 2020, loadedYear: 2025, range, defaultYear: 2025 }).isDefault).toBe(true);
+    expect(yearControlState({ draft: 2025, loadedYear: 2020, range, defaultYear: 2025 }).isDefault).toBe(false);
+  });
+
+  it('is never default when the default year is unknown', () => {
+    expect(yearControlState({ draft: 2020, loadedYear: 2020, range, defaultYear: undefined }).isDefault).toBe(false);
+  });
+});
+
+describe('yearKeyAction', () => {
+  it('maps a plain key to the next year', () => {
+    expect(yearKeyAction({ key: 'ArrowRight' }, 2020, 2013, 2025)).toBe(2021);
+  });
+
+  it('ignores keys when a modifier is held', () => {
+    for (const modifier of ['altKey', 'ctrlKey', 'metaKey', 'shiftKey']) {
+      expect(yearKeyAction({ key: 'ArrowRight', [modifier]: true }, 2020, 2013, 2025)).toBeNull();
+    }
+  });
+
+  it('returns null for keys it does not handle', () => {
+    expect(yearKeyAction({ key: 'Tab' }, 2020, 2013, 2025)).toBeNull();
+  });
+});
+
+describe('latestYearTarget', () => {
+  it('targets the known default year explicitly', () => {
+    expect(latestYearTarget(2025)).toBe(2025);
+  });
+
+  it('falls back to null when the default year is unknown', () => {
+    expect(latestYearTarget(undefined)).toBeNull();
   });
 });

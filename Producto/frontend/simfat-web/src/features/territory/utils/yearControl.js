@@ -45,10 +45,37 @@ export function yearControlLabel(layerLabel, year) {
   return `${layerLabel} · Año: ${Number.isInteger(year) ? year : '…'}`;
 }
 
-// Text for the polite live region: only once data for a year has loaded.
-export function yearAnnouncement({ label, year, loading }) {
-  if (loading || !Number.isInteger(year)) {
+// Text for the polite live region: only when a layer for exactly this year is
+// loaded. Failed or empty loads stay silent (the visible error lives elsewhere).
+export function yearAnnouncement({ label, year, layerYear, loading }) {
+  if (loading || !Number.isInteger(year) || layerYear !== year) {
     return '';
   }
   return `${label}: datos del año ${year} cargados.`;
+}
+
+// Buttons act on the pending slider draft when there is one; "default" is a
+// property of the year actually loaded.
+export function yearControlState({ draft, loadedYear, range, defaultYear }) {
+  const current = draft ?? loadedYear;
+  return {
+    current,
+    atMin: current <= range.minYear,
+    atMax: current >= range.maxYear,
+    isDefault: Number.isInteger(defaultYear) && loadedYear === defaultYear
+  };
+}
+
+// Key to year decision; any modifier leaves the browser/AT shortcut alone.
+export function yearKeyAction(event, current, minYear, maxYear) {
+  if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) {
+    return null;
+  }
+  return stepYear(current, event.key, minYear, maxYear);
+}
+
+// "Último" prefers the explicit default year (cache hit); null lets the
+// backend pick when the default is not known yet.
+export function latestYearTarget(defaultYear) {
+  return Number.isInteger(defaultYear) ? defaultYear : null;
 }

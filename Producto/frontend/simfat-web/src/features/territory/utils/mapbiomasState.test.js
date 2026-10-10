@@ -183,6 +183,29 @@ describe('mapbiomasReducer', () => {
         { type: 'select-year', year: null }
       ]);
       expect(state.selectedYear).toBeUndefined();
+      expect(state.defaultYear).toBe(2025);
+    });
+
+    it('keeps the default year when an explicit year is selected', () => {
+      const state = run([
+        { type: 'request', regionId: 'biobio' },
+        { type: 'success', regionId: 'biobio', requestedYear: undefined, layer: ranged },
+        { type: 'select-year', year: 2020 }
+      ]);
+      expect(state.defaultYear).toBe(2025);
+    });
+
+    it('keeps range and default year when a success carries no layer', () => {
+      const state = run([
+        { type: 'request', regionId: 'biobio' },
+        { type: 'success', regionId: 'biobio', requestedYear: undefined, layer: ranged },
+        { type: 'select-year', year: 2020 },
+        { type: 'request', regionId: 'biobio' },
+        { type: 'success', regionId: 'biobio', requestedYear: 2020, layer: null }
+      ]);
+      expect(state.layer).toBeNull();
+      expect(state.range).toEqual({ minYear: 2013, maxYear: 2025 });
+      expect(state.defaultYear).toBe(2025);
     });
   });
 });

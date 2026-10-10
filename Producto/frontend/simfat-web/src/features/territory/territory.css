@@ -180,7 +180,15 @@
 .territory-year-latest {
   min-width: 44px;
   min-height: 44px;
+  display: inline-flex;
+  align-items: center;
   justify-content: center;
+}
+
+.territory-year-step[aria-disabled="true"],
+.territory-year-latest[aria-disabled="true"] {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .territory-year-select {
