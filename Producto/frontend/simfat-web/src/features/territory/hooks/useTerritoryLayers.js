@@ -446,7 +446,8 @@ export function useTerritoryLayers(options = {}) {
   });
   const { setYear: setBurnedYear } = burned;
 
-  // Entry point for the year control (S3-3); no UI uses it yet.
+  // Entry point for generic year callers; the year control itself uses each
+  // layer's own setYear from mapbiomasLayers.
   const setMapbiomasYear = useCallback(
     (indicator, year) => {
       if (indicator === 'BURNED') setBurnedYear(year);
