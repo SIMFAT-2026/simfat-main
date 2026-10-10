@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
+  chipLabel,
+  controlVisible,
   controlYear,
+  latestYearLabel,
   latestYearTarget,
   yearAnnouncement,
   yearControlState,
@@ -98,5 +101,41 @@ describe('controlYear', () => {
 
   it('falls back to the default year when stale and the year was reset', () => {
     expect(controlYear({ layer: { year: 2023 }, selectedYear: undefined, defaultYear: 2025, stale: true })).toBe(2025);
+  });
+});
+
+describe('latestYearLabel', () => {
+  it('names the layer in the accessible label of the latest-year button', () => {
+    expect(latestYearLabel('Área quemada')).toBe('Volver al último año de Área quemada');
+  });
+});
+
+describe('controlVisible', () => {
+  it('is hidden when the layer is off or has no state', () => {
+    expect(controlVisible({ active: false, state: { range: { minYear: 2020, maxYear: 2024 } } })).toBe(false);
+    expect(controlVisible({ active: true, state: undefined })).toBe(false);
+  });
+
+  it('is visible with a known range or while the range is loading', () => {
+    expect(controlVisible({ active: true, state: { range: { minYear: 2020, maxYear: 2024 }, loading: false } })).toBe(true);
+    expect(controlVisible({ active: true, state: { range: null, loading: true } })).toBe(true);
+  });
+
+  it('is hidden when the range is unknown and nothing is loading', () => {
+    expect(controlVisible({ active: true, state: { range: null, loading: false } })).toBe(false);
+  });
+});
+
+describe('chipLabel', () => {
+  it('drops the year while the inline select shows it', () => {
+    expect(
+      chipLabel({ plain: 'Cobertura (MapBiomas)', withYear: 'Cobertura (MapBiomas) · 2024', controlVisible: true })
+    ).toBe('Cobertura (MapBiomas)');
+  });
+
+  it('keeps the year of the displayed layer when no control is visible', () => {
+    expect(
+      chipLabel({ plain: 'Cobertura (MapBiomas)', withYear: 'Cobertura (MapBiomas) · 2024', controlVisible: false })
+    ).toBe('Cobertura (MapBiomas) · 2024');
   });
 });

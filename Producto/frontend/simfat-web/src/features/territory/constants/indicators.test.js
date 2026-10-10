@@ -78,7 +78,7 @@ describe('layerGroupInfoLines', () => {
   it('explains each group, including that risk ignores the MapBiomas year', () => {
     expect(layerGroupInfoLines()).toEqual([
       'Riesgo y eventos: situación actual. El riesgo es el valor actual; no depende del año elegido en las capas MapBiomas.',
-      'MapBiomas: historia anual (elige el año sobre el mapa).',
+      'MapBiomas: historia anual (elige el año junto a cada capa).',
       'Más capas: última observación satelital y climática.'
     ]);
   });

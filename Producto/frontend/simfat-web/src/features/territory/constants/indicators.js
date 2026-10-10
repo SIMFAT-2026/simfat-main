@@ -44,7 +44,7 @@ export const LAYER_TOGGLE_GROUPS = [
     id: 'mapbiomas',
     title: 'MapBiomas',
     placement: 'inline',
-    info: 'MapBiomas: historia anual (elige el año sobre el mapa).',
+    info: 'MapBiomas: historia anual (elige el año junto a cada capa).',
     indicators: [...MAPBIOMAS_INDICATORS]
   },
   {

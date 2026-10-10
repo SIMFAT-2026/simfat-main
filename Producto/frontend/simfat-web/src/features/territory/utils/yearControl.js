@@ -40,3 +40,20 @@ export function yearControlState({ year, range, defaultYear }) {
 export function latestYearTarget(defaultYear) {
   return Number.isInteger(defaultYear) ? defaultYear : null;
 }
+
+// Accessible name and tooltip of the compact "↺" latest-year button.
+export function latestYearLabel(label) {
+  return `Volver al último año de ${label}`;
+}
+
+// The inline control renders only for an active layer that has a known range
+// or is still loading it (then it shows "Cargando…").
+export function controlVisible({ active, state }) {
+  return Boolean(active && state && (state.range || state.loading));
+}
+
+// The chip shows the plain layer name while its inline select shows the year;
+// without a visible control it keeps the year of the displayed layer.
+export function chipLabel({ plain, withYear, controlVisible: visible }) {
+  return visible ? plain : withYear;
+}

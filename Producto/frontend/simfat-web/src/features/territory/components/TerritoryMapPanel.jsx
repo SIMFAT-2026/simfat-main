@@ -27,6 +27,7 @@ import { CLIMATE_INDICATORS } from '../constants/indicators';
 import { burnedFillOpacity } from '../utils/mapbiomasStyle';
 import LayerToggleGroups from './LayerToggleGroups';
 import MapbiomasYearControl from './MapbiomasYearControl';
+import { chipLabel, controlVisible } from '../utils/yearControl';
 import { LandcoverChoropleth, LandcoverLegend } from './LandcoverLayer';
 
 // LocalDateTime de Java llega sin 'Z' — JS lo interpreta como hora local del browser.
@@ -1197,6 +1198,12 @@ function TerritoryMapPanel({
 
         <LayerToggleGroups
           visibleIndicators={visibleIndicators}
+          renderYearControl={(indicator) => {
+            const entry = MAPBIOMAS_YEAR_CONTROLS.find((item) => item.indicator === indicator);
+            const state = mapbiomasLayers[indicator];
+            if (!entry || !controlVisible({ active: visibleIndicators.includes(indicator), state })) return null;
+            return <MapbiomasYearControl label={entry.label} state={state} />;
+          }}
           renderToggle={(indicator) => (
             <label key={indicator} className="territory-toggle" title={INDICATOR_FULL_LABELS[indicator] || indicator}>
               <input
@@ -1206,11 +1213,18 @@ function TerritoryMapPanel({
                 onChange={() => toggleIndicator(indicator)}
               />
               <span>
-                {indicator === 'BURNED'
-                  ? burnedToggleLabel(mapbiomasLayers.BURNED?.layer)
-                  : indicator === 'LANDCOVER'
-                    ? landcoverToggleLabel(mapbiomasLayers.LANDCOVER?.layer)
-                    : INDICATOR_LABELS[indicator] || CLIMATE_SCALES[indicator]?.label || indicator}
+                {indicator === 'BURNED' || indicator === 'LANDCOVER'
+                  ? chipLabel({
+                      plain: INDICATOR_LABELS[indicator],
+                      withYear: indicator === 'BURNED'
+                        ? burnedToggleLabel(mapbiomasLayers.BURNED?.layer)
+                        : landcoverToggleLabel(mapbiomasLayers.LANDCOVER?.layer),
+                      controlVisible: controlVisible({
+                        active: visibleIndicators.includes(indicator),
+                        state: mapbiomasLayers[indicator]
+                      })
+                    })
+                  : INDICATOR_LABELS[indicator] || CLIMATE_SCALES[indicator]?.label || indicator}
               </span>
             </label>
           )}
@@ -1253,19 +1267,6 @@ function TerritoryMapPanel({
           </div>
         )}
       </div>
-
-      {/* Q31: one fixed row between the layer toggles and the map, shown only
-          while a MapBiomas layer is active. */}
-      {MAPBIOMAS_YEAR_CONTROLS.some(({ indicator }) => visibleIndicators.includes(indicator)) && (
-        <div className="territory-year-controls">
-          {MAPBIOMAS_YEAR_CONTROLS.filter(({ indicator }) => visibleIndicators.includes(indicator)).map(
-            ({ indicator, label }) =>
-              mapbiomasLayers[indicator] && (
-                <MapbiomasYearControl key={indicator} label={label} state={mapbiomasLayers[indicator]} />
-              )
-          )}
-        </div>
-      )}
 
       {loading ? <LoadingSpinner label="Cargando capas territoriales..." /> : null}
       {!loading && error ? <ErrorMessage error={{ message: error }} onRetry={onRetry} /> : null}

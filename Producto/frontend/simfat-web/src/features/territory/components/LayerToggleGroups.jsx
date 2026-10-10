@@ -103,8 +103,10 @@ function MoreLayers({ group, visibleIndicators, renderToggle }) {
 
 // Compact layer toggles: inline chip rows for the always-visible groups, a
 // "Más capas" popover for the rest and an info button explaining the groups.
-// `renderToggle(indicator)` renders one chip (checkbox label).
-function LayerToggleGroups({ visibleIndicators, renderToggle }) {
+// `renderToggle(indicator)` renders one chip (checkbox label);
+// `renderYearControl(indicator)` optionally renders the inline control that
+// stays glued to that chip (they wrap together as one unit).
+function LayerToggleGroups({ visibleIndicators, renderToggle, renderYearControl }) {
   const inline = LAYER_TOGGLE_GROUPS.filter((group) => group.placement === 'inline');
   const popover = LAYER_TOGGLE_GROUPS.filter((group) => group.placement === 'popover');
 
@@ -113,7 +115,18 @@ function LayerToggleGroups({ visibleIndicators, renderToggle }) {
       {inline.map((group) => (
         <div key={group.id} className="territory-toggle-row" role="group" aria-label={group.title}>
           <span className="territory-toggle-row-label" aria-hidden="true">{group.title}:</span>
-          <div className="territory-chips">{group.indicators.map(renderToggle)}</div>
+          <div className="territory-chips">
+            {group.indicators.map((indicator) => {
+              const control = renderYearControl?.(indicator) ?? null;
+              if (!control) return renderToggle(indicator);
+              return (
+                <span key={indicator} className="territory-chip-pair">
+                  {renderToggle(indicator)}
+                  {control}
+                </span>
+              );
+            })}
+          </div>
         </div>
       ))}
       <div className="territory-toggle-row territory-toggle-extras">

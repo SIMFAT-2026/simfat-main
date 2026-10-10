@@ -1,15 +1,17 @@
 import { useId } from 'react';
 import {
   controlYear,
+  latestYearLabel,
   latestYearTarget,
   yearAnnouncement,
   yearControlState,
   yearOptions
 } from '../utils/yearControl';
 
-// One compact row for one active MapBiomas layer (Q31): label, ‹ select ›,
-// "Último". `state` is the hook result for that layer: { selectedYear, range,
-// defaultYear, layer, loading, stale, setYear }. Every change commits at once.
+// Compact inline control rendered right after the chip of one active MapBiomas
+// layer (Q31): ‹ select › ↺. `state` is the hook result for that layer:
+// { selectedYear, range, defaultYear, layer, loading, stale, setYear }. Every
+// change commits at once.
 function MapbiomasYearControl({ label, state }) {
   const { range, defaultYear, layer, loading, setYear } = state;
   // While a stale (previous year) layer is shown, the control follows the
@@ -28,7 +30,6 @@ function MapbiomasYearControl({ label, state }) {
   const { atMin, atMax, isDefault } = range && hasYear
     ? yearControlState({ year, range, defaultYear })
     : {};
-  const labelId = `${baseId}-label`;
   const selectId = `${baseId}-select`;
   const stepTo = (disabled, target) => () => {
     if (disabled || (target !== null && !Number.isInteger(target))) return;
@@ -38,10 +39,12 @@ function MapbiomasYearControl({ label, state }) {
   // The live region is always mounted (initially empty) and only its text
   // changes, so assistive tech registers it before the first announcement.
   return (
-    <div className="territory-year-control" role="group" aria-labelledby={labelId} aria-busy={loading}>
-      <label id={labelId} htmlFor={range ? selectId : undefined} className="territory-year-label">
-        {label}
-      </label>
+    <span
+      className="territory-year-control"
+      role="group"
+      aria-label={`Selector de año: ${label}`}
+      aria-busy={loading}
+    >
       {range ? (
         <>
           <button
@@ -79,10 +82,12 @@ function MapbiomasYearControl({ label, state }) {
           <button
             type="button"
             className="btn btn-secondary territory-year-latest"
+            aria-label={latestYearLabel(label)}
+            title={latestYearLabel(label)}
             aria-disabled={isDefault ? 'true' : undefined}
             onClick={stepTo(isDefault, latestYearTarget(defaultYear))}
           >
-            Último
+            <span aria-hidden="true">↺</span>
           </button>
         </>
       ) : (
@@ -91,7 +96,7 @@ function MapbiomasYearControl({ label, state }) {
       <span className="sr-only" role="status" aria-live="polite">
         {yearAnnouncement({ label, year, layerYear: layer?.year, loading })}
       </span>
-    </div>
+    </span>
   );
 }
 
