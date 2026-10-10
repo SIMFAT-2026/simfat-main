@@ -1308,6 +1308,7 @@ function TerritoryMapPanel({
                   layer={mapbiomasLayers.LANDCOVER?.layer}
                   loading={Boolean(mapbiomasLayers.LANDCOVER?.loading)}
                   interactive={mapbiomasOwnerId === 'LANDCOVER'}
+                  riskVisible={visibleIndicators.includes('RISK_SCORE')}
                   onComunaClick={handleComunaClick}
                   emphasizeOutline={!mapbiomasLayers.LANDCOVER?.layer && visibleIndicators.every((indicator) => indicator === 'LANDCOVER')}
                 />

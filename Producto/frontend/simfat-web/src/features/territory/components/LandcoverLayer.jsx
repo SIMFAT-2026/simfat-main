@@ -8,6 +8,7 @@ import {
   landcoverLegendNote,
   landcoverTooltipLines
 } from '../utils/landcoverLayer';
+import { landcoverFillOpacity } from '../utils/mapbiomasStyle';
 
 // Leaflet renders string tooltips as HTML, so build a DOM node with textContent:
 // comuna names and labels can never be interpreted as markup.
@@ -35,6 +36,7 @@ export const LandcoverChoropleth = memo(function LandcoverChoropleth({
   loading,
   interactive = true,
   emphasizeOutline = false,
+  riskVisible = false,
   onComunaClick
 }) {
   const layerRef = useRef(layer);
@@ -55,7 +57,7 @@ export const LandcoverChoropleth = memo(function LandcoverChoropleth({
         const entry = layerRef.current?.values?.[comunaId];
         return {
           fillColor: landcoverColorFor(entry),
-          fillOpacity: hasLandcoverData(entry) ? 0.6 : 0.12,
+          fillOpacity: landcoverFillOpacity({ hasData: hasLandcoverData(entry), riskVisible }),
           color: '#334155',
           weight: emphasizeOutline && !entry ? 1.6 : 0.8,
           opacity: emphasizeOutline && !entry ? 0.95 : 0.7
