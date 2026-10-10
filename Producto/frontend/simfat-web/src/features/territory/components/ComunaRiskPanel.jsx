@@ -192,7 +192,7 @@ function IndexInfo({ info, label }) {
 const COPERNICUS_POLL_INTERVAL_S = 5;
 const COPERNICUS_POLL_TIMEOUT_S = 150;
 
-export default function ComunaRiskPanel({ comunaId, score, regionId, onClose, canSync, onSync, onScoreUpdated, readOnly = false }) {
+export default function ComunaRiskPanel({ comunaId, score, regionId, onClose, canSync, onSync, onScoreUpdated, readOnly = false, extraSections = null }) {
   const [syncState, setSyncState] = useState({ phase: 'idle', elapsed: 0, error: null, result: null });
 
   useEffect(() => {
@@ -331,6 +331,8 @@ export default function ComunaRiskPanel({ comunaId, score, regionId, onClose, ca
           ✦ ENHANCED
         </p>
       </section>
+
+      {extraSections}
 
       <div className="panel-footer">
         {computedAt && <span className="panel-meta">Actualizado {computedAt}</span>}

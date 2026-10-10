@@ -2,6 +2,8 @@ import { useEffect, useRef, useState, useCallback, useMemo, memo } from 'react';
 import { createPortal } from 'react-dom';
 import L from 'leaflet';
 import ComunaRiskPanel from './ComunaRiskPanel';
+import ComunaMapbiomasSection from './ComunaMapbiomasSection';
+import { panelYear } from '../utils/comunaMapbiomas';
 import { GeoJSON, MapContainer, Marker, Pane, TileLayer, Tooltip, useMap } from 'react-leaflet';
 import marker2x from 'leaflet/dist/images/marker-icon-2x.png';
 import markerIcon from 'leaflet/dist/images/marker-icon.png';
@@ -228,7 +230,8 @@ const BurnedChoropleth = memo(function BurnedChoropleth({
   loading,
   landcoverLayer = null,
   interactive = true,
-  emphasizeOutline = false
+  emphasizeOutline = false,
+  onComunaClick
 }) {
   const layerRef = useRef(layer);
   layerRef.current = layer;
@@ -287,6 +290,8 @@ const BurnedChoropleth = memo(function BurnedChoropleth({
           });
           layerGeo.setTooltipContent(root);
         });
+        // Owning hover also owns click: opens the same comuna panel as RISK_SCORE.
+        layerGeo.on('click', () => onComunaClick?.(comunaId, nombre));
       }}
     />
   );
@@ -1315,6 +1320,7 @@ function TerritoryMapPanel({
                   layer={mapbiomasLayers.LANDCOVER?.layer}
                   loading={Boolean(mapbiomasLayers.LANDCOVER?.loading)}
                   interactive={mapbiomasOwnerId === 'LANDCOVER'}
+                  onComunaClick={handleComunaClick}
                   emphasizeOutline={!mapbiomasLayers.LANDCOVER?.layer && visibleIndicators.every((indicator) => indicator === 'LANDCOVER')}
                 />
               )}
@@ -1329,6 +1335,7 @@ function TerritoryMapPanel({
                   loading={Boolean(mapbiomasLayers.BURNED?.loading)}
                   landcoverLayer={visibleIndicators.includes('LANDCOVER') ? (mapbiomasLayers.LANDCOVER?.layer ?? null) : null}
                   interactive={mapbiomasOwnerId === 'BURNED'}
+                  onComunaClick={handleComunaClick}
                   emphasizeOutline={!mapbiomasLayers.BURNED?.layer && visibleIndicators.every((indicator) => indicator === 'BURNED')}
                 />
               )}
@@ -1440,6 +1447,18 @@ function TerritoryMapPanel({
               onScoreUpdated={handleScoreUpdated}
               canSync={false}
               readOnly={readOnly}
+              extraSections={
+                <ComunaMapbiomasSection
+                  comunaId={selectedComuna.comunaId}
+                  year={panelYear({
+                    visible: visibleIndicators.includes('LANDCOVER'),
+                    selectedYear: mapbiomasLayers.LANDCOVER?.selectedYear
+                  })}
+                  burnedYear={
+                    visibleIndicators.includes('BURNED') ? mapbiomasLayers.BURNED?.selectedYear : undefined
+                  }
+                />
+              }
             />
           ) : (
             <div className="territory-legend">
