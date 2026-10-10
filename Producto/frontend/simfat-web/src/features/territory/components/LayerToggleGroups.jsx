@@ -1,93 +1,127 @@
-import { useEffect, useId, useState } from 'react';
-import { LAYER_TOGGLE_GROUPS, activeLayerSummary, hasVisibleLayer, isToggleGroupExpanded } from '../constants/indicators';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
+import { LAYER_TOGGLE_GROUPS, activeLayerSummary, layerGroupInfoLines } from '../constants/indicators';
+import { nextDisclosureState, shouldCloseOnOutside } from './disclosure';
 
-const NARROW_QUERY = '(max-width: 640px)';
+// Open/close state for a button + panel pair: Escape (focus back to the button)
+// and outside clicks close it; listeners exist only while it is open.
+function useDisclosure() {
+  const [open, setOpen] = useState(false);
+  const buttonRef = useRef(null);
+  const panelRef = useRef(null);
 
-// True while the viewport is phone-sized; drives the collapsible group default.
-function useNarrowViewport() {
-  const [narrow, setNarrow] = useState(() =>
-    typeof window !== 'undefined' && typeof window.matchMedia === 'function'
-      ? window.matchMedia(NARROW_QUERY).matches
-      : false
-  );
-
-  useEffect(() => {
-    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return undefined;
-    const query = window.matchMedia(NARROW_QUERY);
-    const update = () => setNarrow(query.matches);
-    update();
-    // Older Safari only implements the deprecated addListener/removeListener.
-    if (typeof query.addEventListener === 'function') {
-      query.addEventListener('change', update);
-      return () => query.removeEventListener('change', update);
-    }
-    query.addListener(update);
-    return () => query.removeListener(update);
+  const dispatch = useCallback((event) => {
+    const next = nextDisclosureState(openRef.current, event);
+    if (next.restoreFocus) buttonRef.current?.focus();
+    setOpen(next.open);
   }, []);
 
-  return narrow;
+  // Mirror of `open` readable from document listeners without re-subscribing.
+  const openRef = useRef(open);
+  openRef.current = open;
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const onPointerDown = (event) => {
+      if (shouldCloseOnOutside(event.target, [buttonRef.current, panelRef.current])) dispatch('outside');
+    };
+    const onKeyDown = (event) => {
+      if (event.key === 'Escape') dispatch('escape');
+    };
+    document.addEventListener('mousedown', onPointerDown);
+    document.addEventListener('touchstart', onPointerDown);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', onPointerDown);
+      document.removeEventListener('touchstart', onPointerDown);
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [open, dispatch]);
+
+  return { open, buttonRef, panelRef, toggle: () => dispatch('toggle') };
 }
 
-function ToggleGroup({ group, visibleIndicators, narrow, renderToggle }) {
-  const baseId = useId();
-  const [override, setOverride] = useState(null);
-  const [latched, setLatched] = useState(false);
-  const expanded = isToggleGroupExpanded({ group, visibleIndicators, narrow, override, latched });
-  const anyVisible = hasVisibleLayer(group, visibleIndicators);
-  const summary = group.collapsible ? activeLayerSummary({ group, visibleIndicators, expanded }) : '';
-
-  // A group that auto-expanded because a layer became visible stays open.
-  useEffect(() => {
-    if (anyVisible) setLatched(true);
-  }, [anyVisible]);
-  const titleId = `${baseId}-title`;
-  const bodyId = `${baseId}-body`;
+function InfoButton() {
+  const { open, buttonRef, panelRef, toggle } = useDisclosure();
+  const panelId = useId();
 
   return (
-    <div className="territory-toggle-group" role="group" aria-labelledby={titleId}>
-      <div className="territory-toggle-group-header">
-        <h4 id={titleId} className="territory-toggle-group-title">
-          {group.collapsible ? (
-            <button
-              type="button"
-              className="territory-toggle-group-button"
-              aria-expanded={expanded}
-              aria-controls={bodyId}
-              onClick={() => setOverride(!expanded)}
-            >
-              <span aria-hidden="true">{expanded ? '▾' : '▸'}</span> {group.title}
-              {summary && <span className="territory-toggle-group-count"> {summary}</span>}
-            </button>
-          ) : (
-            group.title
-          )}
-        </h4>
-        <span className="territory-toggle-group-subtitle">{group.subtitle}</span>
+    <span className="territory-disclosure">
+      <button
+        ref={buttonRef}
+        type="button"
+        className="territory-info-button"
+        aria-label="Qué muestra cada grupo de capas"
+        aria-expanded={open}
+        aria-controls={panelId}
+        onClick={toggle}
+      >
+        <span aria-hidden="true">ⓘ</span>
+      </button>
+      <div ref={panelRef} id={panelId} className="territory-popover territory-info-panel" hidden={!open}>
+        {layerGroupInfoLines().map((line) => (
+          <p key={line}>{line}</p>
+        ))}
       </div>
-      {group.note && <p className="territory-toggle-group-note">ⓘ {group.note}</p>}
-      <div id={bodyId} className="territory-layer-toggles" hidden={!expanded}>
-        {group.indicators.map(renderToggle)}
-      </div>
-    </div>
+    </span>
   );
 }
 
-// The layer toggles, grouped by time semantics (see LAYER_TOGGLE_GROUPS).
-// `renderToggle(indicator)` renders one checkbox label.
+function MoreLayers({ group, visibleIndicators, renderToggle }) {
+  const { open, buttonRef, panelRef, toggle } = useDisclosure();
+  const panelId = useId();
+  const titleId = `${panelId}-title`;
+  const summary = activeLayerSummary({ group, visibleIndicators });
+
+  return (
+    <span className="territory-disclosure">
+      <button
+        ref={buttonRef}
+        type="button"
+        className="territory-more-button"
+        aria-expanded={open}
+        aria-controls={panelId}
+        onClick={toggle}
+      >
+        Más capas {summary && <span className="territory-more-count">{summary}</span>}
+        <span aria-hidden="true"> {open ? '▴' : '▾'}</span>
+      </button>
+      <div
+        ref={panelRef}
+        id={panelId}
+        className="territory-popover territory-more-panel"
+        role="group"
+        aria-labelledby={titleId}
+        hidden={!open}
+      >
+        <strong id={titleId} className="territory-popover-title">{group.title}</strong>
+        <span className="territory-popover-context">{group.context}</span>
+        <div className="territory-chips">{group.indicators.map(renderToggle)}</div>
+      </div>
+    </span>
+  );
+}
+
+// Compact layer toggles: inline chip rows for the always-visible groups, a
+// "Más capas" popover for the rest and an info button explaining the groups.
+// `renderToggle(indicator)` renders one chip (checkbox label).
 function LayerToggleGroups({ visibleIndicators, renderToggle }) {
-  const narrow = useNarrowViewport();
+  const inline = LAYER_TOGGLE_GROUPS.filter((group) => group.placement === 'inline');
+  const popover = LAYER_TOGGLE_GROUPS.filter((group) => group.placement === 'popover');
 
   return (
     <div className="territory-toggle-groups">
-      {LAYER_TOGGLE_GROUPS.map((group) => (
-        <ToggleGroup
-          key={group.id}
-          group={group}
-          visibleIndicators={visibleIndicators}
-          narrow={narrow}
-          renderToggle={renderToggle}
-        />
+      {inline.map((group) => (
+        <div key={group.id} className="territory-toggle-row" role="group" aria-label={group.title}>
+          <span className="territory-toggle-row-label" aria-hidden="true">{group.title}:</span>
+          <div className="territory-chips">{group.indicators.map(renderToggle)}</div>
+        </div>
       ))}
+      <div className="territory-toggle-row territory-toggle-extras">
+        {popover.map((group) => (
+          <MoreLayers key={group.id} group={group} visibleIndicators={visibleIndicators} renderToggle={renderToggle} />
+        ))}
+        <InfoButton />
+      </div>
     </div>
   );
 }

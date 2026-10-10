@@ -6,8 +6,9 @@ import {
   LAYER_TOGGLE_GROUPS,
   MAPBIOMAS_INDICATORS,
   SECONDARY_INDICATORS,
-  isToggleGroupExpanded,
-  activeLayerSummary
+  hasVisibleLayer,
+  activeLayerSummary,
+  layerGroupInfoLines
 } from './indicators';
 
 describe('indicator groups', () => {
@@ -64,62 +65,41 @@ describe('LAYER_TOGGLE_GROUPS', () => {
     expect([...all].sort()).toEqual([...toggleIndicators].sort());
   });
 
-  it('gives every group a one-line context and only the last one collapses', () => {
-    LAYER_TOGGLE_GROUPS.forEach((group) => expect(group.subtitle.length).toBeGreaterThan(0));
-    expect(LAYER_TOGGLE_GROUPS.map((group) => Boolean(group.collapsible))).toEqual([false, false, true]);
+  it('keeps events and MapBiomas inline and moves current conditions into the popover', () => {
+    expect(LAYER_TOGGLE_GROUPS.map((group) => group.placement)).toEqual(['inline', 'inline', 'popover']);
   });
 
-  it('points the year controls above the map', () => {
-    expect(LAYER_TOGGLE_GROUPS[1].subtitle).toBe('Historia anual (elige el año sobre el mapa)');
-  });
-
-  it('notes that risk is current and independent of the MapBiomas year', () => {
-    expect(LAYER_TOGGLE_GROUPS[0].note).toBe(
-      'El riesgo es el valor actual; no depende del año elegido en las capas MapBiomas.'
-    );
+  it('gives the popover group its context line', () => {
+    expect(LAYER_TOGGLE_GROUPS[2].context).toBe('Última observación satelital y climática');
   });
 });
 
-describe('isToggleGroupExpanded', () => {
-  const group = LAYER_TOGGLE_GROUPS[2];
-
-  it('is always expanded for non-collapsible groups', () => {
-    expect(isToggleGroupExpanded({ group: LAYER_TOGGLE_GROUPS[0], visibleIndicators: [], narrow: true })).toBe(true);
+describe('layerGroupInfoLines', () => {
+  it('explains each group, including that risk ignores the MapBiomas year', () => {
+    expect(layerGroupInfoLines()).toEqual([
+      'Riesgo y eventos: situación actual. El riesgo es el valor actual; no depende del año elegido en las capas MapBiomas.',
+      'MapBiomas: historia anual (elige el año sobre el mapa).',
+      'Más capas: última observación satelital y climática.'
+    ]);
   });
+});
 
-  it('is expanded on wide screens', () => {
-    expect(isToggleGroupExpanded({ group, visibleIndicators: [], narrow: false })).toBe(true);
-  });
-
-  it('is collapsed on narrow screens unless one of its layers is visible', () => {
-    expect(isToggleGroupExpanded({ group, visibleIndicators: ['RISK_SCORE'], narrow: true })).toBe(false);
-    expect(isToggleGroupExpanded({ group, visibleIndicators: ['RISK_SCORE', 'WIND'], narrow: true })).toBe(true);
-  });
-
-  it('lets an explicit user choice win over the default', () => {
-    expect(isToggleGroupExpanded({ group, visibleIndicators: [], narrow: true, override: true })).toBe(true);
-    expect(isToggleGroupExpanded({ group, visibleIndicators: ['WIND'], narrow: true, override: false })).toBe(false);
-  });
-
-  it('never auto-collapses once latched open (the user is interacting with it)', () => {
-    expect(isToggleGroupExpanded({ group, visibleIndicators: [], narrow: true, latched: true })).toBe(true);
-  });
-
-  it('still lets an explicit collapse win over the latch', () => {
-    expect(isToggleGroupExpanded({ group, visibleIndicators: ['WIND'], narrow: true, latched: true, override: false })).toBe(false);
+describe('hasVisibleLayer', () => {
+  it('is true only when one of the group layers is visible', () => {
+    expect(hasVisibleLayer(LAYER_TOGGLE_GROUPS[2], ['RISK_SCORE'])).toBe(false);
+    expect(hasVisibleLayer(LAYER_TOGGLE_GROUPS[2], ['RISK_SCORE', 'WIND'])).toBe(true);
   });
 });
 
 describe('activeLayerSummary', () => {
   const group = LAYER_TOGGLE_GROUPS[2];
 
-  it('is empty while expanded or when nothing is visible', () => {
-    expect(activeLayerSummary({ group, visibleIndicators: ['WIND'], expanded: true })).toBe('');
-    expect(activeLayerSummary({ group, visibleIndicators: ['RISK_SCORE'], expanded: false })).toBe('');
+  it('is empty when nothing in the group is visible', () => {
+    expect(activeLayerSummary({ group, visibleIndicators: ['RISK_SCORE'] })).toBe('');
   });
 
-  it('counts the visible layers of a collapsed group', () => {
-    expect(activeLayerSummary({ group, visibleIndicators: ['WIND'], expanded: false })).toBe('(1 activa)');
-    expect(activeLayerSummary({ group, visibleIndicators: ['WIND', 'NDVI', 'RISK_SCORE'], expanded: false })).toBe('(2 activas)');
+  it('counts the visible layers of the group', () => {
+    expect(activeLayerSummary({ group, visibleIndicators: ['WIND'] })).toBe('(1 activa)');
+    expect(activeLayerSummary({ group, visibleIndicators: ['WIND', 'NDVI', 'RISK_SCORE'] })).toBe('(2 activas)');
   });
 });
