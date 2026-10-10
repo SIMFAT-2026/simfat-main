@@ -161,4 +161,8 @@ describe('controlYear', () => {
     expect(controlYear({ layer: null, selectedYear: 2023, stale: false })).toBe(2023);
     expect(controlYear({ layer: null, selectedYear: undefined, stale: false })).toBeUndefined();
   });
+
+  it('falls back to the default year when stale and the year was reset', () => {
+    expect(controlYear({ layer: { year: 2023 }, selectedYear: undefined, defaultYear: 2025, stale: true })).toBe(2025);
+  });
 });

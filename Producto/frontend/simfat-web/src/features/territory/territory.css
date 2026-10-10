@@ -88,12 +88,29 @@
 }
 
 .territory-toggle-group-button {
+  min-height: 32px;
   padding: 0;
   border: 0;
   background: none;
   color: inherit;
   font: inherit;
   cursor: pointer;
+}
+
+.territory-toggle-group-button:focus-visible {
+  outline: 3px solid #1d4ed8;
+  outline-offset: 2px;
+}
+
+.territory-toggle-group-count {
+  color: #475569;
+  font-weight: 400;
+}
+
+@media (max-width: 640px) {
+  .territory-toggle-group-button {
+    min-height: 44px;
+  }
 }
 
 .territory-toggle-group-subtitle {
@@ -279,6 +296,10 @@
 
 .sidebar-collapsed .territory-map-wrapper {
   grid-template-columns: minmax(0, 1fr) minmax(280px, 340px);
+}
+
+.territory-map-region {
+  min-width: 0;
 }
 
 .territory-map {

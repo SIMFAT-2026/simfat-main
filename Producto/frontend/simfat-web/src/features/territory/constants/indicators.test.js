@@ -6,7 +6,8 @@ import {
   LAYER_TOGGLE_GROUPS,
   MAPBIOMAS_INDICATORS,
   SECONDARY_INDICATORS,
-  isToggleGroupExpanded
+  isToggleGroupExpanded,
+  activeLayerSummary
 } from './indicators';
 
 describe('indicator groups', () => {
@@ -68,6 +69,10 @@ describe('LAYER_TOGGLE_GROUPS', () => {
     expect(LAYER_TOGGLE_GROUPS.map((group) => Boolean(group.collapsible))).toEqual([false, false, true]);
   });
 
+  it('points the year controls above the map', () => {
+    expect(LAYER_TOGGLE_GROUPS[1].subtitle).toBe('Historia anual (elige el año sobre el mapa)');
+  });
+
   it('notes that risk is current and independent of the MapBiomas year', () => {
     expect(LAYER_TOGGLE_GROUPS[0].note).toBe(
       'El riesgo es el valor actual; no depende del año elegido en las capas MapBiomas.'
@@ -94,5 +99,27 @@ describe('isToggleGroupExpanded', () => {
   it('lets an explicit user choice win over the default', () => {
     expect(isToggleGroupExpanded({ group, visibleIndicators: [], narrow: true, override: true })).toBe(true);
     expect(isToggleGroupExpanded({ group, visibleIndicators: ['WIND'], narrow: true, override: false })).toBe(false);
+  });
+
+  it('never auto-collapses once latched open (the user is interacting with it)', () => {
+    expect(isToggleGroupExpanded({ group, visibleIndicators: [], narrow: true, latched: true })).toBe(true);
+  });
+
+  it('still lets an explicit collapse win over the latch', () => {
+    expect(isToggleGroupExpanded({ group, visibleIndicators: ['WIND'], narrow: true, latched: true, override: false })).toBe(false);
+  });
+});
+
+describe('activeLayerSummary', () => {
+  const group = LAYER_TOGGLE_GROUPS[2];
+
+  it('is empty while expanded or when nothing is visible', () => {
+    expect(activeLayerSummary({ group, visibleIndicators: ['WIND'], expanded: true })).toBe('');
+    expect(activeLayerSummary({ group, visibleIndicators: ['RISK_SCORE'], expanded: false })).toBe('');
+  });
+
+  it('counts the visible layers of a collapsed group', () => {
+    expect(activeLayerSummary({ group, visibleIndicators: ['WIND'], expanded: false })).toBe('(1 activa)');
+    expect(activeLayerSummary({ group, visibleIndicators: ['WIND', 'NDVI', 'RISK_SCORE'], expanded: false })).toBe('(2 activas)');
   });
 });

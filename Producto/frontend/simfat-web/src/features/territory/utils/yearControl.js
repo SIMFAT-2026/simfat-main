@@ -43,8 +43,8 @@ export function yearOptions(minYear, maxYear) {
 
 // Year the control shows: while a stale layer (previous year) is displayed the
 // control reflects the year being loaded, not the year of the visible polygons.
-export function controlYear({ layer, selectedYear, stale }) {
-  return stale ? selectedYear : layer?.year ?? selectedYear;
+export function controlYear({ layer, selectedYear, defaultYear, stale }) {
+  return stale ? selectedYear ?? defaultYear : layer?.year ?? selectedYear;
 }
 
 export function yearControlLabel(layerLabel, year) {

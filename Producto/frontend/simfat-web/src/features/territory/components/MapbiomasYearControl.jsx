@@ -20,7 +20,12 @@ function MapbiomasYearControl({ label, state }) {
   const { range, defaultYear, layer, loading, setYear } = state;
   // While a stale (previous year) layer is shown, the control follows the
   // year being loaded, not the year of the visible polygons.
-  const loadedYear = controlYear({ layer, selectedYear: state.selectedYear, stale: state.stale });
+  const loadedYear = controlYear({
+    layer,
+    selectedYear: state.selectedYear,
+    defaultYear: state.defaultYear,
+    stale: state.stale
+  });
   const baseId = useId();
   const [draft, setDraft] = useState(loadedYear);
   // While a new year loads there is no layer yet: show the year being fetched.

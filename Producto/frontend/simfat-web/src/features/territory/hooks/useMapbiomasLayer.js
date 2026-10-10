@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { fetchMapbiomasLayer } from '../services/territoryApiService';
 import { mapbiomasCacheKey } from '../utils/mapbiomasLayer';
-import { initialMapbiomasState, mapbiomasReducer } from '../utils/mapbiomasState';
+import { initialMapbiomasState, isStaleLayer, mapbiomasReducer } from '../utils/mapbiomasState';
 
 // MapBiomas layers are yearly and static between data releases, so a longer TTL
 // than the live-layer cache is fine.
@@ -82,18 +82,19 @@ export function useMapbiomasLayer(indicator, { visible, regionId, publicMode }) 
   // The effect that requests a new region runs after render, so for one render
   // the state can still describe the previous region: never expose it.
   const matchesRegion = state.regionId === regionId;
+  const stale = isStaleLayer(state, regionId);
   return useMemo(
     () => ({
       selectedYear: state.selectedYear,
       range: state.range,
       defaultYear: state.defaultYear,
       layer: matchesRegion ? state.layer : null,
-      stale: matchesRegion && state.stale,
+      stale,
       loading: visible && (!matchesRegion || state.loading),
       error: matchesRegion ? state.error : '',
       setYear,
       retry
     }),
-    [state.selectedYear, state.range, state.defaultYear, state.layer, state.stale, state.loading, state.error, matchesRegion, visible, setYear, retry]
+    [state.selectedYear, state.range, state.defaultYear, state.layer, stale, state.loading, state.error, matchesRegion, visible, setYear, retry]
   );
 }

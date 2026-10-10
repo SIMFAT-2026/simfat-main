@@ -487,7 +487,7 @@ function featureMeta(feature) {
     return `Nivel: ${props.level}`;
   }
   if (props.category) {
-    return `Categoria: ${props.category}`;
+    return `Categoría: ${props.category}`;
   }
   return '';
 }
@@ -1270,11 +1270,12 @@ function TerritoryMapPanel({
       {loading ? <LoadingSpinner label="Cargando capas territoriales..." /> : null}
       {!loading && error ? <ErrorMessage error={{ message: error }} onRetry={onRetry} /> : null}
       {!loading && !error && !regionData ? (
-        <EmptyState title="Sin datos territoriales" description="No hay capas para la region seleccionada." />
+        <EmptyState title="Sin datos territoriales" description="No hay capas para la región seleccionada." />
       ) : null}
 
       {!loading && !error && regionData ? (
-        <div className="territory-map-wrapper" aria-busy={mapStale}>
+        <div className="territory-map-wrapper">
+          <div className="territory-map-region" aria-busy={mapStale}>
           <MapContainer
             key={regionData.regionId}
             className="territory-map"
@@ -1400,6 +1401,7 @@ function TerritoryMapPanel({
               )}
             </Pane>
           </MapContainer>
+          </div>
 
           {selectedReport && (
             <ReportCard
@@ -1568,7 +1570,7 @@ function TerritoryMapPanel({
               )}
 
               <p className="territory-meta">
-                Fuente: {regionData.source === 'backend' ? 'Backend' : 'Mock local'} | Ultima actualizacion:{' '}
+                Fuente: {regionData.source === 'backend' ? 'Backend' : 'Mock local'} | Última actualización:{' '}
                 {parseUtcDate(regionData.generatedAt)}
               </p>
             </div>

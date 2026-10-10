@@ -1,5 +1,5 @@
 import { useEffect, useId, useState } from 'react';
-import { LAYER_TOGGLE_GROUPS, isToggleGroupExpanded } from '../constants/indicators';
+import { LAYER_TOGGLE_GROUPS, activeLayerSummary, hasVisibleLayer, isToggleGroupExpanded } from '../constants/indicators';
 
 const NARROW_QUERY = '(max-width: 640px)';
 
@@ -16,8 +16,13 @@ function useNarrowViewport() {
     const query = window.matchMedia(NARROW_QUERY);
     const update = () => setNarrow(query.matches);
     update();
-    query.addEventListener('change', update);
-    return () => query.removeEventListener('change', update);
+    // Older Safari only implements the deprecated addListener/removeListener.
+    if (typeof query.addEventListener === 'function') {
+      query.addEventListener('change', update);
+      return () => query.removeEventListener('change', update);
+    }
+    query.addListener(update);
+    return () => query.removeListener(update);
   }, []);
 
   return narrow;
@@ -26,7 +31,15 @@ function useNarrowViewport() {
 function ToggleGroup({ group, visibleIndicators, narrow, renderToggle }) {
   const baseId = useId();
   const [override, setOverride] = useState(null);
-  const expanded = isToggleGroupExpanded({ group, visibleIndicators, narrow, override });
+  const [latched, setLatched] = useState(false);
+  const expanded = isToggleGroupExpanded({ group, visibleIndicators, narrow, override, latched });
+  const anyVisible = hasVisibleLayer(group, visibleIndicators);
+  const summary = group.collapsible ? activeLayerSummary({ group, visibleIndicators, expanded }) : '';
+
+  // A group that auto-expanded because a layer became visible stays open.
+  useEffect(() => {
+    if (anyVisible) setLatched(true);
+  }, [anyVisible]);
   const titleId = `${baseId}-title`;
   const bodyId = `${baseId}-body`;
 
@@ -43,6 +56,7 @@ function ToggleGroup({ group, visibleIndicators, narrow, renderToggle }) {
               onClick={() => setOverride(!expanded)}
             >
               <span aria-hidden="true">{expanded ? '▾' : '▸'}</span> {group.title}
+              {summary && <span className="territory-toggle-group-count"> {summary}</span>}
             </button>
           ) : (
             group.title

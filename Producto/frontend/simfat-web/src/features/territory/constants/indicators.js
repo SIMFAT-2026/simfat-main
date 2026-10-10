@@ -42,7 +42,7 @@ export const LAYER_TOGGLE_GROUPS = [
   {
     id: 'mapbiomas',
     title: 'MapBiomas',
-    subtitle: 'Historia anual (elige el año bajo el mapa)',
+    subtitle: 'Historia anual (elige el año sobre el mapa)',
     indicators: [...MAPBIOMAS_INDICATORS]
   },
   {
@@ -56,9 +56,31 @@ export const LAYER_TOGGLE_GROUPS = [
 
 // Collapsible groups are open on wide screens and whenever one of their layers
 // is visible; on narrow screens they start closed. An explicit user choice
-// (override true/false) wins over that default.
-export function isToggleGroupExpanded({ group, visibleIndicators = [], narrow = false, override = null }) {
+// (override true/false) wins over that default. `latched` means the group
+// already auto-expanded once: it never auto-collapses afterwards (unchecking
+// the last layer must not move the user's focus away); only an explicit
+// collapse closes it.
+export function isToggleGroupExpanded({
+  group,
+  visibleIndicators = [],
+  narrow = false,
+  override = null,
+  latched = false
+}) {
   if (!group?.collapsible) return true;
   if (typeof override === 'boolean') return override;
+  if (latched) return true;
   return !narrow || group.indicators.some((indicator) => visibleIndicators.includes(indicator));
+}
+
+export function hasVisibleLayer(group, visibleIndicators = []) {
+  return Boolean(group?.indicators.some((indicator) => visibleIndicators.includes(indicator)));
+}
+
+// "(2 activas)" for a collapsed group that hides visible layers, else ''.
+export function activeLayerSummary({ group, visibleIndicators = [], expanded }) {
+  if (expanded) return '';
+  const count = group.indicators.filter((indicator) => visibleIndicators.includes(indicator)).length;
+  if (count === 0) return '';
+  return `(${count} ${count === 1 ? 'activa' : 'activas'})`;
 }
