@@ -7,8 +7,20 @@ export const initialMapbiomasState = {
   regionId: null,
   layer: null,
   loading: false,
-  error: ''
+  error: '',
+  // Available years {minYear, maxYear}, remembered from the last payload so the
+  // year control keeps its bounds while another year is loading.
+  range: null,
+  // Year the backend picked on its own (Q28): what "Último" returns to.
+  defaultYear: undefined
 };
+
+function rangeFrom(layer, fallback) {
+  const { minYear, maxYear } = layer || {};
+  return Number.isInteger(minYear) && Number.isInteger(maxYear) && minYear <= maxYear
+    ? { minYear, maxYear }
+    : fallback;
+}
 
 // Every failure maps to this fixed Spanish message: raw error text (e.g.
 // "Network Error") never reaches the UI.
@@ -54,6 +66,11 @@ export function mapbiomasReducer(state, action) {
         ...state,
         layer: action.layer,
         selectedYear: Number.isInteger(action.layer.year) ? action.layer.year : state.selectedYear,
+        range: rangeFrom(action.layer, state.range),
+        defaultYear:
+          action.requestedYear === undefined && Number.isInteger(action.layer.year)
+            ? action.layer.year
+            : state.defaultYear,
         loading: false,
         error: ''
       };
