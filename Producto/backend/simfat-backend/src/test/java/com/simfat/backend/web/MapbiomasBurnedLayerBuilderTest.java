@@ -125,10 +125,10 @@ class MapbiomasBurnedLayerBuilderTest {
         // BURNED payload; it was missing entirely. Threaded through exactly like dataVersion.
         Map<String, Object> map = MapbiomasBurnedLayerBuilder.build(
             List.of(), Map.of(), 2019, 2013, 2025, "test-version",
-            "MapBiomas Chile - Coleccion 2 de Cobertura y Uso del Suelo (1999-2024) y Coleccion 1 de Fuego (2013-2025). Licencia CC BY 4.0.");
+            "MapBiomas Chile - Colección 2 de Cobertura y Uso del Suelo (1999-2024) y Colección 1 de Fuego (2013-2025). Licencia CC BY 4.0.");
 
         assertThat(map.get("citation")).isEqualTo(
-            "MapBiomas Chile - Coleccion 2 de Cobertura y Uso del Suelo (1999-2024) y Coleccion 1 de Fuego (2013-2025). Licencia CC BY 4.0.");
+            "MapBiomas Chile - Colección 2 de Cobertura y Uso del Suelo (1999-2024) y Colección 1 de Fuego (2013-2025). Licencia CC BY 4.0.");
     }
 
     @SuppressWarnings("unchecked")

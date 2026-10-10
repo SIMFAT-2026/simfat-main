@@ -95,7 +95,8 @@ class MapbiomasComunaDetailBuilderTest {
             stats(true), 2003, Optional.of(susceptibility(null)), 0.0, CITATION);
 
         assertThat(d.landCover().shares()).extracting(MapbiomasComunaDetailDTO.ClassShare::code)
-            .containsExactly(59, 12, 27);
+            .containsExactly(59, 12);
+        assertThat(d.landCover().unobservedShare()).isEqualTo(0.1);
         assertThat(d.landCover().shares().get(0).label()).isEqualTo("Bosque Primario");
         double sum = d.landCover().shares().stream().mapToDouble(MapbiomasComunaDetailDTO.ClassShare::share).sum();
         assertThat(sum).isLessThanOrEqualTo(1.0 + 1e-9);
@@ -111,12 +112,12 @@ class MapbiomasComunaDetailBuilderTest {
 
         assertThat(off.indices().weight()).isEqualTo(0.0);
         assertThat(off.indices().enteredInScore()).isFalse();
-        assertThat(off.indices().scoreContribution()).isEqualTo(0.0);
+        assertThat(off.indices().weightedComponent()).isEqualTo(0.0);
         assertThat(on.indices().sMapbiomas()).isEqualTo(0.6);
         assertThat(on.indices().fuelIndex()).isEqualTo(0.7);
         assertThat(on.indices().historyIndex()).isEqualTo(0.4);
         assertThat(on.indices().enteredInScore()).isTrue();
-        assertThat(on.indices().scoreContribution()).isEqualTo(0.35 * 0.6);
+        assertThat(on.indices().weightedComponent()).isEqualTo(0.21);
     }
 
     @Test
@@ -126,8 +127,98 @@ class MapbiomasComunaDetailBuilderTest {
             Optional.of(susceptibility(MapbiomasSusceptibility.MAPBIOMAS_UNAVAILABLE)), 0.35, CITATION);
 
         assertThat(d.indices().enteredInScore()).isFalse();
-        assertThat(d.indices().scoreContribution()).isEqualTo(0.0);
+        assertThat(d.indices().weightedComponent()).isEqualTo(0.0);
         assertThat(d.indices().qualityFlag()).isEqualTo(MapbiomasSusceptibility.MAPBIOMAS_UNAVAILABLE);
+        // The 0.0 score is a placeholder, never a claim: it must not be reported as a real S_mb.
+        assertThat(d.indices().sMapbiomas()).isNull();
+        assertThat(d.indices().fuelIndex()).isNull();
+        assertThat(d.indices().historyIndex()).isNull();
+    }
+
+    @Test
+    void partialFlag_withPositiveWeight_stillEntersTheScore() {
+        MapbiomasComunaDetailDTO d = MapbiomasComunaDetailBuilder.build(
+            stats(true), 2024,
+            Optional.of(new MapbiomasSusceptibility(0.4, null, 0.4, "v1",
+                MapbiomasSusceptibility.MAPBIOMAS_FUEL_UNAVAILABLE, null)), 0.35, CITATION);
+
+        assertThat(d.indices().enteredInScore()).isTrue();
+        assertThat(d.indices().sMapbiomas()).isEqualTo(0.4);
+        assertThat(d.indices().weightedComponent()).isEqualTo(0.14);
+    }
+
+    @Test
+    void weightedComponent_isRoundedToFourDecimalsLikeTheRiskService() {
+        MapbiomasComunaDetailDTO d = MapbiomasComunaDetailBuilder.build(
+            stats(true), 2024,
+            Optional.of(new MapbiomasSusceptibility(0.123456, 0.1, 0.1, "v1", null, 0.0)), 0.35, CITATION);
+
+        assertThat(d.indices().weightedComponent()).isEqualTo(0.0432);
+    }
+
+    @Test
+    void invalidIndices_degradeWithoutDroppingTheRestOfTheResponse() {
+        MapbiomasComunaDetailDTO d = MapbiomasComunaDetailBuilder.build(
+            stats(true), 2024, Optional.empty(), 0.35, CITATION, true);
+
+        assertThat(d.indices().qualityFlag()).isEqualTo(MapbiomasComunaDetailBuilder.DATA_INVALID_FLAG);
+        assertThat(d.indices().enteredInScore()).isFalse();
+        assertThat(d.indices().sMapbiomas()).isNull();
+        assertThat(d.indices().fuelIndex()).isNull();
+        assertThat(d.indices().historyIndex()).isNull();
+        assertThat(d.indices().weightedComponent()).isEqualTo(0.0);
+        assertThat(d.fire().available()).isTrue();
+        assertThat(d.landCover().available()).isTrue();
+    }
+
+    @Test
+    void corruptLandCoverSeries_degradeToUnavailableInsteadOfThrowing() {
+        for (String badKey : new String[] {"999", "abc"}) {
+            ComunaMapbiomasStats s = stats(true);
+            s.getLandCover().getSharesByYear().getClasses().put(badKey, new int[26]);
+            MapbiomasComunaDetailDTO d = MapbiomasComunaDetailBuilder.build(s, 2024, Optional.empty(), 0.0, CITATION);
+            assertThat(d.landCover().available()).as(badKey).isFalse();
+            assertThat(d.landCover().shares()).isNull();
+            assertThat(d.landCover().series()).isNull();
+            assertThat(d.fire().available()).isTrue();
+        }
+        ComunaMapbiomasStats shortSeries = stats(true);
+        shortSeries.getLandCover().getSharesByYear().getClasses().put("12", new int[3]);
+        MapbiomasComunaDetailDTO d = MapbiomasComunaDetailBuilder.build(shortSeries, 2024, Optional.empty(), 0.0, CITATION);
+        assertThat(d.landCover().available()).isFalse();
+        assertThat(d.fire().available()).isTrue();
+    }
+
+    @Test
+    void yearOutsideStoredSeries_isUnavailableButKeepsTheSeriesForCharting() {
+        ComunaMapbiomasStats s = stats(true);
+        s.getLandCover().getSharesByYear().setFirstYear(2000);
+        s.getLandCover().getSharesByYear().setLastYear(2025);
+
+        MapbiomasComunaDetailDTO d = MapbiomasComunaDetailBuilder.build(s, 1999, Optional.empty(), 0.0, CITATION);
+
+        assertThat(d.landCover().available()).isFalse();
+        assertThat(d.landCover().year()).isEqualTo(1999);
+        assertThat(d.landCover().shares()).isNull();
+        assertThat(d.landCover().unobservedShare()).isNull();
+        assertThat(d.landCover().series()).isNotNull();
+        assertThat(d.landCover().series().classes().get("59")).hasSize(26);
+    }
+
+    @Test
+    void yearWithNoObservedClass_isUnavailableAndReportsOnlyUnobservedShare() {
+        ComunaMapbiomasStats s = stats(true);
+        Map<String, int[]> classes = s.getLandCover().getSharesByYear().getClasses();
+        classes.get("59")[4] = 0;
+        classes.get("12")[4] = 0;
+        classes.get("27")[4] = 10000;
+
+        MapbiomasComunaDetailDTO d = MapbiomasComunaDetailBuilder.build(s, 2003, Optional.empty(), 0.0, CITATION);
+
+        assertThat(d.landCover().available()).isFalse();
+        assertThat(d.landCover().shares()).isNull();
+        assertThat(d.landCover().unobservedShare()).isEqualTo(1.0);
+        assertThat(d.landCover().series()).isNotNull();
     }
 
     @Test

@@ -26,6 +26,15 @@ import org.junit.jupiter.api.Test;
  */
 class MapbiomasComunaDetailControllerTest extends MongoFreeWebTestSupport {
 
+    @org.springframework.boot.test.mock.mockito.SpyBean
+    private com.simfat.backend.service.mapbiomas.MapbiomasSusceptibilityService susceptibilityService;
+    @org.springframework.boot.test.mock.mockito.MockBean
+    private com.simfat.backend.repository.ComunaRiskSnapshotRepository snapshotRepository;
+    @org.springframework.beans.factory.annotation.Autowired
+    private MapbiomasComunaDetailController controller;
+
+    private ComunaMapbiomasStats seeded;
+
     private static final String ID = "CHL.6.1.1_1";
     private static final String URL = "/api/territory/public/mapbiomas/" + ID;
 
@@ -67,6 +76,9 @@ class MapbiomasComunaDetailControllerTest extends MongoFreeWebTestSupport {
         provenance.setDownloadDate("2026-09-21");
         provenance.setSources(java.util.List.of("https://secret.example/signed"));
         stats.setProvenance(provenance);
+        seeded = stats;
+        controller.clearDefaultYearCache();
+        when(comunaMapbiomasStatsRepository.findByDataVersion(any())).thenReturn(java.util.List.of(stats));
         when(comunaMapbiomasStatsRepository.findByComunaIdAndDataVersion(anyString(), any()))
             .thenReturn(Optional.empty());
         when(comunaMapbiomasStatsRepository.findByComunaIdAndDataVersion(
@@ -77,7 +89,7 @@ class MapbiomasComunaDetailControllerTest extends MongoFreeWebTestSupport {
     void anonymousKnownComuna_returns200WithWhitelistedShape() throws Exception {
         mockMvc.perform(get(URL))
             .andExpect(status().isOk())
-            .andExpect(header().string("Cache-Control", containsString("max-age=86400")))
+            .andExpect(header().string("Cache-Control", is("public, max-age=300")))
             .andExpect(jsonPath("$.success", is(true)))
             .andExpect(jsonPath("$.data.comunaId", is(ID)))
             .andExpect(jsonPath("$.data.landCover.year", is(2024)))
@@ -85,6 +97,8 @@ class MapbiomasComunaDetailControllerTest extends MongoFreeWebTestSupport {
             .andExpect(jsonPath("$.data.landCover.series.classes.59", hasSize(26)))
             .andExpect(jsonPath("$.data.attribution.license", is("CC BY 4.0")))
             .andExpect(jsonPath("$.data.attribution.text", not("")))
+            .andExpect(jsonPath("$.data.attribution.text", containsString("Colección 2")))
+            .andExpect(jsonPath("$.data.attribution.text", containsString("Colección 1")))
             .andExpect(jsonPath("$.data.fire.burnedHaByYear.2017", is(10.0)))
             .andExpect(jsonPath("$.data.fireHistoryAvailable", is(true)))
             .andExpect(jsonPath("$.data.indices.weight", is(0.0)))
@@ -145,9 +159,65 @@ class MapbiomasComunaDetailControllerTest extends MongoFreeWebTestSupport {
     void unknownButWellFormedComuna_is404WithSpanishMessageAndNoEcho() throws Exception {
         mockMvc.perform(get("/api/territory/public/mapbiomas/CHL.99.9.9_1"))
             .andExpect(status().isNotFound())
-            .andExpect(jsonPath("$.message", containsString("MapBiomas")))
+            .andExpect(jsonPath("$.message", is("No hay datos de MapBiomas para la comuna solicitada")))
             .andExpect(jsonPath("$.message", not(containsString("CHL.99.9.9_1"))))
             .andExpect(content().string(not(containsString("at com.simfat"))));
+    }
+
+    @Test
+    void omittedYear_usesTheDataDerivedDefaultLikeTheLandCoverLayer() throws Exception {
+        // Latest observed year in the loaded dataVersion is 2020 (series 1999-2020).
+        ComunaMapbiomasStats.SharesByYear series = seeded.getLandCover().getSharesByYear();
+        series.setLastYear(2020);
+        int[] forest = new int[22];
+        java.util.Arrays.fill(forest, 5000);
+        series.setClasses(Map.of("59", forest));
+
+        mockMvc.perform(get(URL))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.landCover.year", is(2020)))
+            .andExpect(jsonPath("$.data.landCover.available", is(true)));
+        mockMvc.perform(get(URL).param("year", "2024"))
+            .andExpect(jsonPath("$.data.landCover.year", is(2024)))
+            .andExpect(jsonPath("$.data.landCover.available", is(false)));
+    }
+
+    @Test
+    void invalidSusceptibilityData_degradesIndicesButKeepsTheRestOf200() throws Exception {
+        org.mockito.Mockito.doThrow(new IllegalArgumentException("bad seed"))
+            .when(susceptibilityService).forComuna(ID);
+
+        mockMvc.perform(get(URL))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.indices.qualityFlag", is("MAPBIOMAS_DATA_INVALID")))
+            .andExpect(jsonPath("$.data.indices.enteredInScore", is(false)))
+            .andExpect(jsonPath("$.data.indices.sMapbiomas").value(org.hamcrest.Matchers.nullValue()))
+            .andExpect(jsonPath("$.data.fire.available", is(true)))
+            .andExpect(jsonPath("$.data.landCover.available", is(true)));
+    }
+
+    @Test
+    void corruptLandCoverSeries_is200WithLandCoverUnavailable() throws Exception {
+        seeded.getLandCover().getSharesByYear().setClasses(Map.of("999", new int[26]));
+
+        mockMvc.perform(get(URL))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.landCover.available", is(false)))
+            .andExpect(jsonPath("$.data.fire.available", is(true)));
+    }
+
+    @Test
+    void effectiveWeight_comesFromThePersistedSnapshotWhenOneExists() throws Exception {
+        org.mockito.Mockito.doReturn(Optional.of(new com.simfat.backend.service.mapbiomas.MapbiomasSusceptibility(
+            0.6, 0.7, 0.4, "v", null, 0.0))).when(susceptibilityService).forComuna(ID);
+        com.simfat.backend.model.ComunaRiskSnapshot snapshot = new com.simfat.backend.model.ComunaRiskSnapshot();
+        snapshot.setMapbiomasWeight(0.2);
+        when(snapshotRepository.findTopByComunaIdOrderByComputedAtDesc(ID)).thenReturn(Optional.of(snapshot));
+
+        mockMvc.perform(get(URL))
+            .andExpect(jsonPath("$.data.indices.weight", is(0.2)))
+            .andExpect(jsonPath("$.data.indices.enteredInScore", is(true)))
+            .andExpect(jsonPath("$.data.indices.weightedComponent", is(0.12)));
     }
 
     @Test

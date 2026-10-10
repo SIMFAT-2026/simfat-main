@@ -142,7 +142,7 @@ public class TerritoryController {
     // so it can be corrected without a redeploy. The default text below is PROVISIONAL: design D6
     // marks this attribution as UNVERIFIED/ADAPTED pending confirmation from MapBiomas Chile's own
     // citation template -- do not treat this string as final/legally reviewed.
-    @Value("${mapbiomas.citation:MapBiomas Chile - Coleccion 2 de Cobertura y Uso del Suelo (1999-2024) y Coleccion 1 de Fuego (2013-2025). Licencia CC BY 4.0.}")
+    @Value("${mapbiomas.citation:MapBiomas Chile - Colección 2 de Cobertura y Uso del Suelo (1999-2024) y Colección 1 de Fuego (2013-2025). Licencia CC BY 4.0.}")
     private String mapbiomasCitation;
 
     public TerritoryController(

@@ -28,6 +28,18 @@ public record MapbiomasComunaDetailDTO(
     public record Attribution(String text, String license, String sourceUrl, String dataVersion, String downloadDate) {
     }
 
+    /**
+     * Land cover for the requested {@code year}. Semantics are aligned with the LANDCOVER layer:
+     * {@code available=false} (with {@code shares=null}) when the comuna has no usable series,
+     * the year lies outside the stored series, or no OBSERVED class (anything but 27) has a share
+     * above zero in that year. In the last two cases {@code series} is still returned so the UI
+     * can chart the history. If the stored series is corrupt (unknown class, short or non-numeric
+     * key) everything but {@code available}/{@code year} is null instead of failing the request.
+     *
+     * <p>{@code shares} lists OBSERVED classes only: class 27 ("No observado") is never in it, as
+     * in the layer's dominance rule. Its share for the year is reported solely through
+     * {@code unobservedShare} (a fraction 0-1; null when the year is outside the series).
+     */
     public record LandCover(
         boolean available,
         Integer year,
@@ -35,6 +47,7 @@ public record MapbiomasComunaDetailDTO(
         Integer minYear,
         Integer maxYear,
         List<ClassShare> shares,
+        Double unobservedShare,
         Series series
     ) {
     }
@@ -82,10 +95,19 @@ public record MapbiomasComunaDetailDTO(
     }
 
     /**
-     * Susceptibility components as already computed by the scoring service. {@code weight} is
-     * the CONFIGURED wM; {@code enteredInScore} is true only when wM &gt; 0 and the comuna's
-     * MapBiomas data is usable, so the UI can say honestly whether MapBiomas affects the risk
-     * score. {@code scoreContribution} = wM * S_mapbiomas when it entered, else 0.
+     * Susceptibility components as already computed by the scoring service. {@code weight} is the
+     * EFFECTIVE wM the user sees in the persisted risk snapshot (falling back to the configured
+     * wM when the comuna has no snapshot); {@code enteredInScore} is true only when wM &gt; 0 and
+     * the comuna's MapBiomas data is usable, so the UI can say honestly whether MapBiomas affects
+     * the risk score.
+     *
+     * <p>{@code weightedComponent} = wEff * S_mapbiomas (rounded to 4 decimals) when it entered,
+     * else 0. It is one term of the convex blend {@code (1 - wEff) * S_dyn + wEff * S_mb}, NOT
+     * the net change to the score: the net effect is {@code wEff * (S_mb - S_dyn)}.
+     *
+     * <p>{@code sMapbiomas}, {@code fuelIndex} and {@code historyIndex} are null when the data is
+     * unusable ({@code MAPBIOMAS_UNAVAILABLE} placeholder score, or {@code MAPBIOMAS_DATA_INVALID}
+     * when the stored data failed validation), never a fabricated number.
      */
     public record Indices(
         Double fuelIndex,
@@ -93,7 +115,7 @@ public record MapbiomasComunaDetailDTO(
         Double sMapbiomas,
         double weight,
         boolean enteredInScore,
-        double scoreContribution,
+        double weightedComponent,
         String qualityFlag,
         Double unobservedShare
     ) {
