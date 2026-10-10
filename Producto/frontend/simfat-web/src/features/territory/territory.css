@@ -294,7 +294,7 @@
 
 .territory-year-controls {
   display: grid;
-  gap: 6px;
+  gap: 4px;
   margin: 6px 0;
 }
 
@@ -302,8 +302,8 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 6px 8px;
-  padding: 4px 8px;
+  gap: 4px 6px;
+  padding: 2px 8px;
   border: 1px solid #d7e0ea;
   border-radius: 7px;
   background: #fff;
@@ -312,20 +312,16 @@
 }
 
 .territory-year-label {
+  min-width: 6.5rem;
   font-weight: 700;
   color: #0f172a;
 }
 
-.territory-year-slider {
-  flex: 1 1 160px;
-  min-width: 0;
-  min-height: 44px;
-}
-
 .territory-year-step,
 .territory-year-latest {
-  min-width: 44px;
-  min-height: 44px;
+  min-width: 32px;
+  min-height: 32px;
+  padding-block: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -338,13 +334,11 @@
 }
 
 .territory-year-select {
-  display: none;
-  min-height: 44px;
-  flex: 1 1 120px;
-  min-width: 0;
+  min-height: 32px;
+  width: auto;
+  min-width: 5rem;
 }
 
-.territory-year-slider:focus-visible,
 .territory-year-select:focus-visible,
 .territory-year-step:focus-visible,
 .territory-year-latest:focus-visible {
@@ -353,12 +347,14 @@
 }
 
 @media (max-width: 640px) {
-  .territory-year-slider {
-    display: none;
+  .territory-year-step,
+  .territory-year-latest,
+  .territory-year-select {
+    min-height: 44px;
   }
 
-  .territory-year-select {
-    display: block;
+  .territory-year-step {
+    min-width: 44px;
   }
 }
 
