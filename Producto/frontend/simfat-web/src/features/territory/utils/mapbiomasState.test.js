@@ -90,6 +90,17 @@ describe('mapbiomasReducer', () => {
     expect(state.error).not.toBe('');
   });
 
+  it('uses a layer-specific fixed message when the failure names the indicator', () => {
+    const requested = run([{ type: 'request', regionId: 'biobio' }]);
+    const failed = mapbiomasReducer(requested, {
+      type: 'failure',
+      indicator: 'LANDCOVER',
+      regionId: 'biobio',
+      requestedYear: undefined
+    });
+    expect(failed.error).toBe('No fue posible cargar la cobertura del suelo.');
+  });
+
   it('records a failure for the current request and ignores stale ones', () => {
     const requested = run([{ type: 'request', regionId: 'biobio' }]);
     const failed = mapbiomasReducer(requested, {

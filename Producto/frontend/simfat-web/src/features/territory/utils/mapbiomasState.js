@@ -25,6 +25,10 @@ function rangeFrom(layer, fallback) {
 // Every failure maps to this fixed Spanish message: raw error text (e.g.
 // "Network Error") never reaches the UI.
 export const LOAD_ERROR_MESSAGE = 'No fue posible cargar el área quemada.';
+const LOAD_ERROR_MESSAGES = {
+  BURNED: LOAD_ERROR_MESSAGE,
+  LANDCOVER: 'No fue posible cargar la cobertura del suelo.'
+};
 const MISSING_LAYER_MESSAGE = 'No hay datos de esta capa para el año y la región seleccionados.';
 
 function isCurrentRequest(state, action) {
@@ -79,7 +83,7 @@ export function mapbiomasReducer(state, action) {
       if (!isCurrentRequest(state, action)) {
         return state;
       }
-      return { ...state, layer: null, loading: false, error: LOAD_ERROR_MESSAGE };
+      return { ...state, layer: null, loading: false, error: LOAD_ERROR_MESSAGES[action.indicator] || LOAD_ERROR_MESSAGE };
     }
     default:
       return state;
