@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { fetchComunaMapbiomas } from '../services/territoryApiService';
 import {
   boundedCacheSet,
@@ -22,6 +22,7 @@ export function useComunaMapbiomas(comunaId, year) {
   const [result, setResult] = useState({ key: null, comunaId: null, data: null, error: null });
   // Bumping this re-runs the load effect, which retries the same request.
   const [attempt, setAttempt] = useState(0);
+  const lastShownRef = useRef(null);
 
   const cached = comunaId ? readFreshCache(detailCache, key, Date.now()) : null;
 
@@ -56,10 +57,16 @@ export function useComunaMapbiomas(comunaId, year) {
   }, []);
 
   if (cached) {
+    lastShownRef.current = { comunaId, data: cached };
     return { loading: false, stale: false, data: cached, error: null, retry };
   }
   const current = result.key === key;
-  const data = current ? result.data : staleDataFor(result, comunaId);
+  if (current && result.data) {
+    lastShownRef.current = { comunaId, data: result.data };
+  }
+  // Stale data is whatever was last on screen for this comuna (a cache hit or a
+  // fetch), never an older result, so the bars do not jump back a year.
+  const data = current ? result.data : staleDataFor(lastShownRef.current, comunaId);
   return {
     loading: !current,
     stale: !current && data !== null,

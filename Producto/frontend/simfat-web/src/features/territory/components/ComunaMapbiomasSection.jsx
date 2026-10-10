@@ -112,8 +112,12 @@ export default function ComunaMapbiomasSection({ comunaId, year, burnedYear }) {
     <section className="panel-section" aria-labelledby="mb-section-title" aria-busy={loading}>
       <h5 className="panel-section-title" id="mb-section-title" tabIndex={-1} ref={headingRef}>MapBiomas</h5>
       <div role="status">
+        {/* While refreshing over stale data the text is screen-reader only, so
+            no line is inserted above the bars (that shift read as a flicker). */}
         {loading && (
-          <p className="mb-note">{stale ? 'Actualizando datos MapBiomas…' : 'Cargando datos MapBiomas…'}</p>
+          <p className={stale ? 'sr-only' : 'mb-note'}>
+            {stale ? 'Actualizando datos MapBiomas…' : 'Cargando datos MapBiomas…'}
+          </p>
         )}
       </div>
       {errorView && (
@@ -127,7 +131,7 @@ export default function ComunaMapbiomasSection({ comunaId, year, burnedYear }) {
         </div>
       )}
       {data && (
-        <>
+        <div className={stale ? 'mb-content mb-content-stale' : 'mb-content'}>
           <CoverageBlock landCover={data.landCover} />
           <FireBlock data={data} highlightYear={burnedYear} />
           <div>
@@ -145,7 +149,7 @@ export default function ComunaMapbiomasSection({ comunaId, year, burnedYear }) {
             ))}
           </div>
           <Attribution attribution={data.attribution} />
-        </>
+        </div>
       )}
     </section>
   );
