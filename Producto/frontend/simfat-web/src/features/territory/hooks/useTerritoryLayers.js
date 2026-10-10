@@ -445,14 +445,21 @@ export function useTerritoryLayers(options = {}) {
     publicMode
   });
   const { setYear: setBurnedYear } = burned;
+  const landcover = useMapbiomasLayer('LANDCOVER', {
+    visible: visibleIndicators.includes('LANDCOVER'),
+    regionId: selectedRegionId,
+    publicMode
+  });
+  const { setYear: setLandcoverYear } = landcover;
 
   // Entry point for generic year callers; the year control itself uses each
   // layer's own setYear from mapbiomasLayers.
   const setMapbiomasYear = useCallback(
     (indicator, year) => {
       if (indicator === 'BURNED') setBurnedYear(year);
+      if (indicator === 'LANDCOVER') setLandcoverYear(year);
     },
-    [setBurnedYear]
+    [setBurnedYear, setLandcoverYear]
   );
 
   const reloadSelectedRegion = useCallback(async () => {
@@ -474,7 +481,7 @@ export function useTerritoryLayers(options = {}) {
       loading: loadingRegions.has(selectedRegionId) && !selectedRegionData,
       refreshing: loadingRegions.has(selectedRegionId) && Boolean(selectedRegionData),
       reloadSelectedRegion,
-      mapbiomasLayers: { BURNED: burned },
+      mapbiomasLayers: { BURNED: burned, LANDCOVER: landcover },
       setMapbiomasYear,
       cacheTtlMs: CACHE_TTL_MS
     }),
@@ -487,6 +494,7 @@ export function useTerritoryLayers(options = {}) {
       loadingRegions,
       reloadSelectedRegion,
       burned,
+      landcover,
       setMapbiomasYear
     ]
   );
