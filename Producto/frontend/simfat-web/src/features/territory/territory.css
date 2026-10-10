@@ -60,6 +60,59 @@
   min-width: 0;
 }
 
+.territory-toggle-groups {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.territory-toggle-group {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.territory-toggle-group-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 8px;
+  min-width: 0;
+}
+
+.territory-toggle-group-title {
+  margin: 0;
+  color: #0f172a;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.territory-toggle-group-button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.territory-toggle-group-subtitle {
+  color: #64748b;
+  font-size: 0.75rem;
+  overflow-wrap: anywhere;
+}
+
+.territory-toggle-group-note {
+  margin: 0;
+  color: #475569;
+  font-size: 0.75rem;
+  overflow-wrap: anywhere;
+}
+
+.territory-layer-toggles[hidden] {
+  display: none;
+}
+
 .territory-controls-title {
   grid-column: 1 / -1;
   margin: 0;

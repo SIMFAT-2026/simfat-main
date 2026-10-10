@@ -3,8 +3,10 @@ import {
   CRITICAL_INDICATORS,
   DEFAULT_INDICATORS,
   DEFAULT_VISIBLE_INDICATORS,
+  LAYER_TOGGLE_GROUPS,
   MAPBIOMAS_INDICATORS,
-  SECONDARY_INDICATORS
+  SECONDARY_INDICATORS,
+  isToggleGroupExpanded
 } from './indicators';
 
 describe('indicator groups', () => {
@@ -34,5 +36,63 @@ describe('indicator groups', () => {
 
   it('has no duplicates in the default list', () => {
     expect(new Set(DEFAULT_INDICATORS).size).toBe(DEFAULT_INDICATORS.length);
+  });
+});
+
+describe('LAYER_TOGGLE_GROUPS', () => {
+  const toggleIndicators = [
+    'RISK_SCORE', 'FIRMS', 'ALERTS', 'REPORTS', 'BURNED', 'LANDCOVER',
+    'NDVI', 'NDMI', 'WIND', 'HUMIDITY', 'AIR_TEMP', 'SOIL_TEMP'
+  ];
+
+  it('orders the groups by time semantics: events, MapBiomas, current conditions', () => {
+    expect(LAYER_TOGGLE_GROUPS.map((group) => group.title)).toEqual([
+      'Riesgo y eventos',
+      'MapBiomas',
+      'Condiciones actuales'
+    ]);
+    expect(LAYER_TOGGLE_GROUPS.map((group) => group.indicators)).toEqual([
+      ['RISK_SCORE', 'FIRMS', 'ALERTS', 'REPORTS'],
+      ['BURNED', 'LANDCOVER'],
+      ['NDVI', 'NDMI', 'WIND', 'HUMIDITY', 'AIR_TEMP', 'SOIL_TEMP']
+    ]);
+  });
+
+  it('lists every toggle indicator exactly once', () => {
+    const all = LAYER_TOGGLE_GROUPS.flatMap((group) => group.indicators);
+    expect([...all].sort()).toEqual([...toggleIndicators].sort());
+  });
+
+  it('gives every group a one-line context and only the last one collapses', () => {
+    LAYER_TOGGLE_GROUPS.forEach((group) => expect(group.subtitle.length).toBeGreaterThan(0));
+    expect(LAYER_TOGGLE_GROUPS.map((group) => Boolean(group.collapsible))).toEqual([false, false, true]);
+  });
+
+  it('notes that risk is current and independent of the MapBiomas year', () => {
+    expect(LAYER_TOGGLE_GROUPS[0].note).toBe(
+      'El riesgo es el valor actual; no depende del año elegido en las capas MapBiomas.'
+    );
+  });
+});
+
+describe('isToggleGroupExpanded', () => {
+  const group = LAYER_TOGGLE_GROUPS[2];
+
+  it('is always expanded for non-collapsible groups', () => {
+    expect(isToggleGroupExpanded({ group: LAYER_TOGGLE_GROUPS[0], visibleIndicators: [], narrow: true })).toBe(true);
+  });
+
+  it('is expanded on wide screens', () => {
+    expect(isToggleGroupExpanded({ group, visibleIndicators: [], narrow: false })).toBe(true);
+  });
+
+  it('is collapsed on narrow screens unless one of its layers is visible', () => {
+    expect(isToggleGroupExpanded({ group, visibleIndicators: ['RISK_SCORE'], narrow: true })).toBe(false);
+    expect(isToggleGroupExpanded({ group, visibleIndicators: ['RISK_SCORE', 'WIND'], narrow: true })).toBe(true);
+  });
+
+  it('lets an explicit user choice win over the default', () => {
+    expect(isToggleGroupExpanded({ group, visibleIndicators: [], narrow: true, override: true })).toBe(true);
+    expect(isToggleGroupExpanded({ group, visibleIndicators: ['WIND'], narrow: true, override: false })).toBe(false);
   });
 });

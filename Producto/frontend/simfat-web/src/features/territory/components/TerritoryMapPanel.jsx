@@ -24,6 +24,7 @@ import {
 import { burnedTooltipLines, landcoverLineFor, landcoverToggleLabel } from '../utils/landcoverLayer';
 import { burnedLegendNote, burnedLineFor, burnedToggleLabel, mapbiomasOwner } from '../utils/mapbiomasLayer';
 import { CLIMATE_INDICATORS } from '../constants/indicators';
+import LayerToggleGroups from './LayerToggleGroups';
 import MapbiomasYearControl from './MapbiomasYearControl';
 import { LandcoverChoropleth, LandcoverLegend } from './LandcoverLayer';
 
@@ -712,7 +713,6 @@ const MAPBIOMAS_YEAR_CONTROLS = [
   { indicator: 'LANDCOVER', label: 'Cobertura' }
 ];
 
-const MAP_TOGGLE_INDICATORS = ['RISK_SCORE', 'FIRMS', 'NDVI', 'NDMI', 'ALERTS', 'REPORTS', 'BURNED', 'LANDCOVER'];
 const ALERT_TOOLTIP_COMPONENTS = ['firms', 'fwi', 'ndmi', 'ndvi'];
 
 function componentScoreParts(component) {
@@ -1189,8 +1189,9 @@ function TerritoryMapPanel({
           </select>
         </label>
 
-        <div className="territory-layer-toggles">
-          {MAP_TOGGLE_INDICATORS.map((indicator) => (
+        <LayerToggleGroups
+          visibleIndicators={visibleIndicators}
+          renderToggle={(indicator) => (
             <label key={indicator} className="territory-toggle" title={INDICATOR_FULL_LABELS[indicator] || indicator}>
               <input
                 type="checkbox"
@@ -1203,24 +1204,11 @@ function TerritoryMapPanel({
                   ? burnedToggleLabel(mapbiomasLayers.BURNED?.layer)
                   : indicator === 'LANDCOVER'
                     ? landcoverToggleLabel(mapbiomasLayers.LANDCOVER?.layer)
-                    : INDICATOR_LABELS[indicator] || indicator}
+                    : INDICATOR_LABELS[indicator] || CLIMATE_SCALES[indicator]?.label || indicator}
               </span>
             </label>
-          ))}
-          {/* Opt-in climate layers (DEC-B): off by default, each with its own
-              color scale (DEC-A) rendered as a comuna choropleth. */}
-          {CLIMATE_INDICATORS.map((indicator) => (
-            <label key={indicator} className="territory-toggle" title={INDICATOR_FULL_LABELS[indicator] || indicator}>
-              <input
-                type="checkbox"
-                aria-label={INDICATOR_FULL_LABELS[indicator] || indicator}
-                checked={visibleIndicators.includes(indicator)}
-                onChange={() => toggleIndicator(indicator)}
-              />
-              <span>{INDICATOR_LABELS[indicator] || CLIMATE_SCALES[indicator]?.label || indicator}</span>
-            </label>
-          ))}
-        </div>
+          )}
+        />
 
         <div className="territory-control-actions">
           <button
