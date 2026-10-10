@@ -44,7 +44,7 @@ function TerritoryContent({ isAuthenticated }) {
     <>
       <section className="page-container territory-page">
         <SectionTitle
-          title="Monitorizacion territorial"
+          title="Monitorización territorial"
         />
 
         <TerritoryMapPanel
