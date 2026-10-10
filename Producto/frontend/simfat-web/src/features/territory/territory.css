@@ -569,8 +569,11 @@
 
 .regional-summary-detail {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 6px 16px;
+  /* Columns hug their content and pack to the left; 1fr tracks spread the top
+     comunas list to the middle of a wide panel. */
+  grid-template-columns: repeat(auto-fit, minmax(180px, max-content));
+  justify-content: start;
+  gap: 6px 32px;
 }
 
 .regional-summary-detail[hidden] {
