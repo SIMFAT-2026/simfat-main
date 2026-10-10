@@ -3,6 +3,7 @@ import { LANDCOVER_CLASSES, landcoverColorFor } from '../constants/landcoverClas
 import { NEUTRAL_FILL } from '../constants/colorScales';
 import {
   burnedTooltipLines,
+  formatShareAsPercent,
   hasLandcoverData,
   landcoverLegendClasses,
   landcoverLegendNote,
@@ -93,7 +94,7 @@ describe('landcoverLegendNote', () => {
 
 describe('landcoverLineFor', () => {
   it('builds the dominant-cover line for the risk tooltip', () => {
-    expect(landcoverLineFor(entry(9, 'Silvicultura', 0.6), 2024)).toBe('Cobertura 2024: Silvicultura 60,00 %');
+    expect(landcoverLineFor(entry(9, 'Silvicultura', 0.6), 2024)).toBe('Cobertura 2024: Silvicultura 60 %');
   });
 
   it('omits the percentage when the share is missing', () => {
@@ -118,13 +119,13 @@ describe('landcoverTooltipLines', () => {
     { code: 15, label: 'Pastura', share: 0.05 }
   ];
 
-  it('shows comuna, year and at most the top 3 classes with truncated percentages', () => {
+  it('shows comuna, year and at most the top 3 classes with whole percentages', () => {
     expect(landcoverTooltipLines({ nombre: 'Tomé', year: 2024, entry: entry(9, 'Silvicultura', 0.6, top) })).toEqual([
       'Tomé',
       'Cobertura 2024',
-      'Silvicultura: 60,00 %',
-      'Matorral: 24,99 %',
-      'Pastizal: 10,00 %'
+      'Silvicultura: 60 %',
+      'Matorral: 25 %',
+      'Pastizal: 10 %'
     ]);
   });
 
@@ -138,7 +139,7 @@ describe('landcoverTooltipLines', () => {
     expect(landcoverTooltipLines({ nombre: 'Tomé', year: 2024, entry: entry(9, 'Silvicultura', 0.6, odd) })).toEqual([
       'Tomé',
       'Cobertura 2024',
-      'Pastizal: 10,00 %'
+      'Pastizal: 10 %'
     ]);
   });
 
@@ -146,13 +147,13 @@ describe('landcoverTooltipLines', () => {
     expect(landcoverTooltipLines({ nombre: 'Tomé', year: 2024, entry: entry(9, 'Silvicultura', 0.6, []) })).toEqual([
       'Tomé',
       'Cobertura 2024',
-      'Silvicultura: 60,00 %'
+      'Silvicultura: 60 %'
     ]);
     const filtered = [{ code: 66, label: 'Matorral', share: 0 }];
     expect(landcoverTooltipLines({ nombre: 'Tomé', year: 2024, entry: entry(9, 'Silvicultura', 0.6, filtered) })).toEqual([
       'Tomé',
       'Cobertura 2024',
-      'Silvicultura: 60,00 %'
+      'Silvicultura: 60 %'
     ]);
   });
 
@@ -216,5 +217,24 @@ describe('landcoverToggleLabel', () => {
   it('shows the plain label until a layer is loaded, then the year', () => {
     expect(landcoverToggleLabel(null)).toBe('Cobertura (MapBiomas)');
     expect(landcoverToggleLabel({ year: 2024, values: {} })).toBe('Cobertura (MapBiomas) · 2024');
+  });
+});
+
+describe('formatShareAsPercent', () => {
+  it('rounds land-cover shares to whole percents with a Spanish format', () => {
+    expect(formatShareAsPercent(0.6)).toBe('60 %');
+    expect(formatShareAsPercent(0.3184)).toBe('32 %');
+    expect(formatShareAsPercent(0.2499)).toBe('25 %');
+    expect(formatShareAsPercent(1)).toBe('100 %');
+  });
+
+  it('never shows a present class as 0 %', () => {
+    expect(formatShareAsPercent(0.004)).toBe('< 1 %');
+    expect(formatShareAsPercent(0)).toBe('0 %');
+  });
+
+  it('returns Sin datos for non-numbers', () => {
+    expect(formatShareAsPercent(null)).toBe('Sin datos');
+    expect(formatShareAsPercent(Number.NaN)).toBe('Sin datos');
   });
 });

@@ -1,5 +1,5 @@
 import { LANDCOVER_CLASSES } from '../constants/landcoverClasses';
-import { burnedTooltipText, formatFractionAsPercent } from './mapbiomasLayer';
+import { burnedTooltipText } from './mapbiomasLayer';
 
 // Pure helpers for the yearly MapBiomas LANDCOVER layer (dominant class per comuna).
 
@@ -18,6 +18,19 @@ export function hasLandcoverData(entry) {
 }
 
 const hasDominant = hasLandcoverData;
+
+// Land-cover shares read as whole percents (no legend bins to protect, unlike
+// BURNED). A present class never reads as 0 %.
+export function formatShareAsPercent(fraction) {
+  if (!isNumber(fraction)) {
+    return 'Sin datos';
+  }
+  const percent = Math.round(fraction * 100);
+  if (percent === 0 && fraction > 0) {
+    return '< 1 %';
+  }
+  return `${percent} %`;
+}
 
 function dominantLabelOf(entry) {
   return entry.dominantLabel || LANDCOVER_CLASSES[entry.dominantClass].label;
@@ -68,12 +81,12 @@ export function landcoverLineFor(entry, year) {
   if (!hasDominant(entry)) {
     return NO_DATA_LINE;
   }
-  const share = isNumber(entry.dominantShare) ? ` ${formatFractionAsPercent(entry.dominantShare)}` : '';
+  const share = isNumber(entry.dominantShare) ? ` ${formatShareAsPercent(entry.dominantShare)}` : '';
   return `Cobertura ${year}: ${dominantLabelOf(entry)}${share}`;
 }
 
 // Tooltip lines (one per row) for one comuna of the LANDCOVER choropleth: name,
-// year and the top 3 classes with truncated percentages.
+// year and the top 3 classes with whole percentages.
 export function landcoverTooltipLines({ nombre, year, entry }) {
   if (!hasDominant(entry)) {
     return [nombre, `${NO_DATA_LINE} en ${year}`];
@@ -81,9 +94,9 @@ export function landcoverTooltipLines({ nombre, year, entry }) {
   const top = (Array.isArray(entry.top) ? entry.top : [])
     .filter((item) => typeof item?.label === 'string' && item.label && isNumber(item.share) && item.share > 0)
     .slice(0, 3)
-    .map((item) => `${item.label}: ${formatFractionAsPercent(item.share)}`);
+    .map((item) => `${item.label}: ${formatShareAsPercent(item.share)}`);
   if (top.length === 0) {
-    const share = isNumber(entry.dominantShare) ? `: ${formatFractionAsPercent(entry.dominantShare)}` : '';
+    const share = isNumber(entry.dominantShare) ? `: ${formatShareAsPercent(entry.dominantShare)}` : '';
     top.push(`${dominantLabelOf(entry)}${share}`);
   }
   return [nombre, `Cobertura ${year}`, ...top];
