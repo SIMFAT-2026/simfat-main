@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import L from 'leaflet';
 import ComunaRiskPanel from './ComunaRiskPanel';
 import ComunaMapbiomasSection from './ComunaMapbiomasSection';
-import { panelYear } from '../utils/comunaMapbiomas';
+import { comunaPanelOrigin, panelYear } from '../utils/comunaMapbiomas';
 import { GeoJSON, MapContainer, Marker, Pane, TileLayer, Tooltip, useMap } from 'react-leaflet';
 import marker2x from 'leaflet/dist/images/marker-icon-2x.png';
 import markerIcon from 'leaflet/dist/images/marker-icon.png';
@@ -1441,6 +1441,8 @@ function TerritoryMapPanel({
             <ComunaRiskPanel
               key={selectedComuna.comunaId}
               comunaId={selectedComuna.comunaId}
+              comunaName={selectedComuna.nombre}
+              openedFrom={comunaPanelOrigin(mapbiomasOwnerId)}
               score={effectiveComunalScores?.[selectedComuna.comunaId] || selectedComuna.score}
               regionId={selectedRegionId}
               onClose={() => setSelectedComuna(null)}
