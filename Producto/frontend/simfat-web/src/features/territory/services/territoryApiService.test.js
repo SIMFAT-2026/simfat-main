@@ -5,7 +5,7 @@ const { authGet, publicGet } = vi.hoisted(() => ({ authGet: vi.fn(), publicGet: 
 vi.mock('../../../api/axiosClient', () => ({ default: { get: authGet } }));
 vi.mock('../../../api/publicAxiosClient', () => ({ default: { get: publicGet } }));
 
-import { fetchMapbiomasLayer } from './territoryApiService';
+import { fetchComunaMapbiomas, fetchMapbiomasLayer } from './territoryApiService';
 
 const burned = {
   indicator: 'BURNED',
@@ -63,5 +63,28 @@ describe('fetchMapbiomasLayer', () => {
     await expect(fetchMapbiomasLayer('WIND', { regionId: 'CL-BI' })).rejects.toThrow(/MapBiomas/);
     expect(authGet).not.toHaveBeenCalled();
     expect(publicGet).not.toHaveBeenCalled();
+  });
+});
+
+describe('fetchComunaMapbiomas', () => {
+  const detail = { comunaId: 'CHL.6.1.1_1', landCover: { available: true } };
+
+  it('reads the public detail route with the tokenless client and the year', async () => {
+    publicGet.mockResolvedValue({ data: { success: true, data: detail } });
+    const signal = new AbortController().signal;
+    const result = await fetchComunaMapbiomas('CHL.6.1.1_1', { year: 2020, signal });
+    expect(authGet).not.toHaveBeenCalled();
+    expect(publicGet).toHaveBeenCalledWith('/api/territory/public/mapbiomas/CHL.6.1.1_1', {
+      params: { year: 2020 },
+      signal
+    });
+    expect(result).toEqual(detail);
+  });
+
+  it('omits the year param when not chosen and encodes the id', async () => {
+    publicGet.mockResolvedValue({ data: { data: detail } });
+    await fetchComunaMapbiomas('a/b');
+    expect(publicGet.mock.calls[0][0]).toBe('/api/territory/public/mapbiomas/a%2Fb');
+    expect(publicGet.mock.calls[0][1].params).toEqual({});
   });
 });
