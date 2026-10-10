@@ -1138,7 +1138,7 @@ function TerritoryMapPanel({
       <div className="filter-bar territory-controls">
         <h3 className="territory-controls-title">Mapa territorial interactivo</h3>
         <label>
-          Region
+          Región
           <select value={selectedRegionId} onChange={(event) => setSelectedRegionId(event.target.value)}>
             {regionOptions.map((region) => (
               <option key={region.id} value={region.id}>
