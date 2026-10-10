@@ -57,7 +57,7 @@ function CriticalRegionsTable({ data, loading, error, onRetry }: CriticalRegions
           <table className="data-table">
             <thead>
               <tr>
-                <th>Region</th>
+                <th>Región</th>
                 <th>Criticidad</th>
                 <th>Ha perdidas</th>
                 <th>Alertas</th>

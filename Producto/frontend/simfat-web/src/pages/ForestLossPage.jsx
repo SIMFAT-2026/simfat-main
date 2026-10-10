@@ -90,7 +90,7 @@ function ForestLossPage() {
 
   const columns = useMemo(
     () => [
-      { key: 'regionId', header: 'Region', render: (row) => regionMap[row.regionId] || row.regionId },
+      { key: 'regionId', header: 'Región', render: (row) => regionMap[row.regionId] || row.regionId },
       { key: 'anio', header: 'Anio' },
       { key: 'hectareasPerdidas', header: 'Ha perdidas' },
       { key: 'porcentajePerdida', header: '% perdida' },
@@ -199,7 +199,7 @@ function ForestLossPage() {
 
       <form className="form-grid" onSubmit={onSubmit}>
         <label>
-          Region
+          Región
           <select name="regionId" value={form.regionId} onChange={onInputChange} required>
             <option value="">Seleccione una region</option>
             {regions.map((region) => (

@@ -24,9 +24,9 @@ const OPERATIONAL_ALERTS_VISIBLE = 10;
 
 const PERIOD_PRESETS = [
   { key: 'all', label: 'Mostrar todo' },
-  { key: '24h', label: 'Ultimas 24h' },
-  { key: '48h', label: 'Ultimas 48h' },
-  { key: '7d', label: 'Ultima semana' },
+  { key: '24h', label: 'Últimas 24h' },
+  { key: '48h', label: 'Últimas 48h' },
+  { key: '7d', label: 'Última semana' },
   { key: 'custom', label: 'Personalizado' }
 ];
 
@@ -108,7 +108,7 @@ function AlertsReadView({ data, rowActions, onExportCsv, feedback, children }) {
         },
         {
           key: 'regionId',
-          header: 'Region',
+          header: 'Región',
           sortable: true,
           sortValue: (row) => regionMap[row.regionId] || row.regionId,
           render: (row) => regionMap[row.regionId] || row.regionId
@@ -133,7 +133,7 @@ function AlertsReadView({ data, rowActions, onExportCsv, feedback, children }) {
     return [
       {
         key: 'regionId',
-        header: 'Region',
+        header: 'Región',
         sortable: true,
         sortValue: (row) => regionMap[row.regionId] || row.regionId,
         render: (row) => regionMap[row.regionId] || row.regionId
@@ -153,7 +153,7 @@ function AlertsReadView({ data, rowActions, onExportCsv, feedback, children }) {
         render: (row) => <AlertBadge level={row.nivelRiesgo} />
       },
       { key: 'fuente', header: 'Fuente', sortable: true },
-      { key: 'descripcion', header: 'Descripcion' }
+      { key: 'descripcion', header: 'Descripción' }
     ];
   }, [publicMode, regionMap]);
 
