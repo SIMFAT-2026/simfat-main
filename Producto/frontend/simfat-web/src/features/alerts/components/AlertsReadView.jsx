@@ -285,7 +285,7 @@ function AlertsReadView({ data, rowActions, onExportCsv, feedback, children }) {
               <details className="access-help metric-help">
                 <summary>&#9432;</summary>
                 {publicMode ? (
-                  <p>Detecciones y alertas de la region seleccionada dentro del periodo elegido (maximo 90 dias y 1000 eventos, los mas recientes primero).</p>
+                  <p>Detecciones y alertas de la región seleccionada dentro del período elegido (máximo 90 días y 1000 eventos, los más recientes primero).</p>
                 ) : (
                   <p>Total de eventos de alerta que coinciden con los filtros activos. Incluye detecciones FIRMS y alertas creadas manualmente. Sin filtros, muestra el historico completo.</p>
                 )}

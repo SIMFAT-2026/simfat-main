@@ -247,7 +247,7 @@ function ForestLossPage() {
           </button>
           {editingId ? (
             <button type="button" className="btn btn-secondary" onClick={resetForm}>
-              Cancelar edicion
+              Cancelar edición
             </button>
           ) : null}
         </div>

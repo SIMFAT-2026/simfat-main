@@ -224,7 +224,7 @@ function AuthenticatedAlerts() {
           <div className="form-actions">
             <button className="btn" type="submit">Actualizar</button>
             <button type="button" className="btn btn-secondary" onClick={resetForm}>
-              Cancelar edicion
+              Cancelar edición
             </button>
           </div>
         </form>

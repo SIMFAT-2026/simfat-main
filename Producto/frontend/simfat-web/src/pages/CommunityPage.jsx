@@ -703,7 +703,7 @@ function CommunityPage() {
 
               <div className="community-editor-row">
                 <label>
-                  Categoria
+                  Categoría
                   <select name="category" value={resourceForm.category} onChange={handleResourceInput}>
                     {RESOURCE_CATEGORIES.map((category) => (
                       <option key={category} value={category}>
@@ -750,7 +750,7 @@ function CommunityPage() {
               </label>
 
               <label>
-                Descripcion
+                Descripción
                 <textarea
                   name="description"
                   rows={4}

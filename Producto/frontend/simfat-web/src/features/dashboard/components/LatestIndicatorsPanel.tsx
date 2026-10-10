@@ -80,7 +80,7 @@ function LatestIndicatorsPanel({
         error={error}
         isEmpty={!data}
         emptyTitle="Sin lectura reciente"
-        emptyDescription="Aun no tenemos un valor reciente para la region seleccionada."
+        emptyDescription="Aún no tenemos un valor reciente para la región seleccionada."
         onRetry={onRetry}
       >
         <div className="latest-indicator-grid">

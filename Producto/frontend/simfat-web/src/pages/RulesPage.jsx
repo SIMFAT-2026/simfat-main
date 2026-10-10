@@ -279,7 +279,7 @@ function RulesPage() {
               <li><strong>Logica OR:</strong> si cualquiera de los umbrales configurados se supera, la regla se activa.</li>
               <li><strong>Alcance:</strong> una regla puede aplicar a una región específica o a todas (Global).</li>
               <li><strong>Activa / Inactiva:</strong> las reglas inactivas no generan alertas aunque se cumplan los umbrales.</li>
-              <li><strong>Umbrales opcionales:</strong> deja en blanco los que no quieras usar. Solo se evaluan los que tienen valor.</li>
+              <li><strong>Umbrales opcionales:</strong> deja en blanco los que no quieras usar. Solo se evalúan los que tienen valor.</li>
             </ul>
           </details>
         </div>
@@ -306,7 +306,7 @@ function RulesPage() {
             </label>
 
             <label>
-              <FieldLabel tooltip="Global aplica la regla a todas las regiones monitoreadas. Si eliges una región específica, solo se evalua para ella.">
+              <FieldLabel tooltip="Global aplica la regla a todas las regiones monitoreadas. Si eliges una región específica, solo se evalúa para ella.">
                 Región (opcional)
               </FieldLabel>
               <select name="regionId" value={form.regionId} onChange={onInputChange}>
@@ -374,7 +374,7 @@ function RulesPage() {
             </label>
 
             <label>
-              <FieldLabel tooltip="Si está Inactiva, la regla no se evalua en los ciclos de scoring y no genera alertas aunque se superen los umbrales. Útil para desactivar temporalmente sin eliminar la configuración.">
+              <FieldLabel tooltip="Si está Inactiva, la regla no se evalúa en los ciclos de scoring y no genera alertas aunque se superen los umbrales. Útil para desactivar temporalmente sin eliminar la configuración.">
                 Activa
               </FieldLabel>
               <select name="activa" value={form.activa} onChange={onInputChange}>
