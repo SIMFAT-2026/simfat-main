@@ -88,11 +88,12 @@ export function useMapbiomasLayer(indicator, { visible, regionId, publicMode }) 
       range: state.range,
       defaultYear: state.defaultYear,
       layer: matchesRegion ? state.layer : null,
+      stale: matchesRegion && state.stale,
       loading: visible && (!matchesRegion || state.loading),
       error: matchesRegion ? state.error : '',
       setYear,
       retry
     }),
-    [state.selectedYear, state.range, state.defaultYear, state.layer, state.loading, state.error, matchesRegion, visible, setYear, retry]
+    [state.selectedYear, state.range, state.defaultYear, state.layer, state.stale, state.loading, state.error, matchesRegion, visible, setYear, retry]
   );
 }

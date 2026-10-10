@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   YEAR_PAGE_STEP,
   clampYear,
+  controlYear,
   latestYearTarget,
   stepYear,
   yearAnnouncement,
@@ -144,5 +145,20 @@ describe('latestYearTarget', () => {
 
   it('falls back to null when the default year is unknown', () => {
     expect(latestYearTarget(undefined)).toBeNull();
+  });
+});
+
+describe('controlYear', () => {
+  it('shows the loaded layer year when it is the selected one', () => {
+    expect(controlYear({ layer: { year: 2025 }, selectedYear: 2025, stale: false })).toBe(2025);
+  });
+
+  it('shows the selected year, not the displayed layer year, while the layer is stale', () => {
+    expect(controlYear({ layer: { year: 2025 }, selectedYear: 2023, stale: true })).toBe(2023);
+  });
+
+  it('falls back to the selected year without a layer', () => {
+    expect(controlYear({ layer: null, selectedYear: 2023, stale: false })).toBe(2023);
+    expect(controlYear({ layer: null, selectedYear: undefined, stale: false })).toBeUndefined();
   });
 });

@@ -12,7 +12,10 @@ export const initialMapbiomasState = {
   // year control keeps its bounds while another year is loading.
   range: null,
   // Year the backend picked on its own (Q28): what "Último" returns to.
-  defaultYear: undefined
+  defaultYear: undefined,
+  // True while `layer` belongs to a different year than selectedYear (kept on
+  // screen, dimmed, until the requested year arrives).
+  stale: false
 };
 
 function rangeFrom(layer, fallback) {
@@ -44,17 +47,25 @@ export function mapbiomasReducer(state, action) {
       if (!Number.isInteger(action.year) || action.year === state.selectedYear) {
         return state;
       }
+      if (state.layer !== null && state.layer.year === action.year) {
+        // Back to the year already on screen: the hook issues no new request
+        // (its in-flight one is aborted), so settle here instead of staying
+        // stale and loading forever.
+        return { ...state, selectedYear: action.year, stale: false, loading: false };
+      }
       return { ...state, selectedYear: action.year };
     }
     case 'request': {
-      // A loaded layer survives only if it is exactly the region and year being
-      // requested, so data for one year is never shown under another.
-      const keepLayer =
-        state.layer !== null && state.regionId === action.regionId && state.layer.year === state.selectedYear;
+      // A loaded layer survives within the same region only (never across
+      // regions). If it is for another year than the one requested it is kept
+      // as `stale`: consumers must derive every label from layer.year, so
+      // nothing claims the new year before its data arrives.
+      const keepLayer = state.layer !== null && state.regionId === action.regionId;
       return {
         ...state,
         regionId: action.regionId,
         layer: keepLayer ? state.layer : null,
+        stale: keepLayer && state.layer.year !== state.selectedYear,
         loading: true,
         error: ''
       };
@@ -64,7 +75,7 @@ export function mapbiomasReducer(state, action) {
         return state;
       }
       if (!action.layer) {
-        return { ...state, layer: null, loading: false, error: MISSING_LAYER_MESSAGE };
+        return { ...state, layer: null, stale: false, loading: false, error: MISSING_LAYER_MESSAGE };
       }
       return {
         ...state,
@@ -75,6 +86,7 @@ export function mapbiomasReducer(state, action) {
           action.requestedYear === undefined && Number.isInteger(action.layer.year)
             ? action.layer.year
             : state.defaultYear,
+        stale: false,
         loading: false,
         error: ''
       };
@@ -83,7 +95,7 @@ export function mapbiomasReducer(state, action) {
       if (!isCurrentRequest(state, action)) {
         return state;
       }
-      return { ...state, layer: null, loading: false, error: LOAD_ERROR_MESSAGES[action.indicator] || LOAD_ERROR_MESSAGE };
+      return { ...state, layer: null, stale: false, loading: false, error: LOAD_ERROR_MESSAGES[action.indicator] || LOAD_ERROR_MESSAGE };
     }
     default:
       return state;

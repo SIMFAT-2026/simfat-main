@@ -24,6 +24,7 @@ import {
 import { burnedTooltipLines, landcoverLineFor, landcoverToggleLabel } from '../utils/landcoverLayer';
 import { burnedLegendNote, burnedLineFor, burnedToggleLabel, mapbiomasOwner } from '../utils/mapbiomasLayer';
 import { CLIMATE_INDICATORS } from '../constants/indicators';
+import { burnedFillOpacity } from '../utils/mapbiomasStyle';
 import LayerToggleGroups from './LayerToggleGroups';
 import MapbiomasYearControl from './MapbiomasYearControl';
 import { LandcoverChoropleth, LandcoverLegend } from './LandcoverLayer';
@@ -215,9 +216,9 @@ const ClimateChoropleth = memo(function ClimateChoropleth({ geoJson, indicator, 
   );
 });
 
-// Renders the yearly MapBiomas BURNED layer as a comuna choropleth. Unlike the
-// live layers it is keyed on the layer year, so loading another year rebuilds
-// the polygons and restyles them. While the layer is not loaded (loading or
+// Renders the yearly MapBiomas BURNED layer as a comuna choropleth. Another
+// year restyles the same polygons (style and tooltip read the latest layer
+// through refs), and `stale` dims the previous year while the new one loads. While the layer is not loaded (loading or
 // failed) every comuna is neutral and the tooltip says why.
 // When `interactive` is false (RISK_SCORE is visible) the polygons take no
 // pointer events, so hover and click fall through to the risk layer below, which
@@ -232,6 +233,7 @@ const BurnedChoropleth = memo(function BurnedChoropleth({
   landcoverLayer = null,
   interactive = true,
   emphasizeOutline = false,
+  stale = false,
   onComunaClick
 }) {
   const layerRef = useRef(layer);
@@ -245,7 +247,7 @@ const BurnedChoropleth = memo(function BurnedChoropleth({
 
   return (
     <GeoJSON
-      key={`burned-${layer?.year ?? 'none'}-${interactive ? 'i' : 'n'}-${emphasizeOutline ? 'e' : 'p'}`}
+      key={`burned-${interactive ? 'i' : 'n'}-${emphasizeOutline ? 'e' : 'p'}`}
       pane="burned-layer-pane"
       interactive={interactive}
       data={geoJson}
@@ -254,7 +256,7 @@ const BurnedChoropleth = memo(function BurnedChoropleth({
         const entry = layerRef.current?.values?.[comunaId];
         return {
           fillColor: burnedColorFor(entry),
-          fillOpacity: entry?.available === true ? 0.55 : 0.12,
+          fillOpacity: burnedFillOpacity({ hasData: entry?.available === true, stale }),
           color: '#334155',
           weight: emphasizeOutline && !entry ? 1.6 : 0.8,
           opacity: emphasizeOutline && !entry ? 0.95 : 0.7
@@ -1163,6 +1165,10 @@ function TerritoryMapPanel({
   }, [selectedComuna]);
 
   const mapbiomasOwnerId = mapbiomasOwner(visibleIndicators);
+  // A previous-year MapBiomas layer is still on screen while a new year loads.
+  const mapStale = MAPBIOMAS_YEAR_CONTROLS.some(
+    ({ indicator }) => visibleIndicators.includes(indicator) && mapbiomasLayers[indicator]?.stale
+  );
 
   return (
     <article className="dashboard-card territory-map-card">
@@ -1268,7 +1274,7 @@ function TerritoryMapPanel({
       ) : null}
 
       {!loading && !error && regionData ? (
-        <div className="territory-map-wrapper">
+        <div className="territory-map-wrapper" aria-busy={mapStale}>
           <MapContainer
             key={regionData.regionId}
             className="territory-map"
@@ -1309,6 +1315,7 @@ function TerritoryMapPanel({
                   loading={Boolean(mapbiomasLayers.LANDCOVER?.loading)}
                   interactive={mapbiomasOwnerId === 'LANDCOVER'}
                   riskVisible={visibleIndicators.includes('RISK_SCORE')}
+                  stale={Boolean(mapbiomasLayers.LANDCOVER?.stale)}
                   onComunaClick={handleComunaClick}
                   emphasizeOutline={!mapbiomasLayers.LANDCOVER?.layer && visibleIndicators.every((indicator) => indicator === 'LANDCOVER')}
                 />
@@ -1324,6 +1331,7 @@ function TerritoryMapPanel({
                   loading={Boolean(mapbiomasLayers.BURNED?.loading)}
                   landcoverLayer={visibleIndicators.includes('LANDCOVER') ? (mapbiomasLayers.LANDCOVER?.layer ?? null) : null}
                   interactive={mapbiomasOwnerId === 'BURNED'}
+                  stale={Boolean(mapbiomasLayers.BURNED?.stale)}
                   onComunaClick={handleComunaClick}
                   emphasizeOutline={!mapbiomasLayers.BURNED?.layer && visibleIndicators.every((indicator) => indicator === 'BURNED')}
                 />

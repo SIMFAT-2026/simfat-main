@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import {
+  controlYear,
   latestYearTarget,
   yearAnnouncement,
   yearControlLabel,
@@ -17,7 +18,9 @@ const SLIDER_COMMIT_DELAY_MS = 200;
 // loading, setYear }. Buttons and the mobile <select> commit immediately.
 function MapbiomasYearControl({ label, state }) {
   const { range, defaultYear, layer, loading, setYear } = state;
-  const loadedYear = layer?.year ?? state.selectedYear;
+  // While a stale (previous year) layer is shown, the control follows the
+  // year being loaded, not the year of the visible polygons.
+  const loadedYear = controlYear({ layer, selectedYear: state.selectedYear, stale: state.stale });
   const baseId = useId();
   const [draft, setDraft] = useState(loadedYear);
   // While a new year loads there is no layer yet: show the year being fetched.
