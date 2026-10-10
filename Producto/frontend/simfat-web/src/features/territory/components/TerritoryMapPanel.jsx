@@ -19,8 +19,8 @@ import {
   VEGETATION_SCALES,
   burnedColorFor
 } from '../constants/colorScales';
-import { landcoverLineFor, landcoverToggleLabel } from '../utils/landcoverLayer';
-import { burnedLegendNote, burnedLineFor, burnedToggleLabel, burnedTooltipText } from '../utils/mapbiomasLayer';
+import { burnedTooltipLines, landcoverLineFor, landcoverToggleLabel } from '../utils/landcoverLayer';
+import { burnedLegendNote, burnedLineFor, burnedToggleLabel, mapbiomasOwner } from '../utils/mapbiomasLayer';
 import { CLIMATE_INDICATORS } from '../constants/indicators';
 import MapbiomasYearControl from './MapbiomasYearControl';
 import { LandcoverChoropleth, LandcoverLegend } from './LandcoverLayer';
@@ -218,12 +218,15 @@ const ClimateChoropleth = memo(function ClimateChoropleth({ geoJson, indicator, 
 // failed) every comuna is neutral and the tooltip says why.
 // When `interactive` is false (RISK_SCORE is visible) the polygons take no
 // pointer events, so hover and click fall through to the risk layer below, which
-// shows the burned line in its own tooltip. `emphasizeOutline` thickens the
-// neutral outline while the layer is the only thing on the map and not loaded.
+// shows the burned line in its own tooltip. When it owns hover (no RISK_SCORE)
+// and LANDCOVER is visible and loaded, `landcoverLayer` adds the cover line to
+// its tooltip. `emphasizeOutline` thickens the neutral outline while the layer
+// is the only thing on the map and not loaded.
 const BurnedChoropleth = memo(function BurnedChoropleth({
   geoJson,
   layer,
   loading,
+  landcoverLayer = null,
   interactive = true,
   emphasizeOutline = false
 }) {
@@ -231,6 +234,8 @@ const BurnedChoropleth = memo(function BurnedChoropleth({
   layerRef.current = layer;
   const loadingRef = useRef(loading);
   loadingRef.current = loading;
+  const landcoverRef = useRef(landcoverLayer);
+  landcoverRef.current = landcoverLayer;
 
   if (!geoJson || !geoJson.features) return null;
 
@@ -262,9 +267,25 @@ const BurnedChoropleth = memo(function BurnedChoropleth({
             layerGeo.setTooltipContent(`${nombre}: ${loadingRef.current ? 'Cargando…' : 'Sin datos de Fuego'}`);
             return;
           }
-          layerGeo.setTooltipContent(
-            burnedTooltipText({ nombre, year: current.year, entry: current.values?.[comunaId] })
-          );
+          const cover = landcoverRef.current;
+          const lines = burnedTooltipLines({
+            nombre,
+            year: current.year,
+            entry: current.values?.[comunaId],
+            landcoverLine: cover ? landcoverLineFor(cover.values?.[comunaId], cover.year) : ''
+          });
+          if (lines.length === 1) {
+            layerGeo.setTooltipContent(lines[0]);
+            return;
+          }
+          // Several rows: build a DOM node so names and labels are never read as markup.
+          const root = document.createElement('div');
+          lines.forEach((line) => {
+            const row = document.createElement('div');
+            row.textContent = line;
+            root.appendChild(row);
+          });
+          layerGeo.setTooltipContent(root);
         });
       }}
     />
@@ -990,8 +1011,8 @@ function ComunaTooltip({ comunaId, nombre, score, pos, burnedLine = '', landcove
           ))}
         </div>
       )}
-      {burnedLine && <div className="comuna-tooltip-burned">{burnedLine}</div>}
-      {landcoverLine && <div className="comuna-tooltip-burned">{landcoverLine}</div>}
+      {burnedLine && <div className="comuna-tooltip-context-line">{burnedLine}</div>}
+      {landcoverLine && <div className="comuna-tooltip-context-line">{landcoverLine}</div>}
     </div>
   );
 }
@@ -1136,6 +1157,8 @@ function TerritoryMapPanel({
     setSelectedComuna((prev) => prev ? { ...prev, score: updatedScore } : null);
   }, [selectedComuna]);
 
+  const mapbiomasOwnerId = mapbiomasOwner(visibleIndicators);
+
   return (
     <article className="dashboard-card territory-map-card">
       {/* Persistent region-level risk breakdown panel: always visible when
@@ -1278,10 +1301,12 @@ function TerritoryMapPanel({
               )}
             </Pane>
 
-            {/* Stacking of the MapBiomas layers: LANDCOVER (412) is the base, BURNED
-                (415) sits above it, RISK_SCORE (410) below both. Only the topmost
-                of these is interactive: RISK_SCORE when visible, else BURNED, else
-                LANDCOVER. The others show their data as a line in that tooltip. */}
+            {/* Stacking of the MapBiomas layers: RISK_SCORE (410) sits below LANDCOVER
+                (412) and BURNED (415) yet owns hover and click when visible. Owner
+                precedence (mapbiomasOwner): RISK_SCORE > BURNED > LANDCOVER. Only
+                the owner is interactive; the others take no pointer events and
+                their data shows as extra lines in the owner's tooltip (the risk
+                tooltip, or the BURNED tooltip for LANDCOVER). */}
             <Pane name="landcover-layer-pane" style={{ zIndex: 412 }}>
               {comunalGeoJson && visibleIndicators.includes('LANDCOVER') && (
                 <LandcoverChoropleth
@@ -1289,7 +1314,7 @@ function TerritoryMapPanel({
                   geoJson={comunalGeoJson}
                   layer={mapbiomasLayers.LANDCOVER?.layer}
                   loading={Boolean(mapbiomasLayers.LANDCOVER?.loading)}
-                  interactive={!visibleIndicators.includes('RISK_SCORE') && !visibleIndicators.includes('BURNED')}
+                  interactive={mapbiomasOwnerId === 'LANDCOVER'}
                   emphasizeOutline={!mapbiomasLayers.LANDCOVER?.layer && visibleIndicators.every((indicator) => indicator === 'LANDCOVER')}
                 />
               )}
@@ -1302,7 +1327,8 @@ function TerritoryMapPanel({
                   geoJson={comunalGeoJson}
                   layer={mapbiomasLayers.BURNED?.layer}
                   loading={Boolean(mapbiomasLayers.BURNED?.loading)}
-                  interactive={!visibleIndicators.includes('RISK_SCORE')}
+                  landcoverLayer={visibleIndicators.includes('LANDCOVER') ? (mapbiomasLayers.LANDCOVER?.layer ?? null) : null}
+                  interactive={mapbiomasOwnerId === 'BURNED'}
                   emphasizeOutline={!mapbiomasLayers.BURNED?.layer && visibleIndicators.every((indicator) => indicator === 'BURNED')}
                 />
               )}

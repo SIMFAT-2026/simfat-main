@@ -7,7 +7,8 @@ import {
   burnedToggleLabel,
   burnedTooltipText,
   formatFractionAsPercent,
-  mapbiomasCacheKey
+  mapbiomasCacheKey,
+  mapbiomasOwner
 } from './mapbiomasLayer';
 
 describe('formatFractionAsPercent', () => {
@@ -249,5 +250,28 @@ describe('burnedToggleLabel', () => {
 
   it('appends the loaded year', () => {
     expect(burnedToggleLabel({ year: 2025, values: {} })).toBe('Área quemada (MapBiomas) · 2025');
+  });
+});
+
+describe('mapbiomasOwner', () => {
+  const cases = [
+    [[], null],
+    [['LANDCOVER'], 'LANDCOVER'],
+    [['BURNED'], 'BURNED'],
+    [['BURNED', 'LANDCOVER'], 'BURNED'],
+    [['RISK_SCORE'], 'RISK_SCORE'],
+    [['RISK_SCORE', 'LANDCOVER'], 'RISK_SCORE'],
+    [['RISK_SCORE', 'BURNED'], 'RISK_SCORE'],
+    [['LANDCOVER', 'BURNED', 'RISK_SCORE'], 'RISK_SCORE']
+  ];
+
+  it.each(cases)('visible %j -> owner %s', (visible, owner) => {
+    expect(mapbiomasOwner(visible)).toBe(owner);
+  });
+
+  it('ignores unrelated indicators and tolerates a missing list', () => {
+    expect(mapbiomasOwner(['NDVI', 'FIRMS'])).toBeNull();
+    expect(mapbiomasOwner(['NDVI', 'LANDCOVER'])).toBe('LANDCOVER');
+    expect(mapbiomasOwner(undefined)).toBeNull();
   });
 });

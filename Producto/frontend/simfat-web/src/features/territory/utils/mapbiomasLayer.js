@@ -96,6 +96,14 @@ export function burnedTooltipText({ nombre, year, entry }) {
   return `${nombre}: ${burnedLineFor(entry, year)}`;
 }
 
+// Which MapBiomas-related layer owns hover/click: the topmost of RISK_SCORE >
+// BURNED > LANDCOVER among the visible indicators. Layers below the owner take
+// no pointer events; the owner shows their data as extra tooltip lines.
+export function mapbiomasOwner(visibleIndicators) {
+  const visible = Array.isArray(visibleIndicators) ? visibleIndicators : [];
+  return ['RISK_SCORE', 'BURNED', 'LANDCOVER'].find((indicator) => visible.includes(indicator)) ?? null;
+}
+
 // Toggle label: keeps the year visible once a layer is loaded, since the legend
 // is replaced by the comuna panel when a comuna is selected.
 export function burnedToggleLabel(layer) {

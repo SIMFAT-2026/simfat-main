@@ -1,5 +1,5 @@
 import { LANDCOVER_CLASSES } from '../constants/landcoverClasses';
-import { formatFractionAsPercent } from './mapbiomasLayer';
+import { burnedTooltipText, formatFractionAsPercent } from './mapbiomasLayer';
 
 // Pure helpers for the yearly MapBiomas LANDCOVER layer (dominant class per comuna).
 
@@ -9,13 +9,18 @@ function isNumber(value) {
   return typeof value === 'number' && Number.isFinite(value);
 }
 
-// The payload label is authoritative; the official palette is only a fallback.
-function hasDominant(entry) {
-  return (
-    entry?.available === true &&
-    Boolean(LANDCOVER_CLASSES[entry.dominantClass]) &&
-    typeof (entry.dominantLabel || LANDCOVER_CLASSES[entry.dominantClass].label) === 'string'
-  );
+// The single "has data" predicate of the LANDCOVER layer: available AND a
+// dominant class from the official palette. It decides colour, opacity, legend
+// counts, notes and tooltips. The payload label is authoritative; the palette
+// label is only a fallback.
+export function hasLandcoverData(entry) {
+  return entry?.available === true && Boolean(LANDCOVER_CLASSES[entry.dominantClass]);
+}
+
+const hasDominant = hasLandcoverData;
+
+function dominantLabelOf(entry) {
+  return entry.dominantLabel || LANDCOVER_CLASSES[entry.dominantClass].label;
 }
 
 // Classes present among the comunas of the layer, most frequent first, so the
@@ -26,7 +31,7 @@ export function landcoverLegendClasses(layer) {
   Object.values(layer?.values || {}).forEach((entry) => {
     if (!hasDominant(entry)) return;
     counts.set(entry.dominantClass, (counts.get(entry.dominantClass) || 0) + 1);
-    labels.set(entry.dominantClass, entry.dominantLabel || LANDCOVER_CLASSES[entry.dominantClass].label);
+    labels.set(entry.dominantClass, dominantLabelOf(entry));
   });
   return [...counts.entries()]
     .map(([code, count]) => ({
@@ -60,24 +65,36 @@ export function landcoverLegendNote(layer, { hasYearControl = false } = {}) {
 
 // Dominant-cover sentence for one comuna, without its name (risk tooltip line).
 export function landcoverLineFor(entry, year) {
-  if (!hasDominant(entry) || !isNumber(entry.dominantShare)) {
+  if (!hasDominant(entry)) {
     return NO_DATA_LINE;
   }
-  const label = entry.dominantLabel || LANDCOVER_CLASSES[entry.dominantClass].label;
-  return `Cobertura ${year}: ${label} ${formatFractionAsPercent(entry.dominantShare)}`;
+  const share = isNumber(entry.dominantShare) ? ` ${formatFractionAsPercent(entry.dominantShare)}` : '';
+  return `Cobertura ${year}: ${dominantLabelOf(entry)}${share}`;
 }
 
 // Tooltip lines (one per row) for one comuna of the LANDCOVER choropleth: name,
 // year and the top 3 classes with truncated percentages.
 export function landcoverTooltipLines({ nombre, year, entry }) {
-  if (entry?.available !== true) {
+  if (!hasDominant(entry)) {
     return [nombre, `${NO_DATA_LINE} en ${year}`];
   }
   const top = (Array.isArray(entry.top) ? entry.top : [])
-    .filter((item) => typeof item?.label === 'string' && item.label && isNumber(item.share) && item.share >= 0)
+    .filter((item) => typeof item?.label === 'string' && item.label && isNumber(item.share) && item.share > 0)
     .slice(0, 3)
     .map((item) => `${item.label}: ${formatFractionAsPercent(item.share)}`);
+  if (top.length === 0) {
+    const share = isNumber(entry.dominantShare) ? `: ${formatFractionAsPercent(entry.dominantShare)}` : '';
+    top.push(`${dominantLabelOf(entry)}${share}`);
+  }
   return [nombre, `Cobertura ${year}`, ...top];
+}
+
+// Rows of the BURNED tooltip. BURNED owns hover when RISK_SCORE is off, so the
+// LANDCOVER line (if any) is appended; without it this is just the burned text.
+export function burnedTooltipLines({ nombre, year, entry, landcoverLine = '' }) {
+  const lines = [burnedTooltipText({ nombre, year, entry })];
+  if (landcoverLine) lines.push(landcoverLine);
+  return lines;
 }
 
 export function landcoverToggleLabel(layer) {

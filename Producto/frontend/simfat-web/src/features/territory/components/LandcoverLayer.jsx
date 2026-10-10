@@ -2,7 +2,12 @@ import { memo, useRef } from 'react';
 import { GeoJSON } from 'react-leaflet';
 import { NEUTRAL_FILL } from '../constants/colorScales';
 import { landcoverColorFor } from '../constants/landcoverClasses';
-import { landcoverLegendClasses, landcoverLegendNote, landcoverTooltipLines } from '../utils/landcoverLayer';
+import {
+  hasLandcoverData,
+  landcoverLegendClasses,
+  landcoverLegendNote,
+  landcoverTooltipLines
+} from '../utils/landcoverLayer';
 
 // Leaflet renders string tooltips as HTML, so build a DOM node with textContent:
 // comuna names and labels can never be interpreted as markup.
@@ -49,7 +54,7 @@ export const LandcoverChoropleth = memo(function LandcoverChoropleth({
         const entry = layerRef.current?.values?.[comunaId];
         return {
           fillColor: landcoverColorFor(entry),
-          fillOpacity: entry?.available === true ? 0.6 : 0.12,
+          fillOpacity: hasLandcoverData(entry) ? 0.6 : 0.12,
           color: '#334155',
           weight: emphasizeOutline && !entry ? 1.6 : 0.8,
           opacity: emphasizeOutline && !entry ? 0.95 : 0.7

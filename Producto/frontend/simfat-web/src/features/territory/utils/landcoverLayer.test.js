@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { LANDCOVER_CLASSES, landcoverColorFor } from '../constants/landcoverClasses';
 import { NEUTRAL_FILL } from '../constants/colorScales';
 import {
+  burnedTooltipLines,
+  hasLandcoverData,
   landcoverLegendClasses,
   landcoverLegendNote,
   landcoverLineFor,
@@ -94,10 +96,15 @@ describe('landcoverLineFor', () => {
     expect(landcoverLineFor(entry(9, 'Silvicultura', 0.6), 2024)).toBe('Cobertura 2024: Silvicultura 60,00 %');
   });
 
+  it('omits the percentage when the share is missing', () => {
+    expect(landcoverLineFor(entry(9, 'Silvicultura', null), 2024)).toBe('Cobertura 2024: Silvicultura');
+    expect(landcoverLineFor({ available: true, dominantClass: 9 }, 2024)).toBe('Cobertura 2024: Silvicultura');
+  });
+
   it('says there is no data when unavailable, missing or incomplete', () => {
     expect(landcoverLineFor(NO_DATA, 2024)).toBe('Sin datos de cobertura');
     expect(landcoverLineFor(undefined, 2024)).toBe('Sin datos de cobertura');
-    expect(landcoverLineFor({ available: true, dominantLabel: null, dominantShare: 0.5 }, 2024)).toBe(
+    expect(landcoverLineFor({ available: true, dominantClass: 999, dominantLabel: 'X', dominantShare: 0.5 }, 2024)).toBe(
       'Sin datos de cobertura'
     );
   });
@@ -122,7 +129,12 @@ describe('landcoverTooltipLines', () => {
   });
 
   it('skips malformed top entries', () => {
-    const odd = [{ code: 9, label: null, share: 0.6 }, { code: 66, label: 'Matorral', share: -1 }, top[2]];
+    const odd = [
+      { code: 9, label: null, share: 0.6 },
+      { code: 66, label: 'Matorral', share: -1 },
+      { code: 63, label: 'Estepa', share: 0 },
+      top[2]
+    ];
     expect(landcoverTooltipLines({ nombre: 'Tomé', year: 2024, entry: entry(9, 'Silvicultura', 0.6, odd) })).toEqual([
       'Tomé',
       'Cobertura 2024',
@@ -130,10 +142,73 @@ describe('landcoverTooltipLines', () => {
     ]);
   });
 
+  it('falls back to the dominant class when top is empty or fully filtered', () => {
+    expect(landcoverTooltipLines({ nombre: 'Tomé', year: 2024, entry: entry(9, 'Silvicultura', 0.6, []) })).toEqual([
+      'Tomé',
+      'Cobertura 2024',
+      'Silvicultura: 60,00 %'
+    ]);
+    const filtered = [{ code: 66, label: 'Matorral', share: 0 }];
+    expect(landcoverTooltipLines({ nombre: 'Tomé', year: 2024, entry: entry(9, 'Silvicultura', 0.6, filtered) })).toEqual([
+      'Tomé',
+      'Cobertura 2024',
+      'Silvicultura: 60,00 %'
+    ]);
+  });
+
+  it('falls back to the dominant class without a percentage when the share is missing', () => {
+    expect(landcoverTooltipLines({ nombre: 'Tomé', year: 2024, entry: entry(9, 'Silvicultura', null) })).toEqual([
+      'Tomé',
+      'Cobertura 2024',
+      'Silvicultura'
+    ]);
+  });
+
+  it('treats an available entry without a palette class as no data', () => {
+    expect(landcoverTooltipLines({ nombre: 'Tomé', year: 2024, entry: entry(999, 'Otra', 0.5) })).toEqual([
+      'Tomé',
+      'Sin datos de cobertura en 2024'
+    ]);
+  });
+
   it('reports no data for an unavailable or missing comuna', () => {
     const expected = ['Tomé', 'Sin datos de cobertura en 2024'];
     expect(landcoverTooltipLines({ nombre: 'Tomé', year: 2024, entry: NO_DATA })).toEqual(expected);
     expect(landcoverTooltipLines({ nombre: 'Tomé', year: 2024, entry: undefined })).toEqual(expected);
+  });
+});
+
+describe('hasLandcoverData', () => {
+  it('requires an available entry whose dominant class is in the official palette', () => {
+    expect(hasLandcoverData(entry(9, 'Silvicultura', 0.6))).toBe(true);
+    expect(hasLandcoverData(entry(9, null, null))).toBe(true);
+    expect(hasLandcoverData(entry(999, 'Otra', 0.5))).toBe(false);
+    expect(hasLandcoverData({ ...entry(9, 'Silvicultura', 0.6), available: false })).toBe(false);
+    expect(hasLandcoverData(NO_DATA)).toBe(false);
+    expect(hasLandcoverData(undefined)).toBe(false);
+  });
+});
+
+describe('legend note counts', () => {
+  it('counts an out-of-palette entry as no data, consistent with the legend', () => {
+    const layer = { year: 2024, values: { a: entry(9, 'Silvicultura', 0.6), b: entry(999, 'Otra', 0.5) } };
+    expect(landcoverLegendNote(layer)).toBe('Año 2024 · 1 de 2 comunas con clase dominante registrada (1 sin datos).');
+  });
+});
+
+describe('burnedTooltipLines', () => {
+  const burned = { available: true, burnedFraction: 0.0247, burnedHa: 120 };
+  const base = burnedTooltipLines({ nombre: 'Tomé', year: 2024, entry: burned });
+
+  it('is just the burned text when no landcover line is given', () => {
+    expect(base).toEqual(['Tomé: Área quemada 2024: 2,47 % · 120 ha']);
+    expect(burnedTooltipLines({ nombre: 'Tomé', year: 2024, entry: burned, landcoverLine: '' })).toEqual(base);
+  });
+
+  it('appends the landcover line as a second row', () => {
+    expect(
+      burnedTooltipLines({ nombre: 'Tomé', year: 2024, entry: burned, landcoverLine: 'Cobertura 2024: Silvicultura 60,00 %' })
+    ).toEqual(['Tomé: Área quemada 2024: 2,47 % · 120 ha', 'Cobertura 2024: Silvicultura 60,00 %']);
   });
 });
 
