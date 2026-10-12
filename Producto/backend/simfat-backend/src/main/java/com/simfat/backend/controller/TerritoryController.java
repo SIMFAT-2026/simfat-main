@@ -559,6 +559,7 @@ public class TerritoryController {
         snapshots.forEach((comunaId, s) -> {
             Map<String, Object> data = new LinkedHashMap<>();
             data.put("alertLevel", s.getAlertLevel());
+            data.put("alertDriver", s.getAlertDriver());
             data.put("scoreComposite", s.getScoreComposite());
             data.put("mode", s.getMode());
             data.put("qualityFlag", s.getQualityFlag());
