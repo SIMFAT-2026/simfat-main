@@ -2,9 +2,13 @@ package com.simfat.backend.service.mapbiomas;
 
 import com.simfat.backend.model.ComunaMapbiomasStats;
 import com.simfat.backend.repository.ComunaMapbiomasStatsRepository;
+import java.util.Collection;
 import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -107,11 +111,25 @@ public class MapbiomasSusceptibilityServiceImpl implements MapbiomasSusceptibili
     public Optional<MapbiomasSusceptibility> forComuna(String comunaId) {
         Optional<ComunaMapbiomasStats> statsOpt =
             statsRepository.findByComunaIdAndDataVersion(comunaId, dataVersion);
-        if (statsOpt.isEmpty()) {
-            return Optional.empty();
-        }
-        ComunaMapbiomasStats stats = statsOpt.get();
+        return statsOpt.map(this::computeFrom);
+    }
 
+    @Override
+    public Map<String, MapbiomasSusceptibility> forComunas(Collection<String> comunaIds) {
+        // Single bulk read (NFR-7) regardless of |comunaIds|, instead of one
+        // findByComunaIdAndDataVersion call per comuna -- see the class Javadoc's "Bulk-read
+        // deferral" note, which explicitly assigns this to S2a2.
+        Set<String> requested = new HashSet<>(comunaIds);
+        Map<String, MapbiomasSusceptibility> result = new HashMap<>();
+        for (ComunaMapbiomasStats stats : statsRepository.findByDataVersion(dataVersion)) {
+            if (requested.contains(stats.getComunaId())) {
+                result.put(stats.getComunaId(), computeFrom(stats));
+            }
+        }
+        return result;
+    }
+
+    private MapbiomasSusceptibility computeFrom(ComunaMapbiomasStats stats) {
         boolean fireAvailable = isFireAvailable(stats.getFire());
         boolean landCoverAvailable = isLandCoverAvailable(stats.getLandCover());
 
@@ -167,10 +185,8 @@ public class MapbiomasSusceptibilityServiceImpl implements MapbiomasSusceptibili
             usedRawBurnedNormFallback ? MapbiomasSusceptibility.MAPBIOMAS_BURNED_NORM_RAW_FALLBACK : null
         );
 
-        return Optional.of(
-            new MapbiomasSusceptibility(
-                score, fuelIndex, historyIndex, stats.getDataVersion(), qualityFlag, unobservedShare
-            )
+        return new MapbiomasSusceptibility(
+            score, fuelIndex, historyIndex, stats.getDataVersion(), qualityFlag, unobservedShare
         );
     }
 
