@@ -2,6 +2,7 @@ package com.simfat.backend.service.impl;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.simfat.backend.config.MonitoredRegionsConfig;
 import com.simfat.backend.model.Region;
 import com.simfat.backend.model.TerritoryWeatherObservation;
 import com.simfat.backend.repository.ComunaInfoRepository;
@@ -92,7 +93,12 @@ public class OpenWeatherFwiServiceImpl implements OpenWeatherFwiService {
             return;
         }
 
-        List<Region> regions = regionRepository.findAll();
+        // S1e1: restrict the region-level weather sync loop to the 3 monitored region
+        // slugs (see MonitoredRegionsConfig.MONITORED_REGION_IDS javadoc). regionRepository
+        // .findAll() would also return the 16 non-target official-Chile Region documents
+        // seeded for display/reference purposes only, wasting Open-Meteo API quota on
+        // regions this project does not monitor.
+        List<Region> regions = regionRepository.findAllById(MonitoredRegionsConfig.MONITORED_REGION_IDS);
         for (Region region : regions) {
             List<Double> bbox = region.getAoiBbox();
             if (bbox == null || bbox.size() != 4) {

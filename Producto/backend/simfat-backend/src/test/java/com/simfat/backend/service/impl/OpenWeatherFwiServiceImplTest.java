@@ -7,10 +7,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.simfat.backend.config.MonitoredRegionsConfig;
+import com.simfat.backend.model.Region;
 import com.simfat.backend.model.TerritoryWeatherObservation;
 import com.simfat.backend.repository.ComunaInfoRepository;
 import com.simfat.backend.repository.RegionRepository;
@@ -22,6 +25,7 @@ import com.simfat.backend.service.fwi.FwiOutputs;
 import java.io.IOException;
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.util.List;
 import okhttp3.mockwebserver.MockResponse;
 import okhttp3.mockwebserver.MockWebServer;
 import okhttp3.mockwebserver.RecordedRequest;
@@ -387,5 +391,81 @@ class OpenWeatherFwiServiceImplTest {
         ArgumentCaptor<TerritoryWeatherObservation> captor = ArgumentCaptor.forClass(TerritoryWeatherObservation.class);
         verify(weatherRepository).save(captor.capture());
         assertEquals("PROXY_V1", captor.getValue().getFwiMethod());
+    }
+
+    private Region regionWithBbox(String id, List<Double> bbox) {
+        Region region = new Region();
+        region.setId(id);
+        region.setAoiBbox(bbox);
+        return region;
+    }
+
+    @Test
+    void syncFwiForAllRegions_queriesOnlyMonitoredRegionIds_neverCallsFindAll() throws InterruptedException {
+        // S1e1: the region-level weather sync loop must query only the 3 monitored
+        // region slugs (MonitoredRegionsConfig.MONITORED_REGION_IDS) instead of
+        // regionRepository.findAll(), which would also return the 16 non-target
+        // official-Chile Region documents seeded for display/reference purposes only.
+        List<Region> monitoredRegions = List.of(
+            regionWithBbox("biobio", List.of(-74.1, -38.9, -71.0, -36.3)),
+            regionWithBbox("nuble", List.of(-73.0, -37.4, -71.0, -35.8)),
+            regionWithBbox("araucania", List.of(-73.9, -39.8, -71.2, -37.8))
+        );
+        when(regionRepository.findAllById(MonitoredRegionsConfig.MONITORED_REGION_IDS))
+            .thenReturn(monitoredRegions);
+
+        for (int i = 0; i < 3; i++) {
+            server.enqueue(new MockResponse()
+                .setResponseCode(200)
+                .addHeader("Content-Type", "application/json")
+                .setBody("{"
+                    + "\"daily\":{"
+                    + "\"temperature_2m_max\":[28.5],"
+                    + "\"relative_humidity_2m_min\":[35.0],"
+                    + "\"windspeed_10m_max\":[20.0],"
+                    + "\"precipitation_sum\":[0.0]"
+                    + "},"
+                    + "\"hourly\":{}"
+                    + "}"));
+        }
+
+        service.syncFwiForAllRegions();
+
+        verify(regionRepository).findAllById(MonitoredRegionsConfig.MONITORED_REGION_IDS);
+        verify(regionRepository, never()).findAll();
+        assertEquals(3, server.getRequestCount());
+        verify(weatherRepository, times(3)).save(any());
+    }
+
+    @Test
+    void syncFwiForAllRegions_skipsMonitoredRegionWithoutBbox_amongMonitoredRegions() {
+        // Triangulation: with a different set of monitored regions (one missing its
+        // bbox), only the ones with a valid bbox are synced -- the pre-existing
+        // skip-no-bbox behavior still works when sourced from findAllById instead
+        // of findAll.
+        List<Region> monitoredRegions = List.of(
+            regionWithBbox("biobio", List.of(-74.1, -38.9, -71.0, -36.3)),
+            regionWithBbox("nuble", null)
+        );
+        when(regionRepository.findAllById(MonitoredRegionsConfig.MONITORED_REGION_IDS))
+            .thenReturn(monitoredRegions);
+
+        server.enqueue(new MockResponse()
+            .setResponseCode(200)
+            .addHeader("Content-Type", "application/json")
+            .setBody("{"
+                + "\"daily\":{"
+                + "\"temperature_2m_max\":[28.5],"
+                + "\"relative_humidity_2m_min\":[35.0],"
+                + "\"windspeed_10m_max\":[20.0],"
+                + "\"precipitation_sum\":[0.0]"
+                + "},"
+                + "\"hourly\":{}"
+                + "}"));
+
+        service.syncFwiForAllRegions();
+
+        assertEquals(1, server.getRequestCount());
+        verify(weatherRepository, times(1)).save(any());
     }
 }
