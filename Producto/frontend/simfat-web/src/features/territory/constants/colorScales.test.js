@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BURNED_SCALE, NEUTRAL_FILL, burnedColorFor } from './colorScales';
+import { BURNED_SCALE, NEUTRAL_FILL, RISK_SCORE_LEGEND, burnedColorFor } from './colorScales';
 
 const available = (burnedFraction) => ({ available: true, burnedFraction, burnedHa: 1 });
 const colorOfBin = (index) => BURNED_SCALE.bins[index].color;
@@ -61,5 +61,16 @@ describe('BURNED_SCALE', () => {
       '> 20 %'
     ]);
     expect(BURNED_SCALE.zero.label).toBe('Sin área quemada');
+  });
+});
+
+describe('RISK_SCORE_LEGEND', () => {
+  it('states the score range and the trigger for each level in visible text', () => {
+    expect(RISK_SCORE_LEGEND.map((item) => item.text)).toEqual([
+      'Normal (puntaje 0–49)',
+      'Preventivo (puntaje 50–69)',
+      'Alto (puntaje 70–84 o FWI ≥ 20)',
+      'Crítico (puntaje ≥ 85 o focos FIRMS)'
+    ]);
   });
 });

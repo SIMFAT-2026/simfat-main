@@ -26,10 +26,10 @@ class FwiThresholdTableTest {
     void forMethod_proxyV1_returnsCalibratedProductionValues() {
         FwiThresholds thresholds = table.forMethod("PROXY_V1");
 
-        // These MUST match ComunaRiskServiceImpl's existing FWI_PREVENTIVO/FWI_CRITICO/FWI_MAX
+        // These MUST match ComunaRiskServiceImpl's existing FWI_ALTO/FWI_CRITICO/FWI_MAX
         // constants exactly -- this table is a config-form copy of already-shipped values, not
         // new numbers.
-        assertEquals(20.0, thresholds.preventivo());
+        assertEquals(20.0, thresholds.alto());
         assertEquals(45.0, thresholds.critico());
         assertEquals(50.0, thresholds.max());
         assertTrue(thresholds.calibrated(), "PROXY_V1 entries are real production values");
@@ -41,7 +41,7 @@ class FwiThresholdTableTest {
 
         // Same numeric values as PROXY_V1 -- a safe, honest placeholder, NOT a claim that these
         // are the correct Van Wagner-scale values.
-        assertEquals(20.0, thresholds.preventivo());
+        assertEquals(20.0, thresholds.alto());
         assertEquals(45.0, thresholds.critico());
         assertEquals(50.0, thresholds.max());
 

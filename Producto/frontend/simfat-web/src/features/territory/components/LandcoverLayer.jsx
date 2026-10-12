@@ -8,6 +8,7 @@ import {
   landcoverLegendNote,
   landcoverTooltipLines
 } from '../utils/landcoverLayer';
+import { landcoverFillOpacity } from '../utils/mapbiomasStyle';
 
 // Leaflet renders string tooltips as HTML, so build a DOM node with textContent:
 // comuna names and labels can never be interpreted as markup.
@@ -23,8 +24,9 @@ function tooltipElement(lines) {
 }
 
 // Yearly MapBiomas LANDCOVER layer: each comuna is filled with the official
-// colour of its dominant class. Keyed on the layer year so another year rebuilds
-// and restyles the polygons. While the layer is not loaded every comuna is
+// colour of its dominant class. Another year restyles the same polygons (the
+// style and tooltip read the latest layer through refs), so there is no remount
+// and no blink; `stale` dims the previous year's layer while the new one loads. While the layer is not loaded every comuna is
 // neutral and the tooltip says why. When `interactive` is false (a layer above
 // it, RISK_SCORE or BURNED, owns hover and click) the polygons take no pointer
 // events. `emphasizeOutline` thickens the neutral outline while the layer is the
@@ -35,6 +37,8 @@ export const LandcoverChoropleth = memo(function LandcoverChoropleth({
   loading,
   interactive = true,
   emphasizeOutline = false,
+  riskVisible = false,
+  stale = false,
   onComunaClick
 }) {
   const layerRef = useRef(layer);
@@ -46,7 +50,7 @@ export const LandcoverChoropleth = memo(function LandcoverChoropleth({
 
   return (
     <GeoJSON
-      key={`landcover-${layer?.year ?? 'none'}-${interactive ? 'i' : 'n'}-${emphasizeOutline ? 'e' : 'p'}`}
+      key={`landcover-${interactive ? 'i' : 'n'}-${emphasizeOutline ? 'e' : 'p'}`}
       pane="landcover-layer-pane"
       interactive={interactive}
       data={geoJson}
@@ -55,7 +59,7 @@ export const LandcoverChoropleth = memo(function LandcoverChoropleth({
         const entry = layerRef.current?.values?.[comunaId];
         return {
           fillColor: landcoverColorFor(entry),
-          fillOpacity: hasLandcoverData(entry) ? 0.6 : 0.12,
+          fillOpacity: landcoverFillOpacity({ hasData: hasLandcoverData(entry), riskVisible, stale }),
           color: '#334155',
           weight: emphasizeOutline && !entry ? 1.6 : 0.8,
           opacity: emphasizeOutline && !entry ? 0.95 : 0.7

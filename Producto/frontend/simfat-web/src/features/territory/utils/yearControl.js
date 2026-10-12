@@ -1,38 +1,7 @@
 // Pure helpers for the MapBiomas year control (Q31). Generic on purpose: any
 // yearly MapBiomas layer (BURNED, later LANDCOVER) plugs in with its own range.
 
-export const YEAR_PAGE_STEP = 5;
-
-export function clampYear(year, minYear, maxYear) {
-  if (!Number.isInteger(year)) {
-    return minYear;
-  }
-  return Math.min(maxYear, Math.max(minYear, year));
-}
-
-// Next year for a keyboard key, or null when the key is not a year shortcut.
-export function stepYear(year, key, minYear, maxYear) {
-  switch (key) {
-    case 'ArrowRight':
-    case 'ArrowUp':
-      return clampYear(year + 1, minYear, maxYear);
-    case 'ArrowLeft':
-    case 'ArrowDown':
-      return clampYear(year - 1, minYear, maxYear);
-    case 'PageUp':
-      return clampYear(year + YEAR_PAGE_STEP, minYear, maxYear);
-    case 'PageDown':
-      return clampYear(year - YEAR_PAGE_STEP, minYear, maxYear);
-    case 'Home':
-      return minYear;
-    case 'End':
-      return maxYear;
-    default:
-      return null;
-  }
-}
-
-// Years for the mobile <select>, newest first.
+// Years for the <select>, newest first.
 export function yearOptions(minYear, maxYear) {
   const years = [];
   for (let year = maxYear; year >= minYear; year -= 1) {
@@ -41,8 +10,10 @@ export function yearOptions(minYear, maxYear) {
   return years;
 }
 
-export function yearControlLabel(layerLabel, year) {
-  return `${layerLabel} · Año: ${Number.isInteger(year) ? year : '…'}`;
+// Year the control shows: while a stale layer (previous year) is displayed the
+// control reflects the year being loaded, not the year of the visible polygons.
+export function controlYear({ layer, selectedYear, defaultYear, stale }) {
+  return stale ? selectedYear ?? defaultYear : layer?.year ?? selectedYear;
 }
 
 // Text for the polite live region: only when a layer for exactly this year is
@@ -54,28 +25,35 @@ export function yearAnnouncement({ label, year, layerYear, loading }) {
   return `${label}: datos del año ${year} cargados.`;
 }
 
-// Buttons act on the pending slider draft when there is one; "default" is a
-// property of the year actually loaded.
-export function yearControlState({ draft, loadedYear, range, defaultYear }) {
-  const current = draft ?? loadedYear;
+// Bounds for the step buttons and "default" for the "Último" button, all
+// derived from the year the control currently shows.
+export function yearControlState({ year, range, defaultYear }) {
   return {
-    current,
-    atMin: current <= range.minYear,
-    atMax: current >= range.maxYear,
-    isDefault: Number.isInteger(defaultYear) && loadedYear === defaultYear
+    atMin: year <= range.minYear,
+    atMax: year >= range.maxYear,
+    isDefault: Number.isInteger(defaultYear) && year === defaultYear
   };
-}
-
-// Key to year decision; any modifier leaves the browser/AT shortcut alone.
-export function yearKeyAction(event, current, minYear, maxYear) {
-  if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) {
-    return null;
-  }
-  return stepYear(current, event.key, minYear, maxYear);
 }
 
 // "Último" prefers the explicit default year (cache hit); null lets the
 // backend pick when the default is not known yet.
 export function latestYearTarget(defaultYear) {
   return Number.isInteger(defaultYear) ? defaultYear : null;
+}
+
+// Accessible name and tooltip of the compact "↺" latest-year button.
+export function latestYearLabel(label) {
+  return `Volver al último año de ${label}`;
+}
+
+// The inline control renders only for an active layer that has a known range
+// or is still loading it (then it shows "Cargando…").
+export function controlVisible({ active, state }) {
+  return Boolean(active && state && (state.range || state.loading));
+}
+
+// The chip shows the plain layer name while its inline select shows the year;
+// without a visible control it keeps the year of the displayed layer.
+export function chipLabel({ plain, withYear, controlVisible: visible }) {
+  return visible ? plain : withYear;
 }

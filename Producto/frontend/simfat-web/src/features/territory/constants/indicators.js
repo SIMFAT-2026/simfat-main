@@ -24,3 +24,51 @@ export const DEFAULT_INDICATORS = [...CRITICAL_INDICATORS, ...SECONDARY_INDICATO
 // WIND/HUMIDITY/AIR_TEMP/SOIL_TEMP are opt-in climate layers: fetched alongside
 // the rest but not shown until the user toggles them on (DEC-B).
 export const DEFAULT_VISIBLE_INDICATORS = ['RISK_SCORE', 'FIRMS', 'ALERTS', 'REPORTS'];
+
+// Layer toggles grouped by time semantics (the question users ask is "is this
+// today or history?"): current events, yearly MapBiomas history, and the latest
+// satellite/weather observations. NDVI/NDMI come from the latest OpenEO
+// composites and the climate layers from the latest persisted weather
+// observation per comuna (TerritoryController). Order here is the render order.
+// `placement` decides where the chips render: always visible ('inline') or
+// behind the "Más capas" popover ('popover'). `info` feeds the info button.
+export const LAYER_TOGGLE_GROUPS = [
+  {
+    id: 'events',
+    title: 'Riesgo y eventos',
+    placement: 'inline',
+    info: 'Riesgo y eventos: situación actual. El riesgo es el valor actual; no depende del año elegido en las capas MapBiomas.',
+    indicators: ['RISK_SCORE', 'FIRMS', 'ALERTS', 'REPORTS']
+  },
+  {
+    id: 'mapbiomas',
+    title: 'MapBiomas',
+    placement: 'inline',
+    info: 'MapBiomas: historia anual (elige el año junto a cada capa).',
+    indicators: [...MAPBIOMAS_INDICATORS]
+  },
+  {
+    id: 'conditions',
+    title: 'Condiciones actuales',
+    context: 'Última observación satelital y climática',
+    placement: 'popover',
+    info: 'Más capas: última observación satelital y climática.',
+    indicators: ['NDVI', 'NDMI', ...CLIMATE_INDICATORS]
+  }
+];
+
+export function layerGroupInfoLines() {
+  return LAYER_TOGGLE_GROUPS.map((group) => group.info);
+}
+
+export function hasVisibleLayer(group, visibleIndicators = []) {
+  return Boolean(group?.indicators.some((indicator) => visibleIndicators.includes(indicator)));
+}
+
+// "(2 activas)" for the group's visible layers, else ''.
+export function activeLayerSummary({ group, visibleIndicators = [] }) {
+  const count = group.indicators.filter((indicator) => visibleIndicators.includes(indicator)).length;
+  if (count === 0) return '';
+  return `(${count} ${count === 1 ? 'activa' : 'activas'})`;
+}
+

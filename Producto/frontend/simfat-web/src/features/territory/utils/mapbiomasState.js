@@ -15,6 +15,18 @@ export const initialMapbiomasState = {
   defaultYear: undefined
 };
 
+// True while `layer` belongs to a different year than the one requested (kept
+// on screen, dimmed, until the requested year arrives). Derived on every
+// render instead of stored, so there is no frame between `select-year` and the
+// `request` dispatch where the old layer shows undimmed. selectedYear
+// undefined ("Último") targets the known default year: a layer already at that
+// year is not stale, so a same-data refetch does not dim the map.
+export function isStaleLayer(state, regionId) {
+  if (!state || state.layer == null || state.regionId !== regionId) return false;
+  const target = state.selectedYear ?? state.defaultYear;
+  return Number.isInteger(target) && state.layer.year !== target;
+}
+
 function rangeFrom(layer, fallback) {
   const { minYear, maxYear } = layer || {};
   return Number.isInteger(minYear) && Number.isInteger(maxYear) && minYear <= maxYear
@@ -44,13 +56,20 @@ export function mapbiomasReducer(state, action) {
       if (!Number.isInteger(action.year) || action.year === state.selectedYear) {
         return state;
       }
+      if (state.layer !== null && state.layer.year === action.year) {
+        // Back to the year already on screen: the hook issues no new request
+        // (its in-flight one is aborted), so settle here instead of staying
+        // stale and loading forever.
+        return { ...state, selectedYear: action.year, loading: false };
+      }
       return { ...state, selectedYear: action.year };
     }
     case 'request': {
-      // A loaded layer survives only if it is exactly the region and year being
-      // requested, so data for one year is never shown under another.
-      const keepLayer =
-        state.layer !== null && state.regionId === action.regionId && state.layer.year === state.selectedYear;
+      // A loaded layer survives within the same region only (never across
+      // regions). If it is for another year than the one requested it is kept
+      // (see isStaleLayer): consumers must derive every label from layer.year, so
+      // nothing claims the new year before its data arrives.
+      const keepLayer = state.layer !== null && state.regionId === action.regionId;
       return {
         ...state,
         regionId: action.regionId,

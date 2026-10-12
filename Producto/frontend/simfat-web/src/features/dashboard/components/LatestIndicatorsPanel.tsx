@@ -80,12 +80,12 @@ function LatestIndicatorsPanel({
         error={error}
         isEmpty={!data}
         emptyTitle="Sin lectura reciente"
-        emptyDescription="Aun no tenemos un valor reciente para la region seleccionada."
+        emptyDescription="Aún no tenemos un valor reciente para la región seleccionada."
         onRetry={onRetry}
       >
         <div className="latest-indicator-grid">
           <div>
-            <p className="latest-indicator-label">Region</p>
+            <p className="latest-indicator-label">Región</p>
             <strong>{selectedRegionName}</strong>
             <p className="latest-indicator-sub">Codigo: {selectedRegionCode}</p>
           </div>
@@ -98,7 +98,7 @@ function LatestIndicatorsPanel({
             <strong>{formatValue(data?.value ?? null)}</strong>
           </div>
           <div>
-            <p className="latest-indicator-label">Ultima lectura</p>
+            <p className="latest-indicator-label">Última lectura</p>
             <strong>{formatTimestamp(data?.observedAt || '')}</strong>
           </div>
           <div>

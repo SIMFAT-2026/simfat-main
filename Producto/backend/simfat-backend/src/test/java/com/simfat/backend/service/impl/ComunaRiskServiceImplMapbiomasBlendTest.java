@@ -175,7 +175,7 @@ class ComunaRiskServiceImplMapbiomasBlendTest {
     void blend_appliesFormulaAfterModeResolves() {
         ComunaInfo comuna = comunaInfo("comuna-blend");
         when(comunaRepository.findById(comuna.getId())).thenReturn(Optional.of(comuna));
-        stubWeather(comuna, 15.0); // fwiNorm=0.3 -> cFwi=0.156, below FWI_PREVENTIVO(20)
+        stubWeather(comuna, 15.0); // fwiNorm=0.3 -> cFwi=0.156, below FWI_ALTO(20)
         stubFirms(comuna, List.of());
         stubReports(comuna, 0);
         stubNoCopernicus(comuna);
@@ -331,6 +331,39 @@ class ComunaRiskServiceImplMapbiomasBlendTest {
         ComunaRiskSnapshot snapshot = service.recomputeByComuna(comuna.getId());
 
         assertEquals("PREVENTIVO", snapshot.getAlertLevel());
+    }
+
+    // Pins the FWI trigger: FWI >= 20 raises the alert to ALTO even though the score
+    // (cFwi = 0.52 * 0.4 = 0.208) is far below scoreAlto.
+    @Test
+    void fwiAtAltoThreshold_raisesToAlto_evenWithLowScore() {
+        ComunaInfo comuna = comunaInfo("comuna-fwi-alto");
+        when(comunaRepository.findById(comuna.getId())).thenReturn(Optional.of(comuna));
+        stubWeather(comuna, 20.0);
+        stubFirms(comuna, List.of());
+        stubReports(comuna, 0);
+        stubNoCopernicus(comuna);
+        when(mapbiomasService.forComuna(comuna.getId())).thenReturn(Optional.empty());
+
+        ComunaRiskSnapshot snapshot = service.recomputeByComuna(comuna.getId());
+
+        assertEquals("ALTO", snapshot.getAlertLevel());
+        assertEquals(round4(0.208), snapshot.getScoreComposite());
+    }
+
+    @Test
+    void fwiJustBelowAltoThreshold_doesNotRaiseToAlto() {
+        ComunaInfo comuna = comunaInfo("comuna-fwi-below-alto");
+        when(comunaRepository.findById(comuna.getId())).thenReturn(Optional.of(comuna));
+        stubWeather(comuna, 19.99);
+        stubFirms(comuna, List.of());
+        stubReports(comuna, 0);
+        stubNoCopernicus(comuna);
+        when(mapbiomasService.forComuna(comuna.getId())).thenReturn(Optional.empty());
+
+        ComunaRiskSnapshot snapshot = service.recomputeByComuna(comuna.getId());
+
+        assertEquals("NORMAL", snapshot.getAlertLevel());
     }
 
     @Test

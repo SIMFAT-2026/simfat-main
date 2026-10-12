@@ -141,11 +141,11 @@ function CitizenReportsPage() {
   const columns = useMemo(
     () => [
       { key: 'createdAt', header: 'Creado', render: (row) => formatDate(row.createdAt) },
-      { key: 'regionId', header: 'Region', render: (row) => regionMap[row.regionId] || row.regionId || '-' },
+      { key: 'regionId', header: 'Región', render: (row) => regionMap[row.regionId] || row.regionId || '-' },
       { key: 'comunaId', header: 'Comuna', render: (row) => getLabelForComuna(row.comunaId) || row.comunaId || '-' },
       {
         key: 'category',
-        header: 'Categoria',
+        header: 'Categoría',
         render: (row) => (row.subCategory ? `${row.category} — ${row.subCategory}` : row.category)
       },
       {
@@ -174,7 +174,7 @@ function CitizenReportsPage() {
             '0'
           )
       },
-      { key: 'description', header: 'Descripcion' }
+      { key: 'description', header: 'Descripción' }
     ],
     [regionMap]
   );
@@ -224,7 +224,7 @@ function CitizenReportsPage() {
         latitude: String(position.coords.latitude.toFixed(6)),
         longitude: String(position.coords.longitude.toFixed(6))
       }));
-      feedback.showSuccess('Ubicacion capturada correctamente.');
+      feedback.showSuccess('Ubicación capturada correctamente.');
     } catch (err) {
       feedback.showError(err.message || 'No fue posible capturar la ubicacion.');
     } finally {
@@ -331,7 +331,7 @@ function CitizenReportsPage() {
 
       <FilterBar>
         <label>
-          Region
+          Región
           <select name="regionId" value={filters.regionId} onChange={onFilterChange}>
             <option value="">Todas</option>
             {monitoredRegions.map((region) => (
@@ -355,7 +355,7 @@ function CitizenReportsPage() {
         </label>
 
         <label>
-          Categoria
+          Categoría
           <select name="category" value={filters.category} onChange={onFilterChange}>
             <option value="">Todas</option>
             {REPORT_CATEGORIES.map((category) => (
@@ -377,7 +377,7 @@ function CitizenReportsPage() {
         <h3>Nuevo reporte</h3>
         <form className="form-grid" onSubmit={submitReport}>
           <label>
-            Region
+            Región
             <select name="regionId" value={form.regionId} onChange={onInputChange} required>
               <option value="">Seleccione region</option>
               {monitoredRegions.map((region) => (
@@ -401,7 +401,7 @@ function CitizenReportsPage() {
           </label>
 
           <label>
-            Categoria
+            Categoría
             <select name="category" value={form.category} onChange={onInputChange}>
               {REPORT_CATEGORIES.map((category) => (
                 <option key={category} value={category}>
@@ -436,7 +436,7 @@ function CitizenReportsPage() {
           </label>
 
           <label className="full-width">
-            Descripcion
+            Descripción
             <textarea name="description" rows={3} value={form.description} onChange={onInputChange} required />
           </label>
 

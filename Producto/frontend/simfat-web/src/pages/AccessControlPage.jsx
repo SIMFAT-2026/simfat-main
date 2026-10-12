@@ -461,7 +461,7 @@ function AccessControlPage() {
                 <details className="access-advanced">
                   <summary>Acceso a chat comunitario</summary>
                   <label>
-                    <span>Region principal</span>
+                    <span>Región principal</span>
                     <select
                       value={draftChatAccessByUser[target.id]?.primaryRegionId || ''}
                       onChange={(event) => updatePrimaryChatRegion(target.id, event.target.value)}
@@ -645,7 +645,7 @@ function AccessControlPage() {
                         rows={2}
                         value={expandedVerifUser === row.id ? verifDraft.notes : ''}
                         onChange={(e) => setVerifDraft((prev) => ({ ...prev, notes: e.target.value }))}
-                        placeholder="Descripcion de la decision..."
+                        placeholder="Descripción de la decisión..."
                         style={{ display: 'block', width: '100%', marginTop: '0.25rem', resize: 'vertical' }}
                       />
                     </label>

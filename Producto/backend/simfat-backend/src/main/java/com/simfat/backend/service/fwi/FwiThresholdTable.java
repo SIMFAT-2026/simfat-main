@@ -31,7 +31,7 @@ import org.springframework.stereotype.Component;
  * history, and (3) update {@code fwi-thresholds-v1.json} with the computed values.
  *
  * <p>No consumer is wired to this table yet -- {@code ComunaRiskServiceImpl} still uses its own
- * hardcoded {@code FWI_PREVENTIVO}/{@code FWI_CRITICO}/{@code FWI_MAX} constants. Wiring this
+ * hardcoded {@code FWI_ALTO}/{@code FWI_CRITICO}/{@code FWI_MAX} constants. Wiring this
  * table into the score/override logic is deliberately out of scope for this slice (a later unit,
  * e.g. S2a's score blend work).
  */

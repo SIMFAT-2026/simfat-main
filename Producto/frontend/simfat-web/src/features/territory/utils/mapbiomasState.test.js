@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { initialMapbiomasState, mapbiomasReducer } from './mapbiomasState';
+import { initialMapbiomasState, isStaleLayer, mapbiomasReducer } from './mapbiomasState';
 
 const layer2025 = { indicator: 'BURNED', year: 2025, values: {} };
 const layer2023 = { indicator: 'BURNED', year: 2023, values: {} };
@@ -39,7 +39,7 @@ describe('mapbiomasReducer', () => {
     expect(state.loading).toBe(false);
   });
 
-  it('drops the previous layer when the year changes so it is never shown under another year', () => {
+  it('keeps the previous year layer, while another year of the same region loads', () => {
     const loaded = run([
       { type: 'request', regionId: 'biobio' },
       { type: 'success', regionId: 'biobio', requestedYear: undefined, layer: layer2025 },
@@ -47,8 +47,62 @@ describe('mapbiomasReducer', () => {
       { type: 'request', regionId: 'biobio' }
     ]);
     expect(loaded.selectedYear).toBe(2023);
-    expect(loaded.layer).toBeNull();
+    expect(loaded.layer).toBe(layer2025);
     expect(loaded.loading).toBe(true);
+  });
+
+  it('settles at once when the user returns to the year of the kept layer mid-load', () => {
+    const state = run([
+      { type: 'request', regionId: 'biobio' },
+      { type: 'success', regionId: 'biobio', requestedYear: undefined, layer: layer2025 },
+      { type: 'select-year', year: 2023 },
+      { type: 'request', regionId: 'biobio' },
+      { type: 'select-year', year: 2025 }
+    ]);
+    expect(state.layer).toBe(layer2025);
+    expect(state.loading).toBe(false);
+  });
+
+  it('keeps the layer when returning to the backend default year', () => {
+    const state = run([
+      { type: 'request', regionId: 'biobio' },
+      { type: 'success', regionId: 'biobio', requestedYear: undefined, layer: layer2025 },
+      { type: 'select-year', year: 2023 },
+      { type: 'request', regionId: 'biobio' },
+      { type: 'success', regionId: 'biobio', requestedYear: 2023, layer: layer2023 },
+      { type: 'select-year', year: null },
+      { type: 'request', regionId: 'biobio' }
+    ]);
+    expect(state.layer).toBe(layer2023);
+  });
+
+  it('replaces the layer when the requested year arrives', () => {
+    const state = run([
+      { type: 'request', regionId: 'biobio' },
+      { type: 'success', regionId: 'biobio', requestedYear: undefined, layer: layer2025 },
+      { type: 'select-year', year: 2023 },
+      { type: 'request', regionId: 'biobio' },
+      { type: 'success', regionId: 'biobio', requestedYear: 2023, layer: layer2023 }
+    ]);
+    expect(state.layer).toBe(layer2023);
+  });
+
+  it('drops the previous layer when the new year fails or has no data', () => {
+    const pending = run([
+      { type: 'request', regionId: 'biobio' },
+      { type: 'success', regionId: 'biobio', requestedYear: undefined, layer: layer2025 },
+      { type: 'select-year', year: 2023 },
+      { type: 'request', regionId: 'biobio' }
+    ]);
+    const failed = mapbiomasReducer(pending, {
+      type: 'failure',
+      indicator: 'BURNED',
+      regionId: 'biobio',
+      requestedYear: 2023
+    });
+    expect(failed.layer).toBeNull();
+    const empty = mapbiomasReducer(pending, { type: 'success', regionId: 'biobio', requestedYear: 2023, layer: null });
+    expect(empty.layer).toBeNull();
   });
 
   it('keeps the loaded layer when the same region and year are requested again', () => {
@@ -58,6 +112,16 @@ describe('mapbiomasReducer', () => {
       { type: 'request', regionId: 'biobio' }
     ]);
     expect(state.layer).toBe(layer2025);
+  });
+
+  it('never keeps a layer across regions, even for a different year', () => {
+    const state = run([
+      { type: 'request', regionId: 'biobio' },
+      { type: 'success', regionId: 'biobio', requestedYear: undefined, layer: layer2025 },
+      { type: 'select-year', year: 2023 },
+      { type: 'request', regionId: 'nuble' }
+    ]);
+    expect(state.layer).toBeNull();
   });
 
   it('drops the layer when the region changes but keeps the chosen year', () => {
@@ -156,7 +220,6 @@ describe('mapbiomasReducer', () => {
         { type: 'select-year', year: 2020 },
         { type: 'request', regionId: 'biobio' }
       ]);
-      expect(state.layer).toBeNull();
       expect(state.range).toEqual({ minYear: 2013, maxYear: 2025 });
     });
 
@@ -218,5 +281,49 @@ describe('mapbiomasReducer', () => {
       expect(state.range).toEqual({ minYear: 2013, maxYear: 2025 });
       expect(state.defaultYear).toBe(2025);
     });
+  });
+});
+
+describe('isStaleLayer', () => {
+  const loaded = run([
+    { type: 'request', regionId: 'biobio' },
+    { type: 'success', regionId: 'biobio', requestedYear: undefined, layer: layer2025 }
+  ]);
+
+  it('is false for a null layer', () => {
+    expect(isStaleLayer(initialMapbiomasState, 'biobio')).toBe(false);
+  });
+
+  it('is stale in the very render after select-year, before any request', () => {
+    const state = mapbiomasReducer(loaded, { type: 'select-year', year: 2023 });
+    expect(isStaleLayer(state, 'biobio')).toBe(true);
+  });
+
+  it('is not stale once the requested year is on screen', () => {
+    expect(isStaleLayer(loaded, 'biobio')).toBe(false);
+    const back = mapbiomasReducer(mapbiomasReducer(loaded, { type: 'select-year', year: 2023 }), { type: 'select-year', year: 2025 });
+    expect(isStaleLayer(back, 'biobio')).toBe(false);
+  });
+
+  it('is stale when "Ultimo" resets to a default different from the layer', () => {
+    const on2023 = run([
+      { type: 'select-year', year: 2023 },
+      { type: 'request', regionId: 'biobio' },
+      { type: 'success', regionId: 'biobio', requestedYear: 2023, layer: layer2023 }
+    ], loaded);
+    const reset = mapbiomasReducer(on2023, { type: 'select-year', year: null });
+    expect(reset.selectedYear).toBeUndefined();
+    expect(isStaleLayer(reset, 'biobio')).toBe(true);
+  });
+
+  it('is not stale on "Ultimo" when the layer already is the default year', () => {
+    const reset = { ...loaded, selectedYear: undefined };
+    expect(loaded.defaultYear).toBe(2025);
+    expect(isStaleLayer(reset, 'biobio')).toBe(false);
+  });
+
+  it('is false when the state belongs to another region', () => {
+    const state = mapbiomasReducer(loaded, { type: 'select-year', year: 2023 });
+    expect(isStaleLayer(state, 'nuble')).toBe(false);
   });
 });

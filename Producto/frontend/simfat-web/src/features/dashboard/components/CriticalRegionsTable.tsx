@@ -44,7 +44,7 @@ function CriticalRegionsTable({ data, loading, error, onRetry }: CriticalRegions
   const rows = data || [];
   return (
     <article className="dashboard-card">
-      <h3>Regiones criticas</h3>
+      <h3>Regiones críticas</h3>
       <DashboardPanelState
         loading={loading}
         error={error}
@@ -57,7 +57,7 @@ function CriticalRegionsTable({ data, loading, error, onRetry }: CriticalRegions
           <table className="data-table">
             <thead>
               <tr>
-                <th>Region</th>
+                <th>Región</th>
                 <th>Criticidad</th>
                 <th>Ha perdidas</th>
                 <th>Alertas</th>

@@ -207,7 +207,7 @@ function AccountPage() {
             </label>
 
             <label>
-              <span>Region <span className="field-optional">(opcional)</span></span>
+              <span>Región <span className="field-optional">(opcional)</span></span>
               <select name="regionCode" value={profileForm.regionCode} onChange={onProfileChange}>
                 <option value="">— Selecciona una region —</option>
                 {REGIONES.map((r) => (

@@ -1,13 +1,13 @@
 {
   "PROXY_V1": {
-    "preventivo": 20.0,
+    "alto": 20.0,
     "critico": 45.0,
     "max": 50.0,
     "calibrated": true,
-    "source": "Production defaults already in use by ComunaRiskServiceImpl (FWI_PREVENTIVO/FWI_CRITICO/FWI_MAX constants). Moved into this table for consistency across methods; these are not new numbers."
+    "source": "Production defaults already in use by ComunaRiskServiceImpl (FWI_ALTO/FWI_CRITICO/FWI_MAX constants). Moved into this table for consistency across methods; these are not new numbers."
   },
   "VAN_WAGNER": {
-    "preventivo": 20.0,
+    "alto": 20.0,
     "critico": 45.0,
     "max": 50.0,
     "calibrated": false,
