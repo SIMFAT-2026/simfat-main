@@ -1,0 +1,16 @@
+{
+  "PROXY_V1": {
+    "preventivo": 20.0,
+    "critico": 45.0,
+    "max": 50.0,
+    "calibrated": true,
+    "source": "Production defaults already in use by ComunaRiskServiceImpl (FWI_PREVENTIVO/FWI_CRITICO/FWI_MAX constants). Moved into this table for consistency across methods; these are not new numbers."
+  },
+  "VAN_WAGNER": {
+    "preventivo": 20.0,
+    "critico": 45.0,
+    "max": 50.0,
+    "calibrated": false,
+    "source": "PROVISIONAL placeholder, NOT empirically calibrated. Same numeric values as PROXY_V1 purely as a safe, honest default -- not a claim these are the correct Van Wagner-scale values. Pending: (1) run S1e2a's FwiSpinUpRunner against real production data to build a real Van Wagner FWI history, (2) offline analysis computing the FWI values sitting at the same percentiles PROXY_V1's 20/45 occupy in the proxy's own distribution (quantile matching), (3) update this entry with the computed values and calibrated=true. See design decisions D3/D4 (sdd/mapbiomas-integration/design, design-part2) and task 1e.2."
+  }
+}
