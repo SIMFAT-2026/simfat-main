@@ -6,10 +6,19 @@
 -- would allow self-granted admin rights. The backend connects over JDBC as the table
 -- owner, which bypasses RLS, so enabling RLS without policies does not affect it.
 --
--- V1 tables and flyway_schema_history were hardened by hand on 2026-04-22
+-- V1 tables were hardened by hand on 2026-04-22
 -- (Documentacion/Informes/seguridad-supabase-rls-2026-04-22.md). They are repeated here
 -- so that any fresh environment gets the same state from the migrations alone. Every
 -- statement is idempotent.
+--
+-- flyway_schema_history is deliberately NOT touched here. Flyway holds a lock on its own
+-- history table from its own connection while a migration runs, so an ALTER TABLE on it
+-- from inside a migration waits on Flyway itself until the statement timeout. It was
+-- already hardened by hand in production on 2026-04-22; fresh environments (local Docker,
+-- CI) have no Data API, so nothing is exposed there.
+--
+-- lock_timeout makes any other lock wait fail fast instead of hanging until the pooler's
+-- statement timeout (2 minutes on Supabase).
 --
 -- Precondition: the role that runs Flyway must own every listed table (true when all of
 -- them were created by these migrations over the same datasource). Otherwise the first
@@ -19,7 +28,8 @@
 -- client) and USAGE on schema public (anon/authenticated can still see the schema
 -- but get "permission denied" on every table).
 
-ALTER TABLE public.flyway_schema_history ENABLE ROW LEVEL SECURITY;
+SET LOCAL lock_timeout = '10s';
+
 ALTER TABLE public.app_users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.refresh_tokens ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.password_reset_tokens ENABLE ROW LEVEL SECURITY;
@@ -43,7 +53,7 @@ BEGIN
     FOREACH api_role IN ARRAY ARRAY['anon', 'authenticated'] LOOP
         IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = api_role) THEN
             FOREACH tbl IN ARRAY ARRAY[
-                'flyway_schema_history', 'app_users', 'refresh_tokens', 'password_reset_tokens',
+                'app_users', 'refresh_tokens', 'password_reset_tokens',
                 'roles', 'permissions', 'role_permissions', 'user_roles',
                 'user_verification', 'verification_events',
                 'user_community_profiles', 'community_chat_room_access', 'notifications'
@@ -64,7 +74,7 @@ END
 $$;
 
 REVOKE ALL ON TABLE
-    public.flyway_schema_history, public.app_users, public.refresh_tokens,
+    public.app_users, public.refresh_tokens,
     public.password_reset_tokens, public.roles, public.permissions,
     public.role_permissions, public.user_roles, public.user_verification,
     public.verification_events, public.user_community_profiles,
