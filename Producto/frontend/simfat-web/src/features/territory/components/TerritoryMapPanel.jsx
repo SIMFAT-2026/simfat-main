@@ -1094,7 +1094,7 @@ function TerritoryMapPanel({
           {!readOnly && (
             <>
               <WeatherSyncButton regionId={selectedRegionId} />
-              <small style={{ color: '#94a3b8', fontSize: '0.68rem', marginTop: 2 }}>
+              <small style={{ color: '#475569', fontSize: '0.8rem', marginTop: 2 }}>
                 ⓘ La sincronización puede tardar aprox. 2–3 min
               </small>
             </>

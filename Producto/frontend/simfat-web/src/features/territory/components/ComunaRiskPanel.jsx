@@ -75,10 +75,10 @@ function RiskHistoryChart({ gadmGid, publicMode = false }) {
   return (
     <ResponsiveContainer width="100%" height={110}>
       <LineChart data={data} margin={{ top: 8, right: 8, left: -20, bottom: 0 }}>
-        <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#64748b' }} tickLine={false} axisLine={false} />
-        <YAxis domain={[0, 100]} tick={{ fontSize: 10, fill: '#64748b' }} tickLine={false} axisLine={false} />
+        <XAxis dataKey="date" tick={{ fontSize: 12, fill: '#475569' }} tickLine={false} axisLine={false} />
+        <YAxis domain={[0, 100]} tick={{ fontSize: 12, fill: '#475569' }} tickLine={false} axisLine={false} />
         <ChartTooltip
-          contentStyle={{ background: '#1e293b', border: 'none', borderRadius: 8, fontSize: 11, color: '#f1f5f9' }}
+          contentStyle={{ background: '#1e293b', border: 'none', borderRadius: 8, fontSize: 12, color: '#f1f5f9' }}
           formatter={(val, _name, props) => [`${val}/100 ${props?.payload?.mode === 'ENHANCED' ? '✦' : ''}`, 'Puntaje']}
         />
         <ReferenceLine y={50} stroke={ALERT_LEVEL_CONFIG.PREVENTIVO.color} strokeDasharray="3 3" strokeWidth={1} />
@@ -387,7 +387,7 @@ export default function ComunaRiskPanel({ comunaId, comunaName = null, score, re
               {btnLabel}
             </button>
             {!isLoading && syncState.phase !== 'done' && (
-              <small style={{ color: '#94a3b8', fontSize: '0.68rem', display: 'block', marginTop: 2 }}>
+              <small style={{ color: '#475569', fontSize: '0.8rem', display: 'block', marginTop: 2 }}>
                 ⓘ El proceso tarda aprox. 2–3 min
               </small>
             )}
