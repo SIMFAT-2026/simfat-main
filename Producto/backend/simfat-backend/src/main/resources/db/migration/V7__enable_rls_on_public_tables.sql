@@ -8,15 +8,17 @@
 --
 -- V1 tables were hardened by hand on 2026-04-22
 -- (Documentacion/Informes/seguridad-supabase-rls-2026-04-22.md). They are repeated here
--- so that any fresh environment gets the same state from the migrations alone. Every
+-- so that the backend tables get the same state from the migrations alone. Every
 -- statement is idempotent.
 --
--- flyway_schema_history is deliberately NOT touched here. Flyway holds a lock on its own
--- history table from its own connection while a migration runs, so an ALTER TABLE on it
--- from inside a migration waits on Flyway itself until the statement timeout. It was
--- already hardened by hand in production on 2026-04-22; fresh environments (local Docker,
--- CI) have no Data API, so nothing is exposed there.
---
+-- flyway_schema_history is deliberately NOT touched here, and is the one exception to
+-- "migrations alone are enough". Flyway holds a lock on its own history table from its
+-- own connection while a migration runs, so an ALTER TABLE on it from inside a migration
+-- waits on Flyway itself until the statement timeout. It was hardened by hand in
+-- production on 2026-04-22 and MUST be hardened by hand on any new Supabase project
+-- (see Documentacion/Informes/seguridad-supabase-rls-2026-04-22.md), because a Supabase
+-- project exposes it through the Data API.
+
 -- lock_timeout makes any other lock wait fail fast instead of hanging until the pooler's
 -- statement timeout (2 minutes on Supabase).
 --

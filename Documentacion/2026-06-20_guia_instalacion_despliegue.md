@@ -140,6 +140,15 @@ psql -U postgres -c "GRANT ALL PRIVILEGES ON DATABASE simfat TO simfat_user;"
 
 Las migraciones de esquema se ejecutan automáticamente al iniciar el backend mediante **Flyway**. No es necesario ejecutar scripts SQL manualmente.
 
+> **Nota para un proyecto Supabase nuevo:** la migración V7 activa RLS y revoca privilegios en las tablas del backend, pero **no** toca `flyway_schema_history`, porque Flyway mantiene un bloqueo sobre su propia tabla de historial mientras ejecuta migraciones y un `ALTER TABLE` desde dentro de una migración quedaría esperando a Flyway hasta agotar el tiempo de la sentencia. En cada proyecto Supabase nuevo hay que endurecerla manualmente, una sola vez:
+>
+> ```sql
+> ALTER TABLE public.flyway_schema_history ENABLE ROW LEVEL SECURITY;
+> REVOKE ALL ON TABLE public.flyway_schema_history FROM anon, authenticated, PUBLIC;
+> ```
+>
+> Más contexto en `Documentacion/Informes/seguridad-supabase-rls-2026-04-22.md`.
+
 ### 4.2 Configurar MongoDB
 
 MongoDB en modo standalone no requiere configuración adicional. Verificar que el servicio esté activo:
