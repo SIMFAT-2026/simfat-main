@@ -8,8 +8,8 @@ export const RISK_FILL_OPACITY = 0.55;
 
 // "Sin datos" is deliberately not part of the ramp: light grey fill, dotted outline.
 export const RISK_NO_DATA = {
-  fill: '#64748b',
-  fillOpacity: 0.2,
+  fill: '#cbd5e1',
+  fillOpacity: 0.3,
   color: '#475569',
   weight: 0.9,
   dashArray: '1 5',
@@ -26,7 +26,7 @@ export const ALERT_LEVEL_CONFIG = {
     label: 'Normal',
     range: '0-49',
     legendText: 'Normal (puntaje 0–49)',
-    fill: '#2166ac',
+    fill: '#1f78a0',
     dashArray: null,
     weight: 0.8,
     patternLabel: 'solid'
