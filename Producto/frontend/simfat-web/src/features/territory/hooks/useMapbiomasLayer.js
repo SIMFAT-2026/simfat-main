@@ -70,7 +70,7 @@ export function useMapbiomasLayer(indicator, { visible, regionId, publicMode }) 
         if (controller.signal.aborted) return;
         // Technical detail stays out of the UI; the reducer sets a fixed message.
         console.warn(`MapBiomas ${indicator} layer failed to load`, error);
-        dispatch({ type: 'failure', regionId, requestedYear: selectedYear });
+        dispatch({ type: 'failure', indicator, regionId, requestedYear: selectedYear });
       });
 
     return () => controller.abort();

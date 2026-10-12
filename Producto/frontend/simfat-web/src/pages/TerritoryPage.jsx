@@ -11,7 +11,8 @@ const FOCUS_MAP = {
   alerts: ['ALERTS', 'REPORTS'],
   vegetation: ['NDVI', 'NDMI'],
   loss: ['ALERTS'],
-  burned: ['BURNED']
+  burned: ['BURNED'],
+  landcover: ['LANDCOVER']
 };
 
 // Waits for the session bootstrap before mounting the content, so the data mode
