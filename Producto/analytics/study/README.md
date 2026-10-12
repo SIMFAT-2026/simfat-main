@@ -292,6 +292,27 @@ Guards on the single real run:
 - **Prevalence.** Below 5% and, as a reporting aid only, above 50% are flagged in
   every table (see N15).
 
+## S4c: H1, Fuego vs FIRMS agreement (this slice)
+
+H1 characterizes how well MapBiomas Fuego burn scars and NASA FIRMS active fire
+agree. It has no decision power and touches nothing of the backtest.
+
+- Primary: the share of Fuego scars of at least 250 ha (8-connected burned
+  pixels of one annual raster, clipped to the union of the 86 comunas) with at
+  least one filtered FIRMS detection (type 0, confidence `n`/`h`, same local
+  calendar year) within 375 m of the scar.
+- Secondary: Spearman correlation between the per-comuna annual burned fraction
+  (committed seed) and the filtered FIRMS count (86 x 13 pairs).
+- Code: `src/study/h1.py` (components, scars, exact buffer, summaries) and
+  `scripts/run_h1.py` (gated entry point). Choices the pre-registration leaves
+  open are DEVIATIONS N18-N22.
+- Outputs, written once to `outputs/h1/`: `h1_scars.csv` (one row per scar),
+  `h1_secondary.csv`, `h1_summary.json` (shares with a year-clustered 95% CI,
+  per year and per area class, the Spearman result, input hashes, git sha and
+  pre-registration hash).
+- Run: `python scripts/run_h1.py` (needs the Fuego raster cache that
+  `build_season_mapbiomas.py` also uses; every raster is sha256-verified).
+
 ## Running
 
 ```

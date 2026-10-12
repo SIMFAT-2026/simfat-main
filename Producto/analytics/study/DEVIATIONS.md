@@ -267,3 +267,127 @@ Implementation notes; no change to the pre-registered analysis.
 - Per-season warnings. `degeneracy_warnings` now also names every season whose
   `ci_status` is `single-class` or `bootstrap-failed` (once per season), so it is
   printed to stderr and stored in `decision.json`.
+
+### N18 — H1 scars: connectivity, clip and edge handling (2026-10-06)
+
+The pre-registration says "connected burned pixels in an annual raster" and
+fixes neither the connectivity nor the clip. Fixed here before any H1 code ran
+on the real data.
+
+- Connectivity is 8: two burned pixels sharing only a corner are one scar. It
+  is labelled by `study.h1.connected_components`, a numpy-only hook-and-compress
+  union-find over the sorted burned pixels, tested against an independent
+  breadth-first search on random arrays.
+- Scars are built per annual raster (value 1; zero is data) from the 13
+  sha256-verified annual rasters of 2013-2025, never from the accumulated or
+  frequency products. A pixel burned in two years belongs to a scar of each
+  year.
+- The raster is clipped to the union of the 86 comuna polygons with the pipeline's
+  rule (pixel centre inside, holes excluded, `all_touched=False`). A scar that
+  crosses a comuna border stays one scar and lists every comuna it touches. Only
+  pixels inside the union are kept, so a scar that leaves the monitored area is
+  measured on its inside part.
+- Area is the sum of the pipeline's WGS84 per-row pixel areas
+  (`mb_pipeline.zonal.row_pixel_areas_m2`). The 250 ha test is `area >= 250`
+  (inclusive).
+- Edge handling: `edge_flag` marks a scar with a pixel whose 8-neighbour lies
+  outside the union (or outside the read window). `truncated` marks the stricter
+  case where that outside neighbour is itself burned, i.e. the scar visibly
+  continues beyond the clip and its area is understated. Both are columns of
+  `h1_scars.csv`; no scar is dropped for either flag, and the summary reports the
+  primary share also without edge-flagged scars as a descriptive line.
+
+### N19 — H1 buffer method and detection matching (2026-10-06)
+
+- A detection is within the buffer of a scar iff its Euclidean distance to the
+  nearest burned pixel square of the scar is at most 375 m, i.e. it lies inside
+  the scar polygon (union of its pixel squares) buffered by 375 m. A detection
+  inside a burned pixel is at distance 0. No raster dilation is used.
+- Distances are in local WGS84 metres: degree offsets are scaled by
+  `N cos(phi) pi/180` (longitude) and `M pi/180` (latitude) at the detection's own
+  latitude, with the same `M`/`N` as the pixel-area formula. At -38 degrees a
+  pixel is about 23.6 m wide and 29.8 m tall, so the buffer spans more pixels
+  along columns than along rows. The comparison is `<= 375 m + 1e-6 m` so a
+  detection built at exactly 375 m is inside.
+- Method: for each detection the burned pixels of the kept scars in a pixel
+  window that surely covers 375 m are looked up by binary search and the
+  distance computed for each hit. Tests use hand-built geometry (exactly 375 m
+  and 400 m east and north at several latitudes, a diagonal case that separates
+  Euclidean from square buffers, an anisotropy case, a brute-force comparison on
+  random points).
+- The detections are the filtered ones (type 0, confidence `n` or `h`) of the
+  FIRMS archive, matched to a scar of the same LOCAL calendar year (N2). A
+  detection outside the 86 comunas is NOT dropped here (N4 applies to the
+  backtest target): a detection just beyond the border can lie within 375 m of a
+  scar inside it. One detection can count for two neighbouring scars.
+  `detected` is `n_detections_in_buffer >= 1`.
+- The read window extends 40 pixels (about 1 km) beyond the union so edge scars
+  see all their buffer.
+
+### N20 — H1 area classes (2026-10-06)
+
+The pre-registration asks for no class breakdown, but the run reports one. The
+classes were fixed before the code ran and are half-open: 250-500 ha, 500-1,000
+ha, 1,000-5,000 ha and >= 5,000 ha. They are descriptive and have no decision
+power.
+
+### N21 — H1 intervals and the secondary correlation (2026-10-06)
+
+- Primary interval. The share's 95% CI is a percentile bootstrap that resamples
+  YEARS with replacement (`bootstrap.cluster_bootstrap`, B = 2000, seed
+  20261027, a fresh generator per analysis, as in N8). Scars of one year share
+  weather, season and VIIRS overpasses, and one large fire complex is often split
+  into several neighbouring scars, so scars are not independent; the year is the
+  coarsest dependence unit the data hold. With 13 clusters the interval is coarse
+  and a percentile bootstrap can undercover, which is why the scar-clustered
+  interval (`ci_by_scar`, scars treated as independent, necessarily narrower) is
+  stored next to it for contrast. Quote `ci_by_year`.
+- Per-year shares carry an interval from resampling that year's scars; per-class
+  shares resample years. An interval is `null` with fewer than two clusters.
+- Secondary. Per comuna and year: the burned fraction is the seed's
+  `burnedFractionByYear` (the seed the backtest used; its denominator is the
+  comuna polygon area, Section 15) and the count is the number of filtered
+  detections whose local calendar year is that year and whose point lies inside
+  the comuna (the same point-in-polygon rule as the target, holes excluded, over
+  the whole calendar year, not a season window). Spearman uses average ranks
+  (`metrics.spearman`) over the 86 x 13 pairs; its CI resamples comunas with all
+  their years (the backtest bootstrap). A resample with an undefined correlation
+  is excluded and counted out of `n_valid`.
+- No H1 quantity enters the backtest, the decision rule or any claim.
+
+### N22 — H1 run guards and scope (2026-10-06)
+
+`scripts/run_h1.py` verifies the pre-registration hash first, refuses to start
+when `outputs/h1/h1_summary.json` exists (`--allow-overwrite` records the
+overwrite and the previous file's sha256), when the pre-registration commit is
+not an ancestor of HEAD, or when the study directory is dirty or git cannot
+answer (exit 3), and aborts on any Fuego raster whose sha256 differs from
+`mapbiomas/data/manifest.json`. H1 reads only Fuego rasters, the committed seed,
+the FIRMS archive and the comuna polygons. It reads none of the backtest inputs
+or outputs and writes only under `outputs/h1/`; the backtest, `outputs/tables/`
+and `outputs/decision.json` are untouched. `h1_summary.json` records the input
+hashes, the git sha, the pre-registration hash and the parameters.
+
+### N23 — Known edges of the H1 run, found in review (2026-10-06)
+
+Both H1 reviewers recomputed the committed outputs from the raw sources and
+confirmed them. They recorded these edges, none of which changes a result:
+
+- **DST table before Aug 2016.** `CHILE_DST_INTERVALS_UTC` starts on
+  2016-08-14, so earlier instants get UTC-4, although Chile was on UTC-3 for
+  most of 2013 to May 2016. For H1 this only matters for a detection at
+  03:00-03:59 UTC on Jan 1 of 2014, 2015 or 2016, which would fall into the
+  previous local year. The archive holds no such filtered detection, so the
+  effect on H1 is zero. The backtest windows start in Nov 2016 and are not
+  affected.
+- **End of the FIRMS archive.** The archive ends at 2025-12-31 UTC, so local
+  Dec 31, 2025 evening detections that fall on Jan 1, 2026 UTC are missing.
+  VIIRS passes over Chile around 01:30 and 13:30 local time, so the effect is
+  negligible.
+- **Interval cross-check.** The primary share 332/337 has a year-clustered
+  percentile interval of [0.969, 0.995]. At the scar level, Wilson gives
+  [0.966, 0.994] and the Clopper-Pearson lower bound is 0.966, so the reported
+  interval is not optimistic. Per-year intervals for years with few scars
+  (for example 4 of 4 in 2013) are degenerate at [1, 1] and uninformative.
+- **Provenance.** `h1_summary.json` records the HEAD at run time (7bb2c2b).
+  The outputs were added in the next commit (14cb427), which adds outputs only.
