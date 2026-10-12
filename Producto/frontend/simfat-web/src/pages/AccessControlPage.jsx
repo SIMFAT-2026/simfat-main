@@ -41,7 +41,7 @@ function AccessControlPage() {
   const [error, setError] = useState(null);
   const [users, setUsers] = useState([]);
   const [roles, setRoles] = useState([]);
-  const [permissions, setPermissions] = useState([]);
+  const [, setPermissions] = useState([]);
   const [regions, setRegions] = useState([]);
   const [draftRolesByUser, setDraftRolesByUser] = useState({});
   const [draftChatAccessByUser, setDraftChatAccessByUser] = useState({});

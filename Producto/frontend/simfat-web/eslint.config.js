@@ -20,7 +20,15 @@ export default [
       globals: {
         window: 'readonly',
         document: 'readonly',
-        console: 'readonly'
+        console: 'readonly',
+        setTimeout: 'readonly',
+        clearTimeout: 'readonly',
+        setInterval: 'readonly',
+        clearInterval: 'readonly',
+        URL: 'readonly',
+        FormData: 'readonly',
+        Blob: 'readonly',
+        AbortController: 'readonly'
       }
     },
     plugins: {
@@ -31,7 +39,9 @@ export default [
       ...reactPlugin.configs.recommended.rules,
       ...reactHooksPlugin.configs.recommended.rules,
       'react/react-in-jsx-scope': 'off',
-      'react/prop-types': 'off'
+      'react/prop-types': 'off',
+      // Destructuring to omit fields (`const { a, ...rest } = obj`) is intentional.
+      'no-unused-vars': ['error', { ignoreRestSiblings: true }]
     },
     settings: {
       react: {

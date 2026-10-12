@@ -1,5 +1,7 @@
 import axiosClient from '../../../api/axiosClient';
 import publicAxiosClient from '../../../api/publicAxiosClient';
+import { extractResponseData, normalizeLayerPayload } from '../utils/layerPayload';
+import { buildMapbiomasParams } from '../utils/mapbiomasLayer';
 
 const TERRITORY_ENDPOINTS = {
   layers: '/api/territory/layers',
@@ -21,21 +23,6 @@ const PUBLIC_TERRITORY_ENDPOINTS = {
 // Anonymous mode must never touch the shared client (Bearer + 401 refresh).
 function clientFor(publicMode) {
   return publicMode ? publicAxiosClient : axiosClient;
-}
-
-function isFeatureCollection(value) {
-  return Boolean(value) && typeof value === 'object' && value.type === 'FeatureCollection';
-}
-
-function toFeatureCollection(value) {
-  if (isFeatureCollection(value)) {
-    return value;
-  }
-
-  return {
-    type: 'FeatureCollection',
-    features: []
-  };
 }
 
 function toBounds(value) {
@@ -74,57 +61,6 @@ function toCenter(value, fallbackCenter) {
   return fallbackCenter;
 }
 
-function extractResponseData(payload) {
-  if (payload && typeof payload === 'object' && 'data' in payload) {
-    return payload.data;
-  }
-  return payload;
-}
-
-// Climate indicators are exposed as comuna-keyed value maps:
-// { indicator, unit, values: { comunaId: { value, unit, observedAt } } }
-// instead of GeoJSON FeatureCollections — they are joined onto the
-// comunal GeoJSON client-side (see TerritoryMapPanel ClimateChoropleth).
-const CLIMATE_INDICATORS = ['WIND', 'HUMIDITY', 'AIR_TEMP', 'SOIL_TEMP'];
-
-function isValueMap(value) {
-  return Boolean(value) && typeof value === 'object' && value.values && typeof value.values === 'object';
-}
-
-function toValueMap(value) {
-  if (isValueMap(value)) {
-    return value;
-  }
-  return null;
-}
-
-function normalizeLayerPayload(payload, regionId) {
-  const source = extractResponseData(payload) || {};
-  const layers = source.layers || {};
-
-  const normalizedLayers = {
-    NDVI: toFeatureCollection(layers.NDVI),
-    NDMI: toFeatureCollection(layers.NDMI),
-    ALERTS: toFeatureCollection(layers.ALERTS),
-    FIRMS: toFeatureCollection(layers.FIRMS),
-    REPORTS: toFeatureCollection(layers.REPORTS),
-    RISK_SCORE: toFeatureCollection(layers.RISK_SCORE)
-  };
-
-  CLIMATE_INDICATORS.forEach((indicator) => {
-    const valueMap = toValueMap(layers[indicator]);
-    if (valueMap) {
-      normalizedLayers[indicator] = valueMap;
-    }
-  });
-
-  return {
-    regionId: source.regionId || regionId,
-    generatedAt: source.generatedAt || new Date().toISOString(),
-    layers: normalizedLayers
-  };
-}
-
 function normalizeBoundsPayload(payload, fallback) {
   const source = extractResponseData(payload) || {};
   const bounds = toBounds(source.bounds) || fallback.bounds;
@@ -147,6 +83,17 @@ export async function fetchTerritoryLayers({ regionId, indicators, from, to }) {
   });
 
   return normalizeLayerPayload(response.data, regionId);
+}
+
+// Fetches ONE yearly MapBiomas layer (BURNED or LANDCOVER). These are not part
+// of the region bulk load: each year is requested on demand. When year is
+// omitted the backend applies its data-derived default year. Resolves to the
+// layer payload (year, minYear, maxYear, citation, values...) or null.
+export async function fetchMapbiomasLayer(indicator, { regionId, year, publicMode = false, signal } = {}) {
+  const params = buildMapbiomasParams({ regionId, indicator, year });
+  const endpoint = publicMode ? PUBLIC_TERRITORY_ENDPOINTS.layers : TERRITORY_ENDPOINTS.layers;
+  const response = await clientFor(publicMode).get(endpoint, { params, signal });
+  return normalizeLayerPayload(response.data, regionId).layers[indicator] ?? null;
 }
 
 export async function fetchTerritoryBounds(regionId, fallback) {

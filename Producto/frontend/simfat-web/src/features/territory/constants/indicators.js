@@ -1,0 +1,26 @@
+// Single source of truth for the indicators served as comuna-keyed value maps
+// ({ indicator, unit, values: { comunaId: {...} } }) instead of GeoJSON.
+
+// Opt-in climate layers rendered as comuna choropleths (see ClimateChoropleth).
+export const CLIMATE_INDICATORS = ['WIND', 'HUMIDITY', 'AIR_TEMP', 'SOIL_TEMP'];
+
+// MapBiomas layers: yearly, fetched on demand (never in the region bulk load).
+export const MAPBIOMAS_INDICATORS = ['BURNED', 'LANDCOVER'];
+
+// Everything the normaliser must keep as a value map.
+export const VALUE_MAP_INDICATORS = [...CLIMATE_INDICATORS, ...MAPBIOMAS_INDICATORS];
+
+// Critical: needed for the first meaningful paint (choropleth + active fires + alerts).
+// Secondary: useful context loaded after the map is already interactive.
+// MapBiomas layers are deliberately NOT in either bulk-load group: they are
+// fetched on demand per year (fetchMapbiomasLayer), which also keeps
+// DashboardPage from double-fetching them.
+export const CRITICAL_INDICATORS = ['RISK_SCORE', 'ALERTS', 'FIRMS'];
+export const SECONDARY_INDICATORS = ['NDVI', 'NDMI', 'REPORTS', ...CLIMATE_INDICATORS];
+
+// Every indicator accepted as an initial visible layer (deep links, ?focus=).
+export const DEFAULT_INDICATORS = [...CRITICAL_INDICATORS, ...SECONDARY_INDICATORS, ...MAPBIOMAS_INDICATORS];
+
+// WIND/HUMIDITY/AIR_TEMP/SOIL_TEMP are opt-in climate layers: fetched alongside
+// the rest but not shown until the user toggles them on (DEC-B).
+export const DEFAULT_VISIBLE_INDICATORS = ['RISK_SCORE', 'FIRMS', 'ALERTS', 'REPORTS'];

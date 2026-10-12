@@ -11,6 +11,7 @@ import ErrorMessage from '../../../components/ErrorMessage';
 import LoadingSpinner from '../../../components/LoadingSpinner';
 import WeatherSyncButton from '../../dashboard/components/WeatherSyncButton';
 import { ALERT_LEVEL_CONFIG, CLIMATE_SCALES, RISK_SCORE_LEGEND, VEGETATION_SCALES } from '../constants/colorScales';
+import { CLIMATE_INDICATORS } from '../constants/indicators';
 
 // LocalDateTime de Java llega sin 'Z' — JS lo interpreta como hora local del browser.
 // Esta utilidad fuerza UTC antes de convertir a Santiago para evitar doble conversión.
@@ -45,7 +46,6 @@ const INDICATOR_COLORS = {
   SOIL_TEMP: '#b45309'
 };
 
-const CLIMATE_INDICATORS = ['WIND', 'HUMIDITY', 'AIR_TEMP', 'SOIL_TEMP'];
 const INDEX_CHOROPLETH_INDICATORS = ['NDVI', 'NDMI'];
 const NEUTRAL_FILL = '#cbd5e1';
 

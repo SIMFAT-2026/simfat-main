@@ -8,6 +8,12 @@ import {
   fetchPublicTerritoryBounds,
   fetchPublicTerritoryLayers
 } from '../services/territoryApiService';
+import {
+  CRITICAL_INDICATORS,
+  DEFAULT_INDICATORS,
+  DEFAULT_VISIBLE_INDICATORS,
+  SECONDARY_INDICATORS
+} from '../constants/indicators';
 
 const CACHE_TTL_MS = 120_000;
 const pendingKeys = new Set();
@@ -48,15 +54,6 @@ const REGION_CONFIG = {
 
 export const REGION_OPTIONS = Object.values(REGION_CONFIG);
 
-// Critical: needed for the first meaningful paint (choropleth + active fires + alerts).
-// Secondary: useful context loaded after the map is already interactive.
-const CRITICAL_INDICATORS = ['RISK_SCORE', 'ALERTS', 'FIRMS'];
-const SECONDARY_INDICATORS = ['NDVI', 'NDMI', 'REPORTS', 'WIND', 'HUMIDITY', 'AIR_TEMP', 'SOIL_TEMP'];
-const DEFAULT_INDICATORS = [...CRITICAL_INDICATORS, ...SECONDARY_INDICATORS];
-
-// WIND/HUMIDITY/AIR_TEMP/SOIL_TEMP are opt-in climate layers: fetched alongside
-// the rest but not shown until the user toggles them on (DEC-B).
-const DEFAULT_VISIBLE_INDICATORS = ['RISK_SCORE', 'FIRMS', 'ALERTS', 'REPORTS'];
 const REGION_IDS = new Set(REGION_OPTIONS.map((region) => region.id));
 
 function createPointFeature(id, lng, lat, properties) {
