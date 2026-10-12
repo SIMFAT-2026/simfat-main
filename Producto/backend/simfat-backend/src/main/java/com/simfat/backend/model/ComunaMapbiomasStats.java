@@ -114,6 +114,12 @@ public class ComunaMapbiomasStats {
         private Integer yearLastFire;
         private Integer yearsSinceLastFire;
 
+        // Design D1/D3: empirical percentile rank of the burned fraction across all comunas,
+        // frozen with dataVersion (ties take the mean rank, exact zeros pinned to 0.0). See
+        // mb_pipeline/build_stats.py::add_burned_fraction_pct. Non-null exactly for comunas
+        // with available=true (a comuna excluded from the rank has no value, not a 0.0).
+        private Double burnedFractionPct;
+
         // Non-null exactly when available=false, explaining why (e.g. coverage below
         // threshold, or no fire years processed for the comuna); null when available=true.
         // See mb_pipeline/fire_stats.py::build_fire_section for the exact semantics.
@@ -142,6 +148,9 @@ public class ComunaMapbiomasStats {
 
         public Integer getYearsSinceLastFire() { return yearsSinceLastFire; }
         public void setYearsSinceLastFire(Integer yearsSinceLastFire) { this.yearsSinceLastFire = yearsSinceLastFire; }
+
+        public Double getBurnedFractionPct() { return burnedFractionPct; }
+        public void setBurnedFractionPct(Double burnedFractionPct) { this.burnedFractionPct = burnedFractionPct; }
 
         public String getReason() { return reason; }
         public void setReason(String reason) { this.reason = reason; }

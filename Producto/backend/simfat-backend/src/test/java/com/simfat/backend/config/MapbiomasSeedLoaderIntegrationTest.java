@@ -134,6 +134,10 @@ class MapbiomasSeedLoaderIntegrationTest {
         assertThat(doc.isPartial()).isTrue();
         assertThat(doc.getFire()).isNotNull();
         assertThat(doc.getFire().getAvailable()).isTrue();
+        // S1b3: design D1/D3's burnedFractionPct, regenerated into the real committed seed
+        // (mb_pipeline/build_stats.py::add_burned_fraction_pct); every comuna with
+        // available=true must round-trip a non-null rank, never silently drop to null.
+        assertThat(doc.getFire().getBurnedFractionPct()).isNotNull();
     }
 
     @Test

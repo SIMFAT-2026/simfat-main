@@ -374,3 +374,43 @@ def test_build_fire_section_composes_with_real_annual_burned_fraction_no_key_err
     assert section["available"] is True
     assert section["coverageFraction"] == pytest.approx(1.0)
     assert section["burnedFractionByYear"]["2017"] == pytest.approx(0.13)
+
+
+# --- select_burned_fraction_for_pct: which value feeds burnedFractionPct ----
+#
+# Design D1/D3: burnedFractionPct ranks the cumulative/union burnedFraction
+# once multiple Fuego years are merged; this S1b3 partial dataset only has
+# one Fuego year (2017), so it falls back to that single year's
+# burnedFractionByYear value.
+
+
+def test_select_burned_fraction_for_pct_prefers_cumulative_when_present():
+    fire = {"available": True, "burnedFraction": 0.08, "burnedFractionByYear": {"2020": 0.5}}
+    assert fire_stats.select_burned_fraction_for_pct(fire) == 0.08
+
+
+def test_select_burned_fraction_for_pct_falls_back_to_the_single_available_year():
+    fire = {"available": True, "burnedFractionByYear": {"2017": 0.02}}
+    assert fire_stats.select_burned_fraction_for_pct(fire) == 0.02
+
+
+def test_select_burned_fraction_for_pct_none_when_fire_unavailable():
+    # available=False must be excluded from the rank even though a raw
+    # burnedFractionByYear value is still present (MCS-8: available=False
+    # never hides the underlying numbers, but it does mean "not usable").
+    fire = {"available": False, "burnedFractionByYear": {"2017": 0.5}}
+    assert fire_stats.select_burned_fraction_for_pct(fire) is None
+
+
+def test_select_burned_fraction_for_pct_none_when_no_value_at_all():
+    fire = {"available": True, "burnedFractionByYear": {}}
+    assert fire_stats.select_burned_fraction_for_pct(fire) is None
+
+
+def test_select_burned_fraction_for_pct_raises_when_multiple_years_and_no_cumulative():
+    # Summing/averaging partial years without a real cumulative (union)
+    # computation would silently double-count overlapping burns -- fail
+    # loudly instead of guessing.
+    fire = {"available": True, "burnedFractionByYear": {"2017": 0.1, "2018": 0.2}}
+    with pytest.raises(ValueError, match="cumulative"):
+        fire_stats.select_burned_fraction_for_pct(fire)

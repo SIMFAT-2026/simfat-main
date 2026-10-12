@@ -57,15 +57,41 @@ class MapbiomasSusceptibilityServiceImplTest {
         return landCover;
     }
 
+    /**
+     * Convenience default: {@code burnedFractionPct} is set to the raw most-recent-year
+     * fraction, so every EXISTING fixture built with this 4-arg overload exercises the
+     * D3-intended "pct present" path with unchanged expected numbers (the numeric value of a
+     * percentile rank is unconstrained by this helper -- only the raw-fallback tests below care
+     * about it being present vs. absent). Tests that specifically exercise the fallback (pct
+     * absent) or a genuinely different rank value use the 5-arg overload explicitly.
+     */
     private ComunaMapbiomasStats.Fire fire(
         boolean available, Map<String, Double> burnedFractionByYear, Double frequencyMean, Integer yearsSinceLastFire
+    ) {
+        return fire(available, burnedFractionByYear, frequencyMean, yearsSinceLastFire, mostRecentYearFraction(burnedFractionByYear));
+    }
+
+    private ComunaMapbiomasStats.Fire fire(
+        boolean available, Map<String, Double> burnedFractionByYear, Double frequencyMean, Integer yearsSinceLastFire,
+        Double burnedFractionPct
     ) {
         ComunaMapbiomasStats.Fire fire = new ComunaMapbiomasStats.Fire();
         fire.setAvailable(available);
         fire.setBurnedFractionByYear(burnedFractionByYear);
         fire.setFrequencyMean(frequencyMean);
         fire.setYearsSinceLastFire(yearsSinceLastFire);
+        fire.setBurnedFractionPct(burnedFractionPct);
         return fire;
+    }
+
+    private static Double mostRecentYearFraction(Map<String, Double> burnedFractionByYear) {
+        if (burnedFractionByYear == null || burnedFractionByYear.isEmpty()) {
+            return null;
+        }
+        return burnedFractionByYear.entrySet().stream()
+            .max(java.util.Map.Entry.comparingByKey())
+            .orElseThrow()
+            .getValue();
     }
 
     private ComunaMapbiomasStats stats(ComunaMapbiomasStats.LandCover landCover, ComunaMapbiomasStats.Fire fire) {
@@ -225,5 +251,59 @@ class MapbiomasSusceptibilityServiceImplTest {
         double result = MapbiomasSusceptibilityServiceImpl.computeBurnedNorm(burnedFractionByYear);
 
         assertEquals(0.05, result, 1e-9);
+    }
+
+    // --- S1b3: fire.burnedFractionPct (design D3's intended burnedNorm) --------
+
+    @Test
+    void forComuna_burnedFractionPctPresent_usesItInsteadOfRawFraction() {
+        // Deliberately set the raw fraction (0.90) and the pct (0.30) to very different
+        // values -- a real, zero-inflated percentile rank is NOT the same number as a raw
+        // fraction -- so the assertion cannot pass by accident if the raw fraction were used.
+        Map<String, Double> shares = Map.of("9", 0.5, "12", 0.5);
+        Map<String, Double> burned = Map.of("2020", 0.90);
+        ComunaMapbiomasStats.Fire fire = fire(true, burned, 2.5, 3, 0.30);
+        when(statsRepository.findByComunaIdAndDataVersion(eq(COMUNA_ID), eq(DATA_VERSION)))
+            .thenReturn(Optional.of(stats(landCover(shares), fire)));
+
+        MapbiomasSusceptibility result = service.forComuna(COMUNA_ID).orElseThrow();
+
+        // history = clamp(0.60*0.30 + 0.40*0.5) * 1.0(recency neutral) = 0.38, NOT
+        // clamp(0.60*0.90 + 0.40*0.5) = 0.74 (the raw-fraction value).
+        assertEquals(0.38, result.historyIndex(), 1e-9);
+        assertNull(result.qualityFlag(), "pct is present -- no fallback flag");
+    }
+
+    @Test
+    void forComuna_burnedFractionPctAbsent_fallsBackToRawFractionAndFlagsIt() {
+        Map<String, Double> shares = Map.of("9", 0.5, "12", 0.5);
+        Map<String, Double> burned = Map.of("2020", 0.1);
+        ComunaMapbiomasStats.Fire fire = fire(true, burned, 2.5, 3, null);
+        when(statsRepository.findByComunaIdAndDataVersion(eq(COMUNA_ID), eq(DATA_VERSION)))
+            .thenReturn(Optional.of(stats(landCover(shares), fire)));
+
+        MapbiomasSusceptibility result = service.forComuna(COMUNA_ID).orElseThrow();
+
+        // Same numbers as the original full-blend fixture (raw fallback, unchanged formula).
+        assertEquals(0.26, result.historyIndex(), 1e-9);
+        assertEquals(MapbiomasSusceptibility.MAPBIOMAS_BURNED_NORM_RAW_FALLBACK, result.qualityFlag());
+    }
+
+    @Test
+    void forComuna_burnedFractionPctAbsentAndLandCoverUnavailable_combinesBothFlags() {
+        // The fuel-unavailable flag and the raw-fallback flag are independent conditions and
+        // must both surface, not silently pick one.
+        Map<String, Double> burned = Map.of("2020", 0.1);
+        ComunaMapbiomasStats.Fire fire = fire(true, burned, 2.5, 3, null);
+        when(statsRepository.findByComunaIdAndDataVersion(eq(COMUNA_ID), eq(DATA_VERSION)))
+            .thenReturn(Optional.of(stats(null, fire)));
+
+        MapbiomasSusceptibility result = service.forComuna(COMUNA_ID).orElseThrow();
+
+        assertEquals(
+            MapbiomasSusceptibility.MAPBIOMAS_FUEL_UNAVAILABLE + ","
+                + MapbiomasSusceptibility.MAPBIOMAS_BURNED_NORM_RAW_FALLBACK,
+            result.qualityFlag()
+        );
     }
 }
