@@ -16,7 +16,6 @@ import {
   BURNED_SCALE,
   CLIMATE_SCALES,
   NEUTRAL_FILL,
-  RISK_SCORE_LEGEND,
   VEGETATION_SCALES,
   burnedColorFor
 } from '../constants/colorScales';
@@ -29,6 +28,15 @@ import RegionalSummary from './RegionalSummary';
 import { regionalSummary } from '../utils/regionalSummary';
 import { alertTrigger } from '../utils/alertTrigger';
 import { compassLabelFrom } from '../utils/compass';
+import { comunaRiskStyle, riskLegendItems } from '../utils/riskPalette';
+import {
+  WIND_ARROW,
+  WIND_ARROW_HALO_WIDTH,
+  WIND_ARROW_LEGEND,
+  WIND_ARROW_PATH,
+  windArrowHtml,
+  windArrowSize
+} from '../utils/windArrow';
 import { modeLabel } from '../../../utils/labels';
 import MapbiomasYearControl from './MapbiomasYearControl';
 import { chipLabel, controlVisible } from '../utils/yearControl';
@@ -115,19 +123,6 @@ function climateColorForValue(indicator, value) {
 
 
 
-function comunaBaseStyle(score) {
-  const level = score?.alertLevel || 'NORMAL';
-  const cfg = ALERT_LEVEL_CONFIG[level] || ALERT_LEVEL_CONFIG.NORMAL;
-  return {
-    fillColor: cfg.fill,
-    fillOpacity: score ? 0.34 : 0.10,
-    color: cfg.color,
-    weight: score ? cfg.weight : 0.8,
-    dashArray: score ? cfg.dashArray : null,
-    opacity: score ? 0.9 : 0.7
-  };
-}
-
 const ComunaChoropleth = memo(function ComunaChoropleth({ geoJson, comunalScores, onComunaHover, onComunaHoverEnd, onComunaClick }) {
   // react-leaflet only rebuilds the underlying L.geoJSON layer when `data` (the
   // polygons) changes — onEachFeature's handlers are bound once at that point
@@ -146,7 +141,7 @@ const ComunaChoropleth = memo(function ComunaChoropleth({ geoJson, comunalScores
       data={geoJson}
       style={(feature) => {
         const score = scoresRef.current?.[feature?.properties?.comunaId];
-        return comunaBaseStyle(score);
+        return comunaRiskStyle(score);
       }}
       onEachFeature={(feature, layer) => {
         const comunaId = feature?.properties?.comunaId;
@@ -154,13 +149,13 @@ const ComunaChoropleth = memo(function ComunaChoropleth({ geoJson, comunalScores
 
         layer.on('mouseover', (e) => {
           const score = scoresRef.current?.[comunaId];
-          layer.setStyle({ fillOpacity: 0.68, weight: 1.4, color: '#475569' });
+          layer.setStyle({ fillOpacity: 0.75, weight: 1.6, color: '#0f172a' });
           onComunaHover?.(comunaId, nombre, score, e.containerPoint);
         });
 
         layer.on('mouseout', () => {
           const score = scoresRef.current?.[comunaId];
-          layer.setStyle(comunaBaseStyle(score));
+          layer.setStyle(comunaRiskStyle(score));
           onComunaHoverEnd?.();
         });
 
@@ -397,14 +392,28 @@ function featureCentroid(feature) {
 }
 
 function windArrowIcon(speed, bearingTo) {
-  const color = climateColorForValue('WIND', speed);
-  const html = `<div class="wind-arrow" style="transform: rotate(${bearingTo}deg); border-bottom-color: ${color};"></div>`;
+  const size = windArrowSize(speed);
   return L.divIcon({
     className: 'wind-arrow-icon',
-    html,
-    iconSize: [20, 20],
-    iconAnchor: [10, 10]
+    html: windArrowHtml(speed, bearingTo),
+    iconSize: [size, size],
+    iconAnchor: [size / 2, size / 2]
   });
+}
+
+function WindArrowSample({ size }) {
+  return (
+    <svg className="territory-wind-legend-arrow" width={size} height={size} viewBox="0 0 24 24" aria-hidden="true">
+      <path
+        d={WIND_ARROW_PATH}
+        fill={WIND_ARROW.fill}
+        stroke={WIND_ARROW.halo}
+        strokeWidth={WIND_ARROW_HALO_WIDTH}
+        strokeLinejoin="round"
+        paintOrder="stroke"
+      />
+    </svg>
+  );
 }
 
 // Renders one rotated arrow per comuna centroid showing wind direction
@@ -1356,11 +1365,11 @@ function TerritoryMapPanel({
                 <div className="territory-legend-section">
                   <h5>Riesgo comunal</h5>
                   <ul>
-                    {RISK_SCORE_LEGEND.map((item) => (
-                      <li key={item.label} title={item.note}>
+                    {riskLegendItems().map((item) => (
+                      <li key={item.key} title={item.note}>
                         <span
-                          className="territory-color-dot territory-risk-swatch"
-                          style={{ backgroundColor: item.color, borderColor: item.borderColor, color: item.borderColor }}
+                          className="territory-risk-swatch"
+                          style={{ backgroundColor: item.swatchFill, borderColor: item.borderColor, borderStyle: item.borderStyle }}
                           aria-hidden="true"
                         />
                         <span>{item.text}</span>
@@ -1377,10 +1386,11 @@ function TerritoryMapPanel({
                   <div key={indicator} className="territory-legend-section">
                     <h5>{scale.label}</h5>
                     <ul>
-                      {scale.bins.map((bin) => (
+                      {scale.bins.map((bin, index) => (
                         <li key={bin.label}>
                           <span className="territory-color-dot" style={{ backgroundColor: bin.color }} />
                           <span>{bin.label}</span>
+                          {indicator === 'WIND' ? <WindArrowSample size={WIND_ARROW_LEGEND[index].size} /> : null}
                         </li>
                       ))}
                       <li>
@@ -1388,6 +1398,9 @@ function TerritoryMapPanel({
                         <span>Sin datos</span>
                       </li>
                     </ul>
+                    {indicator === 'WIND' ? (
+                      <p className="territory-legend-note">Las flechas apuntan hacia donde sopla el viento; su tamaño indica la velocidad.</p>
+                    ) : null}
                   </div>
                 );
               })}
@@ -1399,10 +1412,11 @@ function TerritoryMapPanel({
                   <div key={indicator} className="territory-legend-section">
                     <h5>{scale.label} ({scale.unit})</h5>
                     <ul>
-                      {scale.bins.map((bin) => (
+                      {scale.bins.map((bin, index) => (
                         <li key={bin.label}>
                           <span className="territory-color-dot" style={{ backgroundColor: bin.color }} />
                           <span>{bin.label}</span>
+                          {indicator === 'WIND' ? <WindArrowSample size={WIND_ARROW_LEGEND[index].size} /> : null}
                         </li>
                       ))}
                       <li>
@@ -1410,6 +1424,9 @@ function TerritoryMapPanel({
                         <span>Sin datos</span>
                       </li>
                     </ul>
+                    {indicator === 'WIND' ? (
+                      <p className="territory-legend-note">Las flechas apuntan hacia donde sopla el viento; su tamaño indica la velocidad.</p>
+                    ) : null}
                   </div>
                 );
               })}

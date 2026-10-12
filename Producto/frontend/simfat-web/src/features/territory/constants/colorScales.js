@@ -1,53 +1,67 @@
-// Colorblind-safe risk ramp: low risk stays pale/cool, while severity increases through
-// warmer and darker values so the map remains distinguishable by luminance plus stroke pattern.
+// Risk ramp follows green -> yellow -> orange -> dark red (ColorBrewer RdYlGn / YlOrRd family).
+// The map paints these fills at RISK_FILL_OPACITY over the base map, so the values were picked
+// for their *blended* appearance (adjacent levels >= 20 delta E, checked in riskPalette tests).
+// Stroke dash patterns stay as a second, colour-independent cue.
+export const RISK_FILL_OPACITY = 0.55;
+
+// "Sin datos" is deliberately not part of the ramp: light grey fill, dotted outline.
+export const RISK_NO_DATA = {
+  fill: '#64748b',
+  fillOpacity: 0.2,
+  color: '#475569',
+  weight: 0.9,
+  dashArray: '1 5',
+  text: 'Sin datos de riesgo'
+};
+
 export const ALERT_LEVEL_CONFIG = {
   // `range` mirrors the SCORE_* thresholds in ComunaRiskServiceImpl/TerritoryRiskServiceImpl
   // (score is 0-1 there, shown as /100 here) — keep these in sync if those constants change.
   NORMAL: {
-    color: '#1e3a8a',
-    darkUiColor: '#93c5fd',
-    bg: '#dbeafe',
+    color: '#14532d',
+    darkUiColor: '#86efac',
+    bg: '#dcfce7',
     label: 'Normal',
     range: '0-49',
     legendText: 'Normal (puntaje 0–49)',
-    fill: '#dbeafe',
+    fill: '#1a9850',
     dashArray: null,
     weight: 0.8,
     patternLabel: 'solid'
   },
   PREVENTIVO: {
-    color: '#78350f',
-    darkUiColor: '#fbbf24',
-    bg: '#fef3c7',
+    color: '#854d0e',
+    darkUiColor: '#fde047',
+    bg: '#fef9c3',
     label: 'Preventivo',
     range: '50-69',
     legendText: 'Preventivo (puntaje 50–69)',
-    fill: '#f59e0b',
+    fill: '#ffd92f',
     dashArray: '4 3',
     weight: 1.1,
     patternLabel: 'short dash'
   },
   ALTO: {
-    color: '#7c2d12',
+    color: '#9a3412',
     darkUiColor: '#fb923c',
     bg: '#ffedd5',
     label: 'Alto',
     range: '70-84',
     legendText: 'Alto (puntaje 70–84 o FWI ≥ 20)',
-    fill: '#b45309',
+    fill: '#f46d43',
     dashArray: '8 4',
     weight: 1.4,
     patternLabel: 'long dash'
   },
   CRITICO: {
-    color: '#3f1d0b',
-    darkUiColor: '#fdba74',
-    bg: '#f5e8dc',
+    color: '#7f1d1d',
+    darkUiColor: '#fca5a5',
+    bg: '#fee2e2',
     label: 'Crítico',
     range: '85-100',
     legendText: 'Crítico (puntaje ≥ 85 o focos FIRMS)',
     note: 'también se activa con un foco FIRMS detectado hoy, o con FWI ≥ 45, sin importar el puntaje',
-    fill: '#3f1d0b',
+    fill: '#7f0016',
     dashArray: '2 3',
     weight: 1.8,
     patternLabel: 'dense dash'

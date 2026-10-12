@@ -360,8 +360,8 @@ export default function ComunaRiskPanel({ comunaId, comunaName = null, score, re
         <h5 className="panel-section-title">Evolución 30 días</h5>
         <RiskHistoryChart gadmGid={comunaId} publicMode={readOnly} />
         <p className="panel-chart-legend">
-          <span style={{ borderBottom: '2px dashed #ca8a04' }}>&nbsp;&nbsp;</span> Preventivo &nbsp;
-          <span style={{ borderBottom: '2px dashed #ea580c' }}>&nbsp;&nbsp;</span> Alto &nbsp;
+          <span style={{ borderBottom: `2px dashed ${ALERT_LEVEL_CONFIG.PREVENTIVO.color}` }}>&nbsp;&nbsp;</span> Preventivo &nbsp;
+          <span style={{ borderBottom: `2px dashed ${ALERT_LEVEL_CONFIG.ALTO.color}` }}>&nbsp;&nbsp;</span> Alto &nbsp;
           ✦ Con Copernicus
         </p>
       </section>

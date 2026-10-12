@@ -9,13 +9,21 @@
 }
 
 .wind-arrow {
-  width: 0;
-  height: 0;
-  border-left: 6px solid transparent;
-  border-right: 6px solid transparent;
-  border-bottom: 16px solid #0891b2;
-  filter: drop-shadow(0 0 1px rgba(15, 23, 42, 0.7));
-  transform-origin: 50% 70%;
+  display: block;
+  overflow: visible;
+  filter: drop-shadow(0 0 1px rgba(15, 23, 42, 0.6));
+  transform-origin: 50% 50%;
+}
+
+.territory-wind-legend-arrow {
+  display: block;
+  justify-self: end;
+}
+
+.territory-legend-note {
+  margin: 4px 0 0;
+  font-size: 0.8rem;
+  color: #475569;
 }
 
 .wind-hour-slider {
@@ -464,18 +472,13 @@
   border-radius: 999px;
 }
 .territory-risk-swatch {
-  border: 2px solid currentColor;
-  position: relative;
-  overflow: hidden;
-}
-
-.territory-risk-swatch::after {
-  content: '';
-  position: absolute;
-  inset: 2px;
-  border-top: 2px solid currentColor;
-  transform: rotate(-35deg);
-  transform-origin: center;
+  /* Fill is the level colour already blended over land, like the map. */
+  display: inline-block;
+  width: 12px;
+  height: 10px;
+  border: 2px solid;
+  border-radius: 2px;
+  box-sizing: border-box;
 }
 
 .territory-climate-legend {
