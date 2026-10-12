@@ -29,6 +29,38 @@ function srgbToLinear(channel) {
   return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
 }
 
+function linearToSrgb(value) {
+  const v = Math.min(1, Math.max(0, value));
+  return 255 * (v <= 0.0031308 ? 12.92 * v : 1.055 * v ** (1 / 2.4) - 0.055);
+}
+
+// Machado, Oliveira & Fernandes (2009) matrices at full severity, applied in linear RGB.
+const CVD_MATRICES = {
+  protanopia: [
+    [0.152286, 1.052583, -0.204868],
+    [0.114503, 0.786281, 0.099216],
+    [-0.003882, -0.048116, 1.051998]
+  ],
+  deuteranopia: [
+    [0.367322, 0.860646, -0.227968],
+    [0.280085, 0.672501, 0.047413],
+    [-0.01182, 0.04294, 0.968881]
+  ],
+  tritanopia: [
+    [1.255528, -0.076749, -0.178779],
+    [-0.078411, 0.930809, 0.147602],
+    [0.004733, 0.691367, 0.3039]
+  ]
+};
+
+// How a colour looks to someone with the given colour vision deficiency.
+export function simulateColorBlindness(hex, type) {
+  const matrix = CVD_MATRICES[type];
+  if (!matrix) return hex;
+  const linear = hexToRgb(hex).map(srgbToLinear);
+  return rgbToHex(matrix.map((row) => linearToSrgb(row[0] * linear[0] + row[1] * linear[1] + row[2] * linear[2])));
+}
+
 function hexToLab(hex) {
   const [r, g, b] = hexToRgb(hex).map(srgbToLinear);
   const x = (0.4124564 * r + 0.3575761 * g + 0.1804375 * b) / 0.95047;

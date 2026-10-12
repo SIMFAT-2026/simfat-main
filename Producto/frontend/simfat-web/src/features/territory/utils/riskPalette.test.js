@@ -7,7 +7,8 @@ import {
   comunaRiskStyle,
   deltaE2000,
   hexDeltaE,
-  riskLegendItems
+  riskLegendItems,
+  simulateColorBlindness
 } from './riskPalette';
 
 const ORDER = ['NORMAL', 'PREVENTIVO', 'ALTO', 'CRITICO'];
@@ -57,12 +58,46 @@ describe('risk palette distinguishability on the map', () => {
     }
   });
 
-  it('keeps green to red semantics (hue moves from green through yellow to red)', () => {
+  it('keeps calm to alarm semantics (blue Normal, red Crítico)', () => {
     const channel = (hex, i) => parseInt(hex.slice(1 + i * 2, 3 + i * 2), 16);
     const normal = ALERT_LEVEL_CONFIG.NORMAL.fill;
     const critico = ALERT_LEVEL_CONFIG.CRITICO.fill;
-    expect(channel(normal, 1)).toBeGreaterThan(channel(normal, 0));
-    expect(channel(critico, 0)).toBeGreaterThan(channel(critico, 1));
+    expect(channel(normal, 2)).toBeGreaterThan(channel(normal, 0));
+    expect(channel(normal, 2)).toBeGreaterThan(channel(normal, 1));
+    expect(channel(critico, 0)).toBeGreaterThan(channel(critico, 2));
+  });
+});
+
+// About 1 in 12 men has a red-green colour vision deficiency, so every pair of levels
+// must stay distinguishable under simulated protanopia, deuteranopia and tritanopia.
+describe('risk palette under colour vision deficiencies', () => {
+  const fills = blendedLevelFills();
+  const TYPES = ['protanopia', 'deuteranopia', 'tritanopia'];
+
+  it('leaves colours unchanged for normal vision', () => {
+    expect(simulateColorBlindness('#2c7bb6', 'normal')).toBe('#2c7bb6');
+  });
+
+  it('keeps every pair of levels at least 10 delta E apart', () => {
+    for (const type of TYPES) {
+      for (let i = 0; i < ORDER.length; i += 1) {
+        for (let j = i + 1; j < ORDER.length; j += 1) {
+          const a = simulateColorBlindness(fills[ORDER[i]], type);
+          const b = simulateColorBlindness(fills[ORDER[j]], type);
+          expect(hexDeltaE(a, b), `${type} ${ORDER[i]}-${ORDER[j]}`).toBeGreaterThanOrEqual(10);
+        }
+      }
+    }
+  });
+
+  it('never confuses Normal with Alto or Crítico (at least 20 delta E)', () => {
+    for (const type of TYPES) {
+      const normal = simulateColorBlindness(fills.NORMAL, type);
+      for (const level of ['ALTO', 'CRITICO']) {
+        const other = simulateColorBlindness(fills[level], type);
+        expect(hexDeltaE(normal, other), `${type} NORMAL-${level}`).toBeGreaterThanOrEqual(20);
+      }
+    }
   });
 });
 

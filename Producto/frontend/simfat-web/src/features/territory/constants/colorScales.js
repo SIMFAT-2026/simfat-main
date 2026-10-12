@@ -1,4 +1,6 @@
-// Risk ramp follows green -> yellow -> orange -> dark red (ColorBrewer RdYlGn / YlOrRd family).
+// Risk ramp follows blue -> yellow -> orange -> dark red (ColorBrewer RdYlBu / YlOrRd family).
+// Not green: green vs orange/red is the pair red-green colour blindness confuses (about 1 in
+// 12 men); riskPalette tests check every pair under simulated protan/deutan/tritan vision.
 // The map paints these fills at RISK_FILL_OPACITY over the base map, so the values were picked
 // for their *blended* appearance (adjacent levels >= 20 delta E, checked in riskPalette tests).
 // Stroke dash patterns stay as a second, colour-independent cue.
@@ -18,13 +20,13 @@ export const ALERT_LEVEL_CONFIG = {
   // `range` mirrors the SCORE_* thresholds in ComunaRiskServiceImpl/TerritoryRiskServiceImpl
   // (score is 0-1 there, shown as /100 here) — keep these in sync if those constants change.
   NORMAL: {
-    color: '#14532d',
-    darkUiColor: '#86efac',
-    bg: '#dcfce7',
+    color: '#1e3a8a',
+    darkUiColor: '#93c5fd',
+    bg: '#dbeafe',
     label: 'Normal',
     range: '0-49',
     legendText: 'Normal (puntaje 0–49)',
-    fill: '#1a9850',
+    fill: '#2166ac',
     dashArray: null,
     weight: 0.8,
     patternLabel: 'solid'
@@ -36,7 +38,7 @@ export const ALERT_LEVEL_CONFIG = {
     label: 'Preventivo',
     range: '50-69',
     legendText: 'Preventivo (puntaje 50–69)',
-    fill: '#ffd92f',
+    fill: '#fff176',
     dashArray: '4 3',
     weight: 1.1,
     patternLabel: 'short dash'
@@ -48,7 +50,7 @@ export const ALERT_LEVEL_CONFIG = {
     label: 'Alto',
     range: '70-84',
     legendText: 'Alto (puntaje 70–84 o FWI ≥ 20)',
-    fill: '#f46d43',
+    fill: '#e6550d',
     dashArray: '8 4',
     weight: 1.4,
     patternLabel: 'long dash'
