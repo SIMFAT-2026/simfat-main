@@ -32,9 +32,9 @@ function DashboardFiltersPanel({
   return (
     <div className="filter-bar dashboard-filters">
       <label>
-        Region
+        Región
         <select value={filters.regionId} onChange={(event) => onRegionChange(event.target.value)}>
-          <option value="">{regionsLoading ? 'Cargando regiones...' : 'Selecciona una region'}</option>
+          <option value="">{regionsLoading ? 'Cargando regiones…' : 'Selecciona una región'}</option>
           {regions.map((region) => (
             <option key={region.id} value={region.id}>
               {region.nombre} ({region.codigo || 'SIN-COD'})

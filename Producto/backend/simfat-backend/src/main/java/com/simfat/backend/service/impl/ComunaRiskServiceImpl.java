@@ -17,6 +17,9 @@ import com.simfat.backend.repository.TerritoryWeatherObservationRepository;
 import com.simfat.backend.service.ComunaRiskService;
 import com.simfat.backend.service.NotificationService;
 import com.simfat.backend.service.OpenWeatherFwiService;
+import com.simfat.backend.service.mapbiomas.MapbiomasSusceptibility;
+import com.simfat.backend.service.mapbiomas.MapbiomasSusceptibilityService;
+import jakarta.annotation.PostConstruct;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -27,6 +30,7 @@ import java.util.Map;
 import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
@@ -58,11 +62,18 @@ public class ComunaRiskServiceImpl implements ComunaRiskService {
     private static final double NDVI_MIN = 0.1;
     private static final double NDVI_MAX = 0.8;
 
-    // Umbrales de alerta
-    private static final double SCORE_PREVENTIVO = 0.50;
-    private static final double SCORE_ALTO = 0.70;
-    private static final double SCORE_CRITICO = 0.85;
-    private static final double FWI_PREVENTIVO = 20.0;
+    // Umbrales de alerta (score) -- externalized (S2a2, design D3): recalibrating these per wM
+    // is a study output (MRB-9) and stays out of scope here; only the mechanism to override
+    // them via config (with today's values as defaults) is added.
+    @Value("${territory.riesgo.umbral.preventivo:0.50}")
+    private double scorePreventivo = 0.50;
+    @Value("${territory.riesgo.umbral.alto:0.70}")
+    private double scoreAlto = 0.70;
+    @Value("${territory.riesgo.umbral.critico:0.85}")
+    private double scoreCritico = 0.85;
+    // FWI >= 20 raises the comuna to ALTO regardless of its score (High/Very High in the
+    // Canadian FWI classes). Pending empirical recalibration (Table 3 / section 14).
+    private static final double FWI_ALTO = 20.0;
     private static final double FWI_CRITICO = 45.0;
 
     private static final double COPERNICUS_COMUNA_PAD_DEG = 0.15;
@@ -71,6 +82,19 @@ public class ComunaRiskServiceImpl implements ComunaRiskService {
     // santiagoDateKey) so the alert override and the map legend agree on what counts
     // as "happening today".
     private static final ZoneId SANTIAGO_ZONE = ZoneId.of("America/Santiago");
+
+    // MapBiomas blend weight (S2a2, design D3). Default 0.0: merging this to main must not
+    // change a single production alert level before the pre-registered study picks a value
+    // (engram sdd/mapbiomas-integration/design, D3 "Default wM = 0 in code").
+    @Value("${territory.riesgo.mapbiomas.weight:0.0}")
+    private double mapbiomasWeight = 0.0;
+
+    // Pre-registered wM grid (design D3 / spec Global definitions "Grid"; MRB-3b). Any value
+    // outside this set -- NaN, negative, above the 0.50 ceiling, or simply a value with no
+    // committed threshold-table entry (e.g. 0.30) -- MUST fail application startup rather than
+    // silently reach production with an unstudied weight.
+    static final java.util.Set<Double> MAPBIOMAS_WEIGHT_GRID =
+        java.util.Set.of(0.0, 0.10, 0.25, 0.35, 0.50);
 
     private final ComunaInfoRepository comunaRepository;
     private final ComunaRiskSnapshotRepository snapshotRepository;
@@ -81,6 +105,7 @@ public class ComunaRiskServiceImpl implements ComunaRiskService {
     private final NotificationService notificationService;
     private final OpenEoServiceClient openEoServiceClient;
     private final FirmsAttributionRouter firmsAttributionRouter;
+    private final MapbiomasSusceptibilityService mapbiomasService;
 
     public ComunaRiskServiceImpl(
         ComunaInfoRepository comunaRepository,
@@ -91,7 +116,8 @@ public class ComunaRiskServiceImpl implements ComunaRiskService {
         OpenEoIndicatorObservationRepository openEoObsRepository,
         NotificationService notificationService,
         OpenEoServiceClient openEoServiceClient,
-        FirmsAttributionRouter firmsAttributionRouter
+        FirmsAttributionRouter firmsAttributionRouter,
+        MapbiomasSusceptibilityService mapbiomasService
     ) {
         this.comunaRepository = comunaRepository;
         this.snapshotRepository = snapshotRepository;
@@ -102,6 +128,69 @@ public class ComunaRiskServiceImpl implements ComunaRiskService {
         this.notificationService = notificationService;
         this.openEoServiceClient = openEoServiceClient;
         this.firmsAttributionRouter = firmsAttributionRouter;
+        this.mapbiomasService = mapbiomasService;
+    }
+
+    // Test seams: @Value fields are only set by Spring; tests construct this component
+    // directly (same idiom as MapbiomasSusceptibilityServiceImpl#setDataVersion).
+    void setMapbiomasWeight(double mapbiomasWeight) {
+        this.mapbiomasWeight = mapbiomasWeight;
+    }
+
+    void setScorePreventivo(double scorePreventivo) {
+        this.scorePreventivo = scorePreventivo;
+    }
+
+    void setScoreAlto(double scoreAlto) {
+        this.scoreAlto = scoreAlto;
+    }
+
+    void setScoreCritico(double scoreCritico) {
+        this.scoreCritico = scoreCritico;
+    }
+
+    // Test seams (MRB-10, dominance boundary): expose the production FWI weights so
+    // ComunaRiskServiceImplMapbiomasBlendTest derives its breakeven from the REAL constants
+    // instead of duplicating magic numbers that could silently drift from production.
+    static double standardFwiWeight() {
+        return W_FWI_STD;
+    }
+
+    static double enhancedFwiWeight() {
+        return W_FWI_ENH;
+    }
+
+    /**
+     * Fail-fast validation of {@code territory.riesgo.mapbiomas.weight} (task 2a.4, MRB-3b).
+     * Runs once per bean construction via {@code @PostConstruct} -- BEFORE this service can
+     * serve any request -- so an un-shipped or malformed wM (NaN, negative, above the 0.50
+     * ceiling, or any value with no committed threshold-table entry) fails application startup
+     * with a clear message instead of silently reaching production. The safe default (0.0) and
+     * every pre-registered grid value always pass (MRB-3a/3c).
+     */
+    @PostConstruct
+    void validateMapbiomasWeight() {
+        if (!isValidMapbiomasWeight(mapbiomasWeight)) {
+            throw new IllegalStateException(
+                "Invalid territory.riesgo.mapbiomas.weight=" + mapbiomasWeight
+                    + ". It MUST be one of the pre-registered grid values " + MAPBIOMAS_WEIGHT_GRID
+                    + " (design D3 / spec MRB-3b). NaN, negative values, values above 0.50, or "
+                    + "any value with no committed threshold-table entry are rejected at "
+                    + "startup so an unstudied weight can never reach production silently."
+            );
+        }
+    }
+
+    static boolean isValidMapbiomasWeight(double weight) {
+        if (Double.isNaN(weight)) {
+            return false;
+        }
+        for (double allowed : MAPBIOMAS_WEIGHT_GRID) {
+            if (Math.abs(weight - allowed) < 1e-9) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @Scheduled(cron = "${territory.riesgo.comunal.cron:0 30 1,13 * * *}")
@@ -109,12 +198,16 @@ public class ComunaRiskServiceImpl implements ComunaRiskService {
     public void recomputeAllComunas() {
         List<ComunaInfo> comunas = comunaRepository.findAll();
         LOGGER.info("comuna_risk_recompute status=start total={}", comunas.size());
+        // NFR-7: one bulk comuna_mapbiomas_stats read for the whole run, instead of one
+        // findByComunaIdAndDataVersion query per comuna inside the loop below.
+        Map<String, MapbiomasSusceptibility> mapbiomasByComuna =
+            mapbiomasService.forComunas(comunas.stream().map(ComunaInfo::getId).toList());
         int ok = 0, errors = 0;
         for (ComunaInfo comuna : comunas) {
             try {
                 // Sync FWI fresco para el centroide de esta comuna
                 fwiService.syncFwiByRegion(comuna.getId(), comuna.getCenterLat(), comuna.getCenterLon());
-                recomputeByComuna(comuna.getId());
+                recomputeByComuna(comuna.getId(), mapbiomasByComuna);
                 ok++;
             } catch (Exception ex) {
                 LOGGER.warn("comuna_risk_recompute status=error comunaId={} error={}", comuna.getId(), ex.getMessage());
@@ -126,6 +219,12 @@ public class ComunaRiskServiceImpl implements ComunaRiskService {
 
     @Override
     public ComunaRiskSnapshot recomputeByComuna(String comunaId) {
+        // No precomputed bulk map: a single-comuna lookup (forComuna) is the right cardinality
+        // here (API-triggered/manual recompute), unlike the recomputeAllComunas loop.
+        return recomputeByComuna(comunaId, null);
+    }
+
+    private ComunaRiskSnapshot recomputeByComuna(String comunaId, Map<String, MapbiomasSusceptibility> mapbiomasByComuna) {
         ComunaInfo comuna = comunaRepository.findById(comunaId)
             .orElseThrow(() -> new IllegalArgumentException("Comuna no encontrada: " + comunaId));
 
@@ -213,8 +312,14 @@ public class ComunaRiskServiceImpl implements ComunaRiskService {
                 cFwi = fwiNorm * W_FWI_ENH;
                 cFirms = firmsNorm * W_FIRMS_ENH;
                 cReports = reportsNorm * W_REPORTS_ENH;
-                cNdmi = round4(ndmiNorm * W_NDMI_ENH);
-                cNdvi = round4(ndviNorm * W_NDVI_ENH);
+                // Kept as raw (unrounded) doubles here -- rounded exactly once, together with
+                // the MapBiomas blend scaling below, at snapshot.setComponentNdmi/Ndvi. Rounding
+                // here AND again after the (1-wEff) scale would round4() twice, which can shift
+                // the final 4th decimal versus a single round4() of the true product (double
+                // rounding is not a no-op in general -- see ComunaRiskServiceImplMapbiomasBlendTest
+                // #componentSumInvariant_matchesScoreComposite_enhancedModeNotClamped).
+                cNdmi = ndmiNorm * W_NDMI_ENH;
+                cNdvi = ndviNorm * W_NDVI_ENH;
                 ndmiRawVal = ndmi;
                 ndviRawVal = ndvi;
                 openeoObsId = ndmiObs.get().getId();
@@ -223,7 +328,44 @@ public class ComunaRiskServiceImpl implements ComunaRiskService {
             }
         }
 
-        String alertLevel = resolveAlertLevel(scoreComposite, fwiRaw, firmsCount, firmsFrpMean, hasTodayFoco);
+        // --- MapBiomas blend (S2a2, design D3) — applied AFTER the STANDARD/ENHANCED branch
+        // above resolves scoreComposite, so both modes are handled once. resolveAlertLevel
+        // below still evaluates its overrides on RAW fwiRaw/firmsCount/firmsFrpMean/hasTodayFoco
+        // — those are untouched by this block.
+        double sDyn = scoreComposite;
+        Optional<MapbiomasSusceptibility> mapbiomasResult = mapbiomasByComuna != null
+            ? Optional.ofNullable(mapbiomasByComuna.get(comunaId))
+            : mapbiomasService.forComuna(comunaId);
+        // Missing data (empty Optional) or an explicit MAPBIOMAS_UNAVAILABLE flag (score=0.0
+        // there means "absent", not "zero susceptibility") must NEVER lower the score — wEff=0
+        // in both cases, never mapbiomasWeight.
+        boolean mapbiomasUnavailable = mapbiomasResult
+            .map(m -> m.hasFlag(MapbiomasSusceptibility.MAPBIOMAS_UNAVAILABLE))
+            .orElse(false);
+        double wEff = (mapbiomasResult.isPresent() && !mapbiomasUnavailable) ? mapbiomasWeight : 0.0;
+        double sMapbiomas = mapbiomasResult.map(MapbiomasSusceptibility::score).orElse(0.0);
+        scoreComposite = clamp((1.0 - wEff) * sDyn + wEff * sMapbiomas);
+        // Component-sum invariant: scale the persisted dynamic components by (1-wEff) too, so
+        // SUM(components) == scoreComposite within rounding whenever the raw blend did not
+        // clamp (design D3). At wEff=0 every component is multiplied by 1.0 — a bit-identical
+        // no-op — which is what makes the wM=0 golden regression exact.
+        cFwi = cFwi * (1.0 - wEff);
+        cFirms = cFirms * (1.0 - wEff);
+        cReports = cReports * (1.0 - wEff);
+        if (cNdmi != null) {
+            cNdmi = cNdmi * (1.0 - wEff);
+        }
+        if (cNdvi != null) {
+            cNdvi = cNdvi * (1.0 - wEff);
+        }
+        double componentMapbiomas = round4(wEff * sMapbiomas);
+        Double mapbiomasFuelIndex = mapbiomasResult.map(MapbiomasSusceptibility::fuelIndex).orElse(null);
+        Double mapbiomasHistoryIndex = mapbiomasResult.map(MapbiomasSusceptibility::historyIndex).orElse(null);
+        String mapbiomasDataVersion = mapbiomasResult.map(MapbiomasSusceptibility::dataVersion).orElse(null);
+        String mapbiomasQualityFlag = mapbiomasResult.map(MapbiomasSusceptibility::qualityFlag).orElse(null);
+
+        AlertResolution alert = resolveAlert(scoreComposite, fwiRaw, firmsCount, firmsFrpMean, hasTodayFoco);
+        String alertLevel = alert.level();
 
         // Nivel anterior para deduplicacion de notificaciones (antes de guardar el nuevo snapshot)
         String previousAlertLevel = snapshotRepository.findTopByComunaIdOrderByComputedAtDesc(comunaId)
@@ -237,13 +379,14 @@ public class ComunaRiskServiceImpl implements ComunaRiskService {
         snapshot.setComputedAt(now);
         snapshot.setScoreComposite(round4(scoreComposite));
         snapshot.setAlertLevel(alertLevel);
+        snapshot.setAlertDriver(alert.driver());
         snapshot.setMode(mode);
         snapshot.setQualityFlag(qualityFlag);
         snapshot.setComponentFwi(round4(cFwi));
         snapshot.setComponentFirms(round4(cFirms));
         snapshot.setComponentReports(round4(cReports));
-        snapshot.setComponentNdmi(cNdmi);
-        snapshot.setComponentNdvi(cNdvi);
+        snapshot.setComponentNdmi(cNdmi != null ? round4(cNdmi) : null);
+        snapshot.setComponentNdvi(cNdvi != null ? round4(cNdvi) : null);
         snapshot.setComponentLoss(null);
         snapshot.setNdmiRaw(ndmiRawVal);
         snapshot.setNdviRaw(ndviRawVal);
@@ -252,6 +395,12 @@ public class ComunaRiskServiceImpl implements ComunaRiskService {
         snapshot.setFirmsCount(firmsCount);
         snapshot.setFirmsFrpMean(round4(firmsFrpMean));
         snapshot.setReportsCount((int) reportsCount);
+        snapshot.setComponentMapbiomas(componentMapbiomas);
+        snapshot.setMapbiomasFuelIndex(mapbiomasFuelIndex);
+        snapshot.setMapbiomasHistoryIndex(mapbiomasHistoryIndex);
+        snapshot.setMapbiomasWeight(round4(wEff));
+        snapshot.setMapbiomasDataVersion(mapbiomasDataVersion);
+        snapshot.setMapbiomasQualityFlag(mapbiomasQualityFlag);
 
         snapshotRepository.save(snapshot);
         notificationService.triggerComunaRiskAlert(snapshot, previousAlertLevel);
@@ -327,24 +476,42 @@ public class ComunaRiskServiceImpl implements ComunaRiskService {
         return recomputeByComuna(comunaId);
     }
 
-    private String resolveAlertLevel(double score, Double fwiRaw, int firmsCount, double firmsFrpMean, boolean hasTodayFirms) {
-        // A FIRMS detection from TODAY is an active fire happening right now — always CRITICO.
-        if (hasTodayFirms || (fwiRaw != null && fwiRaw >= FWI_CRITICO) || score >= SCORE_CRITICO) {
-            return "CRITICO";
+    // Level plus the single rule that raised it. Rules are evaluated in this exact order and the
+    // first match wins, so the driver is never a guess: FIRMS today, FWI >= FWI_CRITICO, score
+    // >= scoreCritico, FIRMS cluster, FIRMS FRP (CRITICO); FWI >= FWI_ALTO, score >= scoreAlto
+    // (ALTO); score (PREVENTIVO / NORMAL). Drivers: FIRMS_TODAY, FWI, SCORE, FIRMS_CLUSTER, FIRMS_FRP.
+    record AlertResolution(String level, String driver) {}
+
+    AlertResolution resolveAlert(double score, Double fwiRaw, int firmsCount, double firmsFrpMean, boolean hasTodayFirms) {
+        // A FIRMS detection from TODAY is an active fire happening right now: always CRITICO.
+        if (hasTodayFirms) {
+            return new AlertResolution("CRITICO", "FIRMS_TODAY");
+        }
+        if (fwiRaw != null && fwiRaw >= FWI_CRITICO) {
+            return new AlertResolution("CRITICO", "FWI");
+        }
+        if (score >= scoreCritico) {
+            return new AlertResolution("CRITICO", "SCORE");
         }
         // Detections that are only "recent" (not today) still escalate to CRITICO if they
-        // cluster (FIRMS_COUNT_CRITICO) or are individually intense (FIRMS_FRP_CRITICO) —
+        // cluster (FIRMS_COUNT_CRITICO) or are individually intense (FIRMS_FRP_CRITICO),
         // otherwise they just feed the weighted score via firmsNorm.
-        if (firmsCount >= FirmsScoringConstants.FIRMS_COUNT_CRITICO || firmsFrpMean >= FirmsScoringConstants.FIRMS_FRP_CRITICO) {
-            return "CRITICO";
+        if (firmsCount >= FirmsScoringConstants.FIRMS_COUNT_CRITICO) {
+            return new AlertResolution("CRITICO", "FIRMS_CLUSTER");
         }
-        if ((fwiRaw != null && fwiRaw >= FWI_PREVENTIVO) || score >= SCORE_ALTO) {
-            return "ALTO";
+        if (firmsFrpMean >= FirmsScoringConstants.FIRMS_FRP_CRITICO) {
+            return new AlertResolution("CRITICO", "FIRMS_FRP");
         }
-        if (score >= SCORE_PREVENTIVO) {
-            return "PREVENTIVO";
+        if (fwiRaw != null && fwiRaw >= FWI_ALTO) {
+            return new AlertResolution("ALTO", "FWI");
         }
-        return "NORMAL";
+        if (score >= scoreAlto) {
+            return new AlertResolution("ALTO", "SCORE");
+        }
+        if (score >= scorePreventivo) {
+            return new AlertResolution("PREVENTIVO", "SCORE");
+        }
+        return new AlertResolution("NORMAL", "SCORE");
     }
 
     private boolean isToday(LocalDateTime fechaEventoUtc) {

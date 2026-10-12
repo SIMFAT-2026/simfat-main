@@ -1,0 +1,9 @@
+{
+  "file": "Producto/analytics/study/PREREGISTRATION.md",
+  "version": "1.0",
+  "sha256": "541b92660db09d53d3f82217a6b23f4981ccdfb0b168903cd4df4a37cc2a4b4b",
+  "sha256Of": "the file content as stored in git (LF line endings, pinned by .gitattributes)",
+  "commit": "337c68f062b4c8a08dfe20d5a723a10a82e17930",
+  "committedAt": "2026-10-01",
+  "rule": "Study code recomputes this hash before any run and aborts on mismatch. Any later change to PREREGISTRATION.md is a numbered, dated deviation in its change log."
+}

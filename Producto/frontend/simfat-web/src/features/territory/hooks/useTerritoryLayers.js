@@ -8,6 +8,13 @@ import {
   fetchPublicTerritoryBounds,
   fetchPublicTerritoryLayers
 } from '../services/territoryApiService';
+import { useMapbiomasLayer } from './useMapbiomasLayer';
+import {
+  CRITICAL_INDICATORS,
+  DEFAULT_INDICATORS,
+  DEFAULT_VISIBLE_INDICATORS,
+  SECONDARY_INDICATORS
+} from '../constants/indicators';
 
 const CACHE_TTL_MS = 120_000;
 const pendingKeys = new Set();
@@ -48,15 +55,6 @@ const REGION_CONFIG = {
 
 export const REGION_OPTIONS = Object.values(REGION_CONFIG);
 
-// Critical: needed for the first meaningful paint (choropleth + active fires + alerts).
-// Secondary: useful context loaded after the map is already interactive.
-const CRITICAL_INDICATORS = ['RISK_SCORE', 'ALERTS', 'FIRMS'];
-const SECONDARY_INDICATORS = ['NDVI', 'NDMI', 'REPORTS', 'WIND', 'HUMIDITY', 'AIR_TEMP', 'SOIL_TEMP'];
-const DEFAULT_INDICATORS = [...CRITICAL_INDICATORS, ...SECONDARY_INDICATORS];
-
-// WIND/HUMIDITY/AIR_TEMP/SOIL_TEMP are opt-in climate layers: fetched alongside
-// the rest but not shown until the user toggles them on (DEC-B).
-const DEFAULT_VISIBLE_INDICATORS = ['RISK_SCORE', 'FIRMS', 'ALERTS', 'REPORTS'];
 const REGION_IDS = new Set(REGION_OPTIONS.map((region) => region.id));
 
 function createPointFeature(id, lng, lat, properties) {
@@ -104,7 +102,7 @@ function createMockLayers(regionId) {
       RISK_SCORE: {
         type: 'FeatureCollection',
         features: [
-          createPointFeature('nu-risk', -71.9, -36.6, { label: 'Nuble', indicator: 'RISK_SCORE', score: 0.0, alertLevel: 'NORMAL' })
+          createPointFeature('nu-risk', -71.9, -36.6, { label: 'Ñuble', indicator: 'RISK_SCORE', score: 0.0, alertLevel: 'NORMAL' })
         ]
       },
       ...createMockClimateLayers()
@@ -149,7 +147,7 @@ function createMockLayers(regionId) {
       RISK_SCORE: {
         type: 'FeatureCollection',
         features: [
-          createPointFeature('ar-risk', -72.4, -38.7, { label: 'La Araucania', indicator: 'RISK_SCORE', score: 0.0, alertLevel: 'NORMAL' })
+          createPointFeature('ar-risk', -72.4, -38.7, { label: 'La Araucanía', indicator: 'RISK_SCORE', score: 0.0, alertLevel: 'NORMAL' })
         ]
       },
       ...createMockClimateLayers()
@@ -160,7 +158,7 @@ function createMockLayers(regionId) {
     NDVI: {
       type: 'FeatureCollection',
       features: [
-        createPointFeature('bb-ndvi-1', -73.05, -36.82, { label: 'Concepcion', indicator: 'NDVI', value: 0.57 }),
+        createPointFeature('bb-ndvi-1', -73.05, -36.82, { label: 'Concepción', indicator: 'NDVI', value: 0.57 }),
         createPointFeature('bb-ndvi-2', -72.58, -37.47, { label: 'Los Angeles', indicator: 'NDVI', value: 0.5 })
       ]
     },
@@ -189,7 +187,7 @@ function createMockLayers(regionId) {
     RISK_SCORE: {
       type: 'FeatureCollection',
       features: [
-        createPointFeature('bb-risk', -72.5, -37.5, { label: 'Biobio', indicator: 'RISK_SCORE', score: 0.0, alertLevel: 'NORMAL' })
+        createPointFeature('bb-risk', -72.5, -37.5, { label: 'Biobío', indicator: 'RISK_SCORE', score: 0.0, alertLevel: 'NORMAL' })
       ]
     },
     ...createMockClimateLayers()
@@ -440,6 +438,30 @@ export function useTerritoryLayers(options = {}) {
     });
   }, []);
 
+  // MapBiomas layers load on demand (only while visible), outside the bulk load.
+  const burned = useMapbiomasLayer('BURNED', {
+    visible: visibleIndicators.includes('BURNED'),
+    regionId: selectedRegionId,
+    publicMode
+  });
+  const { setYear: setBurnedYear } = burned;
+  const landcover = useMapbiomasLayer('LANDCOVER', {
+    visible: visibleIndicators.includes('LANDCOVER'),
+    regionId: selectedRegionId,
+    publicMode
+  });
+  const { setYear: setLandcoverYear } = landcover;
+
+  // Entry point for generic year callers; the year control itself uses each
+  // layer's own setYear from mapbiomasLayers.
+  const setMapbiomasYear = useCallback(
+    (indicator, year) => {
+      if (indicator === 'BURNED') setBurnedYear(year);
+      if (indicator === 'LANDCOVER') setLandcoverYear(year);
+    },
+    [setBurnedYear, setLandcoverYear]
+  );
+
   const reloadSelectedRegion = useCallback(async () => {
     await loadRegion(selectedRegionId, true);
   }, [loadRegion, selectedRegionId]);
@@ -459,6 +481,8 @@ export function useTerritoryLayers(options = {}) {
       loading: loadingRegions.has(selectedRegionId) && !selectedRegionData,
       refreshing: loadingRegions.has(selectedRegionId) && Boolean(selectedRegionData),
       reloadSelectedRegion,
+      mapbiomasLayers: { BURNED: burned, LANDCOVER: landcover },
+      setMapbiomasYear,
       cacheTtlMs: CACHE_TTL_MS
     }),
     [
@@ -468,7 +492,10 @@ export function useTerritoryLayers(options = {}) {
       visibleIndicators,
       toggleIndicator,
       loadingRegions,
-      reloadSelectedRegion
+      reloadSelectedRegion,
+      burned,
+      landcover,
+      setMapbiomasYear
     ]
   );
 }

@@ -39,9 +39,9 @@ const THRESHOLD_PRESETS = {
   },
   umbralNdvi: {
     presets: [
-      { label: 'Vegetacion moderada', value: 0.5 },
-      { label: 'Vegetacion escasa', value: 0.2 },
-      { label: 'Sin vegetacion', value: 0.0 }
+      { label: 'Vegetación moderada', value: 0.5 },
+      { label: 'Vegetación escasa', value: 0.2 },
+      { label: 'Sin vegetación', value: 0.0 }
     ]
   },
   umbralFirmsCount: {
@@ -49,7 +49,7 @@ const THRESHOLD_PRESETS = {
       { label: 'Bajo', value: 1 },
       { label: 'Moderado', value: 5 },
       { label: 'Alto', value: 15 },
-      { label: 'Critico', value: 30 }
+      { label: 'Crítico', value: 30 }
     ]
   },
   umbralReportesCiudadanos: {
@@ -166,7 +166,7 @@ function RulesPage() {
       { key: 'nombre', header: 'Nombre', sortable: true },
       {
         key: 'regionId',
-        header: 'Region',
+        header: 'Región',
         sortable: true,
         sortValue: (row) => (row.regionId ? regionMap[row.regionId] || row.regionId : 'Global'),
         render: (row) => (row.regionId ? regionMap[row.regionId] || row.regionId : 'Global')
@@ -265,7 +265,7 @@ function RulesPage() {
 
   return (
     <section className="page-container">
-      <SectionTitle title="Reglas" subtitle="Configuracion de reglas de alerta" />
+      <SectionTitle title="Reglas" subtitle="Configuración de reglas de alerta" />
 
       {feedback.message ? <p className={`feedback feedback-${feedback.type}`}>{feedback.message}</p> : null}
 
@@ -273,13 +273,13 @@ function RulesPage() {
         <div className="card-title-row">
           <h3>{editingId ? `Editando: ${form.nombre}` : 'Nueva regla'}</h3>
           <details className="access-help">
-            <summary>&#9432; Como funcionan</summary>
+            <summary>&#9432; Cómo funcionan</summary>
             <ul>
-              <li><strong>Que son:</strong> definen los umbrales que determinan cuando una region escala su nivel de alerta.</li>
-              <li><strong>Logica OR:</strong> si cualquiera de los umbrales configurados se supera, la regla se activa.</li>
-              <li><strong>Alcance:</strong> una regla puede aplicar a una region especifica o a todas (Global).</li>
+              <li><strong>Qué son:</strong> definen los umbrales que determinan cuándo una región escala su nivel de alerta.</li>
+              <li><strong>Lógica OR:</strong> si cualquiera de los umbrales configurados se supera, la regla se activa.</li>
+              <li><strong>Alcance:</strong> una regla puede aplicar a una región específica o a todas (Global).</li>
               <li><strong>Activa / Inactiva:</strong> las reglas inactivas no generan alertas aunque se cumplan los umbrales.</li>
-              <li><strong>Umbrales opcionales:</strong> deja en blanco los que no quieras usar. Solo se evaluan los que tienen valor.</li>
+              <li><strong>Umbrales opcionales:</strong> deja en blanco los que no quieras usar. Solo se evalúan los que tienen valor.</li>
             </ul>
           </details>
         </div>
@@ -290,13 +290,13 @@ function RulesPage() {
               Editando regla: <strong>{form.nombre}</strong>
             </div>
             <button type="button" className="btn btn-secondary btn-sm" onClick={resetForm}>
-              Cancelar edicion
+              Cancelar edición
             </button>
           </div>
         ) : null}
 
         <form onSubmit={onSubmit} className="rules-form">
-          <p className="rules-form-section-title">Identificacion</p>
+          <p className="rules-form-section-title">Identificación</p>
 
           <div className="form-grid rules-form-row-2col">
             <label>
@@ -306,8 +306,8 @@ function RulesPage() {
             </label>
 
             <label>
-              <FieldLabel tooltip="Global aplica la regla a todas las regiones monitoreadas. Si eliges una region especifica, solo se evalua para ella.">
-                Region (opcional)
+              <FieldLabel tooltip="Global aplica la regla a todas las regiones monitoreadas. Si eliges una región específica, solo se evalúa para ella.">
+                Región (opcional)
               </FieldLabel>
               <select name="regionId" value={form.regionId} onChange={onInputChange}>
                 <option value="">Global</option>
@@ -320,12 +320,12 @@ function RulesPage() {
             </label>
           </div>
 
-          <p className="rules-form-section-title">Umbrales de activacion</p>
-          <p className="card-subtitle">Configura uno o mas umbrales. Cualquiera que se supere activa la regla. Deja en blanco los que no uses.</p>
+          <p className="rules-form-section-title">Umbrales de activación</p>
+          <p className="card-subtitle">Configura uno o más umbrales. Cualquiera que se supere activa la regla. Deja en blanco los que no uses.</p>
 
           <div className="form-grid rules-form-row-3col">
             <label>
-              <FieldLabel tooltip="Fire Weather Index (FWI). Indice meteorologico que combina temperatura, humedad, viento y precipitacion. Escala 0-100+. La regla dispara cuando el FWI regional supera este valor. FWI > 20 ya indica condicion de alerta; > 38 es muy alto; > 50 extremo.">
+              <FieldLabel tooltip="Fire Weather Index (FWI). Índice meteorológico que combina temperatura, humedad, viento y precipitación. Escala 0-100+. La regla dispara cuando el FWI regional supera este valor. FWI > 20 ya indica condición de alerta; > 38 es muy alto; > 50 extremo.">
                 Umbral FWI <small>(FWI &ge; valor)</small>
               </FieldLabel>
               <input name="umbralFwi" type="number" step="0.01" value={form.umbralFwi} onChange={onInputChange} />
@@ -334,7 +334,7 @@ function RulesPage() {
             </label>
 
             <label>
-              <FieldLabel tooltip="Normalized Difference Moisture Index (NDMI). Mide la humedad en la vegetacion usando satelite. Escala -1 a +1: valores negativos indican vegetacion seca y mayor riesgo. La regla dispara cuando el NDMI cae POR DEBAJO de este valor.">
+              <FieldLabel tooltip="Normalized Difference Moisture Index (NDMI). Mide la humedad en la vegetación usando satélite. Escala -1 a +1: valores negativos indican vegetación seca y mayor riesgo. La regla dispara cuando el NDMI cae POR DEBAJO de este valor.">
                 Umbral NDMI <small>(NDMI &le; valor)</small>
               </FieldLabel>
               <input name="umbralNdmi" type="number" step="0.01" value={form.umbralNdmi} onChange={onInputChange} />
@@ -343,7 +343,7 @@ function RulesPage() {
             </label>
 
             <label>
-              <FieldLabel tooltip="Normalized Difference Vegetation Index (NDVI). Mide la densidad y salud de la cobertura vegetal. Escala 0 a +1: valores bajos indican poca vegetacion y mayor riesgo de propagacion. La regla dispara cuando el NDVI cae POR DEBAJO de este valor.">
+              <FieldLabel tooltip="Normalized Difference Vegetation Index (NDVI). Mide la densidad y salud de la cobertura vegetal. Escala 0 a +1: valores bajos indican poca vegetación y mayor riesgo de propagación. La regla dispara cuando el NDVI cae POR DEBAJO de este valor.">
                 Umbral NDVI <small>(NDVI &le; valor)</small>
               </FieldLabel>
               <input name="umbralNdvi" type="number" step="0.01" value={form.umbralNdvi} onChange={onInputChange} />
@@ -354,7 +354,7 @@ function RulesPage() {
 
           <div className="form-grid rules-form-row-count">
             <label>
-              <FieldLabel tooltip="Focos de calor detectados por satelites NASA (VIIRS / MODIS) en las ultimas 48 horas. La regla dispara cuando el conteo de detecciones activas en la region supera este numero.">
+              <FieldLabel tooltip="Focos de calor detectados por satélites NASA (VIIRS / MODIS) en las últimas 48 horas. La regla dispara cuando el conteo de detecciones activas en la región supera este número.">
                 Umbral FIRMS <small>(detecciones &ge; valor)</small>
               </FieldLabel>
               <input name="umbralFirmsCount" type="number" value={form.umbralFirmsCount} onChange={onInputChange} />
@@ -363,7 +363,7 @@ function RulesPage() {
             </label>
 
             <label>
-              <FieldLabel tooltip="Numero de reportes ciudadanos activos recibidos en la region. Complementa las fuentes satelitales con informacion local. La regla dispara cuando los reportes superan este umbral.">
+              <FieldLabel tooltip="Número de reportes ciudadanos activos recibidos en la región. Complementa las fuentes satelitales con información local. La regla dispara cuando los reportes superan este umbral.">
                 Umbral reportes ciudadanos <small>(reportes &ge; valor)</small>
               </FieldLabel>
               <input name="umbralReportesCiudadanos" type="number" value={form.umbralReportesCiudadanos} onChange={onInputChange} />
@@ -374,7 +374,7 @@ function RulesPage() {
             </label>
 
             <label>
-              <FieldLabel tooltip="Si esta Inactiva, la regla no se evalua en los ciclos de scoring y no genera alertas aunque se superen los umbrales. Util para desactivar temporalmente sin eliminar la configuracion.">
+              <FieldLabel tooltip="Si está Inactiva, la regla no se evalúa en los ciclos de scoring y no genera alertas aunque se superen los umbrales. Útil para desactivar temporalmente sin eliminar la configuración.">
                 Activa
               </FieldLabel>
               <select name="activa" value={form.activa} onChange={onInputChange}>
@@ -391,7 +391,7 @@ function RulesPage() {
             </button>
             {editingId ? (
               <button type="button" className="btn btn-secondary" onClick={resetForm}>
-                Cancelar edicion
+                Cancelar edición
               </button>
             ) : null}
           </div>
@@ -424,7 +424,7 @@ function RulesPage() {
       <ConfirmModal
         isOpen={Boolean(deleteId)}
         title="Eliminar regla"
-        message="Confirma la eliminacion de la regla seleccionada."
+        message="Confirma la eliminación de la regla seleccionada."
         confirmLabel="Eliminar"
         onConfirm={confirmDelete}
         onCancel={() => setDeleteId('')}

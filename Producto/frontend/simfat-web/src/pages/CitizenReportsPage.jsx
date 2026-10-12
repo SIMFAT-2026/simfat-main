@@ -9,6 +9,7 @@ import SectionTitle from '../components/SectionTitle';
 import { useFeedback } from '../hooks';
 import { useCitizenReportsData } from '../features/reports/hooks/useCitizenReportsData';
 import { getComunasByRegion, getLabelForComuna } from '../data/territorioChile';
+import { reportCategoryLabel, reportStatusLabel } from '../utils/labels';
 
 const REPORT_CATEGORIES = [
   'HUMO',
@@ -91,13 +92,10 @@ function statusBadgeClass(status) {
 }
 
 function statusLabel(row) {
-  if (row.status === 'DESCARTADO' && row.discardReason === 'VENCIDO') {
-    return 'DESCARTADO (vencido)';
-  }
-  if (row.status === 'RECIBIDO' && row.staleCount > 0) {
-    return 'RECIBIDO (vencido)';
-  }
-  return row.status;
+  const stale =
+    (row.status === 'DESCARTADO' && row.discardReason === 'VENCIDO') ||
+    (row.status === 'RECIBIDO' && row.staleCount > 0);
+  return reportStatusLabel(row.status, { stale });
 }
 
 function CitizenReportsPage() {
@@ -141,12 +139,12 @@ function CitizenReportsPage() {
   const columns = useMemo(
     () => [
       { key: 'createdAt', header: 'Creado', render: (row) => formatDate(row.createdAt) },
-      { key: 'regionId', header: 'Region', render: (row) => regionMap[row.regionId] || row.regionId || '-' },
+      { key: 'regionId', header: 'Región', render: (row) => regionMap[row.regionId] || row.regionId || '-' },
       { key: 'comunaId', header: 'Comuna', render: (row) => getLabelForComuna(row.comunaId) || row.comunaId || '-' },
       {
         key: 'category',
-        header: 'Categoria',
-        render: (row) => (row.subCategory ? `${row.category} — ${row.subCategory}` : row.category)
+        header: 'Categoría',
+        render: (row) => (row.subCategory ? `${reportCategoryLabel(row.category)} — ${row.subCategory}` : reportCategoryLabel(row.category))
       },
       {
         key: 'status',
@@ -174,7 +172,7 @@ function CitizenReportsPage() {
             '0'
           )
       },
-      { key: 'description', header: 'Descripcion' }
+      { key: 'description', header: 'Descripción' }
     ],
     [regionMap]
   );
@@ -208,7 +206,7 @@ function CitizenReportsPage() {
 
     try {
       if (!window.navigator?.geolocation) {
-        throw new Error('Tu navegador no soporta geolocalizacion.');
+        throw new Error('Tu navegador no soporta geolocalización.');
       }
 
       const position = await new Promise((resolve, reject) => {
@@ -224,9 +222,9 @@ function CitizenReportsPage() {
         latitude: String(position.coords.latitude.toFixed(6)),
         longitude: String(position.coords.longitude.toFixed(6))
       }));
-      feedback.showSuccess('Ubicacion capturada correctamente.');
+      feedback.showSuccess('Ubicación capturada correctamente.');
     } catch (err) {
-      feedback.showError(err.message || 'No fue posible capturar la ubicacion.');
+      feedback.showError(err.message || 'No fue posible capturar la ubicación.');
     } finally {
       setLocating(false);
     }
@@ -252,16 +250,16 @@ function CitizenReportsPage() {
 
       const subCategoryOptions = REPORT_SUBCATEGORIES[form.category];
       if (subCategoryOptions && !form.subCategory) {
-        throw new Error('Selecciona una subcategoria.');
+        throw new Error('Selecciona una subcategoría.');
       }
 
       if (selectedFiles.length > MAX_FILES) {
-        throw new Error(`Puedes adjuntar maximo ${MAX_FILES} fotos.`);
+        throw new Error(`Puedes adjuntar máximo ${MAX_FILES} fotos.`);
       }
 
       const hasOversized = selectedFiles.some((file) => file.size > MAX_FILE_BYTES);
       if (hasOversized) {
-        throw new Error('Cada foto debe pesar maximo 5 MB.');
+        throw new Error('Cada foto debe pesar máximo 5 MB.');
       }
 
       await createReport({
@@ -292,9 +290,9 @@ function CitizenReportsPage() {
     try {
       await setReportStatus(reportId, status);
       if (filters.status && filters.status !== status) {
-        feedback.showSuccess(`Estado actualizado a ${status}. El reporte puede ocultarse por filtro actual.`);
+        feedback.showSuccess(`Estado actualizado a ${reportStatusLabel(status)}. El reporte puede ocultarse por filtro actual.`);
       } else {
-        feedback.showSuccess(`Estado actualizado a ${status}.`);
+        feedback.showSuccess(`Estado actualizado a ${reportStatusLabel(status)}.`);
       }
     } catch (err) {
       feedback.showError(err.message || 'No se pudo actualizar el estado.');
@@ -323,7 +321,7 @@ function CitizenReportsPage() {
       />
 
       <p className="community-source-note">
-        Origen de datos: {source === 'backend' ? 'backend de reportes' : 'fallback local de continuidad operativa'}.
+        {source === 'backend' ? 'Datos en línea.' : 'Modo sin conexión: se muestran datos locales de respaldo.'}
       </p>
 
       {feedback.message ? <p className={`feedback feedback-${feedback.type}`}>{feedback.message}</p> : null}
@@ -331,7 +329,7 @@ function CitizenReportsPage() {
 
       <FilterBar>
         <label>
-          Region
+          Región
           <select name="regionId" value={filters.regionId} onChange={onFilterChange}>
             <option value="">Todas</option>
             {monitoredRegions.map((region) => (
@@ -348,19 +346,19 @@ function CitizenReportsPage() {
             <option value="">Todos</option>
             {REPORT_STATUSES.map((status) => (
               <option key={status} value={status}>
-                {status}
+                {reportStatusLabel(status)}
               </option>
             ))}
           </select>
         </label>
 
         <label>
-          Categoria
+          Categoría
           <select name="category" value={filters.category} onChange={onFilterChange}>
             <option value="">Todas</option>
             {REPORT_CATEGORIES.map((category) => (
               <option key={category} value={category}>
-                {category}
+                {reportCategoryLabel(category)}
               </option>
             ))}
           </select>
@@ -377,9 +375,9 @@ function CitizenReportsPage() {
         <h3>Nuevo reporte</h3>
         <form className="form-grid" onSubmit={submitReport}>
           <label>
-            Region
+            Región
             <select name="regionId" value={form.regionId} onChange={onInputChange} required>
-              <option value="">Seleccione region</option>
+              <option value="">Seleccione región</option>
               {monitoredRegions.map((region) => (
                 <option key={region.id} value={region.id}>
                   {region.nombre}
@@ -391,7 +389,7 @@ function CitizenReportsPage() {
           <label>
             Comuna
             <select name="comunaId" value={form.comunaId} onChange={onInputChange} required disabled={!form.regionId}>
-              <option value="">{form.regionId ? 'Seleccione comuna' : 'Seleccione una region primero'}</option>
+              <option value="">{form.regionId ? 'Seleccione comuna' : 'Seleccione una región primero'}</option>
               {formComunas.map((comuna) => (
                 <option key={comuna.value} value={comuna.value}>
                   {comuna.label}
@@ -401,11 +399,11 @@ function CitizenReportsPage() {
           </label>
 
           <label>
-            Categoria
+            Categoría
             <select name="category" value={form.category} onChange={onInputChange}>
               {REPORT_CATEGORIES.map((category) => (
                 <option key={category} value={category}>
-                  {category}
+                  {reportCategoryLabel(category)}
                 </option>
               ))}
             </select>
@@ -413,9 +411,9 @@ function CitizenReportsPage() {
 
           {REPORT_SUBCATEGORIES[form.category] ? (
             <label>
-              Subcategoria
+              Subcategoría
               <select name="subCategory" value={form.subCategory} onChange={onInputChange} required>
-                <option value="">Seleccione subcategoria</option>
+                <option value="">Seleccione subcategoría</option>
                 {REPORT_SUBCATEGORIES[form.category].map((subCategory) => (
                   <option key={subCategory} value={subCategory}>
                     {subCategory}
@@ -436,7 +434,7 @@ function CitizenReportsPage() {
           </label>
 
           <label className="full-width">
-            Descripcion
+            Descripción
             <textarea name="description" rows={3} value={form.description} onChange={onInputChange} required />
           </label>
 
@@ -448,7 +446,7 @@ function CitizenReportsPage() {
 
           <div className="form-actions">
             <button type="button" className="btn btn-secondary" onClick={useCurrentLocation} disabled={locating}>
-              {locating ? 'Ubicando...' : 'Usar mi ubicacion'}
+              {locating ? 'Ubicando…' : 'Usar mi ubicación'}
             </button>
             <button type="submit" className="btn" disabled={submitting}>
               {submitting ? 'Enviando...' : 'Enviar reporte'}
@@ -461,7 +459,7 @@ function CitizenReportsPage() {
         <h3>Seguimiento de reportes</h3>
         {loading ? <LoadingSpinner label="Cargando reportes..." /> : null}
         {!loading && filteredReports.length === 0 ? (
-          <EmptyState title="Sin reportes" description="Aun no hay reportes para los filtros seleccionados." />
+          <EmptyState title="Sin reportes" description="Aún no hay reportes para los filtros seleccionados." />
         ) : null}
         {!loading && filteredReports.length > 0 ? (
           <DataTable
@@ -493,7 +491,7 @@ function CitizenReportsPage() {
       <ConfirmModal
         isOpen={Boolean(pendingDeleteId)}
         title="Eliminar reporte"
-        message="Esta accion no se puede deshacer."
+        message="Esta acción no se puede deshacer."
         confirmLabel="Eliminar"
         onConfirm={confirmDelete}
         onCancel={() => setPendingDeleteId('')}
@@ -503,7 +501,7 @@ function CitizenReportsPage() {
         <div className="modal-backdrop" onClick={() => setGalleryReport(null)}>
           <article className="reports-gallery-dialog" onClick={(event) => event.stopPropagation()}>
             <div className="reports-photo-dialog-header">
-              <strong>Galeria del reporte</strong>
+              <strong>Galería del reporte</strong>
               <button type="button" className="btn btn-secondary" onClick={() => setGalleryReport(null)}>
                 Cerrar
               </button>
@@ -537,7 +535,7 @@ function CitizenReportsPage() {
                 </div>
               </>
             ) : (
-              <EmptyState title="Sin fotos" description="Este reporte no registra imagenes asociadas." />
+              <EmptyState title="Sin fotos" description="Este reporte no registra imágenes asociadas." />
             )}
           </article>
         </div>

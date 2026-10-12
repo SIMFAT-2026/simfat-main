@@ -60,7 +60,7 @@ export async function resizeImageFile(file, options = {}) {
   const mimeType = options.mimeType || DEFAULT_MIME_TYPE;
 
   if (!(file instanceof window.File)) {
-    throw new Error('Archivo invalido para redimension.');
+    throw new Error('Archivo inválido para redimensión.');
   }
 
   if (!file.type.startsWith('image/')) {

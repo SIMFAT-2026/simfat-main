@@ -19,6 +19,15 @@ public class MonitoredRegionsConfig {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(MonitoredRegionsConfig.class);
 
+    /**
+     * The 3 region-level slugs SIMFAT actually monitors (Biobio, Nuble, Araucania). This is
+     * the single source of truth other services should reuse instead of hardcoding a second
+     * copy of these ids — e.g. {@code OpenWeatherFwiServiceImpl.syncFwiForAllRegions()} (S1e1)
+     * restricts its region-level weather sync loop to these ids, skipping the 16 non-target
+     * official-Chile {@code Region} documents that exist only for display/reference purposes.
+     */
+    public static final List<String> MONITORED_REGION_IDS = List.of("biobio", "nuble", "araucania");
+
     private final RegionRepository regionRepository;
 
     public MonitoredRegionsConfig(RegionRepository regionRepository) {

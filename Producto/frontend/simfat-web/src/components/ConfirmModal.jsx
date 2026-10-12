@@ -1,4 +1,4 @@
-function ConfirmModal({ isOpen, title, message, onConfirm, onCancel, confirmLabel = 'Confirm' }) {
+function ConfirmModal({ isOpen, title, message, onConfirm, onCancel, confirmLabel = 'Confirmar' }) {
   if (!isOpen) {
     return null;
   }
@@ -10,7 +10,7 @@ function ConfirmModal({ isOpen, title, message, onConfirm, onCancel, confirmLabe
         <p>{message}</p>
         <div className="modal-actions">
           <button type="button" className="btn btn-secondary" onClick={onCancel}>
-            Cancel
+            Cancelar
           </button>
           <button type="button" className="btn btn-danger" onClick={onConfirm}>
             {confirmLabel}

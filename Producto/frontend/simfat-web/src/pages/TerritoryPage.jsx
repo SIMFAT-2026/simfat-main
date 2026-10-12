@@ -10,7 +10,9 @@ const DashboardPage = lazy(() => import('./DashboardPage'));
 const FOCUS_MAP = {
   alerts: ['ALERTS', 'REPORTS'],
   vegetation: ['NDVI', 'NDMI'],
-  loss: ['ALERTS']
+  loss: ['ALERTS'],
+  burned: ['BURNED'],
+  landcover: ['LANDCOVER']
 };
 
 // Waits for the session bootstrap before mounting the content, so the data mode
@@ -42,7 +44,7 @@ function TerritoryContent({ isAuthenticated }) {
     <>
       <section className="page-container territory-page">
         <SectionTitle
-          title="Monitorizacion territorial"
+          title="Monitorización territorial"
         />
 
         <TerritoryMapPanel
@@ -56,6 +58,7 @@ function TerritoryContent({ isAuthenticated }) {
           refreshing={territory.refreshing}
           error={territory.selectedRegionError}
           onRetry={territory.reloadSelectedRegion}
+          mapbiomasLayers={territory.mapbiomasLayers}
           // Anonymous mode still calls the risk-score and comuna history endpoints;
           // they must stay in the backend PublicEndpointPaths allowlist.
           readOnly={!isAuthenticated}
@@ -65,7 +68,7 @@ function TerritoryContent({ isAuthenticated }) {
       {/* The analytics dashboard calls authenticated endpoints: signed-in users only. */}
       {isAuthenticated && (
         <div className="territory-dashboard-block">
-          <Suspense fallback={<div className="loading-state">Cargando panel analitico...</div>}>
+          <Suspense fallback={<div className="loading-state">Cargando panel analítico…</div>}>
             <DashboardPage selectedRegionId={territory.selectedRegionId} />
           </Suspense>
         </div>

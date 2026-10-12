@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState, useCallback, useMemo, memo } from 'react';
-import { createPortal } from 'react-dom';
 import L from 'leaflet';
 import ComunaRiskPanel from './ComunaRiskPanel';
+import ComunaMapbiomasSection from './ComunaMapbiomasSection';
+import { comunaPanelOrigin, panelYear } from '../utils/comunaMapbiomas';
 import { GeoJSON, MapContainer, Marker, Pane, TileLayer, Tooltip, useMap } from 'react-leaflet';
 import marker2x from 'leaflet/dist/images/marker-icon-2x.png';
 import markerIcon from 'leaflet/dist/images/marker-icon.png';
@@ -10,7 +11,37 @@ import EmptyState from '../../../components/EmptyState';
 import ErrorMessage from '../../../components/ErrorMessage';
 import LoadingSpinner from '../../../components/LoadingSpinner';
 import WeatherSyncButton from '../../dashboard/components/WeatherSyncButton';
-import { ALERT_LEVEL_CONFIG, CLIMATE_SCALES, RISK_SCORE_LEGEND, VEGETATION_SCALES } from '../constants/colorScales';
+import {
+  ALERT_LEVEL_CONFIG,
+  BURNED_SCALE,
+  CLIMATE_SCALES,
+  NEUTRAL_FILL,
+  VEGETATION_SCALES,
+  burnedColorFor
+} from '../constants/colorScales';
+import { burnedTooltipLines, landcoverLineFor, landcoverToggleLabel } from '../utils/landcoverLayer';
+import { burnedLegendNote, burnedLineFor, burnedToggleLabel, mapbiomasOwner } from '../utils/mapbiomasLayer';
+import { CLIMATE_INDICATORS } from '../constants/indicators';
+import { burnedFillOpacity } from '../utils/mapbiomasStyle';
+import LayerToggleGroups from './LayerToggleGroups';
+import RegionalSummary from './RegionalSummary';
+import { regionalSummary } from '../utils/regionalSummary';
+import { alertTrigger } from '../utils/alertTrigger';
+import { compassLabelFrom } from '../utils/compass';
+import { REPORT_CARD_COLORS, isLongDescription } from '../utils/reportCard';
+import { comunaRiskStyle, riskLegendItems } from '../utils/riskPalette';
+import {
+  WIND_ARROW,
+  WIND_ARROW_HALO_WIDTH,
+  WIND_ARROW_LEGEND,
+  WIND_ARROW_PATH,
+  windArrowHtml,
+  windArrowSize
+} from '../utils/windArrow';
+import { modeLabel } from '../../../utils/labels';
+import MapbiomasYearControl from './MapbiomasYearControl';
+import { chipLabel, controlVisible } from '../utils/yearControl';
+import { LandcoverChoropleth, LandcoverLegend } from './LandcoverLayer';
 
 // LocalDateTime de Java llega sin 'Z' — JS lo interpreta como hora local del browser.
 // Esta utilidad fuerza UTC antes de convertir a Santiago para evitar doble conversión.
@@ -42,12 +73,12 @@ const INDICATOR_COLORS = {
   WIND: '#0891b2',
   HUMIDITY: '#2b8cbe',
   AIR_TEMP: '#dc2626',
-  SOIL_TEMP: '#b45309'
+  SOIL_TEMP: '#b45309',
+  BURNED: '#AC4B28',
+  LANDCOVER: '#7A5900'
 };
 
-const CLIMATE_INDICATORS = ['WIND', 'HUMIDITY', 'AIR_TEMP', 'SOIL_TEMP'];
 const INDEX_CHOROPLETH_INDICATORS = ['NDVI', 'NDMI'];
-const NEUTRAL_FILL = '#cbd5e1';
 
 const FIRMS_RECENCY_STYLES = {
   today: {
@@ -93,19 +124,6 @@ function climateColorForValue(indicator, value) {
 
 
 
-function comunaBaseStyle(score) {
-  const level = score?.alertLevel || 'NORMAL';
-  const cfg = ALERT_LEVEL_CONFIG[level] || ALERT_LEVEL_CONFIG.NORMAL;
-  return {
-    fillColor: cfg.fill,
-    fillOpacity: score ? 0.34 : 0.10,
-    color: cfg.color,
-    weight: score ? cfg.weight : 0.8,
-    dashArray: score ? cfg.dashArray : null,
-    opacity: score ? 0.9 : 0.7
-  };
-}
-
 const ComunaChoropleth = memo(function ComunaChoropleth({ geoJson, comunalScores, onComunaHover, onComunaHoverEnd, onComunaClick }) {
   // react-leaflet only rebuilds the underlying L.geoJSON layer when `data` (the
   // polygons) changes — onEachFeature's handlers are bound once at that point
@@ -124,7 +142,7 @@ const ComunaChoropleth = memo(function ComunaChoropleth({ geoJson, comunalScores
       data={geoJson}
       style={(feature) => {
         const score = scoresRef.current?.[feature?.properties?.comunaId];
-        return comunaBaseStyle(score);
+        return comunaRiskStyle(score);
       }}
       onEachFeature={(feature, layer) => {
         const comunaId = feature?.properties?.comunaId;
@@ -132,13 +150,13 @@ const ComunaChoropleth = memo(function ComunaChoropleth({ geoJson, comunalScores
 
         layer.on('mouseover', (e) => {
           const score = scoresRef.current?.[comunaId];
-          layer.setStyle({ fillOpacity: 0.68, weight: 1.4, color: '#475569' });
+          layer.setStyle({ fillOpacity: 0.75, weight: 1.6, color: '#0f172a' });
           onComunaHover?.(comunaId, nombre, score, e.containerPoint);
         });
 
         layer.on('mouseout', () => {
           const score = scoresRef.current?.[comunaId];
-          layer.setStyle(comunaBaseStyle(score));
+          layer.setStyle(comunaRiskStyle(score));
           onComunaHoverEnd?.();
         });
 
@@ -194,6 +212,90 @@ const ClimateChoropleth = memo(function ClimateChoropleth({ geoJson, indicator, 
             : 'Sin datos';
           layer.setTooltipContent(`${nombre}: ${valueLabel}`);
         });
+      }}
+    />
+  );
+});
+
+// Renders the yearly MapBiomas BURNED layer as a comuna choropleth. Another
+// year restyles the same polygons (style and tooltip read the latest layer
+// through refs), and `stale` dims the previous year while the new one loads. While the layer is not loaded (loading or
+// failed) every comuna is neutral and the tooltip says why.
+// When `interactive` is false (RISK_SCORE is visible) the polygons take no
+// pointer events, so hover and click fall through to the risk layer below, which
+// shows the burned line in its own tooltip. When it owns hover (no RISK_SCORE)
+// and LANDCOVER is visible and loaded, `landcoverLayer` adds the cover line to
+// its tooltip. `emphasizeOutline` thickens the neutral outline while the layer
+// is the only thing on the map and not loaded.
+const BurnedChoropleth = memo(function BurnedChoropleth({
+  geoJson,
+  layer,
+  loading,
+  landcoverLayer = null,
+  interactive = true,
+  emphasizeOutline = false,
+  stale = false,
+  onComunaClick
+}) {
+  const layerRef = useRef(layer);
+  layerRef.current = layer;
+  const loadingRef = useRef(loading);
+  loadingRef.current = loading;
+  const landcoverRef = useRef(landcoverLayer);
+  landcoverRef.current = landcoverLayer;
+
+  if (!geoJson || !geoJson.features) return null;
+
+  return (
+    <GeoJSON
+      key={`burned-${interactive ? 'i' : 'n'}-${emphasizeOutline ? 'e' : 'p'}`}
+      pane="burned-layer-pane"
+      interactive={interactive}
+      data={geoJson}
+      style={(feature) => {
+        const comunaId = feature?.properties?.comunaId;
+        const entry = layerRef.current?.values?.[comunaId];
+        return {
+          fillColor: burnedColorFor(entry),
+          fillOpacity: burnedFillOpacity({ hasData: entry?.available === true, stale }),
+          color: '#334155',
+          weight: emphasizeOutline && !entry ? 1.6 : 0.8,
+          opacity: emphasizeOutline && !entry ? 0.95 : 0.7
+        };
+      }}
+      onEachFeature={(feature, layerGeo) => {
+        if (!interactive) return;
+        const comunaId = feature?.properties?.comunaId;
+        const nombre = feature?.properties?.nombre || comunaId;
+        layerGeo.bindTooltip('', { sticky: true });
+        layerGeo.on('mouseover', () => {
+          const current = layerRef.current;
+          if (!current) {
+            layerGeo.setTooltipContent(`${nombre}: ${loadingRef.current ? 'Cargando…' : 'Sin datos de Fuego'}`);
+            return;
+          }
+          const cover = landcoverRef.current;
+          const lines = burnedTooltipLines({
+            nombre,
+            year: current.year,
+            entry: current.values?.[comunaId],
+            landcoverLine: cover ? landcoverLineFor(cover.values?.[comunaId], cover.year) : ''
+          });
+          if (lines.length === 1) {
+            layerGeo.setTooltipContent(lines[0]);
+            return;
+          }
+          // Several rows: build a DOM node so names and labels are never read as markup.
+          const root = document.createElement('div');
+          lines.forEach((line) => {
+            const row = document.createElement('div');
+            row.textContent = line;
+            root.appendChild(row);
+          });
+          layerGeo.setTooltipContent(root);
+        });
+        // Owning hover also owns click: opens the same comuna panel as RISK_SCORE.
+        layerGeo.on('click', () => onComunaClick?.(comunaId, nombre));
       }}
     />
   );
@@ -282,16 +384,6 @@ function formatHourLabel(str, includeDate) {
   });
 }
 
-const COMPASS_LABELS = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
-
-// Open-Meteo's winddirection is the bearing the wind comes FROM (meteorological
-// convention). For an arrow that visually shows where the wind is heading, we
-// rotate by +180°; the compass label below still describes the source bearing.
-function compassLabelFrom(directionFromDeg) {
-  const index = Math.round(directionFromDeg / 45) % 8;
-  return COMPASS_LABELS[index];
-}
-
 function featureCentroid(feature) {
   try {
     return L.geoJSON(feature).getBounds().getCenter();
@@ -301,14 +393,28 @@ function featureCentroid(feature) {
 }
 
 function windArrowIcon(speed, bearingTo) {
-  const color = climateColorForValue('WIND', speed);
-  const html = `<div class="wind-arrow" style="transform: rotate(${bearingTo}deg); border-bottom-color: ${color};"></div>`;
+  const size = windArrowSize(speed);
   return L.divIcon({
     className: 'wind-arrow-icon',
-    html,
-    iconSize: [20, 20],
-    iconAnchor: [10, 10]
+    html: windArrowHtml(speed, bearingTo),
+    iconSize: [size, size],
+    iconAnchor: [size / 2, size / 2]
   });
+}
+
+function WindArrowSample({ size }) {
+  return (
+    <svg className="territory-wind-legend-arrow" width={size} height={size} viewBox="0 0 24 24" aria-hidden="true">
+      <path
+        d={WIND_ARROW_PATH}
+        fill={WIND_ARROW.fill}
+        stroke={WIND_ARROW.halo}
+        strokeWidth={WIND_ARROW_HALO_WIDTH}
+        strokeLinejoin="round"
+        paintOrder="stroke"
+      />
+    </svg>
+  );
 }
 
 // Renders one rotated arrow per comuna centroid showing wind direction
@@ -380,13 +486,13 @@ function featureMeta(feature) {
     return `Valor: ${Number(props.value).toFixed(3)}`;
   }
   if (props.hectares !== undefined && props.hectares !== null) {
-    return `Hectareas: ${props.hectares}`;
+    return `Hectáreas: ${props.hectares}`;
   }
   if (props.level) {
     return `Nivel: ${props.level}`;
   }
   if (props.category) {
-    return `Categoria: ${props.category}`;
+    return `Categoría: ${props.category}`;
   }
   return '';
 }
@@ -493,7 +599,9 @@ const INDICATOR_LABELS = {
   WIND: 'Viento',
   HUMIDITY: 'Humedad rel.',
   AIR_TEMP: 'Temp. del aire',
-  SOIL_TEMP: 'Temp. del suelo'
+  SOIL_TEMP: 'Temp. del suelo',
+  BURNED: 'Área quemada (MapBiomas)',
+  LANDCOVER: 'Cobertura (MapBiomas)'
 };
 
 const INDICATOR_FULL_LABELS = {
@@ -506,196 +614,26 @@ const INDICATOR_FULL_LABELS = {
   WIND: 'Viento',
   HUMIDITY: 'Humedad relativa',
   AIR_TEMP: 'Temperatura del aire',
-  SOIL_TEMP: 'Temperatura del suelo'
-};
-
-function IndexInfo({ info, label }) {
-  const [tooltipStyle, setTooltipStyle] = useState(null);
-  const btnRef = useRef(null);
-  const tooltipRef = useRef(null);
-
-  useEffect(() => {
-    if (!tooltipStyle) return undefined;
-
-    function handleDocumentPointerDown(event) {
-      if (btnRef.current?.contains(event.target) || tooltipRef.current?.contains(event.target)) {
-        return;
-      }
-      setTooltipStyle(null);
-    }
-
-    document.addEventListener('pointerdown', handleDocumentPointerDown);
-    return () => document.removeEventListener('pointerdown', handleDocumentPointerDown);
-  }, [tooltipStyle]);
-
-  function handleToggle(e) {
-    e.stopPropagation();
-    if (tooltipStyle) {
-      setTooltipStyle(null);
-      return;
-    }
-    const rect = btnRef.current.getBoundingClientRect();
-    const TOOLTIP_W = 238;
-    const fitsRight = rect.right + 8 + TOOLTIP_W < window.innerWidth;
-    setTooltipStyle({
-      position: 'fixed',
-      top: `${rect.top + rect.height / 2}px`,
-      left: fitsRight ? `${rect.right + 8}px` : `${rect.left - TOOLTIP_W - 8}px`,
-      transform: 'translateY(-50%)',
-    });
-  }
-
-  return (
-    <span className="comp-info-wrap">
-      <button
-        ref={btnRef}
-        type="button"
-        className="comp-info-icon"
-        aria-label={`Info sobre ${label}`}
-        onClick={handleToggle}
-      >ⓘ</button>
-      {tooltipStyle && createPortal(
-        <span ref={tooltipRef} className="comp-info-tooltip" style={tooltipStyle}>
-          {info}
-          <button
-            type="button"
-            className="comp-info-close"
-            onClick={(e) => { e.stopPropagation(); setTooltipStyle(null); }}
-          >×</button>
-        </span>,
-        document.body
-      )}
-    </span>
-  );
-}
-
-const COMPONENT_INFO = {
-  fwi: {
-    description: 'Índice de Peligro de Incendio meteorológico.',
-    rawLabel: 'FWI observado',
-    rawValue: (component) => component?.rawValue,
-    scale: 'Escala raw 0–100+:\n• 0–11: Bajo\n• 11–21: Moderado\n• 21–38: Alto\n• 38–50: Muy alto\n• >50: Extremo'
-  },
-  ndmi: {
-    description: 'Humedad de la vegetación derivada de NDMI.',
-    rawLabel: 'NDMI observado',
-    rawValue: (component) => component?.rawValue,
-    scale: 'Escala raw -1 a 1:\n• >0.1: Vegetación húmeda, bajo riesgo\n• -0.1 a 0.1: Estrés hídrico leve\n• <-0.1: Estrés hídrico severo'
-  },
-  firms: {
-    description: 'Detecciones satelitales recientes de anomalías térmicas NASA FIRMS.',
-    rawLabel: 'Detecciones FIRMS',
-    rawValue: (component) => component?.focosCount,
-    scale: 'A mayor cantidad de focos y FRP, mayor riesgo inmediato.'
-  },
-  ndvi: {
-    description: 'Índice de vegetación derivado de NDVI.',
-    rawLabel: 'NDVI observado',
-    rawValue: (component) => component?.rawValue,
-    scale: 'Escala raw -1 a 1:\n• >0.5: Vegetación densa y sana\n• 0.2–0.5: Vegetación moderada\n• 0–0.2: Vegetación escasa\n• <0: Superficie no vegetada'
-  },
-  reports: {
-    description: 'Reportes ciudadanos verificados.',
-    rawLabel: 'Reportes activos',
-    rawValue: (component) => component?.count,
-    scale: 'A mayor cantidad de reportes verificados, mayor aporte al riesgo.'
-  }
+  SOIL_TEMP: 'Temperatura del suelo',
+  BURNED: 'Área quemada (MapBiomas)',
+  LANDCOVER: 'Cobertura del suelo (MapBiomas)'
 };
 
 const VISIBLE_RISK_COMPONENTS = new Set(['fwi', 'ndmi', 'firms', 'ndvi', 'reports']);
 const POINT_LAYER_INDICATORS = ['FIRMS', 'ALERTS', 'REPORTS'];
-const MAP_TOGGLE_INDICATORS = ['RISK_SCORE', 'FIRMS', 'NDVI', 'NDMI', 'ALERTS', 'REPORTS'];
+// MapBiomas layers that get a year control while visible (Q31).
+const MAPBIOMAS_YEAR_CONTROLS = [
+  { indicator: 'BURNED', label: 'Área quemada' },
+  { indicator: 'LANDCOVER', label: 'Cobertura' }
+];
+
 const ALERT_TOOLTIP_COMPONENTS = ['firms', 'fwi', 'ndmi', 'ndvi'];
-
-function componentScoreParts(component) {
-  const score = typeof component?.score === 'number' ? component.score : null;
-  const max = typeof component?.weight === 'number' ? component.weight : 1;
-
-  return {
-    value: score != null ? (score * 100).toFixed(0) : '—',
-    max: (max * 100).toFixed(0),
-    fillPct: score != null && max > 0 ? Math.min((score / max) * 100, 100) : 0
-  };
-}
-
-function formatRawValue(value) {
-  if (value === null || value === undefined || Number.isNaN(Number(value))) {
-    return 'Sin dato';
-  }
-
-  return Number.isInteger(Number(value)) ? String(Number(value)) : Number(value).toFixed(2);
-}
-
-function componentInfoText(key, component, scoreParts) {
-  const info = COMPONENT_INFO[key];
-  if (!info) return null;
-  const rawValue = info.rawValue?.(component);
-
-  return [
-    info.description,
-    `Aporte mostrado: ${scoreParts.value}/${scoreParts.max} pts del score global.`,
-    `${info.rawLabel}: ${formatRawValue(rawValue)}.`,
-    info.scale
-  ].filter(Boolean).join('\n');
-}
-
-function RiskScoreBadge({ regionData }) {
-  const detail = regionData?.riskScore;
-  const layerFeature = regionData?.layers?.RISK_SCORE?.features?.[0];
-
-  const score = detail?.scoreComposite ?? layerFeature?.properties?.score ?? null;
-  const alertLevel = detail?.alertLevel || layerFeature?.properties?.alertLevel || 'NORMAL';
-  const components = detail?.components || null;
-
-  if (score === null && !alertLevel) return null;
-
-  const level = alertLevel || 'NORMAL';
-  const config = ALERT_LEVEL_CONFIG[level] || ALERT_LEVEL_CONFIG.NORMAL;
-  const scoreDisplay = typeof score === 'number' ? (score * 100).toFixed(0) : '—';
-
-  return (
-    <div className="risk-score-badge" style={{ borderColor: config.color, backgroundColor: config.bg }}>
-      <div className="risk-score-main">
-        <span className="risk-score-label">Nivel de riesgo</span>
-        <span className="risk-score-level" style={{ color: config.color }}>{config.label}</span>
-        <span className="risk-score-value" style={{ color: config.color }}>{scoreDisplay}<small>/100</small></span>
-      </div>
-      {components && (
-        <div className="risk-score-breakdown">
-          {Object.entries(components).filter(([key]) => VISIBLE_RISK_COMPONENTS.has(key)).map(([key, comp]) => {
-            const scoreParts = componentScoreParts(comp);
-            const info = componentInfoText(key, comp, scoreParts);
-            return (
-              <div key={key} className="risk-score-component">
-                <span className="risk-component-label">{COMPONENT_LABELS[key] || key}</span>
-                {info ? <IndexInfo info={info} label={COMPONENT_LABELS[key] || key} /> : <span />}
-                <div className="risk-component-bar-wrap">
-                  <div
-                    className="risk-component-bar"
-                    style={{ width: `${scoreParts.fillPct}%`, backgroundColor: config.color }}
-                  />
-                </div>
-                <span className="risk-component-value">{scoreParts.value}<small>/{scoreParts.max}</small></span>
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-}
 
 const REPORT_CATEGORY_LABELS = {
   HUMO: 'Humo',
   FOCO: 'Foco de incendio',
   INCENDIO: 'Incendio activo',
   OTRO: 'Otro'
-};
-const REPORT_CATEGORY_COLORS = {
-  HUMO: '#94a3b8',
-  FOCO: '#f97316',
-  INCENDIO: '#dc2626',
-  OTRO: '#64748b'
 };
 const REPORT_STATUS_LABELS = {
   RECIBIDO: 'Recibido',
@@ -705,10 +643,17 @@ const REPORT_STATUS_LABELS = {
 };
 
 function ReportCard({ report, pos, onClose }) {
+  const [expanded, setExpanded] = useState(false);
+  const description = report?.properties?.description;
+  useEffect(() => {
+    setExpanded(false);
+  }, [description]);
+
   if (!report || !pos) return null;
   const props = report.properties || {};
   const category = props.category || 'OTRO';
-  const color = REPORT_CATEGORY_COLORS[category] || '#64748b';
+  const color = REPORT_CARD_COLORS.category[category] || REPORT_CARD_COLORS.category.OTRO;
+  const longDescription = isLongDescription(props.description);
   const photoUrl = props.photoUrl || (Array.isArray(props.photoUrls) && props.photoUrls[0]) || null;
   return (
     <div className="report-card" style={{ left: pos.x + 14, top: pos.y - 10 }}>
@@ -724,7 +669,24 @@ function ReportCard({ report, pos, onClose }) {
           style={{ width: '100%', maxHeight: '140px', objectFit: 'cover', borderRadius: '4px', marginBottom: '6px' }}
         />
       )}
-      {props.description && <p className="report-card-desc">{props.description}</p>}
+      {props.description && (
+        <p
+          className={`report-card-desc${expanded ? ' report-card-desc--expanded' : ''}`}
+          title={longDescription && !expanded ? props.description : undefined}
+        >
+          {props.description}
+        </p>
+      )}
+      {longDescription && (
+        <button
+          type="button"
+          className="report-card-more"
+          aria-expanded={expanded}
+          onClick={() => setExpanded((prev) => !prev)}
+        >
+          {expanded ? 'Ver menos' : 'Ver más'}
+        </button>
+      )}
       <div className="report-card-meta">
         {props.status && (
           <span className="report-card-status">{REPORT_STATUS_LABELS[props.status] || props.status}</span>
@@ -842,12 +804,20 @@ function WeatherIllustration({ category, size = 30 }) {
   );
 }
 
-function ComunaTooltip({ comunaId, nombre, score, pos }) {
+function ComunaTooltip({ comunaId, nombre, score, pos, burnedLine = '', landcoverLine = '' }) {
   if (!comunaId || !pos) return null;
   const level = ALERT_LEVEL_CONFIG[score?.alertLevel] || ALERT_LEVEL_CONFIG.NORMAL;
   const pct = typeof score?.scoreComposite === 'number' ? (score.scoreComposite * 100).toFixed(0) : null;
   const displayNombre = nombre || score?.nombreComuna || comunaId;
   const mode = score?.mode;
+  const trigger = alertTrigger({
+    alertLevel: score?.alertLevel,
+    score: score?.scoreComposite,
+    fwiRaw: score?.fwiRaw,
+    firmsCount: score?.firmsCount,
+    firmsFrpMean: score?.firmsFrpMean,
+    alertDriver: score?.alertDriver
+  });
 
   const componentEntries = tooltipComponentEntries(score?.components);
   const fwiInputs = score?.fwiInputs;
@@ -862,7 +832,7 @@ function ComunaTooltip({ comunaId, nombre, score, pos }) {
         <span className="comuna-tooltip-nombre">{displayNombre}</span>
         {mode && (
           <span className={`comuna-mode-badge ${mode === 'ENHANCED' ? 'enhanced' : 'standard'}`}>
-            {mode}
+            {modeLabel(mode)}
           </span>
         )}
       </div>
@@ -886,6 +856,9 @@ function ComunaTooltip({ comunaId, nombre, score, pos }) {
           <div className="comuna-tooltip-level" style={{ color: level.darkUiColor }}>
             {level.label}
           </div>
+          {trigger.kind && trigger.kind !== 'score' && (
+            <div className="comuna-tooltip-trigger" style={{ color: level.darkUiColor }}>{trigger.text}</div>
+          )}
           <div className="comuna-tooltip-score-row">
             <div className="comuna-tooltip-bar-wrap">
               <div
@@ -908,6 +881,65 @@ function ComunaTooltip({ comunaId, nombre, score, pos }) {
           ))}
         </div>
       )}
+      {burnedLine && <div className="comuna-tooltip-context-line">{burnedLine}</div>}
+      {landcoverLine && <div className="comuna-tooltip-context-line">{landcoverLine}</div>}
+    </div>
+  );
+}
+
+// Legend for the BURNED layer. Year, note and source are plain text so colour
+// is never the only channel.
+function BurnedLegend({ state }) {
+  const layer = state?.layer;
+  const title = layer ? `Área quemada ${layer.year} (anual)` : 'Área quemada (anual)';
+  const note = burnedLegendNote(layer, { hasYearControl: true });
+
+  return (
+    <div className="territory-legend-section">
+      <h5>{title}</h5>
+      {!layer && state?.error && !state?.loading && (
+        <div className="territory-meta" role="alert">
+          <p>{state.error}</p>
+          {state.retry && (
+            <button type="button" className="btn btn-secondary" onClick={state.retry}>
+              Reintentar
+            </button>
+          )}
+        </div>
+      )}
+      {!layer && !(state?.error && !state?.loading) && (
+        <p className="territory-meta" role="status">
+          {state?.loading ? 'Cargando…' : 'Sin datos de Fuego.'}
+        </p>
+      )}
+      {layer && (
+        <>
+          <ul>
+            {BURNED_SCALE.bins.map((bin) => (
+              <li key={bin.label}>
+                <span className="territory-color-dot" style={{ backgroundColor: bin.color }} />
+                <span>{bin.label}</span>
+              </li>
+            ))}
+            <li>
+              <span
+                className="territory-color-dot"
+                style={{ backgroundColor: BURNED_SCALE.zero.color, border: '1px solid #94a3b8' }}
+              />
+              <span>{BURNED_SCALE.zero.label}</span>
+            </li>
+            <li>
+              <span className="territory-color-dot" style={{ backgroundColor: NEUTRAL_FILL }} />
+              <span>Sin datos</span>
+            </li>
+          </ul>
+          {note && <p className="territory-meta">{note}</p>}
+          <p className="territory-meta">
+            Fuente: {layer.citation || 'MapBiomas Fuego Chile (provisional)'}. Colores: rampa oficial de MapBiomas
+            Fuego (tamaño de cicatriz), reutilizada porque no existe una rampa para fracción anual quemada.
+          </p>
+        </>
+      )}
     </div>
   );
 }
@@ -923,6 +955,7 @@ function TerritoryMapPanel({
   refreshing,
   error,
   onRetry,
+  mapbiomasLayers = {},
   readOnly = false
 }) {
   const comunalGeoJson = regionData?.comunalGeoJson || null;
@@ -994,22 +1027,48 @@ function TerritoryMapPanel({
     setSelectedComuna((prev) => prev ? { ...prev, score: updatedScore } : null);
   }, [selectedComuna]);
 
+  // FIRMS 48 h and reports 7 d come from the regional snapshot components,
+  // whose backend windows are exactly 48 h / 7 d (TerritoryRiskServiceImpl).
+  const summary = useMemo(() => {
+    const comunaNames = {};
+    for (const feature of comunalGeoJson?.features || []) {
+      const props = feature?.properties;
+      if (props?.comunaId && props?.nombre) comunaNames[props.comunaId] = props.nombre;
+    }
+    return regionalSummary({
+      comunaScores: effectiveComunalScores,
+      comunaNames,
+      comunaTotal: comunalGeoJson?.features?.length,
+      firmsCount48h: regionData?.riskScore?.components?.firms?.focosCount,
+      reports7d: regionData?.riskScore?.components?.reports?.count
+    });
+  }, [comunalGeoJson, effectiveComunalScores, regionData]);
+
+  const mapbiomasOwnerId = mapbiomasOwner(visibleIndicators);
+  // A previous-year MapBiomas layer is still on screen while a new year loads.
+  const mapStale = MAPBIOMAS_YEAR_CONTROLS.some(
+    ({ indicator }) => visibleIndicators.includes(indicator) && mapbiomasLayers[indicator]?.stale
+  );
+
   return (
     <article className="dashboard-card territory-map-card">
-      {/* Persistent region-level risk breakdown panel: always visible when
-          regionData is available, independent of the RISK_SCORE map-layer
-          toggle (spec: risk-score-breakdown-panel). */}
+      {/* One-line regional summary derived from the per-comuna scores the map
+          paints, so it never contradicts the choropleth. Always visible when
+          regionData is available, independent of the RISK_SCORE toggle. */}
       {regionData && (
-        <section className="regional-summary-panel" aria-label="Panel de resumen regional">
-          <h4 className="regional-summary-title">Panel de resumen regional: Región {selectedRegionLabel}</h4>
-          <RiskScoreBadge regionData={regionData} />
-        </section>
+        <RegionalSummary
+          regionLabel={selectedRegionLabel}
+          summary={summary}
+          onComunaClick={(comunaId, nombre) =>
+            handleComunaClick(comunaId, nombre, effectiveComunalScores?.[comunaId])
+          }
+        />
       )}
 
       <div className="filter-bar territory-controls">
         <h3 className="territory-controls-title">Mapa territorial interactivo</h3>
         <label>
-          Region
+          Región
           <select value={selectedRegionId} onChange={(event) => setSelectedRegionId(event.target.value)}>
             {regionOptions.map((region) => (
               <option key={region.id} value={region.id}>
@@ -1019,8 +1078,15 @@ function TerritoryMapPanel({
           </select>
         </label>
 
-        <div className="territory-layer-toggles">
-          {MAP_TOGGLE_INDICATORS.map((indicator) => (
+        <LayerToggleGroups
+          visibleIndicators={visibleIndicators}
+          renderYearControl={(indicator) => {
+            const entry = MAPBIOMAS_YEAR_CONTROLS.find((item) => item.indicator === indicator);
+            const state = mapbiomasLayers[indicator];
+            if (!entry || !controlVisible({ active: visibleIndicators.includes(indicator), state })) return null;
+            return <MapbiomasYearControl label={entry.label} state={state} />;
+          }}
+          renderToggle={(indicator) => (
             <label key={indicator} className="territory-toggle" title={INDICATOR_FULL_LABELS[indicator] || indicator}>
               <input
                 type="checkbox"
@@ -1028,23 +1094,23 @@ function TerritoryMapPanel({
                 checked={visibleIndicators.includes(indicator)}
                 onChange={() => toggleIndicator(indicator)}
               />
-              <span>{INDICATOR_LABELS[indicator] || indicator}</span>
+              <span>
+                {indicator === 'BURNED' || indicator === 'LANDCOVER'
+                  ? chipLabel({
+                      plain: INDICATOR_LABELS[indicator],
+                      withYear: indicator === 'BURNED'
+                        ? burnedToggleLabel(mapbiomasLayers.BURNED?.layer)
+                        : landcoverToggleLabel(mapbiomasLayers.LANDCOVER?.layer),
+                      controlVisible: controlVisible({
+                        active: visibleIndicators.includes(indicator),
+                        state: mapbiomasLayers[indicator]
+                      })
+                    })
+                  : INDICATOR_LABELS[indicator] || CLIMATE_SCALES[indicator]?.label || indicator}
+              </span>
             </label>
-          ))}
-          {/* Opt-in climate layers (DEC-B): off by default, each with its own
-              color scale (DEC-A) rendered as a comuna choropleth. */}
-          {CLIMATE_INDICATORS.map((indicator) => (
-            <label key={indicator} className="territory-toggle" title={INDICATOR_FULL_LABELS[indicator] || indicator}>
-              <input
-                type="checkbox"
-                aria-label={INDICATOR_FULL_LABELS[indicator] || indicator}
-                checked={visibleIndicators.includes(indicator)}
-                onChange={() => toggleIndicator(indicator)}
-              />
-              <span>{INDICATOR_LABELS[indicator] || CLIMATE_SCALES[indicator]?.label || indicator}</span>
-            </label>
-          ))}
-        </div>
+          )}
+        />
 
         <div className="territory-control-actions">
           <button
@@ -1058,7 +1124,7 @@ function TerritoryMapPanel({
           {!readOnly && (
             <>
               <WeatherSyncButton regionId={selectedRegionId} />
-              <small style={{ color: '#94a3b8', fontSize: '0.68rem', marginTop: 2 }}>
+              <small style={{ color: '#475569', fontSize: '0.8rem', marginTop: 2 }}>
                 ⓘ La sincronización puede tardar aprox. 2–3 min
               </small>
             </>
@@ -1087,11 +1153,12 @@ function TerritoryMapPanel({
       {loading ? <LoadingSpinner label="Cargando capas territoriales..." /> : null}
       {!loading && error ? <ErrorMessage error={{ message: error }} onRetry={onRetry} /> : null}
       {!loading && !error && !regionData ? (
-        <EmptyState title="Sin datos territoriales" description="No hay capas para la region seleccionada." />
+        <EmptyState title="Sin datos territoriales" description="No hay capas para la región seleccionada." />
       ) : null}
 
       {!loading && !error && regionData ? (
         <div className="territory-map-wrapper">
+          <div className="territory-map-region" aria-busy={mapStale}>
           <MapContainer
             key={regionData.regionId}
             className="territory-map"
@@ -1113,6 +1180,44 @@ function TerritoryMapPanel({
                   onComunaHover={handleComunaHover}
                   onComunaHoverEnd={handleComunaHoverEnd}
                   onComunaClick={handleComunaClick}
+                />
+              )}
+            </Pane>
+
+            {/* Stacking of the MapBiomas layers: RISK_SCORE (410) sits below LANDCOVER
+                (412) and BURNED (415) yet owns hover and click when visible. Owner
+                precedence (mapbiomasOwner): RISK_SCORE > BURNED > LANDCOVER. Only
+                the owner is interactive; the others take no pointer events and
+                their data shows as extra lines in the owner's tooltip (the risk
+                tooltip, or the BURNED tooltip for LANDCOVER). */}
+            <Pane name="landcover-layer-pane" style={{ zIndex: 412 }}>
+              {comunalGeoJson && visibleIndicators.includes('LANDCOVER') && (
+                <LandcoverChoropleth
+                  key={regionData.regionId}
+                  geoJson={comunalGeoJson}
+                  layer={mapbiomasLayers.LANDCOVER?.layer}
+                  loading={Boolean(mapbiomasLayers.LANDCOVER?.loading)}
+                  interactive={mapbiomasOwnerId === 'LANDCOVER'}
+                  riskVisible={visibleIndicators.includes('RISK_SCORE')}
+                  stale={Boolean(mapbiomasLayers.LANDCOVER?.stale)}
+                  onComunaClick={handleComunaClick}
+                  emphasizeOutline={!mapbiomasLayers.LANDCOVER?.layer && visibleIndicators.every((indicator) => indicator === 'LANDCOVER')}
+                />
+              )}
+            </Pane>
+
+            <Pane name="burned-layer-pane" style={{ zIndex: 415 }}>
+              {comunalGeoJson && visibleIndicators.includes('BURNED') && (
+                <BurnedChoropleth
+                  key={regionData.regionId}
+                  geoJson={comunalGeoJson}
+                  layer={mapbiomasLayers.BURNED?.layer}
+                  loading={Boolean(mapbiomasLayers.BURNED?.loading)}
+                  landcoverLayer={visibleIndicators.includes('LANDCOVER') ? (mapbiomasLayers.LANDCOVER?.layer ?? null) : null}
+                  interactive={mapbiomasOwnerId === 'BURNED'}
+                  stale={Boolean(mapbiomasLayers.BURNED?.stale)}
+                  onComunaClick={handleComunaClick}
+                  emphasizeOutline={!mapbiomasLayers.BURNED?.layer && visibleIndicators.every((indicator) => indicator === 'BURNED')}
                 />
               )}
             </Pane>
@@ -1179,6 +1284,7 @@ function TerritoryMapPanel({
               )}
             </Pane>
           </MapContainer>
+          </div>
 
           {selectedReport && (
             <ReportCard
@@ -1194,6 +1300,22 @@ function TerritoryMapPanel({
               nombre={hoveredComuna.nombre}
               score={hoveredComuna.score}
               pos={tooltipPos}
+              burnedLine={
+                visibleIndicators.includes('BURNED') && mapbiomasLayers.BURNED?.layer
+                  ? burnedLineFor(
+                      mapbiomasLayers.BURNED.layer.values?.[hoveredComuna.comunaId],
+                      mapbiomasLayers.BURNED.layer.year
+                    )
+                  : ''
+              }
+              landcoverLine={
+                visibleIndicators.includes('LANDCOVER') && mapbiomasLayers.LANDCOVER?.layer
+                  ? landcoverLineFor(
+                      mapbiomasLayers.LANDCOVER.layer.values?.[hoveredComuna.comunaId],
+                      mapbiomasLayers.LANDCOVER.layer.year
+                    )
+                  : ''
+              }
             />
           )}
 
@@ -1201,12 +1323,26 @@ function TerritoryMapPanel({
             <ComunaRiskPanel
               key={selectedComuna.comunaId}
               comunaId={selectedComuna.comunaId}
+              comunaName={selectedComuna.nombre}
+              openedFrom={comunaPanelOrigin(mapbiomasOwnerId)}
               score={effectiveComunalScores?.[selectedComuna.comunaId] || selectedComuna.score}
               regionId={selectedRegionId}
               onClose={() => setSelectedComuna(null)}
               onScoreUpdated={handleScoreUpdated}
               canSync={false}
               readOnly={readOnly}
+              extraSections={
+                <ComunaMapbiomasSection
+                  comunaId={selectedComuna.comunaId}
+                  year={panelYear({
+                    visible: visibleIndicators.includes('LANDCOVER'),
+                    selectedYear: mapbiomasLayers.LANDCOVER?.selectedYear
+                  })}
+                  burnedYear={
+                    visibleIndicators.includes('BURNED') ? mapbiomasLayers.BURNED?.selectedYear : undefined
+                  }
+                />
+              }
             />
           ) : (
             <div className="territory-legend">
@@ -1250,14 +1386,14 @@ function TerritoryMapPanel({
                 <div className="territory-legend-section">
                   <h5>Riesgo comunal</h5>
                   <ul>
-                    {RISK_SCORE_LEGEND.map((item) => (
-                      <li key={item.label} title={item.note}>
+                    {riskLegendItems().map((item) => (
+                      <li key={item.key} title={item.note}>
                         <span
-                          className="territory-color-dot territory-risk-swatch"
-                          style={{ backgroundColor: item.color, borderColor: item.borderColor, color: item.borderColor }}
+                          className="territory-risk-swatch"
+                          style={{ backgroundColor: item.swatchFill, borderColor: item.borderColor, borderStyle: item.borderStyle }}
                           aria-hidden="true"
                         />
-                        <span>{item.label} ({item.range})</span>
+                        <span>{item.text}</span>
                       </li>
                     ))}
                   </ul>
@@ -1271,10 +1407,11 @@ function TerritoryMapPanel({
                   <div key={indicator} className="territory-legend-section">
                     <h5>{scale.label}</h5>
                     <ul>
-                      {scale.bins.map((bin) => (
+                      {scale.bins.map((bin, index) => (
                         <li key={bin.label}>
                           <span className="territory-color-dot" style={{ backgroundColor: bin.color }} />
                           <span>{bin.label}</span>
+                          {indicator === 'WIND' ? <WindArrowSample size={WIND_ARROW_LEGEND[index].size} /> : null}
                         </li>
                       ))}
                       <li>
@@ -1282,6 +1419,9 @@ function TerritoryMapPanel({
                         <span>Sin datos</span>
                       </li>
                     </ul>
+                    {indicator === 'WIND' ? (
+                      <p className="territory-legend-note">Las flechas apuntan hacia donde sopla el viento; su tamaño indica la velocidad.</p>
+                    ) : null}
                   </div>
                 );
               })}
@@ -1293,10 +1433,11 @@ function TerritoryMapPanel({
                   <div key={indicator} className="territory-legend-section">
                     <h5>{scale.label} ({scale.unit})</h5>
                     <ul>
-                      {scale.bins.map((bin) => (
+                      {scale.bins.map((bin, index) => (
                         <li key={bin.label}>
                           <span className="territory-color-dot" style={{ backgroundColor: bin.color }} />
                           <span>{bin.label}</span>
+                          {indicator === 'WIND' ? <WindArrowSample size={WIND_ARROW_LEGEND[index].size} /> : null}
                         </li>
                       ))}
                       <li>
@@ -1304,12 +1445,23 @@ function TerritoryMapPanel({
                         <span>Sin datos</span>
                       </li>
                     </ul>
+                    {indicator === 'WIND' ? (
+                      <p className="territory-legend-note">Las flechas apuntan hacia donde sopla el viento; su tamaño indica la velocidad.</p>
+                    ) : null}
                   </div>
                 );
               })}
 
+              {visibleIndicators.includes('BURNED') && (
+                <BurnedLegend state={mapbiomasLayers.BURNED} />
+              )}
+
+              {visibleIndicators.includes('LANDCOVER') && (
+                <LandcoverLegend state={mapbiomasLayers.LANDCOVER} />
+              )}
+
               <p className="territory-meta">
-                Fuente: {regionData.source === 'backend' ? 'Backend' : 'Mock local'} | Ultima actualizacion:{' '}
+                Fuente: {regionData.source === 'backend' ? 'servidor' : 'datos de demostración'} | Última actualización:{' '}
                 {parseUtcDate(regionData.generatedAt)}
               </p>
             </div>

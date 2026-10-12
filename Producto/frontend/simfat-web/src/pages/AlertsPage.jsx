@@ -7,6 +7,7 @@ import { RISK_LEVELS } from '../features/alerts/utils/alertsLogic';
 import { useFeedback } from '../hooks';
 import { createAlert, deleteAlert, updateAlert } from '../services';
 import { asNumberOrNull } from '../utils/data';
+import { levelLabel } from '../utils/labels';
 import { mapValidationErrors } from '../utils/errors';
 
 const initialForm = {
@@ -24,7 +25,7 @@ function toCsvRow(cells) {
 }
 
 function exportAlertsCsv(alerts, regionMap) {
-  const headers = ['ID', 'Region', 'Fecha evento', 'Nivel riesgo', 'Fuente', 'Descripcion', 'Latitud', 'Longitud'];
+  const headers = ['ID', 'Región', 'Fecha evento', 'Nivel riesgo', 'Fuente', 'Descripción', 'Latitud', 'Longitud'];
   const rows = alerts.map((a) => [
     a.id,
     regionMap[a.regionId] || a.regionId,
@@ -167,9 +168,9 @@ function AuthenticatedAlerts() {
       {editingId ? (
         <form className="form-grid" onSubmit={onSubmit}>
           <label>
-            Region
+            Región
             <select name="regionId" value={form.regionId} onChange={onInputChange} required>
-              <option value="">Seleccione una region</option>
+              <option value="">Seleccione una región</option>
               {regions.map((region) => (
                 <option key={region.id} value={region.id}>
                   {region.nombre}
@@ -186,11 +187,11 @@ function AuthenticatedAlerts() {
           </label>
 
           <label>
-            Nivel riesgo
+            Nivel de riesgo
             <select name="nivelRiesgo" value={form.nivelRiesgo} onChange={onInputChange} required>
               {RISK_LEVELS.map((level) => (
                 <option key={level} value={level}>
-                  {level}
+                  {levelLabel(level)}
                 </option>
               ))}
             </select>
@@ -216,7 +217,7 @@ function AuthenticatedAlerts() {
           </label>
 
           <label className="full-width">
-            Descripcion
+            Descripción
             <textarea name="descripcion" value={form.descripcion} onChange={onInputChange} rows={3} />
             {validationErrors.descripcion ? <small className="field-error">{validationErrors.descripcion}</small> : null}
           </label>
@@ -224,7 +225,7 @@ function AuthenticatedAlerts() {
           <div className="form-actions">
             <button className="btn" type="submit">Actualizar</button>
             <button type="button" className="btn btn-secondary" onClick={resetForm}>
-              Cancelar edicion
+              Cancelar edición
             </button>
           </div>
         </form>
@@ -233,7 +234,7 @@ function AuthenticatedAlerts() {
       <ConfirmModal
         isOpen={Boolean(deleteId)}
         title="Eliminar alerta"
-        message="Confirma la eliminacion del evento de alerta."
+        message="Confirma la eliminación del evento de alerta."
         confirmLabel="Eliminar"
         onConfirm={confirmDelete}
         onCancel={() => setDeleteId('')}

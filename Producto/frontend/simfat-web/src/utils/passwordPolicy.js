@@ -3,27 +3,27 @@
 const requirements = [
   {
     id: 'length',
-    label: `Minimo ${PASSWORD_MIN_LENGTH} caracteres`,
+    label: `Mínimo ${PASSWORD_MIN_LENGTH} caracteres`,
     test: (password) => password.length >= PASSWORD_MIN_LENGTH
   },
   {
     id: 'uppercase',
-    label: 'Al menos 1 letra mayuscula',
+    label: 'Al menos 1 letra mayúscula',
     test: (password) => /[A-Z]/.test(password)
   },
   {
     id: 'lowercase',
-    label: 'Al menos 1 letra minuscula',
+    label: 'Al menos 1 letra minúscula',
     test: (password) => /[a-z]/.test(password)
   },
   {
     id: 'number',
-    label: 'Al menos 1 numero',
+    label: 'Al menos 1 número',
     test: (password) => /\d/.test(password)
   },
   {
     id: 'symbol',
-    label: 'Al menos 1 simbolo (!@#$...)',
+    label: 'Al menos 1 símbolo (!@#$...)',
     test: (password) => /[^A-Za-z0-9]/.test(password)
   }
 ];
@@ -45,7 +45,7 @@ export function getPasswordStrength(password) {
   }
 
   if (ratio <= 0.4) {
-    return { label: 'Debil', tone: 'weak', percent: 25, score, max: requirements.length };
+    return { label: 'Débil', tone: 'weak', percent: 25, score, max: requirements.length };
   }
 
   if (ratio <= 0.8) {

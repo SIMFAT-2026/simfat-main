@@ -44,12 +44,12 @@ function CriticalRegionsTable({ data, loading, error, onRetry }: CriticalRegions
   const rows = data || [];
   return (
     <article className="dashboard-card">
-      <h3>Regiones criticas</h3>
+      <h3>Regiones críticas</h3>
       <DashboardPanelState
         loading={loading}
         error={error}
         isEmpty={rows.length === 0}
-        emptyTitle="Sin regiones criticas"
+        emptyTitle="Sin regiones críticas"
         emptyDescription="No hay regiones con criticidad reportada en este momento."
         onRetry={onRetry}
       >
@@ -57,7 +57,7 @@ function CriticalRegionsTable({ data, loading, error, onRetry }: CriticalRegions
           <table className="data-table">
             <thead>
               <tr>
-                <th>Region</th>
+                <th>Región</th>
                 <th>Criticidad</th>
                 <th>Ha perdidas</th>
                 <th>Alertas</th>

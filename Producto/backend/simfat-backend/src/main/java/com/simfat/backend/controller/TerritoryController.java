@@ -14,8 +14,10 @@ import com.simfat.backend.model.OpenEoIndicatorObservation;
 import com.simfat.backend.model.TerritoryRiskSnapshot;
 import com.simfat.backend.model.TerritoryWeatherObservation;
 import com.simfat.backend.model.ComunaInfo;
+import com.simfat.backend.model.ComunaMapbiomasStats;
 import com.simfat.backend.repository.CitizenReportRepository;
 import com.simfat.backend.repository.ComunaInfoRepository;
+import com.simfat.backend.repository.ComunaMapbiomasStatsRepository;
 import com.simfat.backend.repository.ForestLossRecordRepository;
 import com.simfat.backend.repository.HeatAlertEventRepository;
 import com.simfat.backend.repository.OpenEoIndicatorObservationRepository;
@@ -25,6 +27,12 @@ import com.simfat.backend.service.NasaFirmsService;
 import com.simfat.backend.service.OpenWeatherFwiService;
 import com.simfat.backend.service.TerritoryRiskService;
 import com.simfat.backend.web.CoordinateRounding;
+import com.simfat.backend.web.MapbiomasBurnedDefaultYearResolver;
+import com.simfat.backend.web.MapbiomasBurnedLayerBuilder;
+import com.simfat.backend.web.MapbiomasLandCoverDefaultYearResolver;
+import com.simfat.backend.web.MapbiomasLandCoverLayerBuilder;
+import com.simfat.backend.web.MapbiomasLayerCache;
+import com.simfat.backend.web.MapbiomasYear;
 import com.simfat.backend.web.PublicQueryWindow;
 import org.springframework.data.domain.PageRequest;
 import java.time.LocalDate;
@@ -43,6 +51,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.http.MediaType;
 import org.springframework.data.domain.PageRequest;
@@ -63,7 +72,7 @@ public class TerritoryController {
     private static final int PUBLIC_LAYER_DEFAULT_DAYS = 7;
     private static final List<String> VALID_INDICATORS =
         List.of("NDVI", "NDMI", "LOSS", "ALERTS", "REPORTS", "FIRMS", "RISK_SCORE",
-            "WIND", "HUMIDITY", "AIR_TEMP", "SOIL_TEMP");
+            "WIND", "HUMIDITY", "AIR_TEMP", "SOIL_TEMP", "BURNED", "LANDCOVER");
 
     private final HeatAlertEventRepository heatAlertRepository;
     private final CitizenReportRepository citizenReportRepository;
@@ -76,11 +85,65 @@ public class TerritoryController {
     private final ComunaRiskService comunaRiskService;
     private final ComunaInfoRepository comunaInfoRepository;
     private final TerritoryWeatherObservationRepository weatherObservationRepository;
+    private final ComunaMapbiomasStatsRepository mapbiomasStatsRepository;
 
     // Comunas con un sync de Copernicus en curso. El endpoint es fire-and-forget
     // (~2 min de duración real) y sin esto un segundo POST para la misma comuna
     // dispara un INSERT concurrente que choca con el índice único en Mongo.
     private final Set<String> copernicusSyncInFlight = ConcurrentHashMap.newKeySet();
+
+    // Task 2b2a.2 (design D5 caching note): lazily built, keyed (dataVersion, indicator, year,
+    // regionId), invalidated implicitly on restart because mapbiomasDataVersion is a @Value
+    // property -- there is no live "swap dataVersion without redeploy" path yet, so an explicit
+    // eviction listener would be premature (documented rather than silently added).
+    //
+    // Judgment-day finding #1 (CRITICAL, fixed): regionId is normalized via
+    // RegionGeometry.fromRegion(...).id() BEFORE it reaches this key, so under normal operation
+    // this stays bounded by construction (3 known regions x (26 LANDCOVER + 13 BURNED years) = 117 entries max; the cap is 128, see MapbiomasLayerCache).
+    // The comment above previously claimed this bound without the normalization actually being
+    // applied to the key -- a raw, unauthenticated regionId query param reached the key directly,
+    // so distinct garbage values each created a permanent entry (memory exhaustion) and forced a
+    // Mongo scan (load amplification) on /api/territory/public/layers. MapbiomasLayerCache now
+    // also enforces a hard cap (see its Javadoc) as defense in depth, independent of whether a
+    // future edit keeps normalizing correctly.
+    private final MapbiomasLayerCache mapbiomasLayerCache = new MapbiomasLayerCache(MapbiomasLayerCache.DEFAULT_MAX_ENTRIES);
+
+    // Decision Q28: the BURNED omitted-year default is data-derived (latest year with actual
+    // burned data in the loaded dataVersion) rather than a fixed constant. It is immutable per
+    // dataVersion, so it is computed via MapbiomasBurnedDefaultYearResolver AT MOST ONCE per
+    // dataVersion (one findByDataVersion read, across ALL regions so switching regions never
+    // changes the default) and cached in these two fields -- not the bounded
+    // mapbiomasLayerCache, since this is a single scalar keyed by dataVersion, not a per-request
+    // payload keyed by (dataVersion, indicator, year, regionId).
+    private volatile String cachedBurnedDefaultYearDataVersion;
+    private volatile Integer cachedBurnedDefaultYear;
+
+    // Same Q28 rule applied to LANDCOVER (slice S3-0): latest year with land-cover data in the
+    // loaded dataVersion, computed once over the WHOLE dataVersion and cached per dataVersion.
+    private volatile String cachedLandCoverDefaultYearDataVersion;
+    private volatile Integer cachedLandCoverDefaultYear;
+
+    /** Test seam: the controller is a singleton, so cached payloads outlive a single test. */
+    void clearMapbiomasLayerCache() {
+        mapbiomasLayerCache.clear();
+        cachedBurnedDefaultYearDataVersion = null;
+        cachedBurnedDefaultYear = null;
+        cachedLandCoverDefaultYearDataVersion = null;
+        cachedLandCoverDefaultYear = null;
+    }
+
+    // Config property, not a code literal, mirroring MapbiomasSusceptibilityServiceImpl's
+    // dataVersion field so both read the same pinned version (design D1 "Collection refresh").
+    @Value("${mapbiomas.stats.data-version:lulc-col2+fuego-col1@2013-2025}")
+    private String mapbiomasDataVersion;
+
+    // Judgment-day finding #2 (WARNING, fixed): design D5 requires a `citation` field on the
+    // BURNED payload; MapbiomasBurnedLayerBuilder omitted it. Config-driven (not a code literal)
+    // so it can be corrected without a redeploy. The default text below is PROVISIONAL: design D6
+    // marks this attribution as UNVERIFIED/ADAPTED pending confirmation from MapBiomas Chile's own
+    // citation template -- do not treat this string as final/legally reviewed.
+    @Value("${mapbiomas.citation:MapBiomas Chile - Colección 2 de Cobertura y Uso del Suelo (1999-2024) y Colección 1 de Fuego (2013-2025). Licencia CC BY 4.0.}")
+    private String mapbiomasCitation;
 
     public TerritoryController(
         HeatAlertEventRepository heatAlertRepository,
@@ -93,7 +156,8 @@ public class TerritoryController {
         OpenWeatherFwiService openWeatherFwiService,
         ComunaRiskService comunaRiskService,
         ComunaInfoRepository comunaInfoRepository,
-        TerritoryWeatherObservationRepository weatherObservationRepository
+        TerritoryWeatherObservationRepository weatherObservationRepository,
+        ComunaMapbiomasStatsRepository mapbiomasStatsRepository
     ) {
         this.heatAlertRepository = heatAlertRepository;
         this.citizenReportRepository = citizenReportRepository;
@@ -106,6 +170,14 @@ public class TerritoryController {
         this.comunaRiskService = comunaRiskService;
         this.comunaInfoRepository = comunaInfoRepository;
         this.weatherObservationRepository = weatherObservationRepository;
+        this.mapbiomasStatsRepository = mapbiomasStatsRepository;
+    }
+
+    // Test seam: @Value fields are only set by Spring; a test constructing this controller
+    // directly (no Spring context, e.g. a future pure MockMvc-less unit test) can override the
+    // pinned dataVersion, same idiom as MapbiomasSusceptibilityServiceImpl#setDataVersion.
+    void setMapbiomasDataVersion(String mapbiomasDataVersion) {
+        this.mapbiomasDataVersion = mapbiomasDataVersion;
     }
 
     @GetMapping("/bounds")
@@ -135,9 +207,10 @@ public class TerritoryController {
         @RequestParam String regionId,
         @RequestParam(required = false) String indicators,
         @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
-        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to
+        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+        @RequestParam(required = false) String year
     ) {
-        return buildLayersResponse(regionId, indicators, from, to, false);
+        return buildLayersResponse(regionId, indicators, from, to, year, false);
     }
 
     // Publico/anonimo: sin login, para el demo de portafolio en /monitoreo. Reusa exactamente
@@ -149,13 +222,14 @@ public class TerritoryController {
         @RequestParam String regionId,
         @RequestParam(required = false) String indicators,
         @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
-        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to
+        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+        @RequestParam(required = false) String year
     ) {
-        return buildLayersResponse(regionId, indicators, from, to, true);
+        return buildLayersResponse(regionId, indicators, from, to, year, true);
     }
 
     private ResponseEntity<ApiResponse<TerritoryLayersResponseDTO>> buildLayersResponse(
-        String regionId, String indicators, LocalDate from, LocalDate to, boolean anonymizeReports
+        String regionId, String indicators, LocalDate from, LocalDate to, String year, boolean anonymizeReports
     ) {
         LocalDateTime fromDate = from != null ? from.atStartOfDay() : LocalDate.now().minusDays(7).atStartOfDay();
         LocalDateTime toDate = to != null ? to.atTime(23, 59, 59) : LocalDate.now().atTime(23, 59, 59);
@@ -163,6 +237,30 @@ public class TerritoryController {
 
         Map<String, Object> layers = new LinkedHashMap<>();
         List<String> requestedIndicators = parseIndicators(indicators);
+
+        // Slice S3-0 / design D5: `year` is validated ONLY when a MapBiomas indicator is actually
+        // requested (the other indicators stay byte-identical whether `year` is present, absent or
+        // malformed, spec TL-1i), and it is validated HERE, before any other layer runs, so an
+        // invalid `year` on the public route costs no repository or service call. LANDCOVER is
+        // resolved before BURNED so a combined request with a year valid only for BURNED (e.g.
+        // 2025) reports LANDCOVER as the offender.
+        //
+        // Decision Q28: each indicator's omitted-year default is data-derived, but it is only
+        // READ when `year` is actually omitted, so an explicit `year` never pays for that read.
+        MapbiomasYear landCoverYear = null;
+        if (requestedIndicators.contains("LANDCOVER")) {
+            int landCoverDefaultYear = year == null
+                ? resolveLandCoverDefaultYear()
+                : MapbiomasYear.maxYear(MapbiomasYear.Indicator.LANDCOVER);
+            landCoverYear = MapbiomasYear.resolve(MapbiomasYear.Indicator.LANDCOVER, year, landCoverDefaultYear);
+        }
+        MapbiomasYear burnedYear = null;
+        if (requestedIndicators.contains("BURNED")) {
+            int burnedDefaultYear = year == null
+                ? resolveBurnedDefaultYear()
+                : MapbiomasYear.maxYear(MapbiomasYear.Indicator.BURNED);
+            burnedYear = MapbiomasYear.resolve(MapbiomasYear.Indicator.BURNED, year, burnedDefaultYear);
+        }
 
         if (requestedIndicators.contains("NDVI")) {
             layers.put("NDVI", ndviLayer(regionId, geometry, fromDate, toDate));
@@ -186,6 +284,12 @@ public class TerritoryController {
         }
         if (requestedIndicators.contains("RISK_SCORE")) {
             layers.put("RISK_SCORE", riskScoreLayer(regionId, geometry));
+        }
+        if (landCoverYear != null) {
+            layers.put("LANDCOVER", landCoverLayer(regionId, landCoverYear));
+        }
+        if (burnedYear != null) {
+            layers.put("BURNED", burnedLayer(regionId, burnedYear));
         }
         boolean needsClimateLayers = requestedIndicators.contains("WIND")
             || requestedIndicators.contains("HUMIDITY")
@@ -455,6 +559,7 @@ public class TerritoryController {
         snapshots.forEach((comunaId, s) -> {
             Map<String, Object> data = new LinkedHashMap<>();
             data.put("alertLevel", s.getAlertLevel());
+            data.put("alertDriver", s.getAlertDriver());
             data.put("scoreComposite", s.getScoreComposite());
             data.put("mode", s.getMode());
             data.put("qualityFlag", s.getQualityFlag());
@@ -615,6 +720,104 @@ public class TerritoryController {
         props.put("computedAt", computedAt);
 
         return featureCollection(List.of(pointFeature("risk-" + regionId, geometry.centerLng, geometry.centerLat, props)));
+    }
+
+    /**
+     * Decision Q28 (engram {@code sdd/mapbiomas-integration/decisions-q28}): the BURNED
+     * omitted-{@code year} default is the latest year that actually has burned data in the
+     * loaded {@code dataVersion}, computed once over the WHOLE dataVersion (every region, not
+     * just the requested one) so that switching regions never changes the default year shown.
+     * Immutable per dataVersion -- cached in {@link #cachedBurnedDefaultYear} and invalidated by
+     * {@link #clearMapbiomasLayerCache()} (test seam) or a dataVersion change (no live "swap
+     * dataVersion without redeploy" path exists yet, same as {@link #mapbiomasLayerCache}).
+     *
+     * <p><b>Tradeoff accepted</b>: a URL saved without {@code ?year=} shifts to a later year once
+     * more Fuego years are processed into the seed -- mitigated by the frontend always sending an
+     * explicit {@code year} once one has been shown or selected (design D6).
+     */
+    private synchronized int resolveBurnedDefaultYear() {
+        if (cachedBurnedDefaultYear != null && mapbiomasDataVersion.equals(cachedBurnedDefaultYearDataVersion)) {
+            return cachedBurnedDefaultYear;
+        }
+        List<ComunaMapbiomasStats> allStats = mapbiomasStatsRepository.findByDataVersion(mapbiomasDataVersion);
+        int resolved = MapbiomasBurnedDefaultYearResolver.resolve(allStats);
+        cachedBurnedDefaultYearDataVersion = mapbiomasDataVersion;
+        cachedBurnedDefaultYear = resolved;
+        return resolved;
+    }
+
+    /**
+     * BURNED value map for a single validated {@code year} (task 2b2a.2, design D5). One bulk
+     * read of {@code comuna_mapbiomas_stats} per cache miss (NFR-7/TL-1e; never per comuna), then
+     * delegates to the pure {@link MapbiomasBurnedLayerBuilder}. Cached by
+     * {@code (dataVersion, indicator, year, regionId)} -- see {@link #mapbiomasLayerCache}'s
+     * Javadoc for the bounded-size and invalidation rationale.
+     *
+     * <p><b>Judgment-day finding #1 (CRITICAL, fixed):</b> {@code regionId} is a raw,
+     * unauthenticated request parameter on {@code /api/territory/public/layers}. It is normalized
+     * via {@link RegionGeometry#fromRegion} to one of the three known regions BEFORE it is used
+     * for both the cache key and the {@code comunaInfoRepository.findByRegionId} query -- the same
+     * normalization every other indicator already gets through {@code geometry}. This is
+     * behavior-preserving for the 11 other indicators (they already called
+     * {@code RegionGeometry.fromRegion(regionId)} for their own geometry) and closes the
+     * unbounded-cache-key / per-request-Mongo-scan hole for BURNED specifically.
+     */
+    private Map<String, Object> burnedLayer(String regionId, MapbiomasYear resolvedYear) {
+        String normalizedRegionId = RegionGeometry.fromRegion(regionId).id();
+        String cacheKey = mapbiomasDataVersion + "|BURNED|" + resolvedYear.year() + "|" + normalizedRegionId;
+        return mapbiomasLayerCache.computeIfAbsent(cacheKey, () -> {
+            List<ComunaInfo> comunas = comunaInfoRepository.findByRegionId(normalizedRegionId);
+            Map<String, ComunaMapbiomasStats> statsByComunaId = new LinkedHashMap<>();
+            for (ComunaMapbiomasStats stats :
+                mapbiomasStatsRepository.findByRegionIdAndDataVersion(normalizedRegionId, mapbiomasDataVersion)) {
+                statsByComunaId.put(stats.getComunaId(), stats);
+            }
+            return MapbiomasBurnedLayerBuilder.build(
+                comunas, statsByComunaId, resolvedYear.year(),
+                resolvedYear.minYear(), resolvedYear.maxYear(), mapbiomasDataVersion, mapbiomasCitation);
+        });
+    }
+
+    /**
+     * LANDCOVER omitted-{@code year} default: the Q28 rule applied to land cover -- the latest
+     * year with land-cover data in the loaded {@code dataVersion}, computed once over the WHOLE
+     * dataVersion (every region) and cached per dataVersion, exactly like
+     * {@link #resolveBurnedDefaultYear()}. With the current seed this is 2024.
+     */
+    private synchronized int resolveLandCoverDefaultYear() {
+        if (cachedLandCoverDefaultYear != null
+            && mapbiomasDataVersion.equals(cachedLandCoverDefaultYearDataVersion)) {
+            return cachedLandCoverDefaultYear;
+        }
+        List<ComunaMapbiomasStats> allStats = mapbiomasStatsRepository.findByDataVersion(mapbiomasDataVersion);
+        int resolved = MapbiomasLandCoverDefaultYearResolver.resolve(allStats);
+        cachedLandCoverDefaultYearDataVersion = mapbiomasDataVersion;
+        cachedLandCoverDefaultYear = resolved;
+        return resolved;
+    }
+
+    /**
+     * LANDCOVER value map for a single validated {@code year} (slice S3-0, design D5). Same shape
+     * of read as {@link #burnedLayer}: ONE bounded read by {@code (regionId, dataVersion)} through
+     * the indexed repository method per cache miss, never a full scan, then the pure
+     * {@link MapbiomasLandCoverLayerBuilder}. The cache key is built only from the NORMALIZED
+     * region and the validated integer year, so the key space stays closed (see
+     * {@link MapbiomasLayerCache#BOUNDED_KEY_SPACE}).
+     */
+    private Map<String, Object> landCoverLayer(String regionId, MapbiomasYear resolvedYear) {
+        String normalizedRegionId = RegionGeometry.fromRegion(regionId).id();
+        String cacheKey = mapbiomasDataVersion + "|LANDCOVER|" + resolvedYear.year() + "|" + normalizedRegionId;
+        return mapbiomasLayerCache.computeIfAbsent(cacheKey, () -> {
+            List<ComunaInfo> comunas = comunaInfoRepository.findByRegionId(normalizedRegionId);
+            Map<String, ComunaMapbiomasStats> statsByComunaId = new LinkedHashMap<>();
+            for (ComunaMapbiomasStats stats :
+                mapbiomasStatsRepository.findByRegionIdAndDataVersion(normalizedRegionId, mapbiomasDataVersion)) {
+                statsByComunaId.put(stats.getComunaId(), stats);
+            }
+            return MapbiomasLandCoverLayerBuilder.build(
+                comunas, statsByComunaId, resolvedYear.year(),
+                resolvedYear.minYear(), resolvedYear.maxYear(), mapbiomasDataVersion, mapbiomasCitation);
+        });
     }
 
     /**
@@ -783,7 +986,9 @@ public class TerritoryController {
         );
     }
 
-    private record RegionGeometry(String id, String label, double centerLat, double centerLng, double minLat, double minLng, double maxLat, double maxLng, int zoom) {
+    // Package-private (not private) so TerritoryControllerRegionNormalizationTest can exercise
+    // the garbage-input -> canonical-id normalization directly, without Spring/Mongo.
+    record RegionGeometry(String id, String label, double centerLat, double centerLng, double minLat, double minLng, double maxLat, double maxLng, int zoom) {
         static RegionGeometry fromRegion(String regionId) {
             String normalized = regionId == null ? "" : regionId.trim().toLowerCase(Locale.ROOT);
             if ("araucania".equals(normalized)) {

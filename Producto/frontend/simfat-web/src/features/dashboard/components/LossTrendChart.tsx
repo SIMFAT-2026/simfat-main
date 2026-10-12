@@ -23,13 +23,13 @@ function LossTrendChart({ data, loading, error, onRetry }: LossTrendChartProps) 
 
   return (
     <article className="dashboard-card">
-      <h3>Tendencia de perdida forestal</h3>
+      <h3>Tendencia de pérdida forestal</h3>
       <DashboardPanelState
         loading={loading}
         error={error}
         isEmpty={rows.length === 0}
         emptyTitle="Sin tendencia disponible"
-        emptyDescription="No hay datos para graficar la tendencia de perdida."
+        emptyDescription="No hay datos para graficar la tendencia de pérdida."
         onRetry={onRetry}
       >
         <ResponsiveContainer width="100%" height={300}>

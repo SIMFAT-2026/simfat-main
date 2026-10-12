@@ -90,10 +90,10 @@ function ForestLossPage() {
 
   const columns = useMemo(
     () => [
-      { key: 'regionId', header: 'Region', render: (row) => regionMap[row.regionId] || row.regionId },
-      { key: 'anio', header: 'Anio' },
+      { key: 'regionId', header: 'Región', render: (row) => regionMap[row.regionId] || row.regionId },
+      { key: 'anio', header: 'Año' },
       { key: 'hectareasPerdidas', header: 'Ha perdidas' },
-      { key: 'porcentajePerdida', header: '% perdida' },
+      { key: 'porcentajePerdida', header: '% pérdida' },
       { key: 'fuente', header: 'Fuente' },
       { key: 'fechaRegistro', header: 'Fecha registro' }
     ],
@@ -174,13 +174,13 @@ function ForestLossPage() {
 
   return (
     <section className="page-container">
-      <SectionTitle title="Perdida Forestal" subtitle="Gestion de registros de perdida por region y anio" />
+      <SectionTitle title="Pérdida forestal" subtitle="Gestión de registros de pérdida por región y año" />
 
       {feedback.message ? <p className={`feedback feedback-${feedback.type}`}>{feedback.message}</p> : null}
 
       <FilterBar>
         <label>
-          Filtrar por region
+          Filtrar por región
           <select value={filterRegionId} onChange={(event) => setFilterRegionId(event.target.value)}>
             <option value="">Todas</option>
             {regions.map((region) => (
@@ -199,9 +199,9 @@ function ForestLossPage() {
 
       <form className="form-grid" onSubmit={onSubmit}>
         <label>
-          Region
+          Región
           <select name="regionId" value={form.regionId} onChange={onInputChange} required>
-            <option value="">Seleccione una region</option>
+            <option value="">Seleccione una región</option>
             {regions.map((region) => (
               <option key={region.id} value={region.id}>
                 {region.nombre}
@@ -212,19 +212,19 @@ function ForestLossPage() {
         </label>
 
         <label>
-          Anio
+          Año
           <input name="anio" type="number" value={form.anio} onChange={onInputChange} required />
           {validationErrors.anio ? <small className="field-error">{validationErrors.anio}</small> : null}
         </label>
 
         <label>
-          Hectareas perdidas
+          Hectáreas perdidas
           <input name="hectareasPerdidas" type="number" step="0.01" value={form.hectareasPerdidas} onChange={onInputChange} required />
           {validationErrors.hectareasPerdidas ? <small className="field-error">{validationErrors.hectareasPerdidas}</small> : null}
         </label>
 
         <label>
-          Porcentaje perdida
+          Porcentaje de pérdida
           <input name="porcentajePerdida" type="number" step="0.01" value={form.porcentajePerdida} onChange={onInputChange} />
           {validationErrors.porcentajePerdida ? <small className="field-error">{validationErrors.porcentajePerdida}</small> : null}
         </label>
@@ -247,7 +247,7 @@ function ForestLossPage() {
           </button>
           {editingId ? (
             <button type="button" className="btn btn-secondary" onClick={resetForm}>
-              Cancelar edicion
+              Cancelar edición
             </button>
           ) : null}
         </div>
@@ -277,7 +277,7 @@ function ForestLossPage() {
       <ConfirmModal
         isOpen={Boolean(deleteId)}
         title="Eliminar registro"
-        message="Confirma la eliminacion del registro de perdida forestal."
+        message="Confirma la eliminación del registro de pérdida forestal."
         confirmLabel="Eliminar"
         onConfirm={confirmDelete}
         onCancel={() => setDeleteId('')}

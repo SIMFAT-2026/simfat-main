@@ -1,0 +1,277 @@
+import { describe, expect, it } from 'vitest';
+import {
+  buildMapbiomasParams,
+  burnedLegendNote,
+  burnedLineFor,
+  burnedSummary,
+  burnedToggleLabel,
+  burnedTooltipText,
+  formatFractionAsPercent,
+  mapbiomasCacheKey,
+  mapbiomasOwner
+} from './mapbiomasLayer';
+
+describe('formatFractionAsPercent', () => {
+  it('formats a fraction as a Spanish-Chile percentage', () => {
+    expect(formatFractionAsPercent(0.0247)).toBe('2,47 %');
+    expect(formatFractionAsPercent(0.53)).toBe('53,00 %');
+    expect(formatFractionAsPercent(1)).toBe('100,00 %');
+  });
+
+  it('truncates to 2 decimals so the value never crosses a legend bin edge', () => {
+    expect(formatFractionAsPercent(0.00499)).toBe('0,49 %');
+    expect(formatFractionAsPercent(0.019999)).toBe('1,99 %');
+    expect(formatFractionAsPercent(0.0247)).toBe('2,47 %');
+  });
+
+  it('formats an exact zero as 0,00 %', () => {
+    expect(formatFractionAsPercent(0)).toBe('0,00 %');
+  });
+
+  it('never rounds a positive fraction down to a misleading 0,00 %', () => {
+    expect(formatFractionAsPercent(0.00001)).toBe('< 0,01 %');
+    expect(formatFractionAsPercent(0.0001)).toBe('0,01 %');
+    expect(formatFractionAsPercent(0.000099)).toBe('< 0,01 %');
+  });
+
+  it('returns a no-data label for missing or non-finite values', () => {
+    expect(formatFractionAsPercent(null)).toBe('Sin datos');
+    expect(formatFractionAsPercent(undefined)).toBe('Sin datos');
+    expect(formatFractionAsPercent(Number.NaN)).toBe('Sin datos');
+    expect(formatFractionAsPercent('abc')).toBe('Sin datos');
+  });
+});
+
+describe('burnedSummary', () => {
+  const layer = {
+    values: {
+      a: { available: true, burnedFraction: 0.0247, burnedHa: 10 },
+      b: { available: true, burnedFraction: 0.0001, burnedHa: 1 },
+      c: { available: true, burnedFraction: 0, burnedHa: 0 },
+      d: { available: true, burnedFraction: 0, burnedHa: 0 },
+      e: { available: true, burnedFraction: 0, burnedHa: 0 },
+      f: { available: false, burnedFraction: null, burnedHa: null }
+    }
+  };
+
+  it('counts burned, zero and unavailable comunas', () => {
+    expect(burnedSummary(layer)).toEqual({ burned: 2, zero: 3, unavailable: 1, total: 6 });
+  });
+
+  it('treats available:false as unavailable even with a stray fraction', () => {
+    const odd = { values: { a: { available: false, burnedFraction: 0.5 } } };
+    expect(burnedSummary(odd)).toEqual({ burned: 0, zero: 0, unavailable: 1, total: 1 });
+  });
+
+  it('treats a negative fraction as unavailable, never as zero', () => {
+    const odd = { values: { a: { available: true, burnedFraction: -0.2 } } };
+    expect(burnedSummary(odd)).toEqual({ burned: 0, zero: 0, unavailable: 1, total: 1 });
+  });
+
+  it('treats available:true with a non-numeric fraction as unavailable', () => {
+    const odd = { values: { a: { available: true, burnedFraction: null } } };
+    expect(burnedSummary(odd)).toEqual({ burned: 0, zero: 0, unavailable: 1, total: 1 });
+  });
+
+  it('returns zero counts for a missing layer', () => {
+    expect(burnedSummary(null)).toEqual({ burned: 0, zero: 0, unavailable: 0, total: 0 });
+    expect(burnedSummary({})).toEqual({ burned: 0, zero: 0, unavailable: 0, total: 0 });
+  });
+});
+
+describe('mapbiomasCacheKey', () => {
+  const base = { indicator: 'BURNED', year: 2024, regionId: 'CL-BI', publicMode: false };
+
+  it('never shares a key between different years', () => {
+    const years = [2013, 2020, 2024, 2025];
+    const keys = years.map((year) => mapbiomasCacheKey({ ...base, year }));
+    expect(new Set(keys).size).toBe(years.length);
+  });
+
+  it('separates indicators, regions and public/auth mode', () => {
+    const keys = [
+      mapbiomasCacheKey(base),
+      mapbiomasCacheKey({ ...base, indicator: 'LANDCOVER' }),
+      mapbiomasCacheKey({ ...base, regionId: 'CL-AR' }),
+      mapbiomasCacheKey({ ...base, publicMode: true })
+    ];
+    expect(new Set(keys).size).toBe(4);
+  });
+
+  it('uses a distinct "default" slot when no year is given', () => {
+    const noYear = mapbiomasCacheKey({ ...base, year: undefined });
+    expect(noYear).toContain('default');
+    expect(noYear).not.toBe(mapbiomasCacheKey({ ...base, year: 2025 }));
+    expect(mapbiomasCacheKey({ ...base, year: null })).toBe(noYear);
+  });
+
+  it('is stable for equal inputs', () => {
+    expect(mapbiomasCacheKey(base)).toBe(mapbiomasCacheKey({ ...base }));
+  });
+});
+
+describe('buildMapbiomasParams', () => {
+  it('sends the year when given', () => {
+    expect(buildMapbiomasParams({ regionId: 'CL-BI', indicator: 'LANDCOVER', year: 2024 })).toEqual({
+      regionId: 'CL-BI',
+      indicators: 'LANDCOVER',
+      year: 2024
+    });
+  });
+
+  it('omits the year key when undefined or null so the backend default applies', () => {
+    const undef = buildMapbiomasParams({ regionId: 'CL-BI', indicator: 'BURNED' });
+    const nul = buildMapbiomasParams({ regionId: 'CL-BI', indicator: 'BURNED', year: null });
+    expect('year' in undef).toBe(false);
+    expect('year' in nul).toBe(false);
+  });
+
+  it('rejects anything that is not a MapBiomas indicator', () => {
+    expect(() => buildMapbiomasParams({ regionId: 'CL-BI', indicator: 'WIND' })).toThrow(/MapBiomas/);
+  });
+});
+
+function layerOf(year, fractions) {
+  const values = {};
+  fractions.forEach((fraction, index) => {
+    values[`c${index}`] =
+      fraction === undefined
+        ? { available: false, burnedFraction: null, burnedHa: null }
+        : { available: true, burnedFraction: fraction, burnedHa: 10 };
+  });
+  return { indicator: 'BURNED', year, values };
+}
+
+describe('burnedLegendNote', () => {
+  it('states the displayed year and how many comunas have burned area', () => {
+    const layer = layerOf(2025, [0.1, 0.01, 0, 0]);
+    expect(burnedLegendNote(layer, { hasYearControl: true })).toBe(
+      'Año 2025 · 2 de 4 comunas con área quemada registrada. Usa el selector para explorar otros años.'
+    );
+  });
+
+  it('is never tied to a specific year', () => {
+    const note = burnedLegendNote(layerOf(2017, [0, 0.3]), { hasYearControl: true });
+    expect(note).toContain('Año 2017 · 1 de 2 comunas');
+    expect(note).not.toContain('2025');
+  });
+
+  it('omits the selector sentence while there is no year control', () => {
+    expect(burnedLegendNote(layerOf(2025, [0.1, 0]))).toBe(
+      'Año 2025 · 1 de 2 comunas con área quemada registrada.'
+    );
+  });
+
+  it('mentions comunas without data when there are any', () => {
+    expect(burnedLegendNote(layerOf(2024, [0.1, 0, undefined]))).toBe(
+      'Año 2024 · 1 de 3 comunas con área quemada registrada (1 sin datos).'
+    );
+  });
+
+  it('returns an empty string without a usable layer or year', () => {
+    expect(burnedLegendNote(null)).toBe('');
+    expect(burnedLegendNote({ values: {} })).toBe('');
+  });
+});
+
+describe('burnedTooltipText', () => {
+  it('shows percent and hectares for a burned comuna', () => {
+    expect(
+      burnedTooltipText({
+        nombre: 'Santa Juana',
+        year: 2023,
+        entry: { available: true, burnedFraction: 0.0247, burnedHa: 1234.5 }
+      })
+    ).toBe('Santa Juana: Área quemada 2023: 2,47 % · 1.234,5 ha');
+  });
+
+  it('omits hectares when they are not a number', () => {
+    expect(
+      burnedTooltipText({
+        nombre: 'Tomé',
+        year: 2023,
+        entry: { available: true, burnedFraction: 0.01, burnedHa: null }
+      })
+    ).toBe('Tomé: Área quemada 2023: 1,00 %');
+  });
+
+  it('says there was no burned area for an observed zero', () => {
+    expect(
+      burnedTooltipText({
+        nombre: 'Tomé',
+        year: 2025,
+        entry: { available: true, burnedFraction: 0, burnedHa: 0 }
+      })
+    ).toBe('Tomé: Sin área quemada en 2025');
+  });
+
+  it('says there is no Fuego data when unavailable or missing', () => {
+    const expected = 'Tomé: Sin datos de Fuego';
+    expect(burnedTooltipText({ nombre: 'Tomé', year: 2025, entry: { available: false } })).toBe(expected);
+    expect(burnedTooltipText({ nombre: 'Tomé', year: 2025, entry: undefined })).toBe(expected);
+    expect(
+      burnedTooltipText({ nombre: 'Tomé', year: 2025, entry: { available: true, burnedFraction: null } })
+    ).toBe(expected);
+  });
+
+  it('says there is no Fuego data for a negative fraction', () => {
+    expect(
+      burnedTooltipText({
+        nombre: 'Tomé',
+        year: 2025,
+        entry: { available: true, burnedFraction: -0.5, burnedHa: -3 }
+      })
+    ).toBe('Tomé: Sin datos de Fuego');
+  });
+});
+
+describe('burnedLineFor', () => {
+  it('builds the line appended to the risk tooltip for a burned comuna', () => {
+    expect(burnedLineFor({ available: true, burnedFraction: 0.0247, burnedHa: 1234.5 }, 2025)).toBe(
+      'Área quemada 2025: 2,47 % · 1.234,5 ha'
+    );
+  });
+
+  it('handles an observed zero and missing or invalid data', () => {
+    expect(burnedLineFor({ available: true, burnedFraction: 0, burnedHa: 0 }, 2025)).toBe(
+      'Sin área quemada en 2025'
+    );
+    expect(burnedLineFor({ available: false }, 2025)).toBe('Sin datos de Fuego');
+    expect(burnedLineFor(undefined, 2025)).toBe('Sin datos de Fuego');
+    expect(burnedLineFor({ available: true, burnedFraction: -1 }, 2025)).toBe('Sin datos de Fuego');
+  });
+});
+
+describe('burnedToggleLabel', () => {
+  it('shows the plain label before a layer is loaded', () => {
+    expect(burnedToggleLabel(null)).toBe('Área quemada (MapBiomas)');
+    expect(burnedToggleLabel({ values: {} })).toBe('Área quemada (MapBiomas)');
+  });
+
+  it('appends the loaded year', () => {
+    expect(burnedToggleLabel({ year: 2025, values: {} })).toBe('Área quemada (MapBiomas) · 2025');
+  });
+});
+
+describe('mapbiomasOwner', () => {
+  const cases = [
+    [[], null],
+    [['LANDCOVER'], 'LANDCOVER'],
+    [['BURNED'], 'BURNED'],
+    [['BURNED', 'LANDCOVER'], 'BURNED'],
+    [['RISK_SCORE'], 'RISK_SCORE'],
+    [['RISK_SCORE', 'LANDCOVER'], 'RISK_SCORE'],
+    [['RISK_SCORE', 'BURNED'], 'RISK_SCORE'],
+    [['LANDCOVER', 'BURNED', 'RISK_SCORE'], 'RISK_SCORE']
+  ];
+
+  it.each(cases)('visible %j -> owner %s', (visible, owner) => {
+    expect(mapbiomasOwner(visible)).toBe(owner);
+  });
+
+  it('ignores unrelated indicators and tolerates a missing list', () => {
+    expect(mapbiomasOwner(['NDVI', 'FIRMS'])).toBeNull();
+    expect(mapbiomasOwner(['NDVI', 'LANDCOVER'])).toBe('LANDCOVER');
+    expect(mapbiomasOwner(undefined)).toBeNull();
+  });
+});

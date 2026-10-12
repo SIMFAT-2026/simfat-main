@@ -1,3 +1,5 @@
+import { levelLabel } from '../utils/labels';
+
 const CLASS_BY_LEVEL = {
   BAJO: 'badge badge-low',
   MEDIO: 'badge badge-medium',
@@ -7,7 +9,7 @@ const CLASS_BY_LEVEL = {
 };
 
 function AlertBadge({ level }) {
-  return <span className={CLASS_BY_LEVEL[level] || 'badge'}>{level || 'N/A'}</span>;
+  return <span className={CLASS_BY_LEVEL[level] || 'badge'}>{levelLabel(level) || 'N/A'}</span>;
 }
 
 export default AlertBadge;

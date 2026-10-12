@@ -5,6 +5,9 @@ import { fetchComunaHistory, fetchComunalRiskScores, syncComunaCopernicus } from
 import { ALERT_LEVEL_CONFIG } from '../constants/colorScales';
 import { generateComunalReport } from '../utils/reportPrint';
 import { REGIONES } from '../../../data/territorioChile';
+import { panelMode } from '../utils/comunaMapbiomas';
+import { alertTrigger } from '../utils/alertTrigger';
+import { modeLabel } from '../../../utils/labels';
 
 
 const COMPONENT_META = {
@@ -72,11 +75,11 @@ function RiskHistoryChart({ gadmGid, publicMode = false }) {
   return (
     <ResponsiveContainer width="100%" height={110}>
       <LineChart data={data} margin={{ top: 8, right: 8, left: -20, bottom: 0 }}>
-        <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#64748b' }} tickLine={false} axisLine={false} />
-        <YAxis domain={[0, 100]} tick={{ fontSize: 10, fill: '#64748b' }} tickLine={false} axisLine={false} />
+        <XAxis dataKey="date" tick={{ fontSize: 12, fill: '#475569' }} tickLine={false} axisLine={false} />
+        <YAxis domain={[0, 100]} tick={{ fontSize: 12, fill: '#475569' }} tickLine={false} axisLine={false} />
         <ChartTooltip
-          contentStyle={{ background: '#1e293b', border: 'none', borderRadius: 8, fontSize: 11, color: '#f1f5f9' }}
-          formatter={(val, _name, props) => [`${val}/100 ${props?.payload?.mode === 'ENHANCED' ? '✦' : ''}`, 'Score']}
+          contentStyle={{ background: '#1e293b', border: 'none', borderRadius: 8, fontSize: 12, color: '#f1f5f9' }}
+          formatter={(val, _name, props) => [`${val}/100 ${props?.payload?.mode === 'ENHANCED' ? '✦' : ''}`, 'Puntaje']}
         />
         <ReferenceLine y={50} stroke={ALERT_LEVEL_CONFIG.PREVENTIVO.color} strokeDasharray="3 3" strokeWidth={1} />
         <ReferenceLine y={70} stroke={ALERT_LEVEL_CONFIG.ALTO.color} strokeDasharray="3 3" strokeWidth={1} />
@@ -192,7 +195,7 @@ function IndexInfo({ info, label }) {
 const COPERNICUS_POLL_INTERVAL_S = 5;
 const COPERNICUS_POLL_TIMEOUT_S = 150;
 
-export default function ComunaRiskPanel({ comunaId, score, regionId, onClose, canSync, onSync, onScoreUpdated, readOnly = false }) {
+export default function ComunaRiskPanel({ comunaId, comunaName = null, score, regionId, onClose, canSync, onSync, onScoreUpdated, readOnly = false, extraSections = null, openedFrom = 'risk' }) {
   const [syncState, setSyncState] = useState({ phase: 'idle', elapsed: 0, error: null, result: null });
 
   useEffect(() => {
@@ -232,11 +235,38 @@ export default function ComunaRiskPanel({ comunaId, score, regionId, onClose, ca
     return () => window.clearInterval(interval);
   }, [syncState.phase, comunaId, regionId, onScoreUpdated]);
 
-  if (!comunaId || !score) return null;
+  const viewMode = panelMode({ comunaId, score });
+  if (viewMode === 'none') return null;
+
+  if (viewMode === 'mapbiomas-only') {
+    // No risk score for this comuna: keep the header and the extra sections so the
+    // sidebar is never empty (e.g. opened from a MapBiomas layer).
+    return (
+      <aside className="comuna-risk-panel">
+        <div className="panel-header">
+          <div>
+            <h4 className="panel-nombre">{comunaName || comunaId}</h4>
+          </div>
+          <button type="button" className="panel-close" onClick={onClose} aria-label="Cerrar">×</button>
+        </div>
+        <p className="panel-chart-empty">Sin puntaje de riesgo para esta comuna.</p>
+        {extraSections}
+      </aside>
+    );
+  }
+  const mapbiomasFirst = openedFrom === 'mapbiomas';
 
   const displayScore = syncState.result || score;
   const level = ALERT_LEVEL_CONFIG[displayScore.alertLevel] || ALERT_LEVEL_CONFIG.NORMAL;
   const pct = typeof displayScore.scoreComposite === 'number' ? (displayScore.scoreComposite * 100).toFixed(0) : '—';
+  const trigger = alertTrigger({
+    alertLevel: displayScore.alertLevel,
+    score: displayScore.scoreComposite,
+    fwiRaw: displayScore.fwiRaw,
+    firmsCount: displayScore.firmsCount,
+    firmsFrpMean: displayScore.firmsFrpMean,
+    alertDriver: displayScore.alertDriver
+  });
   const mode = displayScore.mode || 'STANDARD';
   const components = displayScore.components || {};
   const meta = COMPONENT_META[mode] || COMPONENT_META.STANDARD;
@@ -277,6 +307,9 @@ export default function ComunaRiskPanel({ comunaId, score, regionId, onClose, ca
         </div>
         <button type="button" className="panel-close" onClick={onClose} aria-label="Cerrar">×</button>
       </div>
+      {trigger.kind && trigger.kind !== 'score' && (
+        <p className="panel-trigger" style={{ color: level.color }}>{trigger.text}</p>
+      )}
 
       <div className="panel-score-row" style={{ borderColor: level.color }}>
         <div>
@@ -284,15 +317,17 @@ export default function ComunaRiskPanel({ comunaId, score, regionId, onClose, ca
           <span className="panel-pct" style={{ color: level.color }}>{pct}<small>/100</small></span>
         </div>
         <div className="panel-badges">
-          <span className={`panel-mode-badge ${mode === 'ENHANCED' ? 'enhanced' : 'standard'}`}>{mode}</span>
+          <span className={`panel-mode-badge ${mode === 'ENHANCED' ? 'enhanced' : 'standard'}`}>{modeLabel(mode)}</span>
           {displayScore.qualityFlag && (
-            <span className="panel-quality-flag" title={displayScore.qualityFlag}>⚠ parcial</span>
+            <span className="panel-quality-flag" title={displayScore.qualityFlag}>⚠ Datos parciales</span>
           )}
         </div>
       </div>
 
+      {mapbiomasFirst && extraSections}
+
       <section className="panel-section">
-        <h5 className="panel-section-title">Componentes WLC</h5>
+        <h5 className="panel-section-title">Componentes del puntaje (WLC)</h5>
         <div className="panel-components">
           {meta.map(({ key, label, weight }) => {
             const val = components[key];
@@ -318,7 +353,7 @@ export default function ComunaRiskPanel({ comunaId, score, regionId, onClose, ca
       </section>
 
       <section className="panel-section">
-        <h5 className="panel-section-title">Componentes FWI proxy</h5>
+        <h5 className="panel-section-title">Variables meteorológicas del FWI</h5>
         <FwiInputsBreakdown fwiInputs={displayScore.fwiInputs} />
       </section>
 
@@ -326,17 +361,19 @@ export default function ComunaRiskPanel({ comunaId, score, regionId, onClose, ca
         <h5 className="panel-section-title">Evolución 30 días</h5>
         <RiskHistoryChart gadmGid={comunaId} publicMode={readOnly} />
         <p className="panel-chart-legend">
-          <span style={{ borderBottom: '2px dashed #ca8a04' }}>&nbsp;&nbsp;</span> Preventivo &nbsp;
-          <span style={{ borderBottom: '2px dashed #ea580c' }}>&nbsp;&nbsp;</span> Alto &nbsp;
-          ✦ ENHANCED
+          <span style={{ borderBottom: `2px dashed ${ALERT_LEVEL_CONFIG.PREVENTIVO.color}` }}>&nbsp;&nbsp;</span> Preventivo &nbsp;
+          <span style={{ borderBottom: `2px dashed ${ALERT_LEVEL_CONFIG.ALTO.color}` }}>&nbsp;&nbsp;</span> Alto &nbsp;
+          ✦ Con Copernicus
         </p>
       </section>
+
+      {!mapbiomasFirst && extraSections}
 
       <div className="panel-footer">
         {computedAt && <span className="panel-meta">Actualizado {computedAt}</span>}
         {canSync && (
           <button type="button" className="btn btn-secondary btn-sm panel-sync-btn" onClick={onSync}>
-            Sync ahora
+            Sincronizar ahora
           </button>
         )}
         {!readOnly && (
@@ -351,7 +388,7 @@ export default function ComunaRiskPanel({ comunaId, score, regionId, onClose, ca
               {btnLabel}
             </button>
             {!isLoading && syncState.phase !== 'done' && (
-              <small style={{ color: '#94a3b8', fontSize: '0.68rem', display: 'block', marginTop: 2 }}>
+              <small style={{ color: '#475569', fontSize: '0.8rem', display: 'block', marginTop: 2 }}>
                 ⓘ El proceso tarda aprox. 2–3 min
               </small>
             )}

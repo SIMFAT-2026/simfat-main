@@ -64,8 +64,8 @@ function LatestIndicatorsPanel({
   if (!hasRegion) {
     return (
       <article className="dashboard-card">
-        <h3>Ultimo indicador</h3>
-        <p className="dashboard-hint">Selecciona una region para consultar el ultimo valor NDVI/NDMI.</p>
+        <h3>Último indicador</h3>
+        <p className="dashboard-hint">Selecciona una región para consultar el último valor NDVI/NDMI.</p>
       </article>
     );
   }
@@ -80,14 +80,14 @@ function LatestIndicatorsPanel({
         error={error}
         isEmpty={!data}
         emptyTitle="Sin lectura reciente"
-        emptyDescription="Aun no tenemos un valor reciente para la region seleccionada."
+        emptyDescription="Aún no tenemos un valor reciente para la región seleccionada."
         onRetry={onRetry}
       >
         <div className="latest-indicator-grid">
           <div>
-            <p className="latest-indicator-label">Region</p>
+            <p className="latest-indicator-label">Región</p>
             <strong>{selectedRegionName}</strong>
-            <p className="latest-indicator-sub">Codigo: {selectedRegionCode}</p>
+            <p className="latest-indicator-sub">Código: {selectedRegionCode}</p>
           </div>
           <div>
             <p className="latest-indicator-label">Indicador</p>
@@ -98,11 +98,11 @@ function LatestIndicatorsPanel({
             <strong>{formatValue(data?.value ?? null)}</strong>
           </div>
           <div>
-            <p className="latest-indicator-label">Ultima lectura</p>
+            <p className="latest-indicator-label">Última lectura</p>
             <strong>{formatTimestamp(data?.observedAt || '')}</strong>
           </div>
           <div>
-            <p className="latest-indicator-label">Estado indice</p>
+            <p className="latest-indicator-label">Estado del índice</p>
             <span className={getValueBadgeClass(valueStatus)}>{valueStatus}</span>
           </div>
           <div>

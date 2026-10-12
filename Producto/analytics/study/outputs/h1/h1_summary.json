@@ -1,0 +1,285 @@
+{
+  "hypothesis": "H1",
+  "decision_power": "none",
+  "description": "Agreement between MapBiomas Fuego burn scars and NASA FIRMS active fire",
+  "preregistration": {
+    "sha256": "541b92660db09d53d3f82217a6b23f4981ccdfb0b168903cd4df4a37cc2a4b4b",
+    "commit": "337c68f062b4c8a08dfe20d5a723a10a82e17930"
+  },
+  "git_sha": "7bb2c2b498d42bbb2f5155a6a4dadd911b87fc95",
+  "git_dirty_study_dir": false,
+  "overwrote_previous": false,
+  "previous_summary_sha256": null,
+  "inputs_sha256": {
+    "annual_rasters": {
+      "2013": "8d6148a4b28ca6ad116a551598694e373fd4a701996998aa2fdcf0782e2f7e19",
+      "2014": "c1b54d3d33c3447ca0470f9b1103883c616be0de13dfead00a72014cf6693e6c",
+      "2015": "eb16f0dece62117e931e5cedbfae553089fd370caebdb8edc4a2df909a595777",
+      "2016": "7ae3d82d865281b907c4a89ddeddc6e744eddee39251cb62c33e0d02a7c254d8",
+      "2017": "4a82d39f74c11ca7c1177faf47c54d05a35e0249e1f02f030446bdf2641a4297",
+      "2018": "2c867bb12eb3c3d4cebf0a440a425e7181d9700ca38fce6ef7e2cbb25f6eea01",
+      "2019": "d77e9c3a0140ff7871a056d063e0118b9180c1d30f1fae6c7ef06ccabdf736e5",
+      "2020": "5b771585c331354c199a8ec20eb9fa2664029f56c1bdeb67f321e456e7a81137",
+      "2021": "967d354d41b635e4fc4d13b866fa3fc1221aab974d9f59bd336a733a58f091f0",
+      "2022": "3d56a3d2d3a889074db88bba90e5192f82e5b12a191d4e5ba4ac27ead5e50778",
+      "2023": "7c64ea9d164da8dc3665bdc357c3f67221715697d8a19550132ea8b14ff84e10",
+      "2024": "0f752d08e6253a5cf213b5d1e839738220b7ddf1b151e160bfb1a1b4f36175a9",
+      "2025": "ce66ae13bd6d990007a0a6bf35ccaa74b780926ee9a080824fb7485a11e89a65"
+    },
+    "burned_fraction_seed": "1980b5763058286a2f5520e8e8981054dd3b87f9c8d28ddb029bc2105eb21c53",
+    "firms_archive": "f9b8f6b21196b385f3be33a3df3571c49c574d74111f2fbf8637cfc7c6ecc862",
+    "fuego_manifest": "0135e70d7a5e264445c984ac044590a3587f7df7504f4aa794d26d293bba483d",
+    "comuna_geojson": {
+      "comunas-araucania.geojson": "471360ac0d188a03ffae88bdd948fa0162e84367256010c53054b4f3c71b6932",
+      "comunas-biobio.geojson": "7c5cdf55d945a5cb81fce3ab1fc62ae9efe51686a68a5fde49e9cd849171033f",
+      "comunas-nuble.geojson": "88b02987ae8abb0f73d5f58f9db63285dba8e6663415620d410c69ac70b8c920"
+    }
+  },
+  "parameters": {
+    "min_scar_ha": 250.0,
+    "buffer_m": 375.0,
+    "connectivity": 8,
+    "buffer_method": "exact distance from detection to the nearest burned pixel square, local WGS84 metres",
+    "area_method": "WGS84 ellipsoidal per-row pixel area (mb_pipeline.zonal.row_pixel_areas_m2)",
+    "area_classes_ha": [
+      [
+        250.0,
+        500.0,
+        "250-500 ha"
+      ],
+      [
+        500.0,
+        1000.0,
+        "500-1,000 ha"
+      ],
+      [
+        1000.0,
+        5000.0,
+        "1,000-5,000 ha"
+      ],
+      [
+        5000.0,
+        null,
+        ">= 5,000 ha"
+      ]
+    ],
+    "years": [
+      2013,
+      2014,
+      2015,
+      2016,
+      2017,
+      2018,
+      2019,
+      2020,
+      2021,
+      2022,
+      2023,
+      2024,
+      2025
+    ],
+    "bootstrap_b": 2000,
+    "bootstrap_seed": 20261027,
+    "firms_filter": "type == 0 and confidence in {n, h}",
+    "year_basis": "America/Santiago local calendar year (DEVIATIONS N2)"
+  },
+  "detections": {
+    "n_rows": 208890,
+    "n_filtered": 190198,
+    "n_filtered_unassigned_study_years": 15571
+  },
+  "primary": {
+    "n_scars": 337,
+    "n_detected": 332,
+    "share": 0.9851632047477745,
+    "n_edge_flag": 55,
+    "n_truncated": 45,
+    "ci_by_year": {
+      "lower": 0.9690265486725663,
+      "upper": 0.9953917050691244,
+      "n_valid": 2000,
+      "n_clusters": 13
+    },
+    "ci_by_scar": {
+      "lower": 0.9703264094955489,
+      "upper": 0.9970326409495549,
+      "n_valid": 2000,
+      "n_clusters": 337
+    }
+  },
+  "per_year": [
+    {
+      "n_scars": 4,
+      "n_detected": 4,
+      "share": 1.0,
+      "year": 2013,
+      "ci_lower": 1.0,
+      "ci_upper": 1.0,
+      "ci_method": "percentile bootstrap, scars resampled"
+    },
+    {
+      "n_scars": 14,
+      "n_detected": 13,
+      "share": 0.9285714285714286,
+      "year": 2014,
+      "ci_lower": 0.7857142857142857,
+      "ci_upper": 1.0,
+      "ci_method": "percentile bootstrap, scars resampled"
+    },
+    {
+      "n_scars": 41,
+      "n_detected": 41,
+      "share": 1.0,
+      "year": 2015,
+      "ci_lower": 1.0,
+      "ci_upper": 1.0,
+      "ci_method": "percentile bootstrap, scars resampled"
+    },
+    {
+      "n_scars": 6,
+      "n_detected": 6,
+      "share": 1.0,
+      "year": 2016,
+      "ci_lower": 1.0,
+      "ci_upper": 1.0,
+      "ci_method": "percentile bootstrap, scars resampled"
+    },
+    {
+      "n_scars": 35,
+      "n_detected": 35,
+      "share": 1.0,
+      "year": 2017,
+      "ci_lower": 1.0,
+      "ci_upper": 1.0,
+      "ci_method": "percentile bootstrap, scars resampled"
+    },
+    {
+      "n_scars": 5,
+      "n_detected": 5,
+      "share": 1.0,
+      "year": 2018,
+      "ci_lower": 1.0,
+      "ci_upper": 1.0,
+      "ci_method": "percentile bootstrap, scars resampled"
+    },
+    {
+      "n_scars": 19,
+      "n_detected": 19,
+      "share": 1.0,
+      "year": 2019,
+      "ci_lower": 1.0,
+      "ci_upper": 1.0,
+      "ci_method": "percentile bootstrap, scars resampled"
+    },
+    {
+      "n_scars": 32,
+      "n_detected": 31,
+      "share": 0.96875,
+      "year": 2020,
+      "ci_lower": 0.90625,
+      "ci_upper": 1.0,
+      "ci_method": "percentile bootstrap, scars resampled"
+    },
+    {
+      "n_scars": 14,
+      "n_detected": 13,
+      "share": 0.9285714285714286,
+      "year": 2021,
+      "ci_lower": 0.7857142857142857,
+      "ci_upper": 1.0,
+      "ci_method": "percentile bootstrap, scars resampled"
+    },
+    {
+      "n_scars": 38,
+      "n_detected": 37,
+      "share": 0.9736842105263158,
+      "year": 2022,
+      "ci_lower": 0.9210526315789473,
+      "ci_upper": 1.0,
+      "ci_method": "percentile bootstrap, scars resampled"
+    },
+    {
+      "n_scars": 98,
+      "n_detected": 98,
+      "share": 1.0,
+      "year": 2023,
+      "ci_lower": 1.0,
+      "ci_upper": 1.0,
+      "ci_method": "percentile bootstrap, scars resampled"
+    },
+    {
+      "n_scars": 9,
+      "n_detected": 9,
+      "share": 1.0,
+      "year": 2024,
+      "ci_lower": 1.0,
+      "ci_upper": 1.0,
+      "ci_method": "percentile bootstrap, scars resampled"
+    },
+    {
+      "n_scars": 22,
+      "n_detected": 21,
+      "share": 0.9545454545454546,
+      "year": 2025,
+      "ci_lower": 0.8636363636363636,
+      "ci_upper": 1.0,
+      "ci_method": "percentile bootstrap, scars resampled"
+    }
+  ],
+  "by_area_class": [
+    {
+      "n_scars": 142,
+      "n_detected": 139,
+      "share": 0.9788732394366197,
+      "class": "250-500 ha",
+      "ci_lower": 0.947914402173913,
+      "ci_upper": 1.0,
+      "ci_method": "percentile bootstrap, years resampled"
+    },
+    {
+      "n_scars": 78,
+      "n_detected": 76,
+      "share": 0.9743589743589743,
+      "class": "500-1,000 ha",
+      "ci_lower": 0.9298245614035088,
+      "ci_upper": 1.0,
+      "ci_method": "percentile bootstrap, years resampled"
+    },
+    {
+      "n_scars": 94,
+      "n_detected": 94,
+      "share": 1.0,
+      "class": "1,000-5,000 ha",
+      "ci_lower": 1.0,
+      "ci_upper": 1.0,
+      "ci_method": "percentile bootstrap, years resampled"
+    },
+    {
+      "n_scars": 23,
+      "n_detected": 23,
+      "share": 1.0,
+      "class": ">= 5,000 ha",
+      "ci_lower": 1.0,
+      "ci_upper": 1.0,
+      "ci_method": "percentile bootstrap, years resampled"
+    }
+  ],
+  "excluding_edge_flag": {
+    "n_scars": 282,
+    "n_detected": 278,
+    "share": 0.9858156028368794
+  },
+  "secondary": {
+    "n_pairs": 1118,
+    "n_comunas": 86,
+    "n_years": 13,
+    "ci_method": "percentile bootstrap, comunas resampled with all their years",
+    "B": 2000,
+    "seed": 20261027,
+    "rho": 0.518051057431802,
+    "ci_lower": 0.4270047929798239,
+    "ci_upper": 0.6020307718297535,
+    "n_valid": 2000
+  },
+  "runtime_seconds": 35.2
+}

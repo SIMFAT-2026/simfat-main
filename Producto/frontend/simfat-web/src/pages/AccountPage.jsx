@@ -9,7 +9,7 @@ const PASSWORD_POLICY = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d]).{12,72
 const VERIFICATION_LABELS = {
   UNVERIFIED: 'Sin verificar',
   EMAIL_VERIFIED: 'Email verificado',
-  PHONE_VERIFIED: 'Telefono verificado',
+  PHONE_VERIFIED: 'Teléfono verificado',
   IDENTITY_VERIFIED: 'Identidad verificada',
   FULLY_VERIFIED: 'Completamente verificado',
   REJECTED: 'Rechazado',
@@ -100,7 +100,7 @@ function AccountPage() {
         ['IDENTITY_VERIFIED', 'FULLY_VERIFIED'].includes(profile.verificationStatus)
       ) {
         profileFeedback.showSuccess(
-          'Perfil actualizado. Tu verificacion de identidad fue reiniciada por el cambio de nombre — un admin puede restaurarla.'
+          'Perfil actualizado. Tu verificación de identidad fue reiniciada por el cambio de nombre — un admin puede restaurarla.'
         );
       } else {
         profileFeedback.showSuccess('Perfil actualizado correctamente.');
@@ -121,11 +121,11 @@ function AccountPage() {
     e.preventDefault();
     passwordFeedback.clear();
     if (!PASSWORD_POLICY.test(passwordForm.newPassword)) {
-      passwordFeedback.showError('La contrasena debe tener 12-72 caracteres, mayuscula, minuscula, numero y simbolo.');
+      passwordFeedback.showError('La contraseña debe tener 12-72 caracteres, mayúscula, minúscula, número y símbolo.');
       return;
     }
     if (passwordForm.newPassword !== passwordForm.confirmPassword) {
-      passwordFeedback.showError('La confirmacion de contrasena no coincide.');
+      passwordFeedback.showError('La confirmación de contraseña no coincide.');
       return;
     }
     setSavingPassword(true);
@@ -136,12 +136,12 @@ function AccountPage() {
         confirmPassword: passwordForm.confirmPassword,
       });
       passwordFeedback.showSuccess(
-        'Contrasena actualizada. Se cerraron todas las sesiones activas. Volveras al login en unos segundos.'
+        'Contraseña actualizada. Se cerraron todas las sesiones activas. Volverás al inicio de sesión en unos segundos.'
       );
       setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
       window.setTimeout(() => navigate('/login', { replace: true }), 2500);
     } catch (error) {
-      passwordFeedback.showError(error.message || 'No fue posible actualizar la contrasena.');
+      passwordFeedback.showError(error.message || 'No fue posible actualizar la contraseña.');
     } finally {
       setSavingPassword(false);
     }
@@ -195,7 +195,7 @@ function AccountPage() {
             </label>
 
             <label>
-              <span>Telefono <span className="field-optional">(opcional)</span></span>
+              <span>Teléfono <span className="field-optional">(opcional)</span></span>
               <input
                 name="phone"
                 type="tel"
@@ -207,9 +207,9 @@ function AccountPage() {
             </label>
 
             <label>
-              <span>Region <span className="field-optional">(opcional)</span></span>
+              <span>Región <span className="field-optional">(opcional)</span></span>
               <select name="regionCode" value={profileForm.regionCode} onChange={onProfileChange}>
-                <option value="">— Selecciona una region —</option>
+                <option value="">— Selecciona una región —</option>
                 {REGIONES.map((r) => (
                   <option key={r.value} value={r.value}>{r.label}</option>
                 ))}
@@ -225,7 +225,7 @@ function AccountPage() {
                 disabled={!profileForm.regionCode}
               >
                 <option value="">
-                  {profileForm.regionCode ? '— Selecciona una comuna —' : '— Primero elige region —'}
+                  {profileForm.regionCode ? '— Selecciona una comuna —' : '— Primero elige región —'}
                 </option>
                 {comunasDisponibles.map((c) => (
                   <option key={c.value} value={c.value}>{c.label}</option>
@@ -248,11 +248,11 @@ function AccountPage() {
 
       {/* Cambiar contraseña */}
       <section className="dashboard-card account-section">
-        <h3>Cambiar contrasena</h3>
+        <h3>Cambiar contraseña</h3>
 
         <form onSubmit={onPasswordSubmit} className="auth-form">
           <label>
-            Contrasena actual
+            Contraseña actual
             <input
               name="currentPassword"
               type={showPasswords ? 'text' : 'password'}
@@ -264,7 +264,7 @@ function AccountPage() {
           </label>
 
           <label>
-            Nueva contrasena
+            Nueva contraseña
             <input
               name="newPassword"
               type={showPasswords ? 'text' : 'password'}
@@ -275,10 +275,10 @@ function AccountPage() {
             />
           </label>
 
-          <p className="field-hint">12-72 caracteres, mayuscula, minuscula, numero y simbolo.</p>
+          <p className="field-hint">12-72 caracteres, mayúscula, minúscula, número y símbolo.</p>
 
           <label>
-            Confirmar nueva contrasena
+            Confirmar nueva contraseña
             <input
               name="confirmPassword"
               type={showPasswords ? 'text' : 'password'}
@@ -295,7 +295,7 @@ function AccountPage() {
               checked={showPasswords}
               onChange={(e) => setShowPasswords(e.target.checked)}
             />
-            Mostrar contrasenas
+            Mostrar contraseñas
           </label>
 
           {passwordFeedback.message
@@ -304,7 +304,7 @@ function AccountPage() {
 
           <div className="form-actions">
             <button type="submit" className="btn btn-danger" disabled={savingPassword}>
-              {savingPassword ? 'Actualizando...' : 'Cambiar contrasena'}
+              {savingPassword ? 'Actualizando…' : 'Cambiar contraseña'}
             </button>
           </div>
         </form>

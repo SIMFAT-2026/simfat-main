@@ -60,7 +60,7 @@ function RegisterPage() {
     }
 
     if (TURNSTILE_ENABLED && !captchaToken) {
-      showError('Completa la verificacion de Cloudflare para continuar.');
+      showError('Completa la verificación de Cloudflare para continuar.');
       return;
     }
 
@@ -83,7 +83,7 @@ function RegisterPage() {
   return (
     <AuthCard
       title="Crear cuenta"
-      subtitle="Registro minimo para entorno de desarrollo NoFires"
+      subtitle="Crea tu cuenta para reportar y recibir alertas"
       footer={
         <>
           <Link to="/login">Ya tengo cuenta</Link>

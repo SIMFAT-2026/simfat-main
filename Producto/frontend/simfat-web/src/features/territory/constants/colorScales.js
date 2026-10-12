@@ -1,5 +1,21 @@
-// Colorblind-safe risk ramp: low risk stays pale/cool, while severity increases through
-// warmer and darker values so the map remains distinguishable by luminance plus stroke pattern.
+// Risk ramp follows blue -> yellow -> orange -> dark red (ColorBrewer RdYlBu / YlOrRd family).
+// Not green: green vs orange/red is the pair red-green colour blindness confuses (about 1 in
+// 12 men); riskPalette tests check every pair under simulated protan/deutan/tritan vision.
+// The map paints these fills at RISK_FILL_OPACITY over the base map, so the values were picked
+// for their *blended* appearance (adjacent levels >= 20 delta E, checked in riskPalette tests).
+// Stroke dash patterns stay as a second, colour-independent cue.
+export const RISK_FILL_OPACITY = 0.55;
+
+// "Sin datos" is deliberately not part of the ramp: light grey fill, dotted outline.
+export const RISK_NO_DATA = {
+  fill: '#cbd5e1',
+  fillOpacity: 0.3,
+  color: '#475569',
+  weight: 0.9,
+  dashArray: '1 5',
+  text: 'Sin datos de riesgo'
+};
+
 export const ALERT_LEVEL_CONFIG = {
   // `range` mirrors the SCORE_* thresholds in ComunaRiskServiceImpl/TerritoryRiskServiceImpl
   // (score is 0-1 there, shown as /100 here) — keep these in sync if those constants change.
@@ -9,56 +25,50 @@ export const ALERT_LEVEL_CONFIG = {
     bg: '#dbeafe',
     label: 'Normal',
     range: '0-49',
-    fill: '#dbeafe',
+    legendText: 'Normal (puntaje 0–49)',
+    fill: '#1f78a0',
     dashArray: null,
     weight: 0.8,
     patternLabel: 'solid'
   },
   PREVENTIVO: {
-    color: '#78350f',
-    darkUiColor: '#fbbf24',
-    bg: '#fef3c7',
+    color: '#854d0e',
+    darkUiColor: '#fde047',
+    bg: '#fef9c3',
     label: 'Preventivo',
     range: '50-69',
-    fill: '#f59e0b',
+    legendText: 'Preventivo (puntaje 50–69)',
+    fill: '#fff176',
     dashArray: '4 3',
     weight: 1.1,
     patternLabel: 'short dash'
   },
   ALTO: {
-    color: '#7c2d12',
+    color: '#9a3412',
     darkUiColor: '#fb923c',
     bg: '#ffedd5',
     label: 'Alto',
     range: '70-84',
-    fill: '#b45309',
+    legendText: 'Alto (puntaje 70–84 o FWI ≥ 20)',
+    fill: '#e6550d',
     dashArray: '8 4',
     weight: 1.4,
     patternLabel: 'long dash'
   },
   CRITICO: {
-    color: '#3f1d0b',
-    darkUiColor: '#fdba74',
-    bg: '#f5e8dc',
+    color: '#7f1d1d',
+    darkUiColor: '#fca5a5',
+    bg: '#fee2e2',
     label: 'Crítico',
     range: '85-100',
-    note: 'también se activa con un foco FIRMS detectado hoy, sin importar el score',
-    fill: '#3f1d0b',
+    legendText: 'Crítico (puntaje ≥ 85, FWI ≥ 45 o focos FIRMS)',
+    note: 'también se activa con un foco FIRMS detectado hoy, o con FWI ≥ 45, sin importar el puntaje',
+    fill: '#7f0016',
     dashArray: '2 3',
     weight: 1.8,
     patternLabel: 'dense dash'
   }
 };
-
-export const RISK_SCORE_LEGEND = Object.values(ALERT_LEVEL_CONFIG).map((item) => ({
-  color: item.fill,
-  label: item.label,
-  range: item.range,
-  note: item.note,
-  dashArray: item.dashArray,
-  borderColor: item.color,
-  patternLabel: item.patternLabel
-}));
 
 // Per-variable color scales: each climate indicator gets its own bins/ramp tuned for fire-risk relevance.
 // `bins` are ascending upper-bounds; the last entry's `max` is Infinity.
@@ -131,3 +141,39 @@ export const VEGETATION_SCALES = {
     ]
   }
 };
+
+// Fill for comunas without data (missing entry, available=false, null value).
+export const NEUTRAL_FILL = '#cbd5e1';
+
+// BURNED: annual burned fraction per comuna (0-1 in the payload, bins on percent).
+// Colours: official MapBiomas Fuego Col 1 legend (FUEGO_COL1_LEYENDA.pdf, sha256
+// a3f9ec02...), the "scar size" ramp. The Fuego legend has no ramp for an annual
+// burned fraction, so this official ramp from the same family is reused here.
+// Bins are fixed (identical for every year) so maps of different years compare
+// directly. `max` is an exclusive upper bound on the fraction; the last is Infinity.
+// An observed 0 gets its own very light class, distinct from NEUTRAL_FILL (no data).
+export const BURNED_SCALE = {
+  label: 'Área quemada',
+  zero: { color: '#f1f5f9', label: 'Sin área quemada' },
+  bins: [
+    { max: 0.005, color: '#D0AE35', label: '< 0,5 %' },
+    { max: 0.02, color: '#C68E2F', label: '0,5–2 %' },
+    { max: 0.05, color: '#B96D2B', label: '2–5 %' },
+    { max: 0.2, color: '#AC4B28', label: '5–20 %' },
+    { max: Infinity, color: '#72251D', label: '> 20 %' }
+  ]
+};
+
+// entry: { available, burnedFraction, burnedHa } from the BURNED value map.
+// A negative or non-finite fraction is invalid data: treated as no data, never zero.
+export function burnedColorFor(entry) {
+  const fraction = entry?.burnedFraction;
+  if (entry?.available !== true || typeof fraction !== 'number' || !Number.isFinite(fraction) || fraction < 0) {
+    return NEUTRAL_FILL;
+  }
+  if (fraction <= 0) {
+    return BURNED_SCALE.zero.color;
+  }
+  const bin = BURNED_SCALE.bins.find((candidate) => fraction < candidate.max);
+  return bin.color;
+}

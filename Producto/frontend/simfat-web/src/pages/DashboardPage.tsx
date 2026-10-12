@@ -9,6 +9,7 @@ import {
   VEGETATION_SCALES
 } from '../features/territory/constants/colorScales';
 import { generateRegionalReport } from '../features/territory/utils/reportPrint';
+import { reportCategoryLabel } from '../utils/labels';
 import '../features/territory/territory.css';
 import '../features/dashboard/dashboard.css';
 
@@ -319,13 +320,13 @@ function CitizenReportsPanel({ features }: { features: GeoFeature[] }) {
     if (cat in counts) counts[cat]++;
     else counts.OTRO++;
   }
-  const data = REPORT_CATS.map((cat) => ({ name: cat, value: counts[cat], fill: REPORT_COLORS[cat] }));
+  const data = REPORT_CATS.map((cat) => ({ name: reportCategoryLabel(cat), value: counts[cat], fill: REPORT_COLORS[cat] }));
 
   return (
     <div style={panel}>
       <h3 style={panelTitle}>
         Reportes ciudadanos
-        <KpiInfo label="reportes ciudadanos" info={'Reportes verificados enviados por ciudadanos a través de la plataforma NoFires.\nComplementan los datos satelitales con observación directa en terreno.\nCategorías: HUMO · FOCO · INCENDIO · OTRO'} />
+        <KpiInfo label="reportes ciudadanos" info={'Reportes verificados enviados por ciudadanos a través de la plataforma NoFires.\nComplementan los datos satelitales con observación directa en terreno.\nCategorías: Humo · Foco · Incendio · Otro'} />
       </h3>
       <ResponsiveContainer width="100%" height={90}>
         <BarChart data={data} barSize={28} margin={{ top: 4, right: 4, left: -24, bottom: 0 }}>

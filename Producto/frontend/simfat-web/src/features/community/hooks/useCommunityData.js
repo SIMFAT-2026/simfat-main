@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../../../auth/AuthContext';
+import { resolveAccessibleRegions } from './communityAccess';
 import {
   createCommunityBoardPost,
   createCommunityContact,
@@ -29,8 +30,8 @@ const MOCK_BOARD = [
   },
   {
     id: 'board-2',
-    title: 'Capacitacion comunitaria',
-    message: 'Jornada de uso de extintores y protocolo de evacuacion local.',
+    title: 'Capacitación comunitaria',
+    message: 'Jornada de uso de extintores y protocolo de evacuación local.',
     priority: 'MEDIA',
     regionId: 'araucania',
     publishedAt: '2026-04-21T12:00:00Z',
@@ -46,16 +47,16 @@ const MOCK_RESOURCES = [
     url: 'https://example.com/protocolo-respuesta',
     regionId: 'biobio',
     comunaId: 'CHL.8.1.1_1',
-    description: 'Flujo recomendado para coordinacion durante las primeras 2 horas.'
+    description: 'Flujo recomendado para coordinación durante las primeras 2 horas.'
   },
   {
     id: 'resource-2',
-    title: 'Guia de prevencion vecinal',
+    title: 'Guía de prevención vecinal',
     category: 'GUIA',
     url: 'https://example.com/guia-prevencion',
     regionId: 'araucania',
     comunaId: 'CHL.9.1.1_1',
-    description: 'Checklist comunitario previo a temporada de alto riesgo.'
+    description: 'Checklist comunitario previo a la temporada de alto riesgo.'
   }
 ];
 
@@ -63,7 +64,7 @@ const MOCK_CONTACTS = [
   {
     id: 'contact-1',
     name: 'Central emergencias regional',
-    organization: 'Proteccion Civil',
+    organization: 'Protección Civil',
     phone: '+56 9 5555 1111',
     email: 'emergencias@simfat.cl',
     regionId: 'biobio',
@@ -72,13 +73,13 @@ const MOCK_CONTACTS = [
   },
   {
     id: 'contact-2',
-    name: 'Coordinacion brigadas',
+    name: 'Coordinación brigadas',
     organization: 'Bomberos',
     phone: '+56 9 5555 2222',
     email: 'brigadas@simfat.cl',
     regionId: 'araucania',
     comunaId: 'CHL.9.1.1_1',
-    protocol: 'Activacion con prioridad alta ante alerta critica confirmada.'
+    protocol: 'Activación con prioridad alta ante alerta crítica confirmada.'
   }
 ];
 
@@ -91,15 +92,15 @@ function normalizeRegions(rawRegions = []) {
 
 function fallbackRegions() {
   return [
-    { id: 'biobio', nombre: 'Biobio' },
-    { id: 'araucania', nombre: 'La Araucania' }
+    { id: 'biobio', nombre: 'Biobío' },
+    { id: 'araucania', nombre: 'La Araucanía' }
   ];
 }
 
 function normalizeBoard(items = []) {
   return items.map((item, index) => ({
     id: String(item.id || createId(`board-${index}`)),
-    title: item.title || item.titulo || 'Sin titulo',
+    title: item.title || item.titulo || 'Sin título',
     message: item.message || item.mensaje || '',
     priority: String(item.priority || item.prioridad || 'MEDIA').toUpperCase(),
     regionId: String(item.regionId || item.region_id || ''),
@@ -155,7 +156,7 @@ export function useCommunityData() {
   const isAdmin = Boolean(
     user?.roleCodes?.includes('ROLE_ADMIN') || user?.roleCodes?.includes('ROLE_SUPER_ADMIN')
   );
-  const accessibleRegions = isAdmin ? null : (user?.communityModuleAccess?.regionIds ?? []);
+  const accessibleRegions = resolveAccessibleRegions(isAdmin, user?.communityModuleAccess?.regionIds);
 
   function filterByAccess(items) {
     if (!accessibleRegions) return items;

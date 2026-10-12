@@ -157,6 +157,9 @@ class SecurityDefaultDenyContractTest {
             "/api/citizen-reports/public",
             "/api/territory/public/layers?regionId=biobio",
             "/api/territory/public/bounds",
+            "/api/territory/public/layers?regionId=biobio&indicators=LANDCOVER&year=2019",
+            "/api/territory/public/mapbiomas/CHL.6.1.1_1",
+            "/api/territory/public/mapbiomas/CHL.6.1.1_1?year=2003",
             "/api/territory/risk-score/biobio",
             "/api/territory/risk-score/comunas/biobio",
             "/api/territory/geojson/biobio",
@@ -221,7 +224,19 @@ class SecurityDefaultDenyContractTest {
         assertThat(statusOf(request(HttpMethod.POST, "/api/territory/public"))).isEqualTo(401);
         assertThat(statusOf(request(HttpMethod.PUT, "/api/territory/public/bounds"))).isEqualTo(401);
         assertThat(statusOf(request(HttpMethod.DELETE, "/api/territory/public/layers"))).isEqualTo(401);
+        assertThat(statusOf(request(HttpMethod.POST, "/api/territory/public/mapbiomas/CHL.6.1.1_1"))).isEqualTo(401);
+        assertThat(statusOf(request(HttpMethod.PUT, "/api/territory/public/mapbiomas/CHL.6.1.1_1"))).isEqualTo(401);
+        assertThat(statusOf(request(HttpMethod.DELETE, "/api/territory/public/mapbiomas/CHL.6.1.1_1"))).isEqualTo(401);
         assertThat(statusOf(request(HttpMethod.POST, "/uploads/citizen-reports/x.jpg"))).isEqualTo(401);
+    }
+
+    @Test
+    void invalidMapbiomasYearOnPublicRoutesReachesTheControllerAs400Not401() throws Exception {
+        for (String path : List.of(
+            "/api/territory/public/mapbiomas/CHL.6.1.1_1?year=1998",
+            "/api/territory/public/layers?regionId=biobio&indicators=LANDCOVER&year=abc")) {
+            assertThat(statusOf(request(HttpMethod.GET, path))).as("GET " + path).isEqualTo(400);
+        }
     }
 
     @Test

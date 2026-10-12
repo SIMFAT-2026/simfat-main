@@ -1,0 +1,138 @@
+[
+  {
+    "dataset": "mapbiomas_fire_chile_col1_accumulated_burned_v1_2013_2025",
+    "url": "https://storage.googleapis.com/mapbiomas-public/initiatives/chile/fire/collection1/accumulated_burned_v1/mapbiomas_fire_chile_col1_accumulated_burned_2013_2025.tif",
+    "fileName": "mapbiomas_fire_chile_col1_accumulated_burned_2013_2025.tif",
+    "sha256": "1b0d5aa3240639b211d99a42b160efa73cb07615771f079c8aa341e2dca5d8ce",
+    "bytes": 3268507,
+    "downloadedAt": "2026-09-30T23:02:20+00:00"
+  },
+  {
+    "dataset": "mapbiomas_fire_chile_col1_annual_burned_v1_2013",
+    "url": "https://storage.googleapis.com/mapbiomas-public/initiatives/chile/fire/collection1/annual_burned_v1/mapbiomas_fire_chile_col1_annual_burned_2013.tif",
+    "fileName": "mapbiomas_fire_chile_col1_annual_burned_2013.tif",
+    "sha256": "8d6148a4b28ca6ad116a551598694e373fd4a701996998aa2fdcf0782e2f7e19",
+    "bytes": 7794717,
+    "downloadedAt": "2026-09-30T23:02:08+00:00"
+  },
+  {
+    "dataset": "mapbiomas_fire_chile_col1_annual_burned_v1_2014",
+    "url": "https://storage.googleapis.com/mapbiomas-public/initiatives/chile/fire/collection1/annual_burned_v1/mapbiomas_fire_chile_col1_annual_burned_2014.tif",
+    "fileName": "mapbiomas_fire_chile_col1_annual_burned_2014.tif",
+    "sha256": "c1b54d3d33c3447ca0470f9b1103883c616be0de13dfead00a72014cf6693e6c",
+    "bytes": 7850770,
+    "downloadedAt": "2026-09-30T23:02:08+00:00"
+  },
+  {
+    "dataset": "mapbiomas_fire_chile_col1_annual_burned_v1_2015",
+    "url": "https://storage.googleapis.com/mapbiomas-public/initiatives/chile/fire/collection1/annual_burned_v1/mapbiomas_fire_chile_col1_annual_burned_2015.tif",
+    "fileName": "mapbiomas_fire_chile_col1_annual_burned_2015.tif",
+    "sha256": "eb16f0dece62117e931e5cedbfae553089fd370caebdb8edc4a2df909a595777",
+    "bytes": 7967748,
+    "downloadedAt": "2026-09-30T23:02:09+00:00"
+  },
+  {
+    "dataset": "mapbiomas_fire_chile_col1_annual_burned_v1_2016",
+    "url": "https://storage.googleapis.com/mapbiomas-public/initiatives/chile/fire/collection1/annual_burned_v1/mapbiomas_fire_chile_col1_annual_burned_2016.tif",
+    "fileName": "mapbiomas_fire_chile_col1_annual_burned_2016.tif",
+    "sha256": "7ae3d82d865281b907c4a89ddeddc6e744eddee39251cb62c33e0d02a7c254d8",
+    "bytes": 7846168,
+    "downloadedAt": "2026-09-30T23:02:10+00:00"
+  },
+  {
+    "dataset": "mapbiomas_fire_chile_col1_annual_burned_v1_2017",
+    "url": "https://storage.googleapis.com/mapbiomas-public/initiatives/chile/fire/collection1/annual_burned_v1/mapbiomas_fire_chile_col1_annual_burned_2017.tif",
+    "fileName": "mapbiomas_fire_chile_col1_annual_burned_2017.tif",
+    "sha256": "4a82d39f74c11ca7c1177faf47c54d05a35e0249e1f02f030446bdf2641a4297",
+    "bytes": 8219152,
+    "downloadedAt": "2026-09-30T23:02:11+00:00"
+  },
+  {
+    "dataset": "mapbiomas_fire_chile_col1_annual_burned_v1_2018",
+    "url": "https://storage.googleapis.com/mapbiomas-public/initiatives/chile/fire/collection1/annual_burned_v1/mapbiomas_fire_chile_col1_annual_burned_2018.tif",
+    "fileName": "mapbiomas_fire_chile_col1_annual_burned_2018.tif",
+    "sha256": "2c867bb12eb3c3d4cebf0a440a425e7181d9700ca38fce6ef7e2cbb25f6eea01",
+    "bytes": 7783027,
+    "downloadedAt": "2026-09-30T23:02:11+00:00"
+  },
+  {
+    "dataset": "mapbiomas_fire_chile_col1_annual_burned_v1_2019",
+    "url": "https://storage.googleapis.com/mapbiomas-public/initiatives/chile/fire/collection1/annual_burned_v1/mapbiomas_fire_chile_col1_annual_burned_2019.tif",
+    "fileName": "mapbiomas_fire_chile_col1_annual_burned_2019.tif",
+    "sha256": "d77e9c3a0140ff7871a056d063e0118b9180c1d30f1fae6c7ef06ccabdf736e5",
+    "bytes": 7809877,
+    "downloadedAt": "2026-09-30T23:02:12+00:00"
+  },
+  {
+    "dataset": "mapbiomas_fire_chile_col1_annual_burned_v1_2020",
+    "url": "https://storage.googleapis.com/mapbiomas-public/initiatives/chile/fire/collection1/annual_burned_v1/mapbiomas_fire_chile_col1_annual_burned_2020.tif",
+    "fileName": "mapbiomas_fire_chile_col1_annual_burned_2020.tif",
+    "sha256": "5b771585c331354c199a8ec20eb9fa2664029f56c1bdeb67f321e456e7a81137",
+    "bytes": 7861595,
+    "downloadedAt": "2026-09-30T23:02:13+00:00"
+  },
+  {
+    "dataset": "mapbiomas_fire_chile_col1_annual_burned_v1_2021",
+    "url": "https://storage.googleapis.com/mapbiomas-public/initiatives/chile/fire/collection1/annual_burned_v1/mapbiomas_fire_chile_col1_annual_burned_2021.tif",
+    "fileName": "mapbiomas_fire_chile_col1_annual_burned_2021.tif",
+    "sha256": "967d354d41b635e4fc4d13b866fa3fc1221aab974d9f59bd336a733a58f091f0",
+    "bytes": 7850801,
+    "downloadedAt": "2026-09-30T23:02:13+00:00"
+  },
+  {
+    "dataset": "mapbiomas_fire_chile_col1_annual_burned_v1_2022",
+    "url": "https://storage.googleapis.com/mapbiomas-public/initiatives/chile/fire/collection1/annual_burned_v1/mapbiomas_fire_chile_col1_annual_burned_2022.tif",
+    "fileName": "mapbiomas_fire_chile_col1_annual_burned_2022.tif",
+    "sha256": "3d56a3d2d3a889074db88bba90e5192f82e5b12a191d4e5ba4ac27ead5e50778",
+    "bytes": 7960664,
+    "downloadedAt": "2026-09-30T23:02:14+00:00"
+  },
+  {
+    "dataset": "mapbiomas_fire_chile_col1_annual_burned_v1_2023",
+    "url": "https://storage.googleapis.com/mapbiomas-public/initiatives/chile/fire/collection1/annual_burned_v1/mapbiomas_fire_chile_col1_annual_burned_2023.tif",
+    "fileName": "mapbiomas_fire_chile_col1_annual_burned_2023.tif",
+    "sha256": "7c64ea9d164da8dc3665bdc357c3f67221715697d8a19550132ea8b14ff84e10",
+    "bytes": 8211922,
+    "downloadedAt": "2026-09-30T23:02:15+00:00"
+  },
+  {
+    "dataset": "mapbiomas_fire_chile_col1_annual_burned_v1_2024",
+    "url": "https://storage.googleapis.com/mapbiomas-public/initiatives/chile/fire/collection1/annual_burned_v1/mapbiomas_fire_chile_col1_annual_burned_2024.tif",
+    "fileName": "mapbiomas_fire_chile_col1_annual_burned_2024.tif",
+    "sha256": "0f752d08e6253a5cf213b5d1e839738220b7ddf1b151e160bfb1a1b4f36175a9",
+    "bytes": 7786112,
+    "downloadedAt": "2026-09-30T23:02:16+00:00"
+  },
+  {
+    "dataset": "mapbiomas_fire_chile_col1_annual_burned_v1_2025",
+    "url": "https://storage.googleapis.com/mapbiomas-public/initiatives/chile/fire/collection1/annual_burned_v1/mapbiomas_fire_chile_col1_annual_burned_2025.tif",
+    "fileName": "mapbiomas_fire_chile_col1_annual_burned_2025.tif",
+    "sha256": "ce66ae13bd6d990007a0a6bf35ccaa74b780926ee9a080824fb7485a11e89a65",
+    "bytes": 7785965,
+    "downloadedAt": "2026-09-30T23:02:16+00:00"
+  },
+  {
+    "dataset": "mapbiomas_fire_chile_col1_frequency_burned_v1_2013_2025",
+    "url": "https://storage.googleapis.com/mapbiomas-public/initiatives/chile/fire/collection1/frequency_burned_v1/mapbiomas_fire_chile_col1_frequency_burned_2013_2025.tif",
+    "fileName": "mapbiomas_fire_chile_col1_frequency_burned_2013_2025.tif",
+    "sha256": "fbd46d45b04d80dd631ee45f2b0bf707d1bac61fb2b16b3eec924c97f8758bfe",
+    "bytes": 3452205,
+    "downloadedAt": "2026-09-30T23:02:17+00:00"
+  },
+  {
+    "dataset": "mapbiomas_fire_chile_col1_year_last_fire_v1_2025",
+    "url": "https://storage.googleapis.com/mapbiomas-public/initiatives/chile/fire/collection1/year_last_fire_v1/mapbiomas_fire_chile_col1_year_last_fire_2025.tif",
+    "fileName": "mapbiomas_fire_chile_col1_year_last_fire_2025.tif",
+    "sha256": "5ac15486ebd035bc42c07ef9d16ced64e8ee2f09dc1bfafe3a537393f4eaf6d1",
+    "bytes": 13939590,
+    "downloadedAt": "2026-09-30T23:02:19+00:00"
+  },
+  {
+    "dataset": "mapbiomas_lulc_col2_coverage",
+    "url": "https://chile.mapbiomas.org/wp-content/uploads/sites/7/2026/08/statistics_lulc_chile_col2_political_level_234.xlsx",
+    "fileName": "statistics_lulc_chile_col2_political_level_234.xlsx",
+    "sha256": "c4d5d6b3c8b227e2c280e06d4647730f9e72febd9e7faa390fb4f01b72e66cb9",
+    "bytes": 48422307,
+    "downloadedAt": "2026-09-21T16:24:30+00:00"
+  }
+]
