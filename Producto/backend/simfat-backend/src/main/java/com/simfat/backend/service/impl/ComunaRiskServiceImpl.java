@@ -71,7 +71,9 @@ public class ComunaRiskServiceImpl implements ComunaRiskService {
     private double scoreAlto = 0.70;
     @Value("${territory.riesgo.umbral.critico:0.85}")
     private double scoreCritico = 0.85;
-    private static final double FWI_PREVENTIVO = 20.0;
+    // FWI >= 20 raises the comuna to ALTO regardless of its score (High/Very High in the
+    // Canadian FWI classes). Pending empirical recalibration (Table 3 / section 14).
+    private static final double FWI_ALTO = 20.0;
     private static final double FWI_CRITICO = 45.0;
 
     private static final double COPERNICUS_COMUNA_PAD_DEG = 0.15;
@@ -483,7 +485,7 @@ public class ComunaRiskServiceImpl implements ComunaRiskService {
         if (firmsCount >= FirmsScoringConstants.FIRMS_COUNT_CRITICO || firmsFrpMean >= FirmsScoringConstants.FIRMS_FRP_CRITICO) {
             return "CRITICO";
         }
-        if ((fwiRaw != null && fwiRaw >= FWI_PREVENTIVO) || score >= scoreAlto) {
+        if ((fwiRaw != null && fwiRaw >= FWI_ALTO) || score >= scoreAlto) {
             return "ALTO";
         }
         if (score >= scorePreventivo) {

@@ -2,10 +2,10 @@ package com.simfat.backend.service.fwi;
 
 /**
  * The three FWI-scale alert thresholds {@code ComunaRiskServiceImpl} normalizes/overrides
- * against ({@code FWI_PREVENTIVO}, {@code FWI_CRITICO}, {@code FWI_MAX}), plus provenance
+ * against ({@code FWI_ALTO}, {@code FWI_CRITICO}, {@code FWI_MAX}), plus provenance
  * metadata that lets a caller tell whether the numbers are real or a placeholder.
  *
- * @param preventivo FWI value at/above which the PREVENTIVO alert level starts to apply.
+ * @param alto FWI value at/above which the ALTO alert level applies regardless of the score.
  * @param critico FWI value at/above which the FWI-driven CRITICO/ALTO override applies.
  * @param max FWI value used to normalize the raw FWI into the [0,1] {@code fwiNorm} score
  *     component (values at or above this are clamped to 1).
@@ -16,7 +16,7 @@ package com.simfat.backend.service.fwi;
  *     uncalibrated entries, what still needs to happen before they can be trusted.
  */
 public record FwiThresholds(
-    double preventivo,
+    double alto,
     double critico,
     double max,
     boolean calibrated,
