@@ -1,4 +1,5 @@
 import { ALERT_LEVEL_CONFIG, VEGETATION_SCALES } from '../constants/colorScales';
+import { FWI_CLASS_NOTE, FWI_REFERENCE_CLASSES, fwiClassLabel, levelRuleRows } from './reportThresholds';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -25,15 +26,6 @@ function vegetationLabel(value, indicator) {
   const scale = VEGETATION_SCALES[indicator];
   const bin = scale.bins.find((b) => value < b.max);
   return bin ? bin.label : scale.bins[scale.bins.length - 1].label;
-}
-
-function fwiLabel(v) {
-  if (v == null || !isFinite(v)) return '—';
-  if (v < 11) return 'Bajo';
-  if (v < 21) return 'Moderado';
-  if (v < 38) return 'Alto';
-  if (v < 50) return 'Muy alto';
-  return 'Extremo';
 }
 
 function dateStr(isoString) {
@@ -129,17 +121,34 @@ function buildDriverText(alertDriver, snapshotFirmsCount, snapshotFirmsFrpMean, 
 
 // ─── Thresholds section (shared) ─────────────────────────────────────────────
 
+function levelDot(level) {
+  return `<span class="ref-dot" style="background:${ALERT_LEVEL_CONFIG[level].color};"></span>`;
+}
+
+const FWI_DOT_COLORS = ['#1e3a8a', '#78350f', '#7c2d12', '#b45309', '#3f1d0b'];
+
+const fwiRows = FWI_REFERENCE_CLASSES.map((c, i) => {
+  const lead = i === 0
+    ? `<td rowspan="${FWI_REFERENCE_CLASSES.length}" style="font-weight:600;vertical-align:top;padding-top:6px;">FWI (referencia)<br><span style="font-weight:400;font-size:10px;color:#555">${FWI_CLASS_NOTE}</span></td>`
+    : '';
+  const range = c.range.replace('>', '&gt;');
+  return `<tr>${lead}<td>${range}</td><td><span class="ref-dot" style="background:${FWI_DOT_COLORS[i]};"></span>${c.label}</td></tr>`;
+}).join('');
+
+const levelRows = levelRuleRows().map((r, i, all) => {
+  const lead = i === 0
+    ? `<td rowspan="${all.length}" style="font-weight:600;vertical-align:top;padding-top:6px;">Nivel de alerta por comuna<br><span style="font-weight:400;font-size:10px;color:#555">Puntaje de riesgo (0–100) y disparadores</span></td>`
+    : '';
+  return `<tr>${lead}<td>${r.rule}</td><td>${levelDot(r.level)}${r.label}</td></tr>`;
+}).join('');
+
 const THRESHOLDS_HTML = `
 <h2>Umbrales de referencia de indicadores</h2>
 <table class="ref-table">
   <thead><tr><th>Indicador</th><th>Rango</th><th>Interpretación</th></tr></thead>
   <tbody>
-    <tr><td rowspan="5" style="font-weight:600;vertical-align:top;padding-top:6px;">FWI<br><span style="font-weight:400;font-size:10px;color:#555">Índice Peligro Incendio</span></td>
-        <td>0 – 11</td><td><span class="ref-dot" style="background:#1e3a8a;"></span>Bajo</td></tr>
-    <tr><td>11 – 21</td><td><span class="ref-dot" style="background:#78350f;"></span>Moderado</td></tr>
-    <tr><td>21 – 38</td><td><span class="ref-dot" style="background:#7c2d12;"></span>Alto</td></tr>
-    <tr><td>38 – 50</td><td><span class="ref-dot" style="background:#b45309;"></span>Muy alto</td></tr>
-    <tr><td>&gt; 50</td><td><span class="ref-dot" style="background:#3f1d0b;"></span>Extremo</td></tr>
+    ${levelRows}
+    ${fwiRows}
     <tr><td rowspan="4" style="font-weight:600;vertical-align:top;padding-top:6px;">NDVI<br><span style="font-weight:400;font-size:10px;color:#555">Índice vegetación (−1 a 1)</span></td>
         <td>&lt; 0</td><td>Superficie no vegetada (agua, suelo expuesto)</td></tr>
     <tr><td>0 – 0.2</td><td>Vegetación escasa o suelo desnudo</td></tr>
@@ -149,16 +158,11 @@ const THRESHOLDS_HTML = `
         <td>&gt; 0.1</td><td>Vegetación húmeda — bajo riesgo</td></tr>
     <tr><td>−0.1 a 0.1</td><td>Estrés hídrico leve</td></tr>
     <tr><td>&lt; −0.1</td><td>Estrés hídrico severo — alto riesgo</td></tr>
-    <tr><td rowspan="4" style="font-weight:600;vertical-align:top;padding-top:6px;">Score WLC<br><span style="font-weight:400;font-size:10px;color:#555">Riesgo compuesto (0–100)</span></td>
-        <td>0 – 20</td><td><span class="ref-dot" style="background:#1e3a8a;"></span>Normal</td></tr>
-    <tr><td>20 – 40</td><td><span class="ref-dot" style="background:#78350f;"></span>Preventivo</td></tr>
-    <tr><td>40 – 60</td><td><span class="ref-dot" style="background:#7c2d12;"></span>Alto</td></tr>
-    <tr><td>&gt; 60</td><td><span class="ref-dot" style="background:#3f1d0b;"></span>Crítico</td></tr>
   </tbody>
 </table>
 <p style="font-size:10px;color:#666;margin-top:6px;">
-  <strong>FIRMS</strong>: Focos activos detectados por satélite NASA en las últimas 48 h — a mayor número de focos de alta confianza, mayor riesgo inmediato.
-  El nivel de alerta puede superar el rango del score WLC cuando se activan condiciones de override por FIRMS (≥ 4 focos o FRP medio ≥ 60 MW) o FWI extremo (≥ 45) — ver "Motivo de escalamiento" en Estado de Alerta.
+  <strong>Niveles por comuna</strong>: el nivel sube por el puntaje o por disparadores (FWI, focos FIRMS); por eso una comuna en nivel Alto puede tener un puntaje menor a 70. El nivel regional se calcula con su propio puntaje regional y puede diferir del de sus comunas.
+  <strong>FIRMS</strong>: focos activos detectados por satélite NASA en las últimas 48 h — a mayor número de focos de alta confianza, mayor riesgo inmediato.
   <strong>Reportes ciudadanos</strong>: observaciones verificadas de humo, focos o incendios activos que complementan los datos satelitales.
 </p>`;
 
@@ -296,7 +300,7 @@ export function generateComunalReport({ score, comunaId, regionLabel, generatedA
     let observedValue = '—';
     if (r.key === 'ndvi' && ndvi != null) observedValue = fmt(ndvi, 3);
     else if (r.key === 'ndmi' && ndmi != null) observedValue = fmt(ndmi, 3);
-    else if (r.key === 'fwi' && fwiRaw != null) observedValue = `${fmt(fwiRaw, 1)} (${fwiLabel(fwiRaw)})`;
+    else if (r.key === 'fwi' && fwiRaw != null) observedValue = `${fmt(fwiRaw, 1)} (clase ${fwiClassLabel(fwiRaw)})`;
     else if (r.key === 'firms' && firmsCount != null) {
       observedValue = `${firmsCount} foco${firmsCount === 1 ? '' : 's'}`;
       if (firmsFrpMean) observedValue += ` (FRP ${fmt(firmsFrpMean, 1)} MW)`;
