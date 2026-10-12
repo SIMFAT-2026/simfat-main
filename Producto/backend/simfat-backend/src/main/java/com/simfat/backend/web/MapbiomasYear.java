@@ -30,9 +30,12 @@ import java.util.regex.Pattern;
  * over the whole dataVersion (all regions, so switching regions never shifts the default) and
  * passed in here. This class stays pure and dependency-free: it never reads stats itself, it
  * only validates that the caller-provided default still lies within the indicator's own range.
- * LANDCOVER is untouched by Q28 and keeps defaulting to {@link #LANDCOVER_MAX_YEAR} (2024).
- * <b>Tradeoff accepted</b>: a URL saved without {@code ?year=} will show a different BURNED year
- * once more Fuego years are processed into the seed -- the frontend should always send an
+ * LANDCOVER mirrors BURNED (slice S3-0): its omitted-{@code year} default is data-derived by
+ * {@code MapbiomasLandCoverDefaultYearResolver} -- the latest year with land-cover data (2024 with
+ * the current seed); {@link #LANDCOVER_MAX_YEAR} is only the resolver's fallback when no comuna
+ * qualifies and the upper bound of the accepted range.
+ * <b>Tradeoff accepted</b>: a URL saved without {@code ?year=} will show a different BURNED or
+ * LANDCOVER year once more years are processed into the seed -- the frontend should always send an
  * explicit {@code year} once one has been shown or selected (design D6: legend/tooltip always
  * print the resolved year).
  */
@@ -64,8 +67,10 @@ public final class MapbiomasYear {
     /**
      * Resolves and validates a raw {@code year} query value for the given indicator, defaulting
      * to {@link #maxYear(Indicator)} when {@code rawYear} is omitted. Equivalent to
-     * {@code resolve(indicator, rawYear, maxYear(indicator))} -- kept as the LANDCOVER-shaped
-     * convenience overload since LANDCOVER's default (Q28) stays the fixed max year.
+     * {@code resolve(indicator, rawYear, maxYear(indicator))} -- a convenience overload for
+     * callers with no data-derived default. Both LANDCOVER and BURNED callers in
+     * {@code TerritoryController} use the three-argument overload with a data-derived default
+     * (see {@code MapbiomasLandCoverDefaultYearResolver} and {@code MapbiomasBurnedDefaultYearResolver}).
      *
      * @param indicator the MapBiomas indicator the year is validated against
      * @param rawYear the raw request parameter; {@code null} means the parameter was omitted
@@ -78,7 +83,7 @@ public final class MapbiomasYear {
     /**
      * Resolves and validates a raw {@code year} query value for the given indicator, defaulting
      * to {@code defaultYear} when {@code rawYear} is omitted (Decision Q28 -- the caller computes
-     * a data-derived default for BURNED; LANDCOVER callers keep passing {@link #maxYear(Indicator)}).
+     * a data-derived default for both LANDCOVER and BURNED).
      *
      * @param indicator the MapBiomas indicator the year is validated against
      * @param rawYear the raw request parameter; {@code null} means the parameter was omitted

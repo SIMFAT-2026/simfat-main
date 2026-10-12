@@ -6,7 +6,7 @@ import java.util.function.Supplier;
 
 /**
  * Bounded, lazily-populated cache for MapBiomas-derived layer payloads (design D5 caching note,
- * task 2b2a.2). Backs {@code TerritoryController#burnedLayer}.
+ * task 2b2a.2). Backs {@code TerritoryController#burnedLayer} and {@code #landCoverLayer}.
  *
  * <p><b>Defense in depth</b> (judgment-day finding #1, CRITICAL): the intended key space is
  * {@code dataVersion x indicator x year x regionId}, and callers are expected to normalize
@@ -19,6 +19,32 @@ import java.util.function.Supplier;
  * recompute" instead of leaking memory or amplifying Mongo load per distinct garbage input.
  */
 public final class MapbiomasLayerCache {
+
+    /**
+     * Regions the layers can be served for (RegionGeometry normalizes every request to one).
+     * Kept as a constant on purpose: {@code RegionGeometry} is a package-private record nested in
+     * {@code TerritoryController} (package {@code controller}, which already depends on this
+     * {@code web} package), so deriving the count from it here would create a dependency cycle.
+     * {@code MapbiomasLayerCacheTest} fails the build if the key space ever outgrows the cap.
+     */
+    public static final int KNOWN_REGIONS = 3;
+
+    /**
+     * The whole legitimate, closed key space: every region x every LANDCOVER year (26) plus every
+     * BURNED year (13) = 117. Keys are built only from the normalized region and validated
+     * integers, so nothing outside this set can ever be requested.
+     */
+    public static final int BOUNDED_KEY_SPACE = KNOWN_REGIONS
+        * ((MapbiomasYear.LANDCOVER_MAX_YEAR - MapbiomasYear.LANDCOVER_MIN_YEAR + 1)
+            + (MapbiomasYear.BURNED_MAX_YEAR - MapbiomasYear.BURNED_MIN_YEAR + 1));
+
+    /**
+     * Deliberate cap: the legitimate key space (117) plus a small headroom (11) so a legitimate
+     * entry is never starved, yet still a hard ceiling (~0.7 MB at ~6.5 KB per payload) if a
+     * future edit ever lets a garbage key through. It was 64 when only BURNED (39 keys) existed;
+     * 64 would have silently stopped caching ~half of the LANDCOVER+BURNED space.
+     */
+    public static final int DEFAULT_MAX_ENTRIES = 128;
 
     private final int maxEntries;
     private final Map<String, Map<String, Object>> entries = new LinkedHashMap<>();

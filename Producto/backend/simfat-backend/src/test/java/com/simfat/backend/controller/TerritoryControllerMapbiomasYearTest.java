@@ -3,6 +3,7 @@ package com.simfat.backend.controller;
 import static org.hamcrest.Matchers.is;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -224,5 +225,135 @@ class TerritoryControllerMapbiomasYearTest extends MongoFreeWebTestSupport {
         // behaviour, unchanged here); what must match is the BURNED layer itself.
         org.assertj.core.api.Assertions.assertThat(garbage.at("/data/layers"))
             .isEqualTo(canonical.at("/data/layers"));
+    }
+
+    private static ComunaMapbiomasStats statsWithLandCover(String comunaId) {
+        // 1999-2024 (26 values): class 59 constant at 60%, class 12 dominant (70%) only in 2024.
+        int[] forest = new int[26];
+        int[] grass = new int[26];
+        for (int i = 0; i < 26; i++) {
+            forest[i] = 6000;
+            grass[i] = i == 25 ? 7000 : 4000;
+        }
+        ComunaMapbiomasStats.SharesByYear series = new ComunaMapbiomasStats.SharesByYear();
+        series.setFirstYear(1999);
+        series.setLastYear(2024);
+        series.setUnit("bp");
+        series.setClasses(Map.of("59", forest, "12", grass));
+        ComunaMapbiomasStats.LandCover landCover = new ComunaMapbiomasStats.LandCover();
+        landCover.setSharesByYear(series);
+        ComunaMapbiomasStats stats = new ComunaMapbiomasStats();
+        stats.setComunaId(comunaId);
+        stats.setLandCover(landCover);
+        return stats;
+    }
+
+    @Test
+    @WithMockUser(authorities = "ROLE_VERIFIED_USER")
+    void getLayers_landcoverWithYear_returnsTheFractionValueMapForThatYear() throws Exception {
+        when(comunaInfoRepository.findByRegionId("biobio")).thenReturn(List.of(comuna("c1")));
+        when(comunaMapbiomasStatsRepository.findByRegionIdAndDataVersion(eq("biobio"), any()))
+            .thenReturn(List.of(statsWithLandCover("c1")));
+
+        mockMvc.perform(get("/api/territory/layers")
+                .param("regionId", "biobio")
+                .param("indicators", "LANDCOVER")
+                .param("year", "2010"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.layers.LANDCOVER.indicator", is("LANDCOVER")))
+            .andExpect(jsonPath("$.data.layers.LANDCOVER.unit", is("fraction")))
+            .andExpect(jsonPath("$.data.layers.LANDCOVER.year", is(2010)))
+            .andExpect(jsonPath("$.data.layers.LANDCOVER.minYear", is(1999)))
+            .andExpect(jsonPath("$.data.layers.LANDCOVER.maxYear", is(2024)))
+            .andExpect(jsonPath("$.data.layers.LANDCOVER.citation").exists())
+            .andExpect(jsonPath("$.data.layers.LANDCOVER.values.c1.available", is(true)))
+            .andExpect(jsonPath("$.data.layers.LANDCOVER.values.c1.dominantClass", is(59)))
+            .andExpect(jsonPath("$.data.layers.LANDCOVER.values.c1.dominantLabel", is("Bosque Primario")))
+            .andExpect(jsonPath("$.data.layers.LANDCOVER.values.c1.dominantShare", is(0.6)));
+    }
+
+    @Test
+    @WithMockUser(authorities = "ROLE_VERIFIED_USER")
+    void getPublicLayers_landcoverOmittedYear_defaultsTo2024() throws Exception {
+        when(comunaInfoRepository.findByRegionId("biobio")).thenReturn(List.of(comuna("c1")));
+        when(comunaMapbiomasStatsRepository.findByRegionIdAndDataVersion(eq("biobio"), any()))
+            .thenReturn(List.of(statsWithLandCover("c1")));
+        when(comunaMapbiomasStatsRepository.findByDataVersion(any()))
+            .thenReturn(List.of(statsWithLandCover("c1")));
+
+        mockMvc.perform(get("/api/territory/public/layers")
+                .param("regionId", "biobio")
+                .param("indicators", "LANDCOVER"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.layers.LANDCOVER.year", is(2024)))
+            .andExpect(jsonPath("$.data.layers.LANDCOVER.values.c1.dominantClass", is(12)))
+            .andExpect(jsonPath("$.data.layers.LANDCOVER.values.c1.dominantShare", is(0.7)));
+    }
+
+    @Test
+    @WithMockUser(authorities = "ROLE_VERIFIED_USER")
+    void landcoverYearOutOfRange_returnsBadRequest_onBothRoutes() throws Exception {
+        for (String route : new String[] {"/api/territory/layers", "/api/territory/public/layers"}) {
+            for (String year : new String[] {"1998", "2025"}) {
+                mockMvc.perform(get(route)
+                        .param("regionId", "biobio")
+                        .param("indicators", "LANDCOVER")
+                        .param("year", year))
+                    .andExpect(status().isBadRequest());
+            }
+        }
+    }
+
+    @Test
+    @WithMockUser(authorities = "ROLE_VERIFIED_USER")
+    void invalidYear_isRejectedBeforeAnyOtherLayerIsComputed_onBothRoutes() throws Exception {
+        for (String route : new String[] {"/api/territory/layers", "/api/territory/public/layers"}) {
+            mockMvc.perform(get(route)
+                    .param("regionId", "biobio")
+                    .param("indicators", "NDVI,NDMI,LOSS,ALERTS,FIRMS,REPORTS,RISK_SCORE,WIND,LANDCOVER,BURNED")
+                    .param("year", "abc"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("LANDCOVER")));
+        }
+
+        verifyNoInteractions(
+            openEoIndicatorObservationRepository,
+            forestLossRecordRepository,
+            heatAlertEventRepository,
+            citizenReportRepository,
+            comunaInfoRepository,
+            comunaMapbiomasStatsRepository,
+            territoryWeatherObservationRepository,
+            territoryRiskService,
+            nasaFirmsService,
+            openWeatherFwiService,
+            comunaRiskService);
+    }
+
+    @Test
+    @WithMockUser(authorities = "ROLE_VERIFIED_USER")
+    void yearValidOnlyForBurned_withBothRequested_namesLandcoverAsTheOffender() throws Exception {
+        mockMvc.perform(get("/api/territory/layers")
+                .param("regionId", "biobio")
+                .param("indicators", "NDVI,BURNED,LANDCOVER")
+                .param("year", "2025"))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("LANDCOVER")));
+
+        verifyNoInteractions(openEoIndicatorObservationRepository, comunaMapbiomasStatsRepository);
+    }
+
+    @Test
+    @WithMockUser(authorities = "ROLE_VERIFIED_USER")
+    void getLayers_burnedUnitIsFraction() throws Exception {
+        when(comunaInfoRepository.findByRegionId("biobio")).thenReturn(List.of());
+        when(comunaMapbiomasStatsRepository.findByRegionIdAndDataVersion(eq("biobio"), any())).thenReturn(List.of());
+
+        mockMvc.perform(get("/api/territory/layers")
+                .param("regionId", "biobio")
+                .param("indicators", "BURNED")
+                .param("year", "2020"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.layers.BURNED.unit", is("fraction")));
     }
 }

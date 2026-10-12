@@ -63,7 +63,8 @@ public final class MapbiomasBurnedLayerBuilder {
 
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("indicator", "BURNED");
-        result.put("unit", "%");
+        // burnedFraction is a 0-1 fraction of MAPPED area (Q29/Q30); the client renders it as %.
+        result.put("unit", "fraction");
         result.put("year", year);
         result.put("minYear", minYear);
         result.put("maxYear", maxYear);
