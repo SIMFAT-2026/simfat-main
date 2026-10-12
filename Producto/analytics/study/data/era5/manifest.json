@@ -1,0 +1,897 @@
+{
+  "attribution": "Weather data by Open-Meteo.com (https://open-meteo.com/), ERA5 reanalysis by ECMWF (Copernicus Climate Change Service). Licence: CC BY 4.0, non-commercial use (project decision Q24, 2026-09-20).",
+  "committedFile": {
+    "bytes": 2280901,
+    "path": "data/era5/noon_inputs_2016-09-01_2025-04-30.csv.gz",
+    "rows": 272104,
+    "sha256": "6bb5546cfcabcbd5e5c8c0d94a42d7a1fbdfe52476701b53bb504e91017590b7"
+  },
+  "comunas": [
+    {
+      "comunaId": "CHL.13.1.1_1",
+      "noonInputDays": 3164,
+      "rawResponseBytes": 3061767,
+      "rawResponseSha256": "3093968581c616f2a076a13189401d21ab7b5646a961cb4445ae8e51615fbc1f",
+      "representativePoint": {
+        "lat": -36.772448101265816,
+        "lon": -72.28987784810127
+      }
+    },
+    {
+      "comunaId": "CHL.13.1.2_1",
+      "noonInputDays": 3164,
+      "rawResponseBytes": 3061575,
+      "rawResponseSha256": "9dd60b9d3a5b4a0702a73f22cbfa61be5984d76018b417163b5c9377b16b5818",
+      "representativePoint": {
+        "lat": -36.616265,
+        "lon": -72.1495
+      }
+    },
+    {
+      "comunaId": "CHL.13.1.3_1",
+      "noonInputDays": 3164,
+      "rawResponseBytes": 3061056,
+      "rawResponseSha256": "d141fe84f8ecdd12072d3bbf336b204e2a90efe94f7339adeb2895de7a5caba1",
+      "representativePoint": {
+        "lat": -36.68835241935485,
+        "lon": -72.21082903225806
+      }
+    },
+    {
+      "comunaId": "CHL.13.1.4_1",
+      "noonInputDays": 3164,
+      "rawResponseBytes": 3053287,
+      "rawResponseSha256": "259d161f01e515b71347c96d070a32cdbb563280055585ca3e6e307c87b520bf",
+      "representativePoint": {
+        "lat": -36.92939672897195,
+        "lon": -71.88169392523362
+      }
+    },
+    {
+      "comunaId": "CHL.13.1.5_1",
+      "noonInputDays": 3164,
+      "rawResponseBytes": 3056993,
+      "rawResponseSha256": "729badbaa4bc950e3c8290080fe353e216ce94366c3184d607b49ce3a049733e",
+      "representativePoint": {
+        "lat": -36.99475424836603,
+        "lon": -72.00541732026143
+      }
+    },
+    {
+      "comunaId": "CHL.13.1.6_1",
+      "noonInputDays": 3164,
+      "rawResponseBytes": 3020990,
+      "rawResponseSha256": "5a6073dbb63a658f95f9da1798fbf071a59688941a9c5cefa9d11d40718ed43b",
+      "representativePoint": {
+        "lat": -36.905563929618765,
+        "lon": -71.5547774193548
+      }
+    },
+    {
+      "comunaId": "CHL.13.1.7_1",
+      "noonInputDays": 3164,
+      "rawResponseBytes": 3061184,
+      "rawResponseSha256": "abee0ef87ade9015f65204eedeedea3160d6af0638dd04c065eb0517a23c28dc",
+      "representativePoint": {
+        "lat": -36.81254319526629,
+        "lon": -72.5218177514793
+      }
+    },
+    {
+      "comunaId": "CHL.13.1.8_1",
+      "noonInputDays": 3164,
+      "rawResponseBytes": 3055149,
+      "rawResponseSha256": "ec96b449a626c5ea4aec1fd97ecc3358b989d9ec092f63174ec2845c31d2d7f8",
+      "representativePoint": {
+        "lat": -36.81866599999999,
+        "lon": -72.00017399999999
+      }
+    },
+    {
+      "comunaId": "CHL.13.1.9_1",
+      "noonInputDays": 3164,
+      "rawResponseBytes": 3054034,
+      "rawResponseSha256": "b6342921f76d7ff3ab0558ae50f2c99d646a33ee7ae3484a015fc52d842e7f3f",
+      "representativePoint": {
+        "lat": -37.09484673539519,
+        "lon": -71.92051786941583
+      }
+    },
+    {
+      "comunaId": "CHL.13.2.1_1",
+      "noonInputDays": 3164,
+      "rawResponseBytes": 3055484,
+      "rawResponseSha256": "98770993d3aba8bb2e9904ad5448febc77c2db85914264ec3e133fe1c085dce0",
+      "representativePoint": {
+        "lat": -36.18603142857144,
+        "lon": -72.70669918367354
+      }
+    },
+    {
+      "comunaId": "CHL.13.2.2_1",
+      "noonInputDays": 3164,
+      "rawResponseBytes": 3057363,
+      "rawResponseSha256": "fdb684c93124955964253bf2f4f52d192f9c47276ee75f4ae567afa8f533e807",
+      "representativePoint": {
+        "lat": -36.50075555555555,
+        "lon": -72.74971965811962
+      }
+    },
+    {
+      "comunaId": "CHL.13.2.3_1",
+      "noonInputDays": 3164,
+      "rawResponseBytes": 3057103,
+      "rawResponseSha256": "73a04f9f5827f28eb2d106edbab3b285515cd635cc804be115a1cda659c677a2",
+      "representativePoint": {
+        "lat": -36.3474802631579,
+        "lon": -72.4244315789474
+      }
+    },
+    {
+      "comunaId": "CHL.13.2.4_1",
+      "noonInputDays": 3164,
+      "rawResponseBytes": 3059798,
+      "rawResponseSha256": "7937f56692a2fa665fee489966d13ee44d340ac927b16d4cd4840c903d1b46ad",
+      "representativePoint": {
+        "lat": -36.5362424778761,
+        "lon": -72.48079646017699
+      }
+    },
+    {
+      "comunaId": "CHL.13.2.5_1",
+      "noonInputDays": 3164,
+      "rawResponseBytes": 3055992,
+      "rawResponseSha256": "9d4f4a5ffaf63551cd63a901cfbc7dcf193e4614ac3be0e5731c46796b024d5b",
+      "representativePoint": {
+        "lat": -36.23113824701197,
+        "lon": -72.5510876494024
+      }
+    },
+    {
+      "comunaId": "CHL.13.2.6_1",
+      "noonInputDays": 3164,
+      "rawResponseBytes": 3064123,
+      "rawResponseSha256": "3e738a0f97e00a17e2fe11d682536f915cef539f80fcd08ca8b6f3e8c2abd65b",
+      "representativePoint": {
+        "lat": -36.65093103448276,
+        "lon": -72.59179137931034
+      }
+    },
+    {
+      "comunaId": "CHL.13.2.7_1",
+      "noonInputDays": 3164,
+      "rawResponseBytes": 3059326,
+      "rawResponseSha256": "83ec316786c09e228b60870a88d8fb8b59891b86ab65e1ab190b0d9dc191afb9",
+      "representativePoint": {
+        "lat": -36.40256140350877,
+        "lon": -72.69115964912281
+      }
+    },
+    {
+      "comunaId": "CHL.13.3.1_1",
+      "noonInputDays": 3164,
+      "rawResponseBytes": 3017300,
+      "rawResponseSha256": "33f5a071ec35126d8f064468efc6971bee0de22746c63190ed27bbdc40961f9d",
+      "representativePoint": {
+        "lat": -36.71625738636362,
+        "lon": -71.5548411931818
+      }
+    },
+    {
+      "comunaId": "CHL.13.3.2_1",
+      "noonInputDays": 3164,
+      "rawResponseBytes": 3063354,
+      "rawResponseSha256": "873f3612f63ff13d2e35534c5a612c71c3e495d342989332d2f0fb04f40b0fa2",
+      "representativePoint": {
+        "lat": -36.27397839195983,
+        "lon": -71.92631306532664
+      }
+    },
+    {
+      "comunaId": "CHL.13.3.3_1",
+      "noonInputDays": 3164,
+      "rawResponseBytes": 3058298,
+      "rawResponseSha256": "1d43b9110004b310f6152403b3ae6d922053c23331dba0e4927b48a9277d2770",
+      "representativePoint": {
+        "lat": -36.40459671361501,
+        "lon": -72.00028497652583
+      }
+    },
+    {
+      "comunaId": "CHL.13.3.4_1",
+      "noonInputDays": 3164,
+      "rawResponseBytes": 3024920,
+      "rawResponseSha256": "d2781a43bc0f9f70ec9f2722cef1f0339df9e47891948c244a1f6274a4b784d8",
+      "representativePoint": {
+        "lat": -36.622053092783524,
+        "lon": -71.27893015463918
+      }
+    },
+    {
+      "comunaId": "CHL.13.3.5_1",
+      "noonInputDays": 3164,
+      "rawResponseBytes": 3061376,
+      "rawResponseSha256": "73393a3dec68d6b632799251d50222f7918872d39991680c6f119157d81a6906",
+      "representativePoint": {
+        "lat": -36.49498881578948,
+        "lon": -72.25222565789473
+      }
+    },
+    {
+      "comunaId": "CHL.3.1.10_1",
+      "noonInputDays": 3164,
+      "rawResponseBytes": 3030355,
+      "rawResponseSha256": "4c7dc473924b56c03006552e2ce20d1a6e5685e9b6eca71eca5db72198002987",
+      "representativePoint": {
+        "lat": -38.84024300000001,
+        "lon": -71.593773
+      }
+    },
+    {
+      "comunaId": "CHL.3.1.11_1",
+      "noonInputDays": 3164,
+      "rawResponseBytes": 3047258,
+      "rawResponseSha256": "4862f01d35c0f0c2c96dfcbccb8abe4d11a1512f8756cd3939b67d1e9b44ccf0",
+      "representativePoint": {
+        "lat": -38.72474429824561,
+        "lon": -73.01466140350874
+      }
+    },
+    {
+      "comunaId": "CHL.3.1.12_1",
+      "noonInputDays": 3164,
+      "rawResponseBytes": 3047830,
+      "rawResponseSha256": "c7993fd8eb5f197dee13b224087436af655693e1fd9dcb920bfaa16d108f032e",
+      "representativePoint": {
+        "lat": -38.816201587301585,
+        "lon": -72.53385793650797
+      }
+    },
+    {
+      "comunaId": "CHL.3.1.13_1",
+      "noonInputDays": 3164,
+      "rawResponseBytes": 3046699,
+      "rawResponseSha256": "e69dd695c43a719dde547b13e9fa8c19841fb8adace41943c0b62a012b1430e1",
+      "representativePoint": {
+        "lat": -38.43934755244754,
+        "lon": -72.46913356643361
+      }
+    },
+    {
+      "comunaId": "CHL.3.1.14_1",
+      "noonInputDays": 3164,
+      "rawResponseBytes": 3047480,
+      "rawResponseSha256": "da0a0cf12217efbf94da5369f46c18ffb19ade9b7bcac497d7e1ce41084404ac",
+      "representativePoint": {
+        "lat": -39.054491,
+        "lon": -72.681156
+      }
+    },
+    {
+      "comunaId": "CHL.3.1.15_1",
+      "noonInputDays": 3164,
+      "rawResponseBytes": 3019462,
+      "rawResponseSha256": "4a6490b39367af96e340e219355156b18d8d80aee91540a4b3a6019593da3c84",
+      "representativePoint": {
+        "lat": -39.27201715481169,
+        "lon": -71.73073054393305
+      }
+    },
+    {
+      "comunaId": "CHL.3.1.16_1",
+      "noonInputDays": 3164,
+      "rawResponseBytes": 3071256,
+      "rawResponseSha256": "27734aaa13df0acc3609e40a5053745b39449d900aa963ab4eba34ff1e1c287e",
+      "representativePoint": {
+        "lat": -38.832630927835034,
+        "lon": -73.27097010309281
+      }
+    },
+    {
+      "comunaId": "CHL.3.1.17_1",
+      "noonInputDays": 3164,
+      "rawResponseBytes": 3047613,
+      "rawResponseSha256": "797ff764e09017b6d0f6c349c9438f3e1bfaced758dbb75e37fb9d10972a3443",
+      "representativePoint": {
+        "lat": -38.66561095890411,
+        "lon": -72.67091095890419
+      }
+    },
+    {
+      "comunaId": "CHL.3.1.18_1",
+      "noonInputDays": 3164,
+      "rawResponseBytes": 3048107,
+      "rawResponseSha256": "86fb2b5aff518b2db6d004e53e3ff1686557c904a0efb888dd282e575b72a812",
+      "representativePoint": {
+        "lat": -39.00090222222224,
+        "lon": -73.12107259259257
+      }
+    },
+    {
+      "comunaId": "CHL.3.1.19_1",
+      "noonInputDays": 3164,
+      "rawResponseBytes": 3041555,
+      "rawResponseSha256": "50fe956ff7234c8fd54a8ef8392a572f953011b961711f41f1172a2508ec090c",
+      "representativePoint": {
+        "lat": -39.218358080808095,
+        "lon": -73.06955151515152
+      }
+    },
+    {
+      "comunaId": "CHL.3.1.1_1",
+      "noonInputDays": 3164,
+      "rawResponseBytes": 3039599,
+      "rawResponseSha256": "f10b91a6399223c28b23fd55b6d3a3b30d4e6a929008cf72b74e1e64c5a75235",
+      "representativePoint": {
+        "lat": -38.60873090379006,
+        "lon": -73.22239329446063
+      }
+    },
+    {
+      "comunaId": "CHL.3.1.20_1",
+      "noonInputDays": 3164,
+      "rawResponseBytes": 3035986,
+      "rawResponseSha256": "7cd860e02e8ded93b7dd237309ef0e01be2064a401801ea2bc23def7e664eaa7",
+      "representativePoint": {
+        "lat": -38.71975495978553,
+        "lon": -72.17856541554957
+      }
+    },
+    {
+      "comunaId": "CHL.3.1.21_1",
+      "noonInputDays": 3164,
+      "rawResponseBytes": 3036941,
+      "rawResponseSha256": "75608707f1c1056677282e8559b6ec66cc351fea579fba4854f9906460b3c7a5",
+      "representativePoint": {
+        "lat": -39.2866205574913,
+        "lon": -72.22838641114983
+      }
+    },
+    {
+      "comunaId": "CHL.3.1.2_1",
+      "noonInputDays": 3164,
+      "rawResponseBytes": 3048773,
+      "rawResponseSha256": "6edc23b1b4a6cc24b4287ce9e4d0ac025cb8c5e71037479caaddcf6e9c635507",
+      "representativePoint": {
+        "lat": -38.574456024096385,
+        "lon": -72.89325120481925
+      }
+    },
+    {
+      "comunaId": "CHL.3.1.3_1",
+      "noonInputDays": 3164,
+      "rawResponseBytes": 3030681,
+      "rawResponseSha256": "7e995f68b7fbbbb85667768cad9024cf3c34b3a1dc1c3af6e41fd74361440cad",
+      "representativePoint": {
+        "lat": -38.94855769230768,
+        "lon": -71.98336401098898
+      }
+    },
+    {
+      "comunaId": "CHL.3.1.4_1",
+      "noonInputDays": 3164,
+      "rawResponseBytes": 3025707,
+      "rawResponseSha256": "928e744f7d7adacb6b5506bff547d97b9a6cf5aa1dfa8c10cda53018029ecb52",
+      "representativePoint": {
+        "lat": -39.31634999999997,
+        "lon": -71.54936583850933
+      }
+    },
+    {
+      "comunaId": "CHL.3.1.5_1",
+      "noonInputDays": 3164,
+      "rawResponseBytes": 3046468,
+      "rawResponseSha256": "9ad9efc7d573d1588e1bb2b8f301c0f27b8ccd4d7341fe25854fae7759dee508",
+      "representativePoint": {
+        "lat": -38.93327892376681,
+        "lon": -72.58696950672643
+      }
+    },
+    {
+      "comunaId": "CHL.3.1.6_1",
+      "noonInputDays": 3164,
+      "rawResponseBytes": 3047830,
+      "rawResponseSha256": "6f7be7eb801a96c791e76523e7132b911aca5f7d4527da082c57100d1c8556b9",
+      "representativePoint": {
+        "lat": -38.45805251141552,
+        "lon": -72.80200639269407
+      }
+    },
+    {
+      "comunaId": "CHL.3.1.7_1",
+      "noonInputDays": 3164,
+      "rawResponseBytes": 3042716,
+      "rawResponseSha256": "e25f7d9c67c28ba4a5e83c50a278e6735883e5fe3c032b73951cb7dfed95600e",
+      "representativePoint": {
+        "lat": -39.17191703703704,
+        "lon": -72.70680518518519
+      }
+    },
+    {
+      "comunaId": "CHL.3.1.8_1",
+      "noonInputDays": 3164,
+      "rawResponseBytes": 3045976,
+      "rawResponseSha256": "fb4f76e870c6b89588e4348d0df298e7e48037f3d998b95b5e45307300f6a83d",
+      "representativePoint": {
+        "lat": -38.5428554517134,
+        "lon": -72.28015545171337
+      }
+    },
+    {
+      "comunaId": "CHL.3.1.9_1",
+      "noonInputDays": 3164,
+      "rawResponseBytes": 3045111,
+      "rawResponseSha256": "55617ce79ead5ed0757fa73506343ba35640930227b172e2592f6bc22a2c4756",
+      "representativePoint": {
+        "lat": -39.369963035019445,
+        "lon": -72.56540233463036
+      }
+    },
+    {
+      "comunaId": "CHL.3.2.10_1",
+      "noonInputDays": 3164,
+      "rawResponseBytes": 3047537,
+      "rawResponseSha256": "9cbe95011b73239271e2e5c065dfa9101560d66fc68cb6d496bc66e01b48572b",
+      "representativePoint": {
+        "lat": -38.26158636363635,
+        "lon": -72.70307231404962
+      }
+    },
+    {
+      "comunaId": "CHL.3.2.11_1",
+      "noonInputDays": 3164,
+      "rawResponseBytes": 3050444,
+      "rawResponseSha256": "83499a87886729ad0d9e8e331fd19e1ff7ab00e484226be06b91660d41fb9b82",
+      "representativePoint": {
+        "lat": -38.28281452991454,
+        "lon": -72.23922521367517
+      }
+    },
+    {
+      "comunaId": "CHL.3.2.1_1",
+      "noonInputDays": 3164,
+      "rawResponseBytes": 3038776,
+      "rawResponseSha256": "4915e1fa15499624138ffb64f6e49409d6e0345d04d5af48e2a3143fb58a920c",
+      "representativePoint": {
+        "lat": -37.788534782608714,
+        "lon": -72.77154755434788
+      }
+    },
+    {
+      "comunaId": "CHL.3.2.2_1",
+      "noonInputDays": 3164,
+      "rawResponseBytes": 3055933,
+      "rawResponseSha256": "e8a3b08cc8d1cde9d62a590f48bdcff0b393578c12fcc711e45bf071ef2bc6a8",
+      "representativePoint": {
+        "lat": -38.01345718015665,
+        "lon": -72.1403892950392
+      }
+    },
+    {
+      "comunaId": "CHL.3.2.3_1",
+      "noonInputDays": 3164,
+      "rawResponseBytes": 3023596,
+      "rawResponseSha256": "ae86b74b45651b89c5e3886dcd3cd8517d53db0012e1802d31c048ea4a31fa9f",
+      "representativePoint": {
+        "lat": -38.4229957805907,
+        "lon": -71.77999451476792
+      }
+    },
+    {
+      "comunaId": "CHL.3.2.4_1",
+      "noonInputDays": 3164,
+      "rawResponseBytes": 3058297,
+      "rawResponseSha256": "a6b9054725631eb194f2975ef288a1679b2e6cf036af154cfe93c59913422956",
+      "representativePoint": {
+        "lat": -38.08860209205021,
+        "lon": -72.3059778242678
+      }
+    },
+    {
+      "comunaId": "CHL.3.2.5_1",
+      "noonInputDays": 3164,
+      "rawResponseBytes": 3026648,
+      "rawResponseSha256": "76f009fe25b4b75f98fcb576ba7862bfcbcb4a93ffa5e4901587329282da55f1",
+      "representativePoint": {
+        "lat": -38.49812499999998,
+        "lon": -71.28440353535353
+      }
+    },
+    {
+      "comunaId": "CHL.3.2.6_1",
+      "noonInputDays": 3164,
+      "rawResponseBytes": 3051420,
+      "rawResponseSha256": "96c1563b04f90abbb8800ae9250c0e34a65f82d39f7340335bf9135dc94bad53",
+      "representativePoint": {
+        "lat": -37.9820803149606,
+        "lon": -72.791974015748
+      }
+    },
+    {
+      "comunaId": "CHL.3.2.7_1",
+      "noonInputDays": 3164,
+      "rawResponseBytes": 3028791,
+      "rawResponseSha256": "70a8a799a233f3ee94f3e6f839afc69000c3345dba3d266bd17e4ea2c6218307",
+      "representativePoint": {
+        "lat": -38.299741901408474,
+        "lon": -73.03015070422536
+      }
+    },
+    {
+      "comunaId": "CHL.3.2.8_1",
+      "noonInputDays": 3164,
+      "rawResponseBytes": 3032462,
+      "rawResponseSha256": "7d760884db81f07a387b3f533e8ab6ba6ab99a4c432405cd8fce88afb80c9c0b",
+      "representativePoint": {
+        "lat": -37.993741578947365,
+        "lon": -73.04651526315789
+      }
+    },
+    {
+      "comunaId": "CHL.3.2.9_1",
+      "noonInputDays": 3164,
+      "rawResponseBytes": 3065557,
+      "rawResponseSha256": "21ac403ed3f318d721fa65eb33ca000251b1c1bcbf4b415ac212602ed72ad216",
+      "representativePoint": {
+        "lat": -37.71195548780488,
+        "lon": -72.58045304878046
+      }
+    },
+    {
+      "comunaId": "CHL.6.1.1_1",
+      "noonInputDays": 3164,
+      "rawResponseBytes": 3065787,
+      "rawResponseSha256": "c8f845affb7dabccc300468d585cda0572c58f120f11131dd662b4ae20bb4054",
+      "representativePoint": {
+        "lat": -37.2909534591195,
+        "lon": -73.43393427672952
+      }
+    },
+    {
+      "comunaId": "CHL.6.1.2_1",
+      "noonInputDays": 3164,
+      "rawResponseBytes": 3038634,
+      "rawResponseSha256": "b6bdf30318df232b17126ae3b8128319c42f396700e084c6a2ae925b707b4593",
+      "representativePoint": {
+        "lat": -37.8618462837838,
+        "lon": -73.29412770270267
+      }
+    },
+    {
+      "comunaId": "CHL.6.1.3_1",
+      "noonInputDays": 3164,
+      "rawResponseBytes": 3038162,
+      "rawResponseSha256": "420b57f9cf45c5f7f3de71f5ef01e7c923eea930d6eab4fa556e733ca8e469b3",
+      "representativePoint": {
+        "lat": -38.03457827868852,
+        "lon": -73.21005778688522
+      }
+    },
+    {
+      "comunaId": "CHL.6.1.4_1",
+      "noonInputDays": 3164,
+      "rawResponseBytes": 3047765,
+      "rawResponseSha256": "da86d6a4751741142b4118bed2e2ea512e735213719015f9c564390890fe2ccf",
+      "representativePoint": {
+        "lat": -37.494297492163,
+        "lon": -73.23873855799371
+      }
+    },
+    {
+      "comunaId": "CHL.6.1.5_1",
+      "noonInputDays": 3164,
+      "rawResponseBytes": 3084453,
+      "rawResponseSha256": "90bd9498ee989159ed8ddec0357ea7845bd4bb5f874d2a6b0c8b83894857abc2",
+      "representativePoint": {
+        "lat": -37.59109885496182,
+        "lon": -73.5539019083969
+      }
+    },
+    {
+      "comunaId": "CHL.6.1.6_1",
+      "noonInputDays": 3164,
+      "rawResponseBytes": 3078781,
+      "rawResponseSha256": "3ae5c2156091e3d8f243fb18a8cadfb394434913b979fb9e17e7240fbcf2e558",
+      "representativePoint": {
+        "lat": -37.67568745874589,
+        "lon": -73.38949075907585
+      }
+    },
+    {
+      "comunaId": "CHL.6.1.7_1",
+      "noonInputDays": 3164,
+      "rawResponseBytes": 3080932,
+      "rawResponseSha256": "44ae65f28e0771630e852fd63610fca61e67a9b3b2c5055c274e71a22563d156",
+      "representativePoint": {
+        "lat": -38.33380377358492,
+        "lon": -73.39692877358488
+      }
+    },
+    {
+      "comunaId": "CHL.6.2.10_1",
+      "noonInputDays": 3164,
+      "rawResponseBytes": 3030421,
+      "rawResponseSha256": "3475dad9179e9cd35111603bd0c792a2ded710f8b8077b91e17a2538504b06d9",
+      "representativePoint": {
+        "lat": -37.46618788927337,
+        "lon": -71.85008096885811
+      }
+    },
+    {
+      "comunaId": "CHL.6.2.11_1",
+      "noonInputDays": 3164,
+      "rawResponseBytes": 3056777,
+      "rawResponseSha256": "134b67c7ce8a523f9bd16046c01bdab517898c8f7c923dd5903e2217d7767108",
+      "representativePoint": {
+        "lat": -37.19955633802818,
+        "lon": -72.73732676056336
+      }
+    },
+    {
+      "comunaId": "CHL.6.2.12_1",
+      "noonInputDays": 3164,
+      "rawResponseBytes": 3018556,
+      "rawResponseSha256": "8eb2bccad0293e75bfd429eb50121c2aaada6699f8814e2433806d671d193bf9",
+      "representativePoint": {
+        "lat": -37.60143285198556,
+        "lon": -71.71326787003608
+      }
+    },
+    {
+      "comunaId": "CHL.6.2.13_1",
+      "noonInputDays": 3164,
+      "rawResponseBytes": 3021516,
+      "rawResponseSha256": "a91b47c4bf9833b080b18f1fc857bbbf5078ba4ed044ec5db13c1c80138ef75f",
+      "representativePoint": {
+        "lat": -37.212907657657645,
+        "lon": -71.75322387387388
+      }
+    },
+    {
+      "comunaId": "CHL.6.2.14_1",
+      "noonInputDays": 3164,
+      "rawResponseBytes": 3058841,
+      "rawResponseSha256": "8745283d346cea3b058a5ff22c8b5407eaca9293ec2d0e9ad4919af53c9737a5",
+      "representativePoint": {
+        "lat": -37.093028925619834,
+        "lon": -72.63349049586778
+      }
+    },
+    {
+      "comunaId": "CHL.6.2.1_1",
+      "noonInputDays": 3164,
+      "rawResponseBytes": 3024787,
+      "rawResponseSha256": "23509a167636fb3a8a64bc02497ce2997d3bd4034d1fe8ed88b6ab5476ccce9c",
+      "representativePoint": {
+        "lat": -37.87271033333333,
+        "lon": -71.33237466666671
+      }
+    },
+    {
+      "comunaId": "CHL.6.2.2_1",
+      "noonInputDays": 3164,
+      "rawResponseBytes": 3016905,
+      "rawResponseSha256": "1c0481ad84069c94be8a04e5d74b9cc78c8b76648d7f7a07da6cfadc3ebd1693",
+      "representativePoint": {
+        "lat": -37.30825301507538,
+        "lon": -71.4235761306533
+      }
+    },
+    {
+      "comunaId": "CHL.6.2.3_1",
+      "noonInputDays": 3164,
+      "rawResponseBytes": 3066330,
+      "rawResponseSha256": "9d2881a3c0021d14fa1e784bac361593fb8303caca3e7cd7b0ac9dba309136b0",
+      "representativePoint": {
+        "lat": -37.063866257668714,
+        "lon": -72.4056018404908
+      }
+    },
+    {
+      "comunaId": "CHL.6.2.4_1",
+      "noonInputDays": 3164,
+      "rawResponseBytes": 3063126,
+      "rawResponseSha256": "496b5f7bd19fbeaf2001b4c4ad9c6e4c9dc2e0973c51cc2c5c06a20535073dc0",
+      "representativePoint": {
+        "lat": -37.32430289855072,
+        "lon": -72.57678260869567
+      }
+    },
+    {
+      "comunaId": "CHL.6.2.5_1",
+      "noonInputDays": 3164,
+      "rawResponseBytes": 3061972,
+      "rawResponseSha256": "29a284c7f535e0a049378ac769ce0fbd8c1d0185dbf5c6fadf70b8a6420f0bf2",
+      "representativePoint": {
+        "lat": -37.427850787401574,
+        "lon": -72.32638543307091
+      }
+    },
+    {
+      "comunaId": "CHL.6.2.6_1",
+      "noonInputDays": 3164,
+      "rawResponseBytes": 3048208,
+      "rawResponseSha256": "7870d00d8669879b33da33f4d6f1a667d92f47277b379a4eaef0d4d0d099248c",
+      "representativePoint": {
+        "lat": -37.87439139534884,
+        "lon": -72.04782627906975
+      }
+    },
+    {
+      "comunaId": "CHL.6.2.7_1",
+      "noonInputDays": 3164,
+      "rawResponseBytes": 3058299,
+      "rawResponseSha256": "331ade1b53a4d19d69830f4ef6d9bba0c7c152571062321fef6e0c5b5dfcf7b9",
+      "representativePoint": {
+        "lat": -37.488676369863015,
+        "lon": -72.84868356164382
+      }
+    },
+    {
+      "comunaId": "CHL.6.2.8_1",
+      "noonInputDays": 3164,
+      "rawResponseBytes": 3064720,
+      "rawResponseSha256": "95bd21f114b84e91628e81a42fcc7e16b47d33f8164e83825066606c47853aaa",
+      "representativePoint": {
+        "lat": -37.60898761904763,
+        "lon": -72.57258476190475
+      }
+    },
+    {
+      "comunaId": "CHL.6.2.9_1",
+      "noonInputDays": 3164,
+      "rawResponseBytes": 3023148,
+      "rawResponseSha256": "059a396e64355f546fda6ea46ba4d9670e650a9eebc87da6c5cb5621ea04715f",
+      "representativePoint": {
+        "lat": -37.934552000000004,
+        "lon": -71.70896
+      }
+    },
+    {
+      "comunaId": "CHL.6.3.10_1",
+      "noonInputDays": 3164,
+      "rawResponseBytes": 3037939,
+      "rawResponseSha256": "a059d7e9515fd9b1f4d9092e5ba2e6769716ba77224006c7c5ba6eb28e531ad5",
+      "representativePoint": {
+        "lat": -37.30351324786325,
+        "lon": -72.96600384615382
+      }
+    },
+    {
+      "comunaId": "CHL.6.3.11_1",
+      "noonInputDays": 3164,
+      "rawResponseBytes": 3062748,
+      "rawResponseSha256": "5ad472da5b1d078fde5d9fbeb86ff6a5c6cf006f7ee417f029973af0846c775c",
+      "representativePoint": {
+        "lat": -36.69666764705883,
+        "lon": -73.11585367647055
+      }
+    },
+    {
+      "comunaId": "CHL.6.3.12_1",
+      "noonInputDays": 3164,
+      "rawResponseBytes": 3050115,
+      "rawResponseSha256": "0e8126c16048773197bd578d77a0ebdae6dd2b66275480de19f70839ab0cc230",
+      "representativePoint": {
+        "lat": -36.59362746781116,
+        "lon": -72.88745836909871
+      }
+    },
+    {
+      "comunaId": "CHL.6.3.1_1",
+      "noonInputDays": 3164,
+      "rawResponseBytes": 3044955,
+      "rawResponseSha256": "6850ec838d08d9d22013f92fe99f3e588df7b6073f67b048f5faf3495b4307df",
+      "representativePoint": {
+        "lat": -36.90492916666665,
+        "lon": -72.98875416666668
+      }
+    },
+    {
+      "comunaId": "CHL.6.3.2_1",
+      "noonInputDays": 3164,
+      "rawResponseBytes": 3056189,
+      "rawResponseSha256": "3186a873fc68c7ae58739020adebb46e596f7e65d079d85ef629078b88925d9d",
+      "representativePoint": {
+        "lat": -36.85388396226415,
+        "lon": -72.94456603773584
+      }
+    },
+    {
+      "comunaId": "CHL.6.3.3_1",
+      "noonInputDays": 3164,
+      "rawResponseBytes": 3048826,
+      "rawResponseSha256": "0908b764590a9449b466faf833ff58e5c0fa2a8eed79765e8237525aeed8b1c6",
+      "representativePoint": {
+        "lat": -37.017720833333335,
+        "lon": -73.07820312499997
+      }
+    },
+    {
+      "comunaId": "CHL.6.3.4_1",
+      "noonInputDays": 3164,
+      "rawResponseBytes": 3057111,
+      "rawResponseSha256": "a5abeca64ce31a3906fdfa999cee20824b2153cb58b4f237ef0e5e24741d36bb",
+      "representativePoint": {
+        "lat": -36.81936464646465,
+        "lon": -72.71056414141412
+      }
+    },
+    {
+      "comunaId": "CHL.6.3.5_1",
+      "noonInputDays": 3164,
+      "rawResponseBytes": 3065314,
+      "rawResponseSha256": "a1a076ddd342299bb86c1ebcce171c0e770d4c78605cb320fc97b9bca09bdfdf",
+      "representativePoint": {
+        "lat": -36.78032236842105,
+        "lon": -73.18231973684212
+      }
+    },
+    {
+      "comunaId": "CHL.6.3.6_1",
+      "noonInputDays": 3164,
+      "rawResponseBytes": 3057018,
+      "rawResponseSha256": "fe14e8589ba63e8d23bb470461ee98baf4a599b1c1f1481fc3a74ffa62aecf7a",
+      "representativePoint": {
+        "lat": -37.01718606965175,
+        "lon": -72.85344527363185
+      }
+    },
+    {
+      "comunaId": "CHL.6.3.7_1",
+      "noonInputDays": 3164,
+      "rawResponseBytes": 3046106,
+      "rawResponseSha256": "f89c8d6d08a9257f501e34f067eaee643d5d9b48de7da5bceeaa6d47c68eb958",
+      "representativePoint": {
+        "lat": -37.11799266055046,
+        "lon": -73.11752752293579
+      }
+    },
+    {
+      "comunaId": "CHL.6.3.8_1",
+      "noonInputDays": 3164,
+      "rawResponseBytes": 3051901,
+      "rawResponseSha256": "e886a98c914dc7562c52b29508da30fc679612a98f3164ae265c89976ddb8376",
+      "representativePoint": {
+        "lat": -36.74116796116504,
+        "lon": -72.93932621359222
+      }
+    },
+    {
+      "comunaId": "CHL.6.3.9_1",
+      "noonInputDays": 3164,
+      "rawResponseBytes": 3048539,
+      "rawResponseSha256": "aed2f185c285f14e8d2efe92733057a262683c18f462e38f5281591e08a04564",
+      "representativePoint": {
+        "lat": -36.90046111111112,
+        "lon": -73.09470555555555
+      }
+    }
+  ],
+  "hourlyVariables": [
+    "temperature_2m",
+    "relative_humidity_2m",
+    "wind_speed_10m",
+    "precipitation"
+  ],
+  "model": "era5",
+  "note": "The download ends on 2025-04-30 so the pre-registered Nov 1-Apr 30 sensitivity window (PREREGISTRATION.md Section 6) is fully covered by real data. The pre-registration fixes no download range, so this is a data-collection parameter, not a deviation.",
+  "preregistration": {
+    "commit": "337c68f062b4c8a08dfe20d5a723a10a82e17930",
+    "sha256": "541b92660db09d53d3f82217a6b23f4981ccdfb0b168903cd4df4a37cc2a4b4b"
+  },
+  "rawFetchRange": {
+    "endDate": "2025-04-30",
+    "note": "starts 1 day before requestedRange.startDate so Sep 1's 24h noon-rain window (13:00 D-1 .. 12:00 D) has D-1 data",
+    "startDate": "2016-08-31"
+  },
+  "representativePointMethod": "One point per comuna, read from the repo's comunas-*.geojson. The largest polygon part's vertex-average is used if it tests inside the polygon (ray-casting, holes excluded); otherwise a 101x101 grid search over that part's bounding box finds the inside point closest to the vertex-average. See study.era5.representative_point.",
+  "requestedRange": {
+    "endDate": "2025-04-30",
+    "startDate": "2016-09-01"
+  },
+  "retrievalDate": "2026-10-02T13:13:40Z",
+  "source": "Open-Meteo Archive API (ERA5 reanalysis)",
+  "timezone": "America/Santiago",
+  "url": "https://archive-api.open-meteo.com/v1/archive"
+}
