@@ -96,6 +96,18 @@ export async function fetchMapbiomasLayer(indicator, { regionId, year, publicMod
   return normalizeLayerPayload(response.data, regionId).layers[indicator] ?? null;
 }
 
+// Per-comuna MapBiomas detail for the comuna panel. Always the tokenless public
+// client (anonymous-readable route). A missing year lets the backend pick its
+// default. Rejects with an ApiError carrying `status` (e.g. 404 unknown comuna).
+export async function fetchComunaMapbiomas(comunaId, { year, signal } = {}) {
+  const params = year === undefined || year === null ? {} : { year };
+  const response = await publicAxiosClient.get(
+    `/api/territory/public/mapbiomas/${encodeURIComponent(comunaId)}`,
+    { params, signal }
+  );
+  return extractResponseData(response.data);
+}
+
 export async function fetchTerritoryBounds(regionId, fallback) {
   const response = await axiosClient.get(TERRITORY_ENDPOINTS.bounds, {
     params: { regionId }

@@ -34,7 +34,8 @@ export const LandcoverChoropleth = memo(function LandcoverChoropleth({
   layer,
   loading,
   interactive = true,
-  emphasizeOutline = false
+  emphasizeOutline = false,
+  onComunaClick
 }) {
   const layerRef = useRef(layer);
   layerRef.current = layer;
@@ -77,6 +78,8 @@ export const LandcoverChoropleth = memo(function LandcoverChoropleth({
             tooltipElement(landcoverTooltipLines({ nombre, year: current.year, entry: current.values?.[comunaId] }))
           );
         });
+        // Owning hover also owns click: opens the same comuna panel as RISK_SCORE.
+        layerGeo.on('click', () => onComunaClick?.(comunaId, nombre));
       }}
     />
   );

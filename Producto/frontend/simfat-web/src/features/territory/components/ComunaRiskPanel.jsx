@@ -5,6 +5,7 @@ import { fetchComunaHistory, fetchComunalRiskScores, syncComunaCopernicus } from
 import { ALERT_LEVEL_CONFIG } from '../constants/colorScales';
 import { generateComunalReport } from '../utils/reportPrint';
 import { REGIONES } from '../../../data/territorioChile';
+import { panelMode } from '../utils/comunaMapbiomas';
 
 
 const COMPONENT_META = {
@@ -192,7 +193,7 @@ function IndexInfo({ info, label }) {
 const COPERNICUS_POLL_INTERVAL_S = 5;
 const COPERNICUS_POLL_TIMEOUT_S = 150;
 
-export default function ComunaRiskPanel({ comunaId, score, regionId, onClose, canSync, onSync, onScoreUpdated, readOnly = false }) {
+export default function ComunaRiskPanel({ comunaId, comunaName = null, score, regionId, onClose, canSync, onSync, onScoreUpdated, readOnly = false, extraSections = null, openedFrom = 'risk' }) {
   const [syncState, setSyncState] = useState({ phase: 'idle', elapsed: 0, error: null, result: null });
 
   useEffect(() => {
@@ -232,7 +233,26 @@ export default function ComunaRiskPanel({ comunaId, score, regionId, onClose, ca
     return () => window.clearInterval(interval);
   }, [syncState.phase, comunaId, regionId, onScoreUpdated]);
 
-  if (!comunaId || !score) return null;
+  const viewMode = panelMode({ comunaId, score });
+  if (viewMode === 'none') return null;
+
+  if (viewMode === 'mapbiomas-only') {
+    // No risk score for this comuna: keep the header and the extra sections so the
+    // sidebar is never empty (e.g. opened from a MapBiomas layer).
+    return (
+      <aside className="comuna-risk-panel">
+        <div className="panel-header">
+          <div>
+            <h4 className="panel-nombre">{comunaName || comunaId}</h4>
+          </div>
+          <button type="button" className="panel-close" onClick={onClose} aria-label="Cerrar">×</button>
+        </div>
+        <p className="panel-chart-empty">Sin puntaje de riesgo para esta comuna.</p>
+        {extraSections}
+      </aside>
+    );
+  }
+  const mapbiomasFirst = openedFrom === 'mapbiomas';
 
   const displayScore = syncState.result || score;
   const level = ALERT_LEVEL_CONFIG[displayScore.alertLevel] || ALERT_LEVEL_CONFIG.NORMAL;
@@ -291,6 +311,8 @@ export default function ComunaRiskPanel({ comunaId, score, regionId, onClose, ca
         </div>
       </div>
 
+      {mapbiomasFirst && extraSections}
+
       <section className="panel-section">
         <h5 className="panel-section-title">Componentes WLC</h5>
         <div className="panel-components">
@@ -331,6 +353,8 @@ export default function ComunaRiskPanel({ comunaId, score, regionId, onClose, ca
           ✦ ENHANCED
         </p>
       </section>
+
+      {!mapbiomasFirst && extraSections}
 
       <div className="panel-footer">
         {computedAt && <span className="panel-meta">Actualizado {computedAt}</span>}
