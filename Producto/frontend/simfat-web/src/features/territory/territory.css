@@ -54,8 +54,8 @@
 
 .territory-layer-toggles {
   display: grid;
-  grid-template-columns: repeat(10, minmax(72px, 1fr));
-  align-items: center;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  align-items: stretch;
   gap: 6px;
   min-width: 0;
 }
@@ -130,10 +130,10 @@
 }
 
 .territory-toggle span {
-  overflow: hidden;
+  min-width: 0;
+  line-height: 1.15;
   text-align: center;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 
 .territory-controls > label {
@@ -553,6 +553,13 @@
   border-radius: 4px;
   padding: 2px 6px;
   color: #cbd5e1;
+}
+
+.comuna-tooltip-burned {
+  font-size: 0.72rem;
+  color: #fcd34d;
+  border-top: 1px solid rgba(255,255,255,0.15);
+  padding-top: 4px;
 }
 
 /* ── Badge modo STANDARD/ENHANCED ── */

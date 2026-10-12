@@ -131,3 +131,39 @@ export const VEGETATION_SCALES = {
     ]
   }
 };
+
+// Fill for comunas without data (missing entry, available=false, null value).
+export const NEUTRAL_FILL = '#cbd5e1';
+
+// BURNED: annual burned fraction per comuna (0-1 in the payload, bins on percent).
+// Colours: official MapBiomas Fuego Col 1 legend (FUEGO_COL1_LEYENDA.pdf, sha256
+// a3f9ec02...), the "scar size" ramp. The Fuego legend has no ramp for an annual
+// burned fraction, so this official ramp from the same family is reused here.
+// Bins are fixed (identical for every year) so maps of different years compare
+// directly. `max` is an exclusive upper bound on the fraction; the last is Infinity.
+// An observed 0 gets its own very light class, distinct from NEUTRAL_FILL (no data).
+export const BURNED_SCALE = {
+  label: 'Área quemada',
+  zero: { color: '#f1f5f9', label: 'Sin área quemada' },
+  bins: [
+    { max: 0.005, color: '#D0AE35', label: '< 0,5 %' },
+    { max: 0.02, color: '#C68E2F', label: '0,5–2 %' },
+    { max: 0.05, color: '#B96D2B', label: '2–5 %' },
+    { max: 0.2, color: '#AC4B28', label: '5–20 %' },
+    { max: Infinity, color: '#72251D', label: '> 20 %' }
+  ]
+};
+
+// entry: { available, burnedFraction, burnedHa } from the BURNED value map.
+// A negative or non-finite fraction is invalid data: treated as no data, never zero.
+export function burnedColorFor(entry) {
+  const fraction = entry?.burnedFraction;
+  if (entry?.available !== true || typeof fraction !== 'number' || !Number.isFinite(fraction) || fraction < 0) {
+    return NEUTRAL_FILL;
+  }
+  if (fraction <= 0) {
+    return BURNED_SCALE.zero.color;
+  }
+  const bin = BURNED_SCALE.bins.find((candidate) => fraction < candidate.max);
+  return bin.color;
+}

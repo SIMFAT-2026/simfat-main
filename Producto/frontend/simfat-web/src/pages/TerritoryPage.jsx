@@ -10,7 +10,8 @@ const DashboardPage = lazy(() => import('./DashboardPage'));
 const FOCUS_MAP = {
   alerts: ['ALERTS', 'REPORTS'],
   vegetation: ['NDVI', 'NDMI'],
-  loss: ['ALERTS']
+  loss: ['ALERTS'],
+  burned: ['BURNED']
 };
 
 // Waits for the session bootstrap before mounting the content, so the data mode
@@ -56,6 +57,7 @@ function TerritoryContent({ isAuthenticated }) {
           refreshing={territory.refreshing}
           error={territory.selectedRegionError}
           onRetry={territory.reloadSelectedRegion}
+          mapbiomasLayers={territory.mapbiomasLayers}
           // Anonymous mode still calls the risk-score and comuna history endpoints;
           // they must stay in the backend PublicEndpointPaths allowlist.
           readOnly={!isAuthenticated}

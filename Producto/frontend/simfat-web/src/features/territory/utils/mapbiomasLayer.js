@@ -8,21 +8,32 @@ const PERCENT_FORMAT = new Intl.NumberFormat('es-CL', {
   maximumFractionDigits: 2
 });
 
+const HECTARES_FORMAT = new Intl.NumberFormat('es-CL', { maximumFractionDigits: 1 });
+
 function isNumber(value) {
   return typeof value === 'number' && Number.isFinite(value);
 }
 
+// A burned fraction is valid only when finite and non-negative; anything else
+// is invalid data and must read as "no data", never as zero.
+function isValidFraction(value) {
+  return isNumber(value) && value >= 0;
+}
+
 // BURNED values are 0-1 fractions (unit "fraction"): 0.0247 -> "2,47 %".
+// The percent is TRUNCATED (not rounded) to 2 decimals so the displayed value
+// can never cross a legend bin edge (0.00499 shows "0,49 %", not "0,50 %").
 export function formatFractionAsPercent(fraction) {
   if (!isNumber(fraction)) {
     return NO_DATA_LABEL;
   }
-  const percent = fraction * 100;
+  // Hundredths of a percent; the epsilon absorbs binary float error (0.29 * 10000).
+  const hundredths = Math.floor(fraction * 10000 + 1e-6);
   // A real, non-zero burned share must never read as an exact zero.
-  if (percent > 0 && percent < 0.005) {
+  if (fraction > 0 && hundredths < 1) {
     return '< 0,01 %';
   }
-  return `${PERCENT_FORMAT.format(percent)} %`;
+  return `${PERCENT_FORMAT.format(hundredths / 100)} %`;
 }
 
 // Counts behind the Q29 legend note: comunas with burned area, comunas with an
@@ -32,7 +43,7 @@ export function burnedSummary(layer) {
   const summary = { burned: 0, zero: 0, unavailable: 0, total: entries.length };
 
   entries.forEach((entry) => {
-    if (!entry || entry.available !== true || !isNumber(entry.burnedFraction)) {
+    if (!entry || entry.available !== true || !isValidFraction(entry.burnedFraction)) {
       summary.unavailable += 1;
     } else if (entry.burnedFraction > 0) {
       summary.burned += 1;
@@ -42,6 +53,54 @@ export function burnedSummary(layer) {
   });
 
   return summary;
+}
+
+// Q29 legend note, derived from the payload (never tied to a specific year).
+// The selector sentence is only shown once the year control exists.
+export function burnedLegendNote(layer, { hasYearControl = false } = {}) {
+  if (!layer || !isNumber(layer.year)) {
+    return '';
+  }
+  const { burned, unavailable, total } = burnedSummary(layer);
+  const noun = total === 1 ? 'comuna' : 'comunas';
+  let note = `Año ${layer.year} · ${burned} de ${total} ${noun} con área quemada registrada`;
+  if (unavailable > 0) {
+    note += ` (${unavailable} sin datos)`;
+  }
+  note += '.';
+  if (hasYearControl) {
+    note += ' Usa el selector para explorar otros años.';
+  }
+  return note;
+}
+
+// The burned-area sentence for one comuna, without the comuna name. Shared by
+// the BURNED tooltip and the line appended to the risk tooltip.
+export function burnedLineFor(entry, year) {
+  const fraction = entry?.burnedFraction;
+  if (entry?.available !== true || !isValidFraction(fraction)) {
+    return 'Sin datos de Fuego';
+  }
+  if (fraction <= 0) {
+    return `Sin área quemada en ${year}`;
+  }
+  let text = `Área quemada ${year}: ${formatFractionAsPercent(fraction)}`;
+  if (isNumber(entry.burnedHa)) {
+    text += ` · ${HECTARES_FORMAT.format(entry.burnedHa)} ha`;
+  }
+  return text;
+}
+
+// Tooltip text for one comuna of the BURNED choropleth.
+export function burnedTooltipText({ nombre, year, entry }) {
+  return `${nombre}: ${burnedLineFor(entry, year)}`;
+}
+
+// Toggle label: keeps the year visible once a layer is loaded, since the legend
+// is replaced by the comuna panel when a comuna is selected.
+export function burnedToggleLabel(layer) {
+  const base = 'Área quemada (MapBiomas)';
+  return layer && isNumber(layer.year) ? `${base} · ${layer.year}` : base;
 }
 
 // year is part of the key so data for one year can never be served as another;

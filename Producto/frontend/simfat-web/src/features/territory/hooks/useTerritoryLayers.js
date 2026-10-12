@@ -8,6 +8,7 @@ import {
   fetchPublicTerritoryBounds,
   fetchPublicTerritoryLayers
 } from '../services/territoryApiService';
+import { useMapbiomasLayer } from './useMapbiomasLayer';
 import {
   CRITICAL_INDICATORS,
   DEFAULT_INDICATORS,
@@ -437,6 +438,22 @@ export function useTerritoryLayers(options = {}) {
     });
   }, []);
 
+  // MapBiomas layers load on demand (only while visible), outside the bulk load.
+  const burned = useMapbiomasLayer('BURNED', {
+    visible: visibleIndicators.includes('BURNED'),
+    regionId: selectedRegionId,
+    publicMode
+  });
+  const { setYear: setBurnedYear } = burned;
+
+  // Entry point for the year control (S3-3); no UI uses it yet.
+  const setMapbiomasYear = useCallback(
+    (indicator, year) => {
+      if (indicator === 'BURNED') setBurnedYear(year);
+    },
+    [setBurnedYear]
+  );
+
   const reloadSelectedRegion = useCallback(async () => {
     await loadRegion(selectedRegionId, true);
   }, [loadRegion, selectedRegionId]);
@@ -456,6 +473,8 @@ export function useTerritoryLayers(options = {}) {
       loading: loadingRegions.has(selectedRegionId) && !selectedRegionData,
       refreshing: loadingRegions.has(selectedRegionId) && Boolean(selectedRegionData),
       reloadSelectedRegion,
+      mapbiomasLayers: { BURNED: burned },
+      setMapbiomasYear,
       cacheTtlMs: CACHE_TTL_MS
     }),
     [
@@ -465,7 +484,9 @@ export function useTerritoryLayers(options = {}) {
       visibleIndicators,
       toggleIndicator,
       loadingRegions,
-      reloadSelectedRegion
+      reloadSelectedRegion,
+      burned,
+      setMapbiomasYear
     ]
   );
 }
