@@ -211,3 +211,75 @@ def test_write_manifest_upserts_by_dataset_and_keeps_other_datasets(tmp_path):
     assert set(by_dataset) == {"a", "b"}
     assert by_dataset["a"] == entry_a2  # replaced, not duplicated
     assert by_dataset["b"] == entry_b
+
+
+# --- S1b5 jd-fix CRITICAL-1: write_manifest_batch guard ---------------------
+#
+# The original S1b5 run downloaded 13 distinct annual_burned_v1 rasters (one
+# per year 2013-2025) but wrote every one of them under the SAME dataset key
+# (``mapbiomas_fire_chile_col1_annual_burned_v1``). ``write_manifest`` upserts
+# by dataset key, so each call silently discarded the previous year's
+# provenance -- only 2025 survived in data/manifest.json. write_manifest_batch
+# is the guard: it validates a whole batch up front and hard-aborts if any
+# two entries in the SAME call share a dataset key but point at different
+# files, instead of silently keeping only the last one.
+
+
+def test_write_manifest_batch_writes_all_entries_when_keys_are_unique(tmp_path):
+    """Two distinct annual years, each with its own year-suffixed dataset
+    key, must both survive -- the exact case the original bug lost."""
+    manifest_path = tmp_path / "manifest.json"
+    entry_2013 = {
+        "dataset": "mapbiomas_fire_chile_col1_annual_burned_v1_2013",
+        "url": "u2013",
+        "fileName": "mapbiomas_fire_chile_col1_annual_burned_2013.tif",
+        "sha256": "h2013",
+        "bytes": 1,
+        "downloadedAt": "t2013",
+    }
+    entry_2014 = {
+        "dataset": "mapbiomas_fire_chile_col1_annual_burned_v1_2014",
+        "url": "u2014",
+        "fileName": "mapbiomas_fire_chile_col1_annual_burned_2014.tif",
+        "sha256": "h2014",
+        "bytes": 2,
+        "downloadedAt": "t2014",
+    }
+
+    entries = download.write_manifest_batch(manifest_path, [entry_2013, entry_2014])
+
+    by_dataset = {e["dataset"]: e for e in entries}
+    assert set(by_dataset) == {
+        "mapbiomas_fire_chile_col1_annual_burned_v1_2013",
+        "mapbiomas_fire_chile_col1_annual_burned_v1_2014",
+    }
+    on_disk = json.loads(manifest_path.read_text(encoding="utf-8"))
+    assert len(on_disk) == 2
+
+
+def test_write_manifest_batch_raises_when_same_dataset_key_used_for_two_different_files(tmp_path):
+    """Reproduces the exact S1b5 bug: two different files pushed under one
+    shared dataset key in the same batch must hard-abort, never silently
+    keep only the last one."""
+    manifest_path = tmp_path / "manifest.json"
+    entry_2013 = {
+        "dataset": "mapbiomas_fire_chile_col1_annual_burned_v1",
+        "url": "u2013",
+        "fileName": "mapbiomas_fire_chile_col1_annual_burned_2013.tif",
+        "sha256": "h2013",
+        "bytes": 1,
+        "downloadedAt": "t2013",
+    }
+    entry_2014 = {
+        "dataset": "mapbiomas_fire_chile_col1_annual_burned_v1",
+        "url": "u2014",
+        "fileName": "mapbiomas_fire_chile_col1_annual_burned_2014.tif",
+        "sha256": "h2014",
+        "bytes": 2,
+        "downloadedAt": "t2014",
+    }
+
+    with pytest.raises(ValueError, match="annual_burned_v1"):
+        download.write_manifest_batch(manifest_path, [entry_2013, entry_2014])
+
+    assert not manifest_path.exists()  # hard-abort BEFORE writing anything

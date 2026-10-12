@@ -300,4 +300,29 @@ class MapbiomasSeedLoaderMappingTest {
         // referenced by the seed is missing from comuna_info) -- also not a healthy "ok".
         assertThat(MapbiomasSeedLoader.computeStatus(0, 86, 0)).isEqualTo("empty_result");
     }
+
+    @Test
+    void mapRawRecord_s1b5FullHistoryRecord_mapsCumulativeBurnedFractionAndLogVariant() throws Exception {
+        // S1b5: the full 2013-2025 seed line adds "fire.burnedFraction" (the pixel-level
+        // UNION over 2013-2025, cross-checked against MapBiomas' own accumulated_burned_v1)
+        // and "fire.burnedFractionLog" (the log1p+p95-clip variant, design D1/D3) alongside
+        // the existing per-year burnedHaByYear/burnedFractionByYear.
+        String raw = "{\"comunaId\":\"CHL.6.3.4_1\",\"landCover\":null,\"fire\":{\"available\":true,"
+            + "\"coverageFraction\":1.0,\"burnedHaByYear\":{\"2013\":0.0,\"2017\":100.0},"
+            + "\"burnedFractionByYear\":{\"2013\":0.0,\"2017\":0.476},"
+            + "\"burnedFraction\":0.586068422288197,\"burnedFractionLog\":1.0,"
+            + "\"frequencyMean\":0.5,\"frequencyMax\":3,\"yearLastFire\":2023,\"yearsSinceLastFire\":2,"
+            + "\"burnedFractionPct\":1.0,\"reason\":null},"
+            + "\"provenance\":{\"sources\":[],\"scope\":\"S1b5 full-history run\",\"downloadDate\":\"2026-09-30\"},"
+            + "\"computedAt\":\"2026-09-30T18:17:35.689908+00:00\",\"partial\":false}";
+        JsonNode node = objectMapper.readTree(raw);
+        ComunaInfo info = comunaInfo("CHL.6.3.4_1", "Florida", "biobio");
+
+        ComunaMapbiomasStats result =
+            MapbiomasSeedLoader.mapRawRecord(node, info, "lulc-col2+fuego-col1@2013-2025", objectMapper);
+
+        assertThat(result.getFire().getBurnedFraction()).isEqualTo(0.586068422288197);
+        assertThat(result.getFire().getBurnedFractionLog()).isEqualTo(1.0);
+        assertThat(result.isPartial()).isFalse();
+    }
 }

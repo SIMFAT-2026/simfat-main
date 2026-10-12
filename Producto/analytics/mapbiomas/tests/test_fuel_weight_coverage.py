@@ -24,7 +24,7 @@ _REPO_ROOT = Path(__file__).resolve().parents[4]
 _SEED_PATH = (
     _REPO_ROOT
     / "Producto/analytics/mapbiomas/data"
-    / "comuna-mapbiomas-stats.lulc-col2+fuego-col1-2017-partial.jsonl"
+    / "comuna-mapbiomas-stats.lulc-col2+fuego-col1-2013-2025.jsonl"
 )
 # fuel-weights-v1.json is the ONE source of truth (design D3) the Java service reads;
 # referenced here by relative path, same pattern S2c's Python port is designed to use.

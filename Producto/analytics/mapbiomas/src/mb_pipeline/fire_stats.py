@@ -4,6 +4,17 @@ Every function here takes ``zonal.ZonalResult`` (or plain dicts derived from
 one) and returns plain dicts -- no raster I/O, no filesystem access -- so the
 aggregation rules are unit-testable without a single GeoTIFF.
 
+LEAKAGE WARNING FOR THE VALIDATION STUDY (design D7): the seed-level fire
+aggregates -- ``burnedFraction`` (the 2013-2025 union), ``burnedFractionPct``,
+``burnedFractionLog``, ``frequencyMean``/``frequencyMax``, ``yearLastFire`` and
+``yearsSinceLastFire`` -- are computed ONCE over the full 2013-2025 window,
+anchored at as-of year 2025. Production scoring may use them (D7 allows the
+full history), but the pre-registered backtest MUST NOT reuse them: for each
+test season s it must recompute them from ``burnedHaByYear`` /
+``burnedFractionByYear`` restricted to years <= s-2. ``yearLastFire`` is the
+pixel-level max of ``year_last_fire_v1`` inside the comuna, reconciled
+(``max``) with the latest year that has annual burned area.
+
 Denominator rule (MCS-6b, AMENDED after real-data evidence): the Fuego
 rasters carry no nodata sentinel, so a pixel value of 0 in
 ``annual_burned_v1`` is real data ("not burned"), not "unmapped" -- burned
@@ -169,6 +180,84 @@ def select_burned_fraction_for_pct(fire: Mapping) -> float | None:
     return None
 
 
+def union_burned_fraction(union: ZonalResult) -> dict:
+    """Cumulative (2013-2025) burned hectares/fraction from a pixel-level
+    UNION zonal result (``zonal.union_zonal_stats`` across every annual
+    raster), S1b5. Mirrors ``annual_burned_fraction``'s shape exactly --
+    same keys, same "raster's own total area is the denominator" rule
+    (module docstring) -- so a caller can treat either as interchangeable
+    per-year-or-cumulative input to ``build_fire_section``.
+    """
+    total_ha = union.area_ha
+    burned_ha = union.value_area_ha.get(BURNED_VALUE, 0.0)
+    burned_fraction = burned_ha / total_ha if total_ha > 0 else 0.0
+    return {"totalHa": total_ha, "burnedHa": burned_ha, "burnedFraction": burned_fraction}
+
+
+class FireGateError(ValueError):
+    """Raised when a comuna's per-year/union burned fractions violate the
+    S1b5 hard gates (design D2/MCS-10b): every abort NAMES the comuna."""
+
+
+def validate_fire_gates(
+    per_year: Mapping[int, Mapping],
+    *,
+    union_fraction: float,
+    comuna_id: str,
+    epsilon: float = 1e-6,
+) -> None:
+    """Hard gate (design D2, MCS-10b): abort loudly, naming ``comuna_id``, if:
+
+    - any single year's ``burnedFraction`` is outside ``[0, 1]``;
+    - the UNION fraction is outside ``[0, 1]``;
+    - ``max(annual) > union`` (a pixel burned in the biggest year can never
+      be "un-unioned" away -- the union must cover at least that year); or
+    - ``union > sum(annual) + epsilon`` (the union cannot exceed the naive,
+      possibly double-counting sum of every year -- MCS-10a/b).
+
+    Years whose ``burnedFraction`` is ``None`` (e.g. below that product's own
+    coverage threshold) are skipped, never treated as 0.0 or as a violation.
+    Never renormalizes or clamps silently -- this is an ABORT, matching the
+    convention of every other ``validate_*`` gate in this pipeline
+    (``build_stats.validate_comuna_year_shares``,
+    ``validate_comuna_polygon_area_ratio``).
+    """
+    annual_fractions = [
+        stats["burnedFraction"]
+        for stats in per_year.values()
+        if stats.get("burnedFraction") is not None
+    ]
+
+    for year, stats in per_year.items():
+        fraction = stats.get("burnedFraction")
+        if fraction is None:
+            continue
+        if not (0.0 - epsilon <= fraction <= 1.0 + epsilon):
+            raise FireGateError(
+                f"comuna={comuna_id!r} year={year}: annual burnedFraction {fraction} "
+                "is outside [0, 1]"
+            )
+
+    if not (0.0 - epsilon <= union_fraction <= 1.0 + epsilon):
+        raise FireGateError(
+            f"comuna={comuna_id!r}: union burnedFraction {union_fraction} is outside [0, 1]"
+        )
+
+    if annual_fractions:
+        max_annual = max(annual_fractions)
+        sum_annual = sum(annual_fractions)
+        if union_fraction < max_annual - epsilon:
+            raise FireGateError(
+                f"comuna={comuna_id!r}: union burnedFraction {union_fraction} is less than "
+                f"the largest single-year annual fraction {max_annual} (max(annual) <= union violated)"
+            )
+        if union_fraction > sum_annual + epsilon:
+            raise FireGateError(
+                f"comuna={comuna_id!r}: union burnedFraction {union_fraction} exceeds the sum "
+                f"of every year's annual fraction {sum_annual} (union <= sum(annual) violated)"
+            )
+
+
 def year_last_fire_stats(ylf: ZonalResult, *, no_fire_value: int = NO_FIRE_VALUE) -> dict:
     """Most recent burn year present in a ``year_last_fire_v1`` window, or None."""
     burned_years = [year for year in ylf.value_pixels if year != no_fire_value]
@@ -183,6 +272,7 @@ def build_fire_section(
     year_last_fire: Mapping,
     threshold: float,
     as_of_year: int,
+    union: Mapping | None = None,
 ) -> dict:
     """Combine per-year stats into the ``fire`` section of a comuna document.
 
@@ -198,6 +288,16 @@ def build_fire_section(
     ``coverageFraction`` key, so reading it from ``per_year`` values raised a
     ``KeyError`` on every real call (CRITICAL 2 in the S1b jd-fix review; see
     ``tests/test_fire_stats.py::test_build_fire_section_composes_with_real_annual_burned_fraction_no_key_error``).
+
+    ``union`` (S1b5, design D1) is the OPTIONAL output of
+    ``union_burned_fraction`` (a real pixel-level union across every annual
+    raster, never a sum of per-year fractions): when given, its
+    ``burnedFraction`` becomes this section's cumulative ``burnedFraction``
+    field, read by ``select_burned_fraction_for_pct`` in preference to any
+    single year. ``None`` when omitted (e.g. the pre-S1b5 single-year 2017
+    caller) -- absence of a cumulative field is itself meaningful (see
+    ``select_burned_fraction_for_pct``'s single-year fallback), never a
+    silently-guessed 0.0.
     """
     if not per_year:
         return {
@@ -205,6 +305,7 @@ def build_fire_section(
             "coverageFraction": None,
             "burnedHaByYear": {},
             "burnedFractionByYear": {},
+            "burnedFraction": union["burnedFraction"] if union else None,
             "frequencyMean": frequency.get("frequencyMean"),
             "frequencyMax": frequency.get("frequencyMax"),
             "yearLastFire": year_last_fire.get("yearLastFire"),
@@ -240,6 +341,7 @@ def build_fire_section(
         "coverageFraction": coverage_fraction,
         "burnedHaByYear": burned_ha_by_year,
         "burnedFractionByYear": burned_fraction_by_year,
+        "burnedFraction": union["burnedFraction"] if union else None,
         "frequencyMean": frequency.get("frequencyMean"),
         "frequencyMax": frequency.get("frequencyMax"),
         "yearLastFire": year_last_fire_value,

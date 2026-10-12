@@ -36,9 +36,10 @@ import org.springframework.stereotype.Component;
  * {@link ComunaMapbiomasStats#buildId} so re-running (e.g. every boot) is idempotent —
  * same fetch-mutate-save idiom as {@code MonitoredComunasConfig.seedFromGeoJson}.
  *
- * <p>Honesty note: the currently shipped seed resource is fire-only (Fuego Colección 1,
- * 2017), {@code landCover=null}, {@code partial=true} — there is no merged LULC+Fuego
- * seed yet (see class javadoc on {@link ComunaMapbiomasStats}).
+ * <p>Since S1b5 the shipped seed resource merges REAL MapBiomas Chile Colección 2 land
+ * cover (1999-2024) with the FULL Fuego Colección 1 fire history (2013-2025, replacing
+ * the earlier 2017-only partial fire section) for all 86 comunas, {@code partial=false}
+ * (see class javadoc on {@link ComunaMapbiomasStats}).
  */
 @Component
 public class MapbiomasSeedLoader {
@@ -46,7 +47,7 @@ public class MapbiomasSeedLoader {
     private static final Logger LOGGER = LoggerFactory.getLogger(MapbiomasSeedLoader.class);
 
     private static final String SEED_RESOURCE_PATH =
-        "seed/mapbiomas/comuna-mapbiomas-stats.lulc-col2+fuego-col1-2017-partial.jsonl";
+        "seed/mapbiomas/comuna-mapbiomas-stats.lulc-col2+fuego-col1-2013-2025.jsonl";
 
     private final ComunaMapbiomasStatsRepository statsRepository;
     private final ComunaInfoRepository comunaInfoRepository;
@@ -55,7 +56,7 @@ public class MapbiomasSeedLoader {
     @Value("${mapbiomas.seed.enabled:true}")
     private boolean seedEnabled;
 
-    @Value("${mapbiomas.seed.data-version:lulc-col2+fuego-col1@2017-partial}")
+    @Value("${mapbiomas.seed.data-version:lulc-col2+fuego-col1@2013-2025}")
     private String dataVersion;
 
     // Test seam: lets tests point loadSeed() at a synthetic (e.g. deliberately malformed)

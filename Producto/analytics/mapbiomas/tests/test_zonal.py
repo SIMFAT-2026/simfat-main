@@ -309,3 +309,74 @@ def test_non_square_pixel_area_and_counts(make_geotiff):
     assert result.pixel_count == n_r * n_c
     expected = analytic_rect_ha(-72.0, north - n_r * dlat, -72.0 + n_c * dlon, north)
     assert result.area_ha == pytest.approx(expected, rel=1e-4)
+
+
+# --- union_zonal_stats: pixel-level OR across same-grid annual rasters (S1b5) -
+#
+# A comuna that burned in year A and again (different pixels) in year B must
+# have a UNION burned area of A_area + B_area (no overlap); a pixel that
+# burned in BOTH years must count ONCE, not twice -- this is what makes it a
+# real pixel-level union rather than sum(annual_burned_fraction(year)).
+
+
+def _grid_with_block(n, r0, r1, c0, c1, value=1):
+    grid = np.zeros((n, n), dtype="uint8")
+    grid[r0:r1, c0:c1] = value
+    return grid
+
+
+def test_union_zonal_stats_non_overlapping_burns_add_up(make_geotiff):
+    # year A: rows 0-2 burned (3x10=30 px); year B: rows 5-6 burned (2x10=20 px);
+    # disjoint -> union pixel count is the simple sum, 50.
+    year_a = make_geotiff(_grid_with_block(10, 0, 3, 0, 10), -72.0, -33.0, 0.01, 0.01, name="a.tif")
+    year_b = make_geotiff(_grid_with_block(10, 5, 7, 0, 10), -72.0, -33.0, 0.01, 0.01, name="b.tif")
+    poly = rect(-72.0, -33.10, -71.90, -33.0)
+    result = zonal.union_zonal_stats([year_a, year_b], poly)
+    assert result.pixel_count == 100
+    assert result.value_pixels == {0: 50, 1: 50}
+
+
+def test_union_zonal_stats_overlapping_burn_counts_once_not_twice(make_geotiff):
+    # both years burn the SAME 3x10 block -> union must still be 30, not 60.
+    year_a = make_geotiff(_grid_with_block(10, 0, 3, 0, 10), -72.0, -33.0, 0.01, 0.01, name="a.tif")
+    year_b = make_geotiff(_grid_with_block(10, 0, 3, 0, 10), -72.0, -33.0, 0.01, 0.01, name="b.tif")
+    poly = rect(-72.0, -33.10, -71.90, -33.0)
+    result = zonal.union_zonal_stats([year_a, year_b], poly)
+    assert result.pixel_count == 100
+    assert result.value_pixels == {0: 70, 1: 30}
+    assert sum(result.value_area_ha.values()) == pytest.approx(result.area_ha)
+
+
+def test_union_zonal_stats_single_raster_equals_its_own_zonal_stats(make_geotiff):
+    path = make_geotiff(_grid_with_block(10, 3, 7, 2, 6), -72.0, -33.0, 0.01, 0.01)
+    poly = rect(-72.0, -33.10, -71.90, -33.0)
+    single = zonal.zonal_stats(path, poly)
+    union = zonal.union_zonal_stats([path], poly)
+    assert union.pixel_count == single.pixel_count
+    assert union.value_pixels == single.value_pixels
+    assert union.area_ha == pytest.approx(single.area_ha)
+
+
+def test_union_zonal_stats_no_rasters_burned_is_all_zero(make_geotiff):
+    year_a = make_geotiff(np.zeros((10, 10), dtype="uint8"), -72.0, -33.0, 0.01, 0.01, name="a.tif")
+    year_b = make_geotiff(np.zeros((10, 10), dtype="uint8"), -72.0, -33.0, 0.01, 0.01, name="b.tif")
+    poly = rect(-72.0, -33.10, -71.90, -33.0)
+    result = zonal.union_zonal_stats([year_a, year_b], poly)
+    assert result.value_pixels.get(1, 0) == 0
+    assert result.value_area_ha.get(1, 0.0) == 0.0
+
+
+def test_union_zonal_stats_polygon_outside_every_raster_gives_empty_result(make_geotiff):
+    year_a = make_geotiff(np.ones((10, 10), dtype="uint8"), -72.0, -33.0, 0.01, 0.01, name="a.tif")
+    result = zonal.union_zonal_stats([year_a], rect(10.0, 10.0, 10.1, 10.1))
+    assert result.pixel_count == 0
+    assert result.value_pixels == {}
+
+
+def test_union_zonal_stats_rejects_mismatched_grids(make_geotiff, tmp_path):
+    year_a = make_geotiff(np.ones((10, 10), dtype="uint8"), -72.0, -33.0, 0.01, 0.01, name="a.tif")
+    # different pixel size -> different transform -> must not silently OR misaligned grids.
+    year_b = make_geotiff(np.ones((10, 10), dtype="uint8"), -72.0, -33.0, 0.02, 0.02, name="b.tif")
+    poly = rect(-72.0, -33.10, -71.90, -33.0)
+    with pytest.raises(ValueError, match="grid"):
+        zonal.union_zonal_stats([year_a, year_b], poly)

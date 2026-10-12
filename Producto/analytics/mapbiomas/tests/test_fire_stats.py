@@ -331,6 +331,42 @@ def test_build_fire_section_below_threshold_is_unavailable_but_keeps_real_number
     assert "below threshold" in section["reason"]
 
 
+def test_build_fire_section_exposes_the_union_cumulative_fraction():
+    # S1b5: build_fire_section accepts an optional `union` dict (from
+    # fire_stats.union_burned_fraction) and surfaces it as the cumulative
+    # `burnedFraction` field, distinct from the per-year `burnedFractionByYear`.
+    per_year = {
+        2015: {"mappedHa": 99.0, "burnedHa": 10.0, "burnedFraction": 10 / 99},
+        2016: {"mappedHa": 99.0, "burnedHa": 5.0, "burnedFraction": 5 / 99},
+    }
+    section = fire_stats.build_fire_section(
+        per_year,
+        coverage_fraction=0.99,
+        frequency={"frequencyMean": 0.5, "frequencyMax": 2},
+        year_last_fire={"yearLastFire": 2016},
+        threshold=0.95,
+        as_of_year=2016,
+        union={"totalHa": 99.0, "burnedHa": 14.0, "burnedFraction": 14 / 99},
+    )
+    assert section["burnedFraction"] == pytest.approx(14 / 99)
+
+
+def test_build_fire_section_union_is_none_when_not_provided():
+    # backward compatibility: callers that don't pass `union` (e.g. the
+    # pre-S1b5 single-year 2017 script) still get a valid document, just
+    # without a cumulative field.
+    per_year = {2017: {"mappedHa": 97.0, "burnedHa": 20.0, "burnedFraction": 20 / 97}}
+    section = fire_stats.build_fire_section(
+        per_year,
+        coverage_fraction=0.97,
+        frequency={"frequencyMean": 0.3, "frequencyMax": 2},
+        year_last_fire={"yearLastFire": 2017},
+        threshold=0.95,
+        as_of_year=2017,
+    )
+    assert section["burnedFraction"] is None
+
+
 def test_build_fire_section_no_processed_years_is_unavailable_with_a_reason():
     section = fire_stats.build_fire_section(
         {}, frequency={"frequencyMean": None, "frequencyMax": None},
@@ -414,3 +450,92 @@ def test_select_burned_fraction_for_pct_raises_when_multiple_years_and_no_cumula
     fire = {"available": True, "burnedFractionByYear": {"2017": 0.1, "2018": 0.2}}
     with pytest.raises(ValueError, match="cumulative"):
         fire_stats.select_burned_fraction_for_pct(fire)
+
+
+# --- union_burned_fraction: the S1b5 cumulative (2013-2025) field ----------
+
+
+def test_union_burned_fraction_shape_mirrors_annual_burned_fraction():
+    union = ZonalResult(pixel_count=100, area_ha=100.0, value_pixels={0: 70, 1: 30}, value_area_ha={0: 70.0, 1: 30.0})
+    result = fire_stats.union_burned_fraction(union)
+    assert result == {"totalHa": 100.0, "burnedHa": 30.0, "burnedFraction": 0.3}
+
+
+def test_union_burned_fraction_zero_when_never_burned():
+    union = ZonalResult(pixel_count=50, area_ha=50.0, value_pixels={0: 50}, value_area_ha={0: 50.0})
+    result = fire_stats.union_burned_fraction(union)
+    assert result["burnedFraction"] == 0.0
+
+
+def test_union_burned_fraction_empty_result_is_zero_not_a_crash():
+    result = fire_stats.union_burned_fraction(ZonalResult())
+    assert result == {"totalHa": 0.0, "burnedHa": 0.0, "burnedFraction": 0.0}
+
+
+# --- validate_fire_gates: MCS-10b hard abort gates (S1b5) -------------------
+#
+# Design D2/MCS-10b: 0 <= annual <= 1 for every year; max(annual) <= union <=
+# sum(annual) (+ float epsilon); union <= 1. MCS-10a: a burn only in one year
+# makes the union equal to exactly that year's annual fraction.
+
+
+def test_validate_fire_gates_passes_for_a_consistent_multi_year_fixture():
+    per_year = {2015: {"burnedFraction": 0.10}, 2016: {"burnedFraction": 0.05}}
+    fire_stats.validate_fire_gates(per_year, union_fraction=0.14, comuna_id="X")  # no raise
+
+
+def test_validate_fire_gates_only_2015_burned_union_equals_that_years_annual():
+    # MCS-10a fixture: a burn only in 2015 -> union == annual[2015], every
+    # other year's annual is 0.
+    per_year = {2014: {"burnedFraction": 0.0}, 2015: {"burnedFraction": 0.2}, 2016: {"burnedFraction": 0.0}}
+    fire_stats.validate_fire_gates(per_year, union_fraction=0.2, comuna_id="X")  # no raise
+    with pytest.raises(fire_stats.FireGateError):
+        # union must NOT silently differ from the only nonzero annual value.
+        fire_stats.validate_fire_gates(per_year, union_fraction=0.25, comuna_id="X")
+
+
+def test_validate_fire_gates_rejects_annual_fraction_above_one():
+    per_year = {2015: {"burnedFraction": 1.2}}
+    with pytest.raises(fire_stats.FireGateError, match="X"):
+        fire_stats.validate_fire_gates(per_year, union_fraction=1.0, comuna_id="X")
+
+
+def test_validate_fire_gates_rejects_annual_fraction_below_zero():
+    per_year = {2015: {"burnedFraction": -0.01}}
+    with pytest.raises(fire_stats.FireGateError):
+        fire_stats.validate_fire_gates(per_year, union_fraction=0.0, comuna_id="X")
+
+
+def test_validate_fire_gates_rejects_union_above_one():
+    per_year = {2015: {"burnedFraction": 0.5}}
+    with pytest.raises(fire_stats.FireGateError):
+        fire_stats.validate_fire_gates(per_year, union_fraction=1.2, comuna_id="X")
+
+
+def test_validate_fire_gates_rejects_union_below_the_max_annual():
+    # union must be AT LEAST the largest single year (a pixel burned in the
+    # biggest year can never be "un-unioned" away).
+    per_year = {2015: {"burnedFraction": 0.30}, 2016: {"burnedFraction": 0.05}}
+    with pytest.raises(fire_stats.FireGateError):
+        fire_stats.validate_fire_gates(per_year, union_fraction=0.20, comuna_id="X")
+
+
+def test_validate_fire_gates_rejects_union_above_the_sum_of_annual():
+    # union must be AT MOST the sum of every year (that would imply a burned
+    # area larger than physically possible, more area unioned than exists).
+    per_year = {2015: {"burnedFraction": 0.10}, 2016: {"burnedFraction": 0.05}}
+    with pytest.raises(fire_stats.FireGateError):
+        fire_stats.validate_fire_gates(per_year, union_fraction=0.20, comuna_id="X")
+
+
+def test_validate_fire_gates_tolerates_a_tiny_float_epsilon():
+    per_year = {2015: {"burnedFraction": 0.10}, 2016: {"burnedFraction": 0.05}}
+    # union == sum(annual) + 1e-9, within the declared epsilon.
+    fire_stats.validate_fire_gates(per_year, union_fraction=0.15 + 1e-9, comuna_id="X")
+
+
+def test_validate_fire_gates_ignores_years_with_none_fraction():
+    # A year with no fraction available (e.g. below coverage threshold for
+    # that product) must not be treated as a gate violation.
+    per_year = {2015: {"burnedFraction": None}, 2016: {"burnedFraction": 0.05}}
+    fire_stats.validate_fire_gates(per_year, union_fraction=0.05, comuna_id="X")
