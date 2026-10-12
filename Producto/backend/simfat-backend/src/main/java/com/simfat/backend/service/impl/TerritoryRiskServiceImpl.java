@@ -47,9 +47,11 @@ public class TerritoryRiskServiceImpl implements TerritoryRiskService {
     private static final double SCORE_PREVENTIVO = 0.50;
     private static final double SCORE_ALTO = 0.70;
     private static final double SCORE_CRITICO = 0.85;
-    private static final double FWI_PREVENTIVO = 20.0;
-    private static final double FWI_ALTO = 30.0;
-    private static final double FWI_CRITICO = 45.0;
+    // Regional FWI scale (20/30/45). It differs from the comuna rule (ALTO at 20, CRITICO at 45,
+    // see ComunaRiskServiceImpl) by design: do not align them without a calibration study.
+    private static final double REGION_FWI_PREVENTIVO = 20.0;
+    private static final double REGION_FWI_ALTO = 30.0;
+    private static final double REGION_FWI_CRITICO = 45.0;
     // Matches the frontend's "today" vs "recent" FIRMS bucket (TerritoryMapPanel.jsx
     // santiagoDateKey) so the alert override and the map legend agree.
     private static final ZoneId SANTIAGO_ZONE = ZoneId.of("America/Santiago");
@@ -223,7 +225,7 @@ public class TerritoryRiskServiceImpl implements TerritoryRiskService {
             return new AlertResolution("CRITICO", "FIRMS_HOY");
         }
         // CRITICO — priority 2: FWI in extreme range (meteorological driver)
-        if (fwiRaw != null && fwiRaw >= FWI_CRITICO) {
+        if (fwiRaw != null && fwiRaw >= REGION_FWI_CRITICO) {
             return new AlertResolution("CRITICO", "FWI");
         }
         // CRITICO — priority 3: composite score threshold
@@ -237,13 +239,13 @@ public class TerritoryRiskServiceImpl implements TerritoryRiskService {
         if (firmsFrpMean >= FirmsScoringConstants.FIRMS_FRP_CRITICO) {
             return new AlertResolution("CRITICO", "FIRMS_FRP");
         }
-        if (fwiRaw != null && fwiRaw >= FWI_ALTO) {
+        if (fwiRaw != null && fwiRaw >= REGION_FWI_ALTO) {
             return new AlertResolution("ALTO", "FWI");
         }
         if (score >= SCORE_ALTO) {
             return new AlertResolution("ALTO", "SCORE_WLC");
         }
-        if (fwiRaw != null && fwiRaw >= FWI_PREVENTIVO) {
+        if (fwiRaw != null && fwiRaw >= REGION_FWI_PREVENTIVO) {
             return new AlertResolution("PREVENTIVO", "FWI");
         }
         if (score >= SCORE_PREVENTIVO) {
