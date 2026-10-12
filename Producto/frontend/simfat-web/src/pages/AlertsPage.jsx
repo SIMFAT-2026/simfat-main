@@ -169,7 +169,7 @@ function AuthenticatedAlerts() {
           <label>
             Región
             <select name="regionId" value={form.regionId} onChange={onInputChange} required>
-              <option value="">Seleccione una region</option>
+              <option value="">Seleccione una región</option>
               {regions.map((region) => (
                 <option key={region.id} value={region.id}>
                   {region.nombre}
@@ -186,7 +186,7 @@ function AuthenticatedAlerts() {
           </label>
 
           <label>
-            Nivel riesgo
+            Nivel de riesgo
             <select name="nivelRiesgo" value={form.nivelRiesgo} onChange={onInputChange} required>
               {RISK_LEVELS.map((level) => (
                 <option key={level} value={level}>
@@ -233,7 +233,7 @@ function AuthenticatedAlerts() {
       <ConfirmModal
         isOpen={Boolean(deleteId)}
         title="Eliminar alerta"
-        message="Confirma la eliminacion del evento de alerta."
+        message="Confirma la eliminación del evento de alerta."
         confirmLabel="Eliminar"
         onConfirm={confirmDelete}
         onCancel={() => setDeleteId('')}

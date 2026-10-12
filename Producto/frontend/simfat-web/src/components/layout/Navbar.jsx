@@ -32,7 +32,7 @@ function Navbar() {
         {isBootstrapping ? (
           <div className="navbar-nav navbar-nav-placeholder" aria-hidden="true" />
         ) : (
-        <nav className="navbar-nav" aria-label="Navegacion principal">
+        <nav className="navbar-nav" aria-label="Navegación principal">
           {primaryNavigationLinks.map((link) =>
             isNavItemLocked(link, isAuthenticated) ? (
               <Link
@@ -69,7 +69,7 @@ function Navbar() {
               {user?.name || user?.fullName || 'Usuario'}
             </Link>
             <button type="button" className="btn btn-secondary navbar-logout-btn" onClick={handleLogout}>
-              Cerrar sesion
+              Cerrar sesión
             </button>
           </div>
         ) : (

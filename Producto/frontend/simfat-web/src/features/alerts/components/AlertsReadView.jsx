@@ -122,7 +122,7 @@ function AlertsReadView({ data, rowActions, onExportCsv, feedback, children }) {
         },
         {
           key: 'nivelRiesgo',
-          header: 'Nivel riesgo',
+          header: 'Nivel de riesgo',
           sortable: true,
           sortValue: (row) => RISK_ORDER[row.nivelRiesgo] ?? 0,
           render: (row) => <AlertBadge level={row.nivelRiesgo} />
@@ -147,7 +147,7 @@ function AlertsReadView({ data, rowActions, onExportCsv, feedback, children }) {
       },
       {
         key: 'nivelRiesgo',
-        header: 'Nivel riesgo',
+        header: 'Nivel de riesgo',
         sortable: true,
         sortValue: (row) => RISK_ORDER[row.nivelRiesgo] ?? 0,
         render: (row) => <AlertBadge level={row.nivelRiesgo} />
@@ -170,8 +170,8 @@ function AlertsReadView({ data, rowActions, onExportCsv, feedback, children }) {
         title="Alertas"
         subtitle={
           publicMode
-            ? 'Eventos de calor y priorizacion territorial con datos publicos (ubicacion aproximada)'
-            : 'Eventos de calor, priorizacion territorial y cruce con reportes ciudadanos'
+            ? 'Eventos de calor y priorización territorial con datos públicos (ubicación aproximada)'
+            : 'Eventos de calor, priorización territorial y cruce con reportes ciudadanos'
         }
       />
 
@@ -179,7 +179,7 @@ function AlertsReadView({ data, rowActions, onExportCsv, feedback, children }) {
 
       <FilterBar>
         <label>
-          Filtrar por region
+          Filtrar por región
           <select value={filterRegionId} onChange={(event) => setFilterRegionId(event.target.value)}>
             {publicMode ? null : <option value="">Todas</option>}
             {regions.map((region) => (
@@ -207,7 +207,7 @@ function AlertsReadView({ data, rowActions, onExportCsv, feedback, children }) {
           {PERIOD_PRESETS.map(({ key, label: presetLabel }) => {
             const isActive = filterPreset === key || (key === 'all' && filterPreset === '');
             // Anonymous "all" means the backend default window (last 30 days).
-            const label = publicMode && key === 'all' ? 'Ultimos 30 dias' : presetLabel;
+            const label = publicMode && key === 'all' ? 'Últimos 30 días' : presetLabel;
             return (
               <button
                 key={key}
@@ -249,7 +249,7 @@ function AlertsReadView({ data, rowActions, onExportCsv, feedback, children }) {
 
         <div className="form-actions">
           <button type="button" className="btn btn-secondary" onClick={loadAlerts} disabled={loading}>
-            {loading ? 'Actualizando...' : publicMode ? 'Actualizar' : 'Actualizar cruce'}
+            {loading ? 'Actualizando…' : publicMode ? 'Actualizar' : 'Actualizar cruce'}
           </button>
           <button type="button" className="btn btn-secondary" onClick={clearFilters}>
             Limpiar filtros
@@ -267,8 +267,8 @@ function AlertsReadView({ data, rowActions, onExportCsv, feedback, children }) {
       ) : null}
       {publicMode ? (
         <p className="card-subtitle">
-          Vista publica: muestra hasta {PUBLIC_MAX_SPAN_DAYS} dias por consulta (por defecto los ultimos 30) y como maximo{' '}
-          {PUBLIC_ALERTS_CAP} alertas recientes. Las ubicaciones se redondean (~1 km). Inicia sesion para ver el detalle completo.
+          Vista pública: muestra hasta {PUBLIC_MAX_SPAN_DAYS} días por consulta (por defecto los últimos 30) y como máximo{' '}
+          {PUBLIC_ALERTS_CAP} alertas recientes. Las ubicaciones se redondean (~1 km). Inicia sesión para ver el detalle completo.
         </p>
       ) : null}
       {publicMode && !loading && !error && secondaryFailed ? (
@@ -285,9 +285,9 @@ function AlertsReadView({ data, rowActions, onExportCsv, feedback, children }) {
               <details className="access-help metric-help">
                 <summary>&#9432;</summary>
                 {publicMode ? (
-                  <p>Detecciones y alertas de la región seleccionada dentro del período elegido (máximo 90 días y 1000 eventos, los más recientes primero).</p>
+                  <p>Detecciones y alertas de la región seleccionada dentro del periodo elegido (máximo 90 días y 1000 eventos, los más recientes primero).</p>
                 ) : (
-                  <p>Total de eventos de alerta que coinciden con los filtros activos. Incluye detecciones FIRMS y alertas creadas manualmente. Sin filtros, muestra el historico completo.</p>
+                  <p>Total de eventos de alerta que coinciden con los filtros activos. Incluye detecciones FIRMS y alertas creadas manualmente. Sin filtros, muestra el histórico completo.</p>
                 )}
               </details>
             </div>
@@ -295,13 +295,13 @@ function AlertsReadView({ data, rowActions, onExportCsv, feedback, children }) {
           </article>
           <article className="metric-card">
             <div className="metric-label">
-              Criticas / Altas
+              Críticas / Altas
               <details className="access-help metric-help">
                 <summary>&#9432;</summary>
                 {publicMode ? (
-                  <p>Eventos con nivel CRITICO o ALTO en la region y el periodo seleccionados. Corresponde al nivel asignado al momento de registrar la deteccion. No refleja el score de riesgo comunal.</p>
+                  <p>Eventos con nivel Crítico o Alto en la región y el periodo seleccionados. Corresponde al nivel asignado al momento de registrar la detección. No refleja el score de riesgo comunal.</p>
                 ) : (
-                  <p>Eventos con nivel CRITICO o ALTO segun los filtros activos. Corresponde al nivel asignado al momento de registrar el evento (FRP para FIRMS, manual para alertas operativas). No refleja el score de riesgo comunal.</p>
+                  <p>Eventos con nivel Crítico o Alto según los filtros activos. Corresponde al nivel asignado al momento de registrar el evento (FRP para FIRMS, manual para alertas operativas). No refleja el score de riesgo comunal.</p>
                 )}
               </details>
             </div>
@@ -315,9 +315,9 @@ function AlertsReadView({ data, rowActions, onExportCsv, feedback, children }) {
               <details className="access-help metric-help">
                 <summary>&#9432;</summary>
                 {publicMode ? (
-                  <p>Reportes ciudadanos ya validados por un moderador en la region y periodo consultados. Se usan para cruzar con eventos de alerta en la priorizacion.</p>
+                  <p>Reportes ciudadanos ya validados por un moderador en la región y periodo consultados. Se usan para cruzar con eventos de alerta en la priorización.</p>
                 ) : (
-                  <p>Reportes recibidos de ciudadanos en la region filtrada. El segundo numero corresponde a reportes validados por un moderador. Se usan para cruzar con eventos de alerta en la priorizacion operativa.</p>
+                  <p>Reportes recibidos de ciudadanos en la región filtrada. El segundo número corresponde a reportes validados por un moderador. Se usan para cruzar con eventos de alerta en la priorización operativa.</p>
                 )}
               </details>
             </div>
@@ -332,7 +332,7 @@ function AlertsReadView({ data, rowActions, onExportCsv, feedback, children }) {
               Comunas en alerta
               <details className="access-help metric-help">
                 <summary>&#9432;</summary>
-                <p>Comunas que escalaron a nivel ALTO o CRITICO segun el score de riesgo compuesto (FWI, FIRMS, NDMI, NDVI, reportes). Corresponde al panel de alertas operativas de abajo.</p>
+                <p>Comunas que escalaron a nivel Alto o Crítico según el puntaje de riesgo compuesto (FWI, FIRMS, NDMI, NDVI, reportes). Corresponde al panel de alertas operativas de abajo.</p>
               </details>
             </div>
             <strong>{operationalAlerts.length}</strong>
@@ -342,7 +342,7 @@ function AlertsReadView({ data, rowActions, onExportCsv, feedback, children }) {
               Mayor prioridad
               <details className="access-help metric-help">
                 <summary>&#9432;</summary>
-                <p>Puntaje del evento de alerta con mayor prioridad operativa. Se calcula combinando el nivel de riesgo del evento, reportes ciudadanos cercanos (radio 12 km) y la recencia del evento (bonus si ocurrio en las ultimas 24 o 72 horas).</p>
+                <p>Puntaje del evento de alerta con mayor prioridad operativa. Se calcula combinando el nivel de riesgo del evento, reportes ciudadanos cercanos (radio 12 km) y la recencia del evento (bonus si ocurrió en las últimas 24 o 72 horas).</p>
               </details>
             </div>
             <strong>{alertInsights.topPriority ? alertInsights.topPriority.priorityScore : '-'}</strong>
@@ -355,28 +355,28 @@ function AlertsReadView({ data, rowActions, onExportCsv, feedback, children }) {
           <div className="card-title-row">
             <h3>Alertas operativas por comuna</h3>
             <details className="access-help">
-              <summary>&#9432; Como funciona</summary>
+              <summary>&#9432; Cómo funciona</summary>
               <ul>
-                <li><strong>Que muestra:</strong> comunas que escalaron a ALTO o CRITICO segun el score de riesgo compuesto. No incluye lecturas FIRMS crudas.</li>
-                <li><strong>Score (0–100):</strong> combina FWI (indice meteorologico de riesgo de incendio), humedad de vegetacion (NDMI), cobertura vegetal (NDVI), detecciones satelitales FIRMS y reportes ciudadanos.</li>
-                <li><strong>Por que FWI solo puede escalar a ALTO:</strong> si el FWI supera 20, la comuna sube a ALTO independientemente del score compuesto. Refleja condicion meteorologica de riesgo.</li>
-                <li><strong>CRITICO:</strong> deteccion FIRMS activa hoy, FWI &gt;= 45, o score &gt;= 85/100.</li>
-                <li><strong>Orden:</strong> CRITICO primero, luego ALTO. Dentro de cada nivel, mayor score arriba.</li>
+                <li><strong>Qué muestra:</strong> comunas que escalaron a Alto o Crítico según el puntaje de riesgo compuesto. No incluye lecturas FIRMS crudas.</li>
+                <li><strong>Puntaje (0–100):</strong> combina FWI (índice meteorológico de riesgo de incendio), humedad de la vegetación (NDMI), cobertura vegetal (NDVI), detecciones satelitales FIRMS y reportes ciudadanos.</li>
+                <li><strong>Por qué el FWI solo puede escalar a Alto:</strong> si el FWI es 20 o más, la comuna sube a Alto independientemente del puntaje compuesto. Refleja una condición meteorológica de riesgo.</li>
+                <li><strong>Crítico:</strong> detección FIRMS activa hoy, FWI &gt;= 45, o puntaje &gt;= 85/100.</li>
+                <li><strong>Orden:</strong> Crítico primero, luego Alto. Dentro de cada nivel, mayor puntaje arriba.</li>
               </ul>
             </details>
           </div>
           <p className="card-subtitle">
-            Comunas que escalaron a nivel ALTO o CRITICO segun el score de riesgo (FWI, NDMI, NDVI, FIRMS, reportes). No incluye
-            detecciones FIRMS crudas — eso esta en la tabla de eventos mas abajo.
+            Comunas que escalaron a nivel Alto o Crítico según el puntaje de riesgo (FWI, NDMI, NDVI, FIRMS, reportes). No incluye
+            detecciones FIRMS crudas — eso está en la tabla de eventos más abajo.
           </p>
           {publicMode && loading ? (
-            <p className="card-subtitle" role="status" aria-busy="true">Cargando comunas en alerta...</p>
+            <p className="card-subtitle" role="status" aria-busy="true">Cargando comunas en alerta…</p>
           ) : (
             <>
               {publicMode && scoresFailed ? (
-                <EmptyState title="Panel no disponible" description="No se pudo cargar el score de riesgo por comuna. Intenta actualizar mas tarde." />
+                <EmptyState title="Panel no disponible" description="No se pudo cargar el puntaje de riesgo por comuna. Intenta actualizar más tarde." />
               ) : operationalAlerts.length === 0 ? (
-                <EmptyState title="Sin comunas en ALTO o CRITICO" description="Ninguna comuna de la region filtrada escalo nivel." />
+                <EmptyState title="Sin comunas en nivel Alto o Crítico" description="Ninguna comuna de la región filtrada escaló de nivel." />
               ) : (
                 <>
                   <ol className="alerts-operational-grid">
@@ -386,7 +386,7 @@ function AlertsReadView({ data, rowActions, onExportCsv, feedback, children }) {
                   </ol>
                   {operationalAlerts.length > OPERATIONAL_ALERTS_VISIBLE ? (
                     <details className="alerts-see-more">
-                      <summary>{operationalAlerts.length - OPERATIONAL_ALERTS_VISIBLE} comunas mas en alerta</summary>
+                      <summary>{operationalAlerts.length - OPERATIONAL_ALERTS_VISIBLE} comunas más en alerta</summary>
                       <ol className="alerts-operational-grid" start={OPERATIONAL_ALERTS_VISIBLE + 1}>
                         {operationalAlerts.slice(OPERATIONAL_ALERTS_VISIBLE).map((item, idx) => (
                           <OperationalItem key={item.comunaId} item={item} position={OPERATIONAL_ALERTS_VISIBLE + idx + 1} />
@@ -405,9 +405,9 @@ function AlertsReadView({ data, rowActions, onExportCsv, feedback, children }) {
         <div className="alerts-layout">
           <AlertsOperationalMap alerts={alerts} reports={reports} selectedAlertId={selectedAlertId} />
           <article className="dashboard-card alerts-priority-card">
-            <h3>Priorizacion operativa</h3>
+            <h3>Priorización operativa</h3>
             {priorityRows.length === 0 ? (
-              <EmptyState title="Sin alertas priorizables" description="Ajusta filtros para construir priorizacion territorial." />
+              <EmptyState title="Sin alertas priorizables" description="Ajusta filtros para construir la priorización territorial." />
             ) : (
               <ul className="alerts-priority-list">
                 {priorityRows.map((item) => (
@@ -425,10 +425,10 @@ function AlertsReadView({ data, rowActions, onExportCsv, feedback, children }) {
                         ? item.comunaLevel
                           ? 'Alerta territorial'
                           : 'Alerta a nivel regional (sin comuna asignada)'
-                        : item.descripcion || 'Alerta territorial sin descripcion'}
+                        : item.descripcion || 'Alerta territorial sin descripción'}
                     </span>
                     <span className="alerts-priority-score">
-                      Score: {item.priorityScore} | Reportes cercanos (&lt;12 km): {item.nearbyReports}
+                      Prioridad: {item.priorityScore} | Reportes cercanos (&lt;12 km): {item.nearbyReports}
                     </span>
                   </li>
                 ))}
@@ -438,17 +438,17 @@ function AlertsReadView({ data, rowActions, onExportCsv, feedback, children }) {
         </div>
       ) : null}
 
-      {loading ? <LoadingSpinner label="Cargando alertas..." /> : null}
+      {loading ? <LoadingSpinner label="Cargando alertas…" /> : null}
       {!loading && error ? <ErrorMessage error={error} onRetry={loadAlerts} /> : null}
       {publicMode && !loading && !error && alertsCapped ? (
         <p className="card-subtitle" role="status">
-          Se muestran los {PUBLIC_ALERTS_CAP} eventos mas recientes del periodo; el filtro de nivel se aplica solo a esos{' '}
+          Se muestran los {PUBLIC_ALERTS_CAP} eventos más recientes del periodo; el filtro de nivel se aplica solo a esos{' '}
           {PUBLIC_ALERTS_CAP} eventos.
         </p>
       ) : null}
       {publicMode && !loading && !error && reports.length >= PUBLIC_REPORTS_CAP ? (
         <p className="card-subtitle" role="status">
-          Para los conteos de reportes cercanos y la priorizacion se usan solo los {PUBLIC_REPORTS_CAP} reportes verificados mas
+          Para los conteos de reportes cercanos y la priorización se usan solo los {PUBLIC_REPORTS_CAP} reportes verificados más
           recientes del periodo.
         </p>
       ) : null}
@@ -456,7 +456,7 @@ function AlertsReadView({ data, rowActions, onExportCsv, feedback, children }) {
         publicMode ? (
           <EmptyState
             title="Sin alertas en el periodo"
-            description="No hay alertas publicas para la region y el periodo seleccionados. Prueba otra region o un periodo mas amplio."
+            description="No hay alertas públicas para la región y el periodo seleccionados. Prueba otra región o un periodo más amplio."
           />
         ) : (
           <EmptyState title="Sin alertas" />

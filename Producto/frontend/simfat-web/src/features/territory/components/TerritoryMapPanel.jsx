@@ -28,6 +28,7 @@ import LayerToggleGroups from './LayerToggleGroups';
 import RegionalSummary from './RegionalSummary';
 import { regionalSummary } from '../utils/regionalSummary';
 import { alertTrigger } from '../utils/alertTrigger';
+import { compassLabelFrom } from '../utils/compass';
 import MapbiomasYearControl from './MapbiomasYearControl';
 import { chipLabel, controlVisible } from '../utils/yearControl';
 import { LandcoverChoropleth, LandcoverLegend } from './LandcoverLayer';
@@ -386,16 +387,6 @@ function formatHourLabel(str, includeDate) {
   });
 }
 
-const COMPASS_LABELS = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
-
-// Open-Meteo's winddirection is the bearing the wind comes FROM (meteorological
-// convention). For an arrow that visually shows where the wind is heading, we
-// rotate by +180°; the compass label below still describes the source bearing.
-function compassLabelFrom(directionFromDeg) {
-  const index = Math.round(directionFromDeg / 45) % 8;
-  return COMPASS_LABELS[index];
-}
-
 function featureCentroid(feature) {
   try {
     return L.geoJSON(feature).getBounds().getCenter();
@@ -484,7 +475,7 @@ function featureMeta(feature) {
     return `Valor: ${Number(props.value).toFixed(3)}`;
   }
   if (props.hectares !== undefined && props.hectares !== null) {
-    return `Hectareas: ${props.hectares}`;
+    return `Hectáreas: ${props.hectares}`;
   }
   if (props.level) {
     return `Nivel: ${props.level}`;
@@ -1431,7 +1422,7 @@ function TerritoryMapPanel({
               )}
 
               <p className="territory-meta">
-                Fuente: {regionData.source === 'backend' ? 'Backend' : 'Mock local'} | Última actualización:{' '}
+                Fuente: {regionData.source === 'backend' ? 'servidor' : 'datos de demostración'} | Última actualización:{' '}
                 {parseUtcDate(regionData.generatedAt)}
               </p>
             </div>

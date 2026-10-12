@@ -249,7 +249,7 @@ function CommunityPage() {
       if (!grouped.has(regionId)) {
         grouped.set(regionId, {
           id: regionId,
-          label: regionMap[regionId] || getLabelForRegion(regionId) || 'Sin region',
+          label: regionMap[regionId] || getLabelForRegion(regionId) || 'Sin región',
           comunas: new Map()
         });
       }
@@ -539,17 +539,17 @@ function CommunityPage() {
   return (
     <section className="page-container">
       <SectionTitle
-        title="Coordinacion comunitaria"
+        title="Coordinación comunitaria"
         subtitle="Mural operativo, biblioteca de recursos y contactos/protocolos por territorio"
       />
 
       <p className="community-source-note">
-        Origen de datos: {source === 'backend' ? 'backend comunitario' : 'fallback local de continuidad operativa'}.
+        {source === 'backend' ? 'Datos en línea.' : 'Modo sin conexión: se muestran datos locales de respaldo.'}
       </p>
 
       {hasNoModuleAccess ? (
         <div className="feedback feedback-info" style={{ marginBottom: 16 }}>
-          Tu cuenta no tiene regiones asignadas en el modulo comunitario.
+          Tu cuenta no tiene regiones asignadas en el módulo comunitario.
           Contacta al administrador para que configure tu acceso.
         </div>
       ) : null}
@@ -559,7 +559,7 @@ function CommunityPage() {
 
       <FilterBar>
         <label>
-          Filtrar por region
+          Filtrar por región
           <select value={filterRegionId} onChange={(event) => setFilterRegionId(event.target.value)}>
             <option value="">Todas</option>
             {regions.map((region) => (
@@ -572,7 +572,7 @@ function CommunityPage() {
 
         <div className="form-actions">
           <button type="button" className="btn btn-secondary" onClick={reload} disabled={loading}>
-            {loading ? 'Recargando...' : 'Recargar modulo'}
+            {loading ? 'Recargando…' : 'Recargar módulo'}
           </button>
         </div>
       </FilterBar>
@@ -596,7 +596,7 @@ function CommunityPage() {
 
               {loading ? <LoadingSpinner label="Cargando mural..." /> : null}
               {!loading && filteredBoard.length === 0 ? (
-                <EmptyState title="Sin avisos comunitarios" description="Publica el primer aviso para esta region." />
+                <EmptyState title="Sin avisos comunitarios" description="Publica el primer aviso para esta región." />
               ) : null}
               {!loading && filteredBoard.map((post, index) => {
                 const position = boardPositions[post.id] || fallbackBoardPosition(index);
@@ -614,7 +614,7 @@ function CommunityPage() {
                   >
                     <span className="community-note-tape" />
                     <strong>{post.title}</strong>
-                    <small>{regionMap[post.regionId] || post.regionId || 'Sin region'} · {formatDate(post.publishedAt)}</small>
+                    <small>{regionMap[post.regionId] || post.regionId || 'Sin región'} · {formatDate(post.publishedAt)}</small>
                     <p>{post.message}</p>
                     <span className={priorityBadge(post.priority)}>{post.priority}</span>
                     {attachment ? <span className="community-note-attachment">📎 {attachment.kind === 'image' ? 'Imagen' : 'Archivo'}</span> : null}
@@ -629,7 +629,7 @@ function CommunityPage() {
             <p>Crea una nota breve para pegarla en el mural comunitario.</p>
             <form className="community-editor-form" onSubmit={submitBoard}>
               <label>
-                Titulo
+                Título
                 <input name="title" value={boardForm.title} onChange={handleBoardInput} required />
               </label>
 
@@ -646,9 +646,9 @@ function CommunityPage() {
                 </label>
 
                 <label>
-                  Region
+                  Región
                   <select name="regionId" value={boardForm.regionId} onChange={handleBoardInput} required>
-                    <option value="">Seleccione region</option>
+                    <option value="">Seleccione región</option>
                     {regions.map((region) => (
                       <option key={region.id} value={region.id}>
                         {region.nombre}
@@ -693,11 +693,11 @@ function CommunityPage() {
         <div className="community-resource-shell">
           <aside className="community-resource-uploader">
             <h3>Biblioteca de recursos</h3>
-            <p>Sube documentos PDF y asocialos a una region y comuna. Solo PDF soportado.</p>
+            <p>Sube documentos PDF y asócialos a una región y comuna. Solo PDF soportado.</p>
 
             <form className="community-resource-form" onSubmit={submitResource}>
               <label>
-                Titulo
+                Título
                 <input name="title" value={resourceForm.title} onChange={handleResourceInput} required />
               </label>
 
@@ -714,9 +714,9 @@ function CommunityPage() {
                 </label>
 
                 <label>
-                  Region
+                  Región
                   <select name="regionId" value={resourceForm.regionId} onChange={handleResourceInput} required>
-                    <option value="">Seleccione region</option>
+                    <option value="">Seleccione región</option>
                     {resourceRegionOptions.map((region) => (
                       <option key={region.id} value={region.id}>
                         {region.label}
@@ -736,7 +736,7 @@ function CommunityPage() {
                   disabled={!canSelectResourceComuna}
                 >
                   <option value="">
-                    {resourceForm.regionId ? 'Seleccione comuna' : 'Seleccione una region primero'}
+                    {resourceForm.regionId ? 'Seleccione comuna' : 'Seleccione una región primero'}
                   </option>
                   {resourceComunas.map((comuna) => (
                     <option key={comuna.value} value={comuna.value}>
@@ -745,7 +745,7 @@ function CommunityPage() {
                   ))}
                 </select>
                 {resourceForm.regionId && !canSelectResourceComuna ? (
-                  <small className="field-error">No hay comunas configuradas para esta region.</small>
+                  <small className="field-error">No hay comunas configuradas para esta región.</small>
                 ) : null}
               </label>
 
@@ -791,10 +791,10 @@ function CommunityPage() {
           </aside>
 
           <section className="community-resource-viewer-panel">
-            <aside className="community-resource-catalog" aria-label="Catalogo de recursos">
+            <aside className="community-resource-catalog" aria-label="Catálogo de recursos">
               <div className="community-resource-catalog-header">
                 <div>
-                  <h4>Catalogo de recursos</h4>
+                  <h4>Catálogo de recursos</h4>
                   <p>Filtra por territorio y selecciona un documento.</p>
                 </div>
                 <span>{catalogResources.length}</span>
@@ -802,7 +802,7 @@ function CommunityPage() {
 
               <div className="community-resource-catalog-filters">
                 <label>
-                  Region
+                  Región
                   <select value={resourceCatalogRegionId} onChange={handleResourceCatalogRegion}>
                     <option value="">Todas</option>
                     {resourceRegionOptions.map((region) => (
@@ -823,7 +823,7 @@ function CommunityPage() {
                     }}
                     disabled={!resourceCatalogRegionId}
                   >
-                    <option value="">{resourceCatalogRegionId ? 'Todas' : 'Seleccione region'}</option>
+                    <option value="">{resourceCatalogRegionId ? 'Todas' : 'Seleccione región'}</option>
                     {resourceCatalogComunas.map((comuna) => (
                       <option key={comuna.value} value={comuna.value}>
                         {comuna.label}
@@ -875,7 +875,7 @@ function CommunityPage() {
                       <p>{selectedResource.category}</p>
                       <h4>{selectedResource.title}</h4>
                       <small>
-                        {regionMap[selectedResource.regionId] || selectedResource.regionId || 'Sin region'} - {getLabelForComuna(selectedResource.comunaId) || 'Sin comuna'}
+                        {regionMap[selectedResource.regionId] || selectedResource.regionId || 'Sin región'} - {getLabelForComuna(selectedResource.comunaId) || 'Sin comuna'}
                       </small>
                     </div>
                     <div className="community-resource-reader-actions">
@@ -903,14 +903,14 @@ function CommunityPage() {
                   ) : (
                     <div className="community-resource-docx-placeholder">
                       <strong>Vista previa no disponible para DOCX</strong>
-                      <p>El navegador no puede embeber DOCX de forma nativa. Puedes abrir o descargar el archivo desde el boton superior.</p>
+                      <p>El navegador no puede embeber DOCX de forma nativa. Puedes abrir o descargar el archivo desde el botón superior.</p>
                     </div>
                   )}
                 </>
               ) : (
                 <div className="community-resource-empty-reader">
                   <strong>Lector PDF embebido</strong>
-                  <p>Selecciona un recurso del catalogo para visualizarlo aqui.</p>
+                  <p>Selecciona un recurso del catálogo para visualizarlo aquí.</p>
                 </div>
               )}
             </div>
@@ -936,11 +936,11 @@ function CommunityPage() {
                   type="search"
                   value={contactSearchTerm}
                   onChange={(event) => setContactSearchTerm(event.target.value)}
-                  placeholder="Nombre, telefono, correo o protocolo"
+                  placeholder="Nombre, teléfono, correo o protocolo"
                 />
               </label>
               <label>
-                Region
+                Región
                 <select value={contactRegionFilterId} onChange={handleContactRegionFilter}>
                   <option value="">Todas</option>
                   {resourceRegionOptions.map((region) => (
@@ -957,7 +957,7 @@ function CommunityPage() {
                   onChange={(event) => setContactComunaFilterId(event.target.value)}
                   disabled={!contactRegionFilterId}
                 >
-                  <option value="">{contactRegionFilterId ? 'Todas' : 'Seleccione region'}</option>
+                  <option value="">{contactRegionFilterId ? 'Todas' : 'Seleccione región'}</option>
                   {contactFilterComunas.map((comuna) => (
                     <option key={comuna.value} value={comuna.value}>
                       {comuna.label}
@@ -980,7 +980,7 @@ function CommunityPage() {
                     <div className="community-contact-main">
                       <strong>{contact.name}</strong>
                       <span>{contact.organization}</span>
-                      <small>{regionMap[contact.regionId] || contact.regionId || 'Sin region'} · {getLabelForComuna(contact.comunaId) || 'Sin comuna'}</small>
+                      <small>{regionMap[contact.regionId] || contact.regionId || 'Sin región'} · {getLabelForComuna(contact.comunaId) || 'Sin comuna'}</small>
                     </div>
                     <div className="community-contact-meta">
                       <a href={`tel:${contact.phone}`} className="community-contact-phone">{contact.phone}</a>
@@ -1021,12 +1021,12 @@ function CommunityPage() {
               </label>
 
               <label>
-                Organizacion
+                Organización
                 <input name="organization" value={contactForm.organization} onChange={handleContactInput} required />
               </label>
 
               <label>
-                Telefono
+                Teléfono
                 <input name="phone" value={contactForm.phone} onChange={handleContactInput} required />
               </label>
 
@@ -1036,9 +1036,9 @@ function CommunityPage() {
               </label>
 
               <label>
-                Region
+                Región
                 <select name="regionId" value={contactForm.regionId} onChange={handleContactInput} required>
-                  <option value="">Seleccione region</option>
+                  <option value="">Seleccione región</option>
                   {resourceRegionOptions.map((region) => (
                     <option key={region.id} value={region.id}>
                       {region.label}
@@ -1056,7 +1056,7 @@ function CommunityPage() {
                   required
                   disabled={!contactForm.regionId}
                 >
-                  <option value="">{contactForm.regionId ? 'Seleccione comuna' : 'Seleccione una region primero'}</option>
+                  <option value="">{contactForm.regionId ? 'Seleccione comuna' : 'Seleccione una región primero'}</option>
                   {contactFormComunas.map((comuna) => (
                     <option key={comuna.value} value={comuna.value}>
                       {comuna.label}
@@ -1080,7 +1080,7 @@ function CommunityPage() {
         </div>
       </article>
 
-      {loading && !error ? <LoadingSpinner label="Sincronizando modulo comunitario..." /> : null}
+      {loading && !error ? <LoadingSpinner label="Sincronizando módulo comunitario…" /> : null}
       {!loading && error && source === 'backend' ? <ErrorMessage error={{ message: error }} onRetry={reload} /> : null}
 
       {selectedPost ? (
@@ -1090,7 +1090,7 @@ function CommunityPage() {
             <span className={priorityBadge(selectedPost.priority)}>{selectedPost.priority}</span>
             <h3>{selectedPost.title}</h3>
             <p className="community-post-meta">
-              {regionMap[selectedPost.regionId] || selectedPost.regionId || 'Sin region'} · {formatDate(selectedPost.publishedAt)} · {selectedPost.author}
+              {regionMap[selectedPost.regionId] || selectedPost.regionId || 'Sin región'} · {formatDate(selectedPost.publishedAt)} · {selectedPost.author}
             </p>
             <p>{selectedPost.message}</p>
             {postAttachment(selectedPost) ? (
@@ -1118,7 +1118,7 @@ function CommunityPage() {
       <ConfirmModal
         isOpen={Boolean(pendingDelete.id)}
         title="Eliminar elemento"
-        message="Esta accion no se puede deshacer."
+        message="Esta acción no se puede deshacer."
         confirmLabel="Eliminar"
         onConfirm={confirmDelete}
         onCancel={() => setPendingDelete({ type: '', id: '' })}

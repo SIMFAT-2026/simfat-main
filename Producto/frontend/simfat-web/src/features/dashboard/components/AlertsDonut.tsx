@@ -16,13 +16,13 @@ function AlertsDonut({ data, loading, error, onRetry }: AlertsDonutProps) {
 
   return (
     <article className="dashboard-card">
-      <h3>Alertas por categoria (donut)</h3>
+      <h3>Alertas por categoría (donut)</h3>
       <DashboardPanelState
         loading={loading}
         error={error}
         isEmpty={rows.length === 0}
         emptyTitle="Sin alertas para visualizar"
-        emptyDescription="No hay informacion para construir el donut de alertas."
+        emptyDescription="No hay información para construir el donut de alertas."
         onRetry={onRetry}
       >
         <ResponsiveContainer width="100%" height={280}>

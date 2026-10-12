@@ -102,7 +102,7 @@ function createMockLayers(regionId) {
       RISK_SCORE: {
         type: 'FeatureCollection',
         features: [
-          createPointFeature('nu-risk', -71.9, -36.6, { label: 'Nuble', indicator: 'RISK_SCORE', score: 0.0, alertLevel: 'NORMAL' })
+          createPointFeature('nu-risk', -71.9, -36.6, { label: 'Ñuble', indicator: 'RISK_SCORE', score: 0.0, alertLevel: 'NORMAL' })
         ]
       },
       ...createMockClimateLayers()
@@ -147,7 +147,7 @@ function createMockLayers(regionId) {
       RISK_SCORE: {
         type: 'FeatureCollection',
         features: [
-          createPointFeature('ar-risk', -72.4, -38.7, { label: 'La Araucania', indicator: 'RISK_SCORE', score: 0.0, alertLevel: 'NORMAL' })
+          createPointFeature('ar-risk', -72.4, -38.7, { label: 'La Araucanía', indicator: 'RISK_SCORE', score: 0.0, alertLevel: 'NORMAL' })
         ]
       },
       ...createMockClimateLayers()
@@ -158,7 +158,7 @@ function createMockLayers(regionId) {
     NDVI: {
       type: 'FeatureCollection',
       features: [
-        createPointFeature('bb-ndvi-1', -73.05, -36.82, { label: 'Concepcion', indicator: 'NDVI', value: 0.57 }),
+        createPointFeature('bb-ndvi-1', -73.05, -36.82, { label: 'Concepción', indicator: 'NDVI', value: 0.57 }),
         createPointFeature('bb-ndvi-2', -72.58, -37.47, { label: 'Los Angeles', indicator: 'NDVI', value: 0.5 })
       ]
     },
@@ -187,7 +187,7 @@ function createMockLayers(regionId) {
     RISK_SCORE: {
       type: 'FeatureCollection',
       features: [
-        createPointFeature('bb-risk', -72.5, -37.5, { label: 'Biobio', indicator: 'RISK_SCORE', score: 0.0, alertLevel: 'NORMAL' })
+        createPointFeature('bb-risk', -72.5, -37.5, { label: 'Biobío', indicator: 'RISK_SCORE', score: 0.0, alertLevel: 'NORMAL' })
       ]
     },
     ...createMockClimateLayers()

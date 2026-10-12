@@ -25,7 +25,7 @@ function IndicatorSeriesChart({ data, loading, error, indicator, hasRegion, onRe
     return (
       <article className="dashboard-card">
         <h3>Serie temporal {indicator}</h3>
-        <p className="dashboard-hint">Selecciona una region para cargar la serie temporal del indicador.</p>
+        <p className="dashboard-hint">Selecciona una región para cargar la serie temporal del indicador.</p>
       </article>
     );
   }
@@ -44,7 +44,7 @@ function IndicatorSeriesChart({ data, loading, error, indicator, hasRegion, onRe
         error={error}
         isEmpty={rows.length === 0 || !hasSomeValue}
         emptyTitle="Sin serie temporal"
-        emptyDescription="No hay valores numericos para la combinacion de filtros seleccionada."
+        emptyDescription="No hay valores numéricos para la combinación de filtros seleccionada."
         onRetry={onRetry}
       >
         <ResponsiveContainer width="100%" height={300}>

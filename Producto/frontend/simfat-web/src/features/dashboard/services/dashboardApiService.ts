@@ -116,7 +116,7 @@ async function getApiData<T>(endpoint: string, userMessage: string, params?: Req
     const payload = ensureApiResponse<T>(response.data);
 
     if (!payload.success) {
-      throw new Error(payload.message || 'La API respondio con success=false');
+      throw new Error(payload.message || 'La API respondió con success=false');
     }
 
     return payload.data;
@@ -131,7 +131,7 @@ async function postApiData<T>(endpoint: string, userMessage: string, params?: Re
     const payload = ensureApiResponse<T>(response.data);
 
     if (!payload.success) {
-      throw new Error(payload.message || 'La API respondio con success=false');
+      throw new Error(payload.message || 'La API respondió con success=false');
     }
 
     return payload.data;
@@ -154,7 +154,7 @@ async function postApiDataWithTimeout<T>(
     const payload = ensureApiResponse<T>(response.data);
 
     if (!payload.success) {
-      throw new Error(payload.message || 'La API respondio con success=false');
+      throw new Error(payload.message || 'La API respondió con success=false');
     }
 
     return payload.data;
@@ -167,7 +167,7 @@ function normalizeRegion(payload: unknown, index: number): RegionDto {
   const source = isObject(payload) ? payload : {};
   return {
     id: toString(source.id, `region-${index + 1}`),
-    nombre: toString(source.nombre ?? source.regionName, `Region ${index + 1}`),
+    nombre: toString(source.nombre ?? source.regionName, `Región ${index + 1}`),
     codigo: toString(source.codigo ?? source.code, '-'),
     zona: toString(source.zona ?? source.zone, ''),
     hectareasBosqueReferencia: toNullableNumber(source.hectareasBosqueReferencia ?? source.referenceHectares)
@@ -190,7 +190,7 @@ function normalizeCriticalRegion(payload: unknown, index: number): CriticalRegio
   const regionId = toString(source.regionId ?? source.id, `region-${index + 1}`);
   const regionName = toString(
     source.regionName ?? source.nombreRegion ?? source.nombre ?? source.region,
-    `Region ${index + 1}`
+    `Región ${index + 1}`
   );
 
   return {
@@ -214,7 +214,7 @@ function normalizeLossTrend(payload: unknown, index: number): LossTrendPointDto 
 function normalizeAlertsSummary(payload: unknown, index: number): AlertsSummaryDto {
   const source = isObject(payload) ? payload : {};
   return {
-    category: toString(source.category ?? source.categoria, `Categoria ${index + 1}`),
+    category: toString(source.category ?? source.categoria, `Categoría ${index + 1}`),
     total: toNumber(source.total ?? source.count),
     level: toCriticity(source.level ?? source.criticidad)
   };
@@ -267,7 +267,7 @@ function normalizeMapPoint(payload: unknown, indicator: IndicatorType, index: nu
 
   return {
     regionId,
-    regionName: toString(source.regionName ?? source.nombreRegion ?? source.region ?? source.aoi, `Region ${index + 1}`),
+    regionName: toString(source.regionName ?? source.nombreRegion ?? source.region ?? source.aoi, `Región ${index + 1}`),
     indicator,
     value,
     criticity: explicitCriticity === 'UNKNOWN' ? inferredCriticity : explicitCriticity
@@ -300,7 +300,7 @@ function normalizeSyncRun(payload: unknown, regionId?: string): SyncRunResultDto
     startedAt: toString(source.startedAt ?? source.timestamp, ''),
     status: toString(source.status, 'UNKNOWN'),
     regionId: toString(source.regionId, regionId || '') || null,
-    message: toString(source.message, 'Sincronizacion iniciada.')
+    message: toString(source.message, 'Sincronización iniciada.')
   };
 }
 
@@ -315,7 +315,7 @@ export async function fetchDashboardSummary(): Promise<DashboardSummaryDto> {
 export async function fetchCriticalRegions(): Promise<CriticalRegionDto[]> {
   const payload = await getApiData<unknown[]>(
     DASHBOARD_ENDPOINTS.criticalRegions,
-    'No fue posible cargar las regiones criticas.'
+    'No fue posible cargar las regiones críticas.'
   );
   return Array.isArray(payload) ? payload.map(normalizeCriticalRegion) : [];
 }
@@ -323,7 +323,7 @@ export async function fetchCriticalRegions(): Promise<CriticalRegionDto[]> {
 export async function fetchLossTrend(): Promise<LossTrendPointDto[]> {
   const payload = await getApiData<unknown[]>(
     DASHBOARD_ENDPOINTS.lossTrend,
-    'No fue posible cargar la tendencia de perdida.'
+    'No fue posible cargar la tendencia de pérdida.'
   );
   return Array.isArray(payload) ? payload.map(normalizeLossTrend) : [];
 }
@@ -339,7 +339,7 @@ export async function fetchAlertsSummary(): Promise<AlertsSummaryDto[]> {
 export async function fetchLatestIndicator(regionId: string, indicator: IndicatorType): Promise<LatestIndicatorDto> {
   const payload = await getApiData<unknown>(
     DASHBOARD_ENDPOINTS.latestIndicators,
-    'No fue posible cargar el ultimo indicador de la region.',
+    'No fue posible cargar el último indicador de la región.',
     { regionId, indicator }
   );
   return normalizeLatestIndicator(payload, indicator, regionId);
@@ -409,7 +409,7 @@ export async function triggerDashboardSync(regionId?: string, from?: string, to?
 
   const payload = await postApiDataWithTimeout<unknown>(
     DASHBOARD_ENDPOINTS.syncRun,
-    'No fue posible iniciar la sincronizacion.',
+    'No fue posible iniciar la sincronización.',
     120000,
     Object.keys(params).length > 0 ? params : undefined
   );
@@ -419,7 +419,7 @@ export async function triggerDashboardSync(regionId?: string, from?: string, to?
 export async function triggerWeatherSync(regionId: string): Promise<SyncRunResultDto> {
   const payload = await postApiDataWithTimeout<unknown>(
     DASHBOARD_ENDPOINTS.weatherSync,
-    'No fue posible iniciar la sincronizacion de clima.',
+    'No fue posible iniciar la sincronización de clima.',
     30000,
     { regionId }
   );
@@ -429,7 +429,7 @@ export async function triggerWeatherSync(regionId: string): Promise<SyncRunResul
 export async function fetchRegions(): Promise<RegionDto[]> {
   const payload = await getApiData<unknown[]>(
     DASHBOARD_ENDPOINTS.regions,
-    'No fue posible cargar regiones desde backend.'
+    'No fue posible cargar regiones desde el servidor.'
   );
   return Array.isArray(payload) ? payload.map(normalizeRegion) : [];
 }

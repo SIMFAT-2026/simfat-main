@@ -208,7 +208,7 @@ function CitizenReportsPage() {
 
     try {
       if (!window.navigator?.geolocation) {
-        throw new Error('Tu navegador no soporta geolocalizacion.');
+        throw new Error('Tu navegador no soporta geolocalización.');
       }
 
       const position = await new Promise((resolve, reject) => {
@@ -226,7 +226,7 @@ function CitizenReportsPage() {
       }));
       feedback.showSuccess('Ubicación capturada correctamente.');
     } catch (err) {
-      feedback.showError(err.message || 'No fue posible capturar la ubicacion.');
+      feedback.showError(err.message || 'No fue posible capturar la ubicación.');
     } finally {
       setLocating(false);
     }
@@ -252,16 +252,16 @@ function CitizenReportsPage() {
 
       const subCategoryOptions = REPORT_SUBCATEGORIES[form.category];
       if (subCategoryOptions && !form.subCategory) {
-        throw new Error('Selecciona una subcategoria.');
+        throw new Error('Selecciona una subcategoría.');
       }
 
       if (selectedFiles.length > MAX_FILES) {
-        throw new Error(`Puedes adjuntar maximo ${MAX_FILES} fotos.`);
+        throw new Error(`Puedes adjuntar máximo ${MAX_FILES} fotos.`);
       }
 
       const hasOversized = selectedFiles.some((file) => file.size > MAX_FILE_BYTES);
       if (hasOversized) {
-        throw new Error('Cada foto debe pesar maximo 5 MB.');
+        throw new Error('Cada foto debe pesar máximo 5 MB.');
       }
 
       await createReport({
@@ -323,7 +323,7 @@ function CitizenReportsPage() {
       />
 
       <p className="community-source-note">
-        Origen de datos: {source === 'backend' ? 'backend de reportes' : 'fallback local de continuidad operativa'}.
+        {source === 'backend' ? 'Datos en línea.' : 'Modo sin conexión: se muestran datos locales de respaldo.'}
       </p>
 
       {feedback.message ? <p className={`feedback feedback-${feedback.type}`}>{feedback.message}</p> : null}
@@ -379,7 +379,7 @@ function CitizenReportsPage() {
           <label>
             Región
             <select name="regionId" value={form.regionId} onChange={onInputChange} required>
-              <option value="">Seleccione region</option>
+              <option value="">Seleccione región</option>
               {monitoredRegions.map((region) => (
                 <option key={region.id} value={region.id}>
                   {region.nombre}
@@ -391,7 +391,7 @@ function CitizenReportsPage() {
           <label>
             Comuna
             <select name="comunaId" value={form.comunaId} onChange={onInputChange} required disabled={!form.regionId}>
-              <option value="">{form.regionId ? 'Seleccione comuna' : 'Seleccione una region primero'}</option>
+              <option value="">{form.regionId ? 'Seleccione comuna' : 'Seleccione una región primero'}</option>
               {formComunas.map((comuna) => (
                 <option key={comuna.value} value={comuna.value}>
                   {comuna.label}
@@ -413,9 +413,9 @@ function CitizenReportsPage() {
 
           {REPORT_SUBCATEGORIES[form.category] ? (
             <label>
-              Subcategoria
+              Subcategoría
               <select name="subCategory" value={form.subCategory} onChange={onInputChange} required>
-                <option value="">Seleccione subcategoria</option>
+                <option value="">Seleccione subcategoría</option>
                 {REPORT_SUBCATEGORIES[form.category].map((subCategory) => (
                   <option key={subCategory} value={subCategory}>
                     {subCategory}
@@ -448,7 +448,7 @@ function CitizenReportsPage() {
 
           <div className="form-actions">
             <button type="button" className="btn btn-secondary" onClick={useCurrentLocation} disabled={locating}>
-              {locating ? 'Ubicando...' : 'Usar mi ubicacion'}
+              {locating ? 'Ubicando…' : 'Usar mi ubicación'}
             </button>
             <button type="submit" className="btn" disabled={submitting}>
               {submitting ? 'Enviando...' : 'Enviar reporte'}
@@ -461,7 +461,7 @@ function CitizenReportsPage() {
         <h3>Seguimiento de reportes</h3>
         {loading ? <LoadingSpinner label="Cargando reportes..." /> : null}
         {!loading && filteredReports.length === 0 ? (
-          <EmptyState title="Sin reportes" description="Aun no hay reportes para los filtros seleccionados." />
+          <EmptyState title="Sin reportes" description="Aún no hay reportes para los filtros seleccionados." />
         ) : null}
         {!loading && filteredReports.length > 0 ? (
           <DataTable
@@ -493,7 +493,7 @@ function CitizenReportsPage() {
       <ConfirmModal
         isOpen={Boolean(pendingDeleteId)}
         title="Eliminar reporte"
-        message="Esta accion no se puede deshacer."
+        message="Esta acción no se puede deshacer."
         confirmLabel="Eliminar"
         onConfirm={confirmDelete}
         onCancel={() => setPendingDeleteId('')}
@@ -503,7 +503,7 @@ function CitizenReportsPage() {
         <div className="modal-backdrop" onClick={() => setGalleryReport(null)}>
           <article className="reports-gallery-dialog" onClick={(event) => event.stopPropagation()}>
             <div className="reports-photo-dialog-header">
-              <strong>Galeria del reporte</strong>
+              <strong>Galería del reporte</strong>
               <button type="button" className="btn btn-secondary" onClick={() => setGalleryReport(null)}>
                 Cerrar
               </button>
@@ -537,7 +537,7 @@ function CitizenReportsPage() {
                 </div>
               </>
             ) : (
-              <EmptyState title="Sin fotos" description="Este reporte no registra imagenes asociadas." />
+              <EmptyState title="Sin fotos" description="Este reporte no registra imágenes asociadas." />
             )}
           </article>
         </div>
