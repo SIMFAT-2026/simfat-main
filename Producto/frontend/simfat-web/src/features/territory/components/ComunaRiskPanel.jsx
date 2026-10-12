@@ -6,6 +6,7 @@ import { ALERT_LEVEL_CONFIG } from '../constants/colorScales';
 import { generateComunalReport } from '../utils/reportPrint';
 import { REGIONES } from '../../../data/territorioChile';
 import { panelMode } from '../utils/comunaMapbiomas';
+import { alertTrigger } from '../utils/alertTrigger';
 
 
 const COMPONENT_META = {
@@ -257,6 +258,13 @@ export default function ComunaRiskPanel({ comunaId, comunaName = null, score, re
   const displayScore = syncState.result || score;
   const level = ALERT_LEVEL_CONFIG[displayScore.alertLevel] || ALERT_LEVEL_CONFIG.NORMAL;
   const pct = typeof displayScore.scoreComposite === 'number' ? (displayScore.scoreComposite * 100).toFixed(0) : '—';
+  const trigger = alertTrigger({
+    alertLevel: displayScore.alertLevel,
+    score: displayScore.scoreComposite,
+    fwiRaw: displayScore.fwiRaw,
+    firmsCount: displayScore.firmsCount,
+    firmsFrpMean: displayScore.firmsFrpMean
+  });
   const mode = displayScore.mode || 'STANDARD';
   const components = displayScore.components || {};
   const meta = COMPONENT_META[mode] || COMPONENT_META.STANDARD;
@@ -297,6 +305,9 @@ export default function ComunaRiskPanel({ comunaId, comunaName = null, score, re
         </div>
         <button type="button" className="panel-close" onClick={onClose} aria-label="Cerrar">×</button>
       </div>
+      {trigger.kind && trigger.kind !== 'score' && (
+        <p className="panel-trigger" style={{ color: level.color }}>{trigger.text}</p>
+      )}
 
       <div className="panel-score-row" style={{ borderColor: level.color }}>
         <div>

@@ -97,6 +97,48 @@ describe('regionalSummary', () => {
     expect(regionalSummary({ comunaScores }).top).toHaveLength(5);
   });
 
+  it('says how many comunas in the top level got there by FWI', () => {
+    const fwiAlto = (nombre, fwiRaw) => ({ ...score(0.25, 'ALTO', nombre), fwiRaw, firmsCount: 0, firmsFrpMean: 0 });
+    const summary = regionalSummary({
+      comunaScores: {
+        a: fwiAlto('Alfa', 21.5),
+        b: fwiAlto('Beta', 20),
+        c: score(0.74, 'ALTO', 'Gama'),
+        d: score(0.1, 'NORMAL', 'Delta')
+      }
+    });
+    expect(summary.alertText).toBe('3 en nivel alto (2 por FWI ≥ 20)');
+  });
+
+  it('omits the trigger breakdown when every top-level comuna is there by score', () => {
+    const summary = regionalSummary({
+      comunaScores: { a: score(0.75, 'ALTO', 'Alfa'), b: score(0.8, 'ALTO', 'Beta') }
+    });
+    expect(summary.alertText).toBe('2 en nivel alto');
+  });
+
+  it('breaks the critical level down by FWI and FIRMS triggers', () => {
+    const summary = regionalSummary({
+      comunaScores: {
+        a: { ...score(0.9, 'CRITICO', 'Alfa'), fwiRaw: 10, firmsCount: 0, firmsFrpMean: 0 },
+        b: { ...score(0.3, 'CRITICO', 'Beta'), fwiRaw: 12, firmsCount: 5, firmsFrpMean: 10 },
+        c: { ...score(0.4, 'CRITICO', 'Gama'), fwiRaw: 47, firmsCount: 0, firmsFrpMean: 0 },
+        d: { ...score(0.3, 'ALTO', 'Delta'), fwiRaw: 25 }
+      }
+    });
+    expect(summary.alertText).toBe('3 en nivel crítico (1 por FWI ≥ 45, 1 por focos FIRMS)');
+  });
+
+  it('does not count FWI triggers for levels below the headline level', () => {
+    const summary = regionalSummary({
+      comunaScores: {
+        a: { ...score(0.9, 'CRITICO', 'Alfa'), fwiRaw: 10 },
+        b: { ...score(0.3, 'ALTO', 'Beta'), fwiRaw: 25 }
+      }
+    });
+    expect(summary.alertText).toBe('1 en nivel crítico');
+  });
+
   it('passes through valid counts and drops invalid ones', () => {
     const ok = regionalSummary({ comunaScores: {}, firmsCount48h: 3, reports7d: 0 });
     expect(ok.firmsCount48h).toBe(3);

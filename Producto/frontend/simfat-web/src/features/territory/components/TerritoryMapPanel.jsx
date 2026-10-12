@@ -27,6 +27,7 @@ import { burnedFillOpacity } from '../utils/mapbiomasStyle';
 import LayerToggleGroups from './LayerToggleGroups';
 import RegionalSummary from './RegionalSummary';
 import { regionalSummary } from '../utils/regionalSummary';
+import { alertTrigger } from '../utils/alertTrigger';
 import MapbiomasYearControl from './MapbiomasYearControl';
 import { chipLabel, controlVisible } from '../utils/yearControl';
 import { LandcoverChoropleth, LandcoverLegend } from './LandcoverLayer';
@@ -789,6 +790,13 @@ function ComunaTooltip({ comunaId, nombre, score, pos, burnedLine = '', landcove
   const pct = typeof score?.scoreComposite === 'number' ? (score.scoreComposite * 100).toFixed(0) : null;
   const displayNombre = nombre || score?.nombreComuna || comunaId;
   const mode = score?.mode;
+  const trigger = alertTrigger({
+    alertLevel: score?.alertLevel,
+    score: score?.scoreComposite,
+    fwiRaw: score?.fwiRaw,
+    firmsCount: score?.firmsCount,
+    firmsFrpMean: score?.firmsFrpMean
+  });
 
   const componentEntries = tooltipComponentEntries(score?.components);
   const fwiInputs = score?.fwiInputs;
@@ -827,6 +835,9 @@ function ComunaTooltip({ comunaId, nombre, score, pos, burnedLine = '', landcove
           <div className="comuna-tooltip-level" style={{ color: level.darkUiColor }}>
             {level.label}
           </div>
+          {trigger.kind && trigger.kind !== 'score' && (
+            <div className="comuna-tooltip-trigger" style={{ color: level.darkUiColor }}>{trigger.text}</div>
+          )}
           <div className="comuna-tooltip-score-row">
             <div className="comuna-tooltip-bar-wrap">
               <div
@@ -1360,7 +1371,7 @@ function TerritoryMapPanel({
                           style={{ backgroundColor: item.color, borderColor: item.borderColor, color: item.borderColor }}
                           aria-hidden="true"
                         />
-                        <span>{item.label} ({item.range})</span>
+                        <span>{item.text}</span>
                       </li>
                     ))}
                   </ul>

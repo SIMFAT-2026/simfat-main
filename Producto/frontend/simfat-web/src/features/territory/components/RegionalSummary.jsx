@@ -1,11 +1,15 @@
 import { useId, useState } from 'react';
 import { ALERT_LEVEL_CONFIG } from '../constants/colorScales';
+import { ALERT_RULE_EXPLANATION } from '../utils/alertTrigger';
+import { useDisclosure } from './useDisclosure';
 
 // One-line regional summary plus a "Ver detalle" disclosure (level
 // distribution and top comunas). `summary` comes from regionalSummary().
 function RegionalSummary({ regionLabel, summary, onComunaClick }) {
   const [open, setOpen] = useState(false);
   const detailId = useId();
+  const infoId = useId();
+  const info = useDisclosure();
   const { comunaCount, alertText, max, maxTies, top, distribution, firmsCount48h, reports7d } = summary;
 
   return (
@@ -16,9 +20,25 @@ function RegionalSummary({ regionLabel, summary, onComunaClick }) {
           <strong>{regionLabel}</strong>
           {comunaCount > 0 ? ` · ${comunaCount} comunas` : ''}
           {` · ${alertText}`}
-          {max ? ` · Máx: ${max.name} ${max.pct}/100${maxTies > 0 ? ` (+${maxTies} con igual puntaje)` : ''}` : ''}
+          {max ? ` · Puntaje máx.: ${max.name} ${max.pct}/100${maxTies > 0 ? ` (+${maxTies} con igual puntaje)` : ''}` : ''}
           {firmsCount48h !== null ? ` · Focos FIRMS 48 h: ${firmsCount48h}` : ''}
           {reports7d !== null ? ` · Reportes 7 d: ${reports7d}` : ''}
+        </span>
+        <span className="territory-disclosure">
+          <button
+            ref={info.buttonRef}
+            type="button"
+            className="territory-info-button"
+            aria-label="Cómo se define el nivel de alerta"
+            aria-expanded={info.open}
+            aria-controls={infoId}
+            onClick={info.toggle}
+          >
+            <span aria-hidden="true">ⓘ</span>
+          </button>
+          <div ref={info.panelRef} id={infoId} className="territory-popover territory-info-panel" hidden={!info.open}>
+            <p>{ALERT_RULE_EXPLANATION}</p>
+          </div>
         </span>
         {comunaCount > 0 && (
           <button

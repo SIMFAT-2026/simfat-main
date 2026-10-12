@@ -1,4 +1,5 @@
 import { ALERT_LEVEL_CONFIG } from '../constants/colorScales';
+import { FWI_ALTO, FWI_CRITICO, alertTrigger } from './alertTrigger';
 
 // Display order of the alert levels, most severe first.
 const LEVEL_ORDER = ['CRITICO', 'ALTO', 'PREVENTIVO', 'NORMAL'];
@@ -6,6 +7,20 @@ const TOP_LIMIT = 5;
 
 function validCount(value) {
   return Number.isFinite(value) && value >= 0 ? value : null;
+}
+
+const FWI_THRESHOLD_BY_LEVEL = { ALTO: FWI_ALTO, CRITICO: FWI_CRITICO };
+
+// " (19 por FWI ≥ 20)" for the comunas of `level` raised by a trigger rather
+// than by their score; empty when none were.
+function triggerBreakdown(entries, level) {
+  const atLevel = entries.filter((entry) => entry.level === level);
+  const parts = [];
+  const byFwi = atLevel.filter((entry) => entry.trigger === 'fwi').length;
+  const byFirms = atLevel.filter((entry) => entry.trigger === 'firms').length;
+  if (byFwi > 0) parts.push(`${byFwi} por FWI ≥ ${FWI_THRESHOLD_BY_LEVEL[level]}`);
+  if (byFirms > 0) parts.push(`${byFirms} por focos FIRMS`);
+  return parts.length ? ` (${parts.join(', ')})` : '';
 }
 
 // Regional summary derived from the per-comuna scores the map paints, so it
@@ -18,6 +33,13 @@ export function regionalSummary({ comunaScores, comunaNames, firmsCount48h, repo
     .map(([comunaId, score]) => {
       const level = LEVEL_ORDER.includes(score.alertLevel) ? score.alertLevel : 'NORMAL';
       return {
+        trigger: alertTrigger({
+          alertLevel: level,
+          score: score.scoreComposite,
+          fwiRaw: score.fwiRaw,
+          firmsCount: score.firmsCount,
+          firmsFrpMean: score.firmsFrpMean
+        }).kind,
         comunaId,
         name: names[comunaId] || score.nombreComuna || comunaId,
         raw: score.scoreComposite,
@@ -42,7 +64,7 @@ export function regionalSummary({ comunaScores, comunaNames, firmsCount48h, repo
   let alertText = 'Sin datos por comuna';
   if (entries.length > 0) {
     alertText = highestAlert
-      ? `${highestAlert.count} en nivel ${highestAlert.label.toLowerCase()}`
+      ? `${highestAlert.count} en nivel ${highestAlert.label.toLowerCase()}${triggerBreakdown(entries, highestAlert.level)}`
       : 'Sin comunas en alerta';
   }
 

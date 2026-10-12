@@ -705,6 +705,17 @@
   white-space: nowrap;
 }
 
+.comuna-tooltip-trigger {
+  margin: -3px 0 5px;
+  font-size: 0.72rem;
+}
+
+.panel-trigger {
+  margin: 4px 0 0;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
 .comuna-tooltip-level {
   font-size: 0.75rem;
   font-weight: 600;
