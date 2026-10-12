@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../../../auth/AuthContext';
+import { resolveAccessibleRegions } from './communityAccess';
 import {
   createCommunityBoardPost,
   createCommunityContact,
@@ -155,7 +156,7 @@ export function useCommunityData() {
   const isAdmin = Boolean(
     user?.roleCodes?.includes('ROLE_ADMIN') || user?.roleCodes?.includes('ROLE_SUPER_ADMIN')
   );
-  const accessibleRegions = isAdmin ? null : (user?.communityModuleAccess?.regionIds ?? []);
+  const accessibleRegions = resolveAccessibleRegions(isAdmin, user?.communityModuleAccess?.regionIds);
 
   function filterByAccess(items) {
     if (!accessibleRegions) return items;
