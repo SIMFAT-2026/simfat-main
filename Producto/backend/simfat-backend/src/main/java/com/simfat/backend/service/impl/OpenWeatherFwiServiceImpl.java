@@ -4,15 +4,23 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.simfat.backend.model.Region;
 import com.simfat.backend.model.TerritoryWeatherObservation;
+import com.simfat.backend.repository.ComunaInfoRepository;
 import com.simfat.backend.repository.RegionRepository;
 import com.simfat.backend.repository.TerritoryWeatherObservationRepository;
 import com.simfat.backend.service.OpenWeatherFwiService;
+import com.simfat.backend.service.fwi.ComunaFwiAdvanceResult;
+import com.simfat.backend.service.fwi.ComunaFwiStateService;
+import com.simfat.backend.service.fwi.FwiInputs;
+import com.simfat.backend.service.fwi.FwiOutputs;
+import com.simfat.backend.service.fwi.LegacyProxyFwiCalculator;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 import org.slf4j.Logger;
@@ -30,9 +38,18 @@ public class OpenWeatherFwiServiceImpl implements OpenWeatherFwiService {
         .connectTimeout(Duration.ofSeconds(10))
         .build();
 
+    // Matches ComunaRiskServiceImpl's SANTIAGO_ZONE convention: "today" for the Van Wagner
+    // noon lookup is always Chile local time, independent of the server's own timezone.
+    private static final ZoneId SANTIAGO_ZONE = ZoneId.of("America/Santiago");
+
+    private static final String FWI_METHOD_PROXY = "PROXY_V1";
+    private static final String FWI_METHOD_VAN_WAGNER = "VAN_WAGNER";
+
     private final TerritoryWeatherObservationRepository weatherRepository;
     private final RegionRepository regionRepository;
     private final ObjectMapper objectMapper;
+    private final ComunaInfoRepository comunaInfoRepository;
+    private final ComunaFwiStateService comunaFwiStateService;
 
     @Value("${openmeteo.api.base-url:https://api.open-meteo.com}")
     private String baseUrl;
@@ -40,14 +57,31 @@ public class OpenWeatherFwiServiceImpl implements OpenWeatherFwiService {
     @Value("${openmeteo.sync.enabled:true}")
     private boolean syncEnabled;
 
+    // S1d2 (design D8 "Oct 6 cut date"): which FWI computation to use. Default PROXY_V1
+    // keeps production behavior unchanged from this slice; VAN_WAGNER is fully wired here
+    // but is a deliberate, later config-only flip, never bundled with a code change.
+    // Gating mechanism (task 1d2.3 / CFW-8a): even when this flag is VAN_WAGNER, the real
+    // chain is ONLY invoked when regionId is a real monitored comuna (comunaInfoRepository
+    // .existsById), so the 16 non-target display-only Region entities (and the "biobio"/
+    // "nuble"/"araucania" region-level slugs, which are also not comuna ids) always stay
+    // on PROXY_V1, regardless of this flag. This covers all three current callers of
+    // syncFwiByRegion — the cron loop below, ComunaRiskServiceImpl's per-comuna recompute,
+    // and TerritoryController's admin-triggered /territory/sync — with no signature change.
+    @Value("${territory.fwi.method:PROXY_V1}")
+    private String fwiMethod;
+
     public OpenWeatherFwiServiceImpl(
         TerritoryWeatherObservationRepository weatherRepository,
         RegionRepository regionRepository,
-        ObjectMapper objectMapper
+        ObjectMapper objectMapper,
+        ComunaInfoRepository comunaInfoRepository,
+        ComunaFwiStateService comunaFwiStateService
     ) {
         this.weatherRepository = weatherRepository;
         this.regionRepository = regionRepository;
         this.objectMapper = objectMapper;
+        this.comunaInfoRepository = comunaInfoRepository;
+        this.comunaFwiStateService = comunaFwiStateService;
     }
 
     @Scheduled(cron = "${openmeteo.sync.cron:0 30 */12 * * *}")
@@ -92,7 +126,13 @@ public class OpenWeatherFwiServiceImpl implements OpenWeatherFwiService {
             + "?latitude=" + lat
             + "&longitude=" + lon
             + "&daily=temperature_2m_max,temperature_2m_min,relative_humidity_2m_min,windspeed_10m_max,winddirection_10m_dominant,precipitation_sum"
-            + "&hourly=soil_temperature_0cm,windspeed_10m,winddirection_10m,weather_code"
+            // S1d2: temperature_2m/relative_humidity_2m/wind_speed_10m/precipitation are
+            // ADDED to the existing hourly block (not replacing soil_temperature_0cm/
+            // windspeed_10m/winddirection_10m/weather_code, which the proxy/tooltip/wind
+            // slider paths already depend on) so the noon-of-today values can be derived
+            // for the Van Wagner path without a second HTTP request.
+            + "&hourly=soil_temperature_0cm,windspeed_10m,winddirection_10m,weather_code,"
+            + "temperature_2m,relative_humidity_2m,wind_speed_10m,precipitation"
             + "&past_hours=24"
             + "&forecast_hours=24"
             + "&forecast_days=1"
@@ -130,7 +170,8 @@ public class OpenWeatherFwiServiceImpl implements OpenWeatherFwiService {
                 return false;
             }
 
-            double proxyFwi = computeProxyFwi(tempMax, rhMin, windMax, precip);
+            LocalDate targetDate = LocalDate.now(SANTIAGO_ZONE);
+            FwiComputationResult fwiResult = computeFwi(regionId, tempMax, rhMin, windMax, precip, hourly, targetDate);
 
             TerritoryWeatherObservation obs = new TerritoryWeatherObservation();
             obs.setRegionId(regionId);
@@ -138,7 +179,7 @@ public class OpenWeatherFwiServiceImpl implements OpenWeatherFwiService {
             obs.setSource(SOURCE);
             obs.setLat(lat);
             obs.setLon(lon);
-            obs.setFwi(round2(proxyFwi));
+            obs.setFwi(round2(fwiResult.fwi()));
             obs.setTempMax(tempMax);
             obs.setTempMin(tempMin);
             obs.setHumidityMin(rhMin);
@@ -150,11 +191,20 @@ public class OpenWeatherFwiServiceImpl implements OpenWeatherFwiService {
             obs.setHourlyTimestamps(getHourlyTimestamps(hourly));
             obs.setHourlyWindSpeed(getHourlyDoubles(hourly, "windspeed_10m"));
             obs.setHourlyWindDirection(getHourlyDoubles(hourly, "winddirection_10m"));
+            obs.setFwiMethod(fwiResult.method());
+            if (fwiResult.ffmc() != null) {
+                obs.setFfmc(round2(fwiResult.ffmc()));
+                obs.setDmc(round2(fwiResult.dmc()));
+                obs.setDc(round2(fwiResult.dc()));
+                obs.setIsi(round2(fwiResult.isi()));
+                obs.setBui(round2(fwiResult.bui()));
+                obs.setDsr(round2(fwiResult.dsr()));
+            }
             obs.setIngestedAt(LocalDateTime.now());
             weatherRepository.save(obs);
 
-            LOGGER.info("fwi_api status=ok regionId={} temp={} rh={} wind={} precip={} proxyFwi={}",
-                regionId, tempMax, rhMin, windMax, precip, round2(proxyFwi));
+            LOGGER.info("fwi_api status=ok regionId={} temp={} rh={} wind={} precip={} fwiMethod={} fwi={}",
+                regionId, tempMax, rhMin, windMax, precip, fwiResult.method(), round2(fwiResult.fwi()));
             return true;
 
         } catch (InterruptedException ex) {
@@ -168,26 +218,97 @@ public class OpenWeatherFwiServiceImpl implements OpenWeatherFwiService {
     }
 
     /**
-     * Proxy FWI en escala 0-60 (similar a CFWI: <15 bajo, 15-30 moderado, 30-45 alto, >45 extremo).
-     * Aproximación documentada para MVP basada en variables Open-Meteo disponibles.
-     * Fuentes: relaciones meteorológicas del CFWI (temperatura-FFMC, humedad-FFMC, viento-ISI).
+     * Result of the method-gated FWI computation: either the {@code PROXY_V1} branch
+     * (only {@code fwi} populated, the five Van Wagner fields left {@code null}) or the
+     * {@code VAN_WAGNER} branch (all seven fields populated from {@link FwiOutputs}).
      */
-    private double computeProxyFwi(double tempMax, double rhMin, double windMaxKmh, double precipMm) {
-        // Factor de secado: temperatura alta eleva peligro
-        double tempFactor = Math.max(0, Math.min(1.0, tempMax / 40.0));
+    private record FwiComputationResult(
+            double fwi, String method, Double ffmc, Double dmc, Double dc, Double isi, Double bui, Double dsr) {
 
-        // Factor de sequedad: humedad mínima del día (peor caso)
-        double drynessFactor = Math.max(0, (100.0 - rhMin) / 100.0);
+        static FwiComputationResult proxy(double fwi) {
+            return new FwiComputationResult(fwi, FWI_METHOD_PROXY, null, null, null, null, null, null);
+        }
+    }
 
-        // Factor de viento: velocidad máxima del día
-        double windFactor = Math.max(0, Math.min(1.0, windMaxKmh / 60.0));
+    /**
+     * Decides and runs the FWI computation for one sync (task 1d2.2/1d2.3). Gated to the
+     * Van Wagner chain ONLY when {@code territory.fwi.method=VAN_WAGNER} AND {@code
+     * regionId} is a real monitored comuna (see the {@link #fwiMethod} field javadoc for
+     * why this second condition exists). Falls back to the proxy, logging a warning, if
+     * today's noon hourly inputs cannot be derived or the chain throws — this method never
+     * fails the sync outright over the Van Wagner path.
+     */
+    private FwiComputationResult computeFwi(
+            String regionId, double tempMax, double rhMin, double windMax, double precip,
+            JsonNode hourly, LocalDate targetDate) {
+        boolean useVanWagner = FWI_METHOD_VAN_WAGNER.equals(fwiMethod) && comunaInfoRepository.existsById(regionId);
+        if (!useVanWagner) {
+            return FwiComputationResult.proxy(LegacyProxyFwiCalculator.computeProxyFwi(tempMax, rhMin, windMax, precip));
+        }
 
-        // Amortiguación por precipitación: 3mm+ reduce significativamente el riesgo
-        double rainFactor = Math.max(0.0, 1.0 - precipMm / 3.0);
+        FwiInputs noonInputs = deriveNoonInputs(hourly, precip, targetDate);
+        if (noonInputs == null) {
+            LOGGER.warn("fwi_van_wagner status=missing_noon_inputs regionId={} fallback=proxy", regionId);
+            return FwiComputationResult.proxy(LegacyProxyFwiCalculator.computeProxyFwi(tempMax, rhMin, windMax, precip));
+        }
 
-        // Compuesto: dryness domina (40%), temperatura (30%), viento (30%)
-        double raw = 60.0 * (0.40 * drynessFactor + 0.30 * tempFactor + 0.30 * windFactor) * rainFactor;
-        return Math.max(0, Math.min(60.0, raw));
+        try {
+            ComunaFwiAdvanceResult advanceResult = comunaFwiStateService.advance(regionId, targetDate, noonInputs);
+            FwiOutputs outputs = advanceResult.outputs();
+            return new FwiComputationResult(
+                    outputs.fwi(), FWI_METHOD_VAN_WAGNER,
+                    outputs.ffmc(), outputs.dmc(), outputs.dc(), outputs.isi(), outputs.bui(), outputs.dsr());
+        } catch (Exception ex) {
+            LOGGER.warn("fwi_van_wagner status=error regionId={} error={} fallback=proxy", regionId, ex.getMessage());
+            return FwiComputationResult.proxy(LegacyProxyFwiCalculator.computeProxyFwi(tempMax, rhMin, windMax, precip));
+        }
+    }
+
+    /**
+     * Derives today's noon-local-time {@link FwiInputs} from the hourly Open-Meteo block,
+     * or {@code null} if the noon timestamp or any of the three required fields is absent.
+     *
+     * <p><b>Documented simplification:</b> {@code precipMm} uses the already-fetched daily
+     * {@code precipitation_sum} (calendar-day total) rather than a strict 24h-ending-at-noon
+     * rolling window, which would require either a second API request or per-hour
+     * accumulation logic. This is a deliberate MVP approximation for S1d2, not a hydrology-
+     * perfect accumulation window.
+     */
+    private FwiInputs deriveNoonInputs(JsonNode hourly, Double dailyPrecipSum, LocalDate targetDate) {
+        Integer noonIndex = findNoonIndex(hourly, targetDate);
+        if (noonIndex == null) {
+            return null;
+        }
+        Double tempC = getDoubleAt(hourly, "temperature_2m", noonIndex);
+        Double rhPct = getDoubleAt(hourly, "relative_humidity_2m", noonIndex);
+        Double windKmh = getDoubleAt(hourly, "wind_speed_10m", noonIndex);
+        if (tempC == null || rhPct == null || windKmh == null) {
+            return null;
+        }
+        double precipMm = dailyPrecipSum == null ? 0.0 : dailyPrecipSum;
+        return new FwiInputs(tempC, rhPct, windKmh, precipMm, targetDate.getMonthValue());
+    }
+
+    private Integer findNoonIndex(JsonNode hourly, LocalDate targetDate) {
+        JsonNode times = hourly.path("time");
+        if (times.isMissingNode() || !times.isArray()) {
+            return null;
+        }
+        String noonTimestamp = targetDate + "T12:00";
+        for (int i = 0; i < times.size(); i++) {
+            if (noonTimestamp.equals(times.get(i).asText())) {
+                return i;
+            }
+        }
+        return null;
+    }
+
+    private Double getDoubleAt(JsonNode hourly, String field, int index) {
+        JsonNode arr = hourly.path(field);
+        if (arr.isMissingNode() || !arr.isArray() || index >= arr.size() || arr.get(index).isNull()) {
+            return null;
+        }
+        return arr.get(index).asDouble();
     }
 
     private Double getFirstDouble(JsonNode daily, String field) {

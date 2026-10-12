@@ -58,6 +58,15 @@ public class TerritoryWeatherObservation {
     private List<Double> hourlyWindSpeed;
     private List<Double> hourlyWindDirection;
 
+    // FWI computation method that produced fwi/ffmc/dmc/dc/isi/bui/dsr for this observation:
+    // "PROXY_V1" (Open-Meteo-derived approximation, LegacyProxyFwiCalculator) or
+    // "VAN_WAGNER" (real Canadian FWI chain, CanadianFwiCalculator + comuna_fwi_state).
+    // Historical documents predating S1d2 do not have this field at all; Spring Data
+    // deserializes the absent field as null, and every reader MUST treat fwiMethod == null
+    // as PROXY_V1 (design D4 / migration note), since PROXY_V1 was the only method that
+    // existed before this field was introduced.
+    private String fwiMethod;
+
     private LocalDateTime ingestedAt;
 
     public String getId() { return id; }
@@ -92,6 +101,9 @@ public class TerritoryWeatherObservation {
 
     public Double getDsr() { return dsr; }
     public void setDsr(Double dsr) { this.dsr = dsr; }
+
+    public String getFwiMethod() { return fwiMethod; }
+    public void setFwiMethod(String fwiMethod) { this.fwiMethod = fwiMethod; }
 
     public Double getLat() { return lat; }
     public void setLat(Double lat) { this.lat = lat; }

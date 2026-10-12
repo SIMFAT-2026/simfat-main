@@ -7,6 +7,7 @@ import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.Objects;
 import java.util.Optional;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 /**
@@ -60,6 +61,7 @@ public class ComunaFwiStateService {
     private final CanadianFwiCalculator calculator;
     private final int maxGapDays;
 
+    @Autowired
     public ComunaFwiStateService(ComunaFwiStateRepository repository) {
         this(repository, CanadianFwiCalculator.northernHemisphere(), DEFAULT_MAX_GAP_DAYS);
     }
