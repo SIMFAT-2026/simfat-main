@@ -21,6 +21,7 @@ import {
 } from '../constants/colorScales';
 import { burnedLegendNote, burnedLineFor, burnedToggleLabel, burnedTooltipText } from '../utils/mapbiomasLayer';
 import { CLIMATE_INDICATORS } from '../constants/indicators';
+import MapbiomasYearControl from './MapbiomasYearControl';
 
 // LocalDateTime de Java llega sin 'Z' — JS lo interpreta como hora local del browser.
 // Esta utilidad fuerza UTC antes de convertir a Santiago para evitar doble conversión.
@@ -674,6 +675,10 @@ const COMPONENT_INFO = {
 
 const VISIBLE_RISK_COMPONENTS = new Set(['fwi', 'ndmi', 'firms', 'ndvi', 'reports']);
 const POINT_LAYER_INDICATORS = ['FIRMS', 'ALERTS', 'REPORTS'];
+// MapBiomas layers that get a year control while visible (Q31). S3-4 adds
+// LANDCOVER here.
+const MAPBIOMAS_YEAR_CONTROLS = [{ indicator: 'BURNED', label: 'Área quemada' }];
+
 const MAP_TOGGLE_INDICATORS = ['RISK_SCORE', 'FIRMS', 'NDVI', 'NDMI', 'ALERTS', 'REPORTS', 'BURNED'];
 const ALERT_TOOLTIP_COMPONENTS = ['firms', 'fwi', 'ndmi', 'ndvi'];
 
@@ -988,7 +993,7 @@ function ComunaTooltip({ comunaId, nombre, score, pos, burnedLine = '' }) {
 function BurnedLegend({ state }) {
   const layer = state?.layer;
   const title = layer ? `Área quemada ${layer.year} (anual)` : 'Área quemada (anual)';
-  const note = burnedLegendNote(layer);
+  const note = burnedLegendNote(layer, { hasYearControl: true });
 
   return (
     <div className="territory-legend-section">
@@ -1216,6 +1221,19 @@ function TerritoryMapPanel({
           </div>
         )}
       </div>
+
+      {/* Q31: one fixed row between the layer toggles and the map, shown only
+          while a MapBiomas layer is active. */}
+      {MAPBIOMAS_YEAR_CONTROLS.some(({ indicator }) => visibleIndicators.includes(indicator)) && (
+        <div className="territory-year-controls">
+          {MAPBIOMAS_YEAR_CONTROLS.filter(({ indicator }) => visibleIndicators.includes(indicator)).map(
+            ({ indicator, label }) =>
+              mapbiomasLayers[indicator] && (
+                <MapbiomasYearControl key={indicator} label={label} state={mapbiomasLayers[indicator]} />
+              )
+          )}
+        </div>
+      )}
 
       {loading ? <LoadingSpinner label="Cargando capas territoriales..." /> : null}
       {!loading && error ? <ErrorMessage error={{ message: error }} onRetry={onRetry} /> : null}

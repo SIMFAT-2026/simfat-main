@@ -15,7 +15,9 @@ describe('mapbiomasReducer', () => {
       regionId: null,
       layer: null,
       loading: false,
-      error: ''
+      error: '',
+      range: null,
+      defaultYear: undefined
     });
   });
 
@@ -123,5 +125,87 @@ describe('mapbiomasReducer', () => {
 
   it('returns the same state for unknown actions', () => {
     expect(mapbiomasReducer(initialMapbiomasState, { type: 'nope' })).toBe(initialMapbiomasState);
+  });
+
+  describe('year range and default year', () => {
+    const ranged = { ...layer2025, minYear: 2013, maxYear: 2025 };
+
+    it('remembers the available range from a loaded layer', () => {
+      const state = run([
+        { type: 'request', regionId: 'biobio' },
+        { type: 'success', regionId: 'biobio', requestedYear: undefined, layer: ranged }
+      ]);
+      expect(state.range).toEqual({ minYear: 2013, maxYear: 2025 });
+    });
+
+    it('keeps the range while another year or region is loading', () => {
+      const state = run([
+        { type: 'request', regionId: 'biobio' },
+        { type: 'success', regionId: 'biobio', requestedYear: undefined, layer: ranged },
+        { type: 'select-year', year: 2020 },
+        { type: 'request', regionId: 'biobio' }
+      ]);
+      expect(state.layer).toBeNull();
+      expect(state.range).toEqual({ minYear: 2013, maxYear: 2025 });
+    });
+
+    it('ignores a payload without a valid range', () => {
+      const state = run([
+        { type: 'request', regionId: 'biobio' },
+        { type: 'success', regionId: 'biobio', requestedYear: undefined, layer: { ...layer2025, minYear: 2030, maxYear: 2013 } }
+      ]);
+      expect(state.range).toBeNull();
+    });
+
+    it('records the backend default year only when no year was requested', () => {
+      const first = run([
+        { type: 'request', regionId: 'biobio' },
+        { type: 'success', regionId: 'biobio', requestedYear: undefined, layer: ranged }
+      ]);
+      expect(first.defaultYear).toBe(2025);
+
+      const explicit = run(
+        [
+          { type: 'select-year', year: 2020 },
+          { type: 'request', regionId: 'biobio' },
+          { type: 'success', regionId: 'biobio', requestedYear: 2020, layer: { ...ranged, year: 2020 } }
+        ],
+        first
+      );
+      expect(explicit.defaultYear).toBe(2025);
+    });
+
+    it('returns to the backend default when the year is cleared', () => {
+      const state = run([
+        { type: 'request', regionId: 'biobio' },
+        { type: 'success', regionId: 'biobio', requestedYear: undefined, layer: ranged },
+        { type: 'select-year', year: 2020 },
+        { type: 'select-year', year: null }
+      ]);
+      expect(state.selectedYear).toBeUndefined();
+      expect(state.defaultYear).toBe(2025);
+    });
+
+    it('keeps the default year when an explicit year is selected', () => {
+      const state = run([
+        { type: 'request', regionId: 'biobio' },
+        { type: 'success', regionId: 'biobio', requestedYear: undefined, layer: ranged },
+        { type: 'select-year', year: 2020 }
+      ]);
+      expect(state.defaultYear).toBe(2025);
+    });
+
+    it('keeps range and default year when a success carries no layer', () => {
+      const state = run([
+        { type: 'request', regionId: 'biobio' },
+        { type: 'success', regionId: 'biobio', requestedYear: undefined, layer: ranged },
+        { type: 'select-year', year: 2020 },
+        { type: 'request', regionId: 'biobio' },
+        { type: 'success', regionId: 'biobio', requestedYear: 2020, layer: null }
+      ]);
+      expect(state.layer).toBeNull();
+      expect(state.range).toEqual({ minYear: 2013, maxYear: 2025 });
+      expect(state.defaultYear).toBe(2025);
+    });
   });
 });
