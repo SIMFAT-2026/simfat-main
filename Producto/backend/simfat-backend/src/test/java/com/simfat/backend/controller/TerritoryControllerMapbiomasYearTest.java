@@ -53,7 +53,7 @@ class TerritoryControllerMapbiomasYearTest extends MongoFreeWebTestSupport {
     private static ComunaMapbiomasStats statsWithFire(String comunaId, Map<String, Double> fractionByYear) {
         ComunaMapbiomasStats stats = new ComunaMapbiomasStats();
         stats.setComunaId(comunaId);
-        stats.setDataVersion("fuego-col1@2017-partial");
+        stats.setDataVersion("lulc-col2+fuego-col1@2017-partial");
         ComunaMapbiomasStats.Fire fire = new ComunaMapbiomasStats.Fire();
         fire.setAvailable(true);
         fire.setBurnedFractionByYear(fractionByYear);

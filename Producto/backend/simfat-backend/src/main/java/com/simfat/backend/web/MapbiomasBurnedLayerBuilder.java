@@ -24,7 +24,8 @@ import java.util.Map;
  *       {@code available=false}.</li>
  *   <li>{@code fire.available=true} but the requested year has no entry in
  *       {@code burnedFractionByYear}/{@code burnedHaByYear} -- the honest state of the REAL
- *       current seed ({@code fuego-col1@2017-partial}, which only populates a 2017 entry): the
+ *       current seed ({@code lulc-col2+fuego-col1@2017-partial}, whose fire section still only
+ *       populates a 2017 entry -- see S1b4 apply-progress): the
  *       comuna reads {@code available=true} (coverage exists) with {@code burnedFraction=null}
  *       and {@code burnedHa=null} for that specific year (not computed yet), distinct from a
  *       real, computed {@code 0.0}.</li>

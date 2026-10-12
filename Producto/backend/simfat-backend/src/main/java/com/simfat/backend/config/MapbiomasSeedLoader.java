@@ -13,6 +13,7 @@ import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -45,7 +46,7 @@ public class MapbiomasSeedLoader {
     private static final Logger LOGGER = LoggerFactory.getLogger(MapbiomasSeedLoader.class);
 
     private static final String SEED_RESOURCE_PATH =
-        "seed/mapbiomas/comuna-mapbiomas-stats.fuego-col1-2017-partial.jsonl";
+        "seed/mapbiomas/comuna-mapbiomas-stats.lulc-col2+fuego-col1-2017-partial.jsonl";
 
     private final ComunaMapbiomasStatsRepository statsRepository;
     private final ComunaInfoRepository comunaInfoRepository;
@@ -54,7 +55,7 @@ public class MapbiomasSeedLoader {
     @Value("${mapbiomas.seed.enabled:true}")
     private boolean seedEnabled;
 
-    @Value("${mapbiomas.seed.data-version:fuego-col1@2017-partial}")
+    @Value("${mapbiomas.seed.data-version:lulc-col2+fuego-col1@2017-partial}")
     private String dataVersion;
 
     // Test seam: lets tests point loadSeed() at a synthetic (e.g. deliberately malformed)
@@ -224,7 +225,10 @@ public class MapbiomasSeedLoader {
         if (landCoverNode.isMissingNode() || landCoverNode.isNull()) {
             entity.setLandCover(null);
         } else {
-            entity.setLandCover(objectMapper.treeToValue(landCoverNode, ComunaMapbiomasStats.LandCover.class));
+            ComunaMapbiomasStats.LandCover landCover =
+                objectMapper.treeToValue(landCoverNode, ComunaMapbiomasStats.LandCover.class);
+            validateSharesByYear(comunaId, landCover);
+            entity.setLandCover(landCover);
         }
         entity.setLandCoverReason(textOrNull(raw, "landCoverReason"));
 
@@ -249,6 +253,64 @@ public class MapbiomasSeedLoader {
         }
 
         return entity;
+    }
+
+    // Design D1 hard gate: every sharesByYear.classes[*] array must have exactly
+    // (lastYear - firstYear + 1) entries, and sharesByClass must equal
+    // sharesByYear[referenceYear]/10000 within 1e-4 (MCS-1d) -- a malformed or
+    // drifted seed line is rejected loudly (thrown, caught by loadSeed()'s per-line
+    // catch and counted as an error) rather than silently persisted.
+    private static final double REFERENCE_YEAR_TOLERANCE = 1e-4;
+    private static final int BP_TOTAL = 10_000;
+
+    private static void validateSharesByYear(String comunaId, ComunaMapbiomasStats.LandCover landCover) {
+        ComunaMapbiomasStats.SharesByYear sharesByYear = landCover.getSharesByYear();
+        if (sharesByYear == null) {
+            return;
+        }
+        Integer firstYear = sharesByYear.getFirstYear();
+        Integer lastYear = sharesByYear.getLastYear();
+        if (firstYear == null || lastYear == null) {
+            throw new IllegalArgumentException(
+                "comuna=" + comunaId + ": sharesByYear.firstYear/lastYear must not be null"
+            );
+        }
+        int expectedLength = lastYear - firstYear + 1;
+        Map<String, int[]> classes = sharesByYear.getClasses();
+        if (classes != null) {
+            for (Map.Entry<String, int[]> entry : classes.entrySet()) {
+                int actualLength = entry.getValue() == null ? 0 : entry.getValue().length;
+                if (actualLength != expectedLength) {
+                    throw new IllegalArgumentException(
+                        "comuna=" + comunaId + " class=" + entry.getKey() + ": sharesByYear array length "
+                            + actualLength + " != lastYear-firstYear+1 (" + expectedLength + ")"
+                    );
+                }
+            }
+        }
+
+        Integer referenceYear = landCover.getReferenceYear();
+        Map<String, Double> sharesByClass = landCover.getSharesByClass();
+        if (referenceYear == null || sharesByClass == null || classes == null) {
+            return;
+        }
+        if (referenceYear < firstYear || referenceYear > lastYear) {
+            return;
+        }
+        int refIndex = referenceYear - firstYear;
+        for (Map.Entry<String, Double> entry : sharesByClass.entrySet()) {
+            int[] series = classes.get(entry.getKey());
+            int bp = series == null ? 0 : series[refIndex];
+            double fromSeries = bp / (double) BP_TOTAL;
+            double fromSharesByClass = entry.getValue() == null ? 0.0 : entry.getValue();
+            if (Math.abs(fromSharesByClass - fromSeries) > REFERENCE_YEAR_TOLERANCE) {
+                throw new IllegalArgumentException(
+                    "comuna=" + comunaId + " class=" + entry.getKey() + ": sharesByClass " + fromSharesByClass
+                        + " drifts from sharesByYear[" + referenceYear + "]/10000 " + fromSeries
+                        + " by more than " + REFERENCE_YEAR_TOLERANCE
+                );
+            }
+        }
     }
 
     private static String textOrNull(JsonNode node, String field) {

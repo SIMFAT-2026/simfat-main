@@ -31,7 +31,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 @ExtendWith(MockitoExtension.class)
 class MapbiomasSusceptibilityServiceImplBulkTest {
 
-    private static final String DATA_VERSION = "fuego-col1@2017-partial";
+    private static final String DATA_VERSION = "lulc-col2+fuego-col1@2017-partial";
 
     @Mock
     private ComunaMapbiomasStatsRepository statsRepository;

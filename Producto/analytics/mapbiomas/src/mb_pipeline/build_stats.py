@@ -50,22 +50,153 @@ def to_basis_points(shares_ha: Mapping[int, float]) -> dict[int, int]:
     return floored
 
 
+def shares_by_year_bp(
+    by_year: Mapping[int, Mapping[int, float]], *, first_year: int, last_year: int
+) -> dict:
+    """Class-major, sparse, per-year basis-point series (design D1 rev2).
+
+    Returns ``{firstYear, lastYear, unit: "bp", classes: {code: [int, ...]}}``
+    where ``classes[code][i]`` is the basis-point share of ``code`` in year
+    ``first_year + i``. Each year's bp values (across every class present
+    that year, via ``to_basis_points``) sum to EXACTLY 10000 -- the same
+    largest-remainder rounding used by ``land_cover_section``, applied
+    independently per year. A class absent from a given year (zero hectares,
+    dropped by ``to_basis_points``) reads 0 at that year's index rather than
+    being missing from the array (fixed-length arrays: length ==
+    ``last_year - first_year + 1``). A class that never has a non-zero share
+    in ANY year in range is not a key in ``classes`` at all (sparse).
+    """
+    n_years = last_year - first_year + 1
+    classes: dict[int, list[int]] = {}
+    for year in range(first_year, last_year + 1):
+        idx = year - first_year
+        year_bp = to_basis_points(by_year.get(year, {}))
+        for code, bp in year_bp.items():
+            classes.setdefault(code, [0] * n_years)[idx] = bp
+    return {"firstYear": first_year, "lastYear": last_year, "unit": "bp", "classes": classes}
+
+
+class ShareSumError(ValueError):
+    """Raised when a comuna-year's classified total drifts from its reference year (MCS-3e)."""
+
+
+def validate_comuna_year_shares(
+    by_year: Mapping[int, Mapping[int, float]],
+    *,
+    comuna_id: str,
+    reference_year: int,
+    tolerance: float = 0.005,
+) -> None:
+    """Hard gate (design D2, MCS-3e): abort if any comuna-year's classified
+    total hectares drifts by more than ``tolerance`` (relative) from the
+    SAME comuna's reference-year total.
+
+    A comuna's classified area is physically stable across years (verified
+    against the real xlsx, S1b4: every one of the 86 target comunas' yearly
+    total is stable to a fraction of a hectare across 1999-2024), so this
+    catches genuine per-year data problems (e.g. a missing class/row for one
+    year) rather than being a cosmetic rounding check. Names ``(comuna_id,
+    year)`` in the raised error, never renormalizes silently.
+
+    IMPORTANT (S1b4 review): this is a DRIFT detector for row dropouts, NOT
+    a double-count gate. It compares each year against the SAME comuna's
+    OWN reference-year total, so a double count that is stable across every
+    year (e.g. one class summed twice, every year alike) shifts both sides
+    of the comparison equally and passes silently -- proven empirically by
+    a judge during S1b4 review. Catching a double count needs a source
+    independent of the xlsx itself; see
+    ``validate_comuna_polygon_area_ratio``, which compares against the
+    comuna's own GeoJSON polygon area instead.
+    """
+    reference_total = sum(by_year[reference_year].values())
+    for year, classes in by_year.items():
+        total = sum(classes.values())
+        fraction = (total / reference_total) if reference_total else 0.0
+        if abs(fraction - 1.0) > tolerance:
+            raise ShareSumError(
+                f"comuna={comuna_id!r} year={year}: classified total {total} ha is "
+                f"{fraction:.4f}x the reference year {reference_year}'s total "
+                f"{reference_total} ha (tolerance {tolerance})"
+            )
+
+
+class AreaRatioError(ValueError):
+    """Raised when a comuna's LULC classified total drifts too far from its
+    own GeoJSON polygon's geodesic area (design D2 independent area gate)."""
+
+
+def validate_comuna_polygon_area_ratio(
+    lulc_total_ha: float,
+    polygon_ha: float,
+    *,
+    comuna_id: str,
+    tolerance: float = 0.15,
+) -> float:
+    """Hard gate (design D2): abort if a comuna's LULC classified total
+    hectares (reference year, ALL classes including 27/unobserved) drifts by
+    more than ``tolerance`` (relative) from that SAME comuna's own GeoJSON
+    polygon area (``area.polygon_area_ha``, computed independently of the
+    xlsx from the repo's comuna GeoJSON).
+
+    This is INDEPENDENT of ``validate_comuna_year_shares``: that gate can
+    only catch a drift that is unstable across years for one comuna, so it
+    is blind to a double count that is stable across every year alike (a
+    judge proved this empirically during S1b4 review by doubling one
+    class's rows in every year and showing the year-drift gate still
+    passed). Comparing against the polygon's own area instead catches that
+    case directly, because a genuinely doubled class pushes the ratio well
+    above 1.0 regardless of year-to-year stability.
+
+    Tolerance (default 15%, i.e. ratio in ``[0.85, 1.15]``): real evidence
+    across all 86 comunas in our 3 target regions (S1b4, 2024 reference
+    year) gives a ratio distribution of min 0.9009 (Coronel), max 1.0118
+    (San Pedro de la Paz), median 1.0007 -- the two comunas below 0.95 are
+    both coastal/multi-part (Coronel, Lebu), consistent with the MapBiomas
+    political-boundary polygon differing from the GADM-derived polygon at
+    the coastline/estuary. 15% gives ~1.5x headroom over that worst real
+    deviation (10%) while staying decisively tighter than the ~50-100%+
+    deviation a genuine double count of any non-trivial class would produce
+    -- it is a principled bound on plausible boundary-source disagreement,
+    not fitted to make every comuna pass.
+    """
+    if polygon_ha <= 0:
+        raise AreaRatioError(
+            f"comuna={comuna_id!r}: polygon area is {polygon_ha} ha (must be positive)"
+        )
+    ratio = lulc_total_ha / polygon_ha
+    if abs(ratio - 1.0) > tolerance:
+        raise AreaRatioError(
+            f"comuna={comuna_id!r}: LULC classified total {lulc_total_ha:.1f} ha is "
+            f"{ratio:.4f}x its GeoJSON polygon's geodesic area {polygon_ha:.1f} ha "
+            f"(tolerance {tolerance:.0%}) -- possible double count or join error"
+        )
+    return ratio
+
+
 def land_cover_section(
     by_year: Mapping[int, Mapping[int, float]],
     *,
     reference_year: int,
     mean_years: Sequence[int],
+    first_year: int | None = None,
+    last_year: int | None = None,
 ) -> dict:
     """Build the ``landCover`` section for one comuna from its per-year hectares.
 
     ``sharesByClass`` (the reference year's shares) and ``sharesByClassMean5y``
-    (the mean of ``mean_years`` hectares) are FRACTIONS summing to ~1.0 (design
-    D1) -- basis points are reserved for ``sharesByYear.classes`` only (not
-    implemented in this slice). Internally the largest-remainder bp rounding
-    (``to_basis_points``) is still used so the emitted fractions are exact
-    multiples of 1/10000, deterministic and reproducible, then divided by
-    ``BP_TOTAL`` before being returned.
+    (the mean of ``mean_years`` hectares) are FRACTIONS summing to ~1.0
+    (design D1) -- basis points are reserved for ``sharesByYear.classes``
+    (design D1 rev2, ``shares_by_year_bp``, spanning ``first_year..last_year``
+    inclusive, defaulting to the full range of years present in ``by_year``
+    when not given explicitly). Internally the largest-remainder bp rounding
+    (``to_basis_points``) is used for BOTH representations so the emitted
+    fractions are exact multiples of 1/10000, deterministic, reproducible,
+    and never drift from the bp series (MCS-1d reference-year consistency).
     """
+    if first_year is None:
+        first_year = min(by_year)
+    if last_year is None:
+        last_year = max(by_year)
     reference_bp = to_basis_points(by_year[reference_year])
 
     total_ha_by_class: dict[int, float] = {}
@@ -79,6 +210,7 @@ def land_cover_section(
         "referenceYear": reference_year,
         "sharesByClass": {code: bp / BP_TOTAL for code, bp in reference_bp.items()},
         "sharesByClassMean5y": {code: bp / BP_TOTAL for code, bp in mean_bp.items()},
+        "sharesByYear": shares_by_year_bp(by_year, first_year=first_year, last_year=last_year),
     }
 
 

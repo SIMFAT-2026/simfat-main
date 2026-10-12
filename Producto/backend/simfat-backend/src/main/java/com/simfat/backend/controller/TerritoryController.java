@@ -125,7 +125,7 @@ public class TerritoryController {
 
     // Config property, not a code literal, mirroring MapbiomasSusceptibilityServiceImpl's
     // dataVersion field so both read the same pinned version (design D1 "Collection refresh").
-    @Value("${mapbiomas.stats.data-version:fuego-col1@2017-partial}")
+    @Value("${mapbiomas.stats.data-version:lulc-col2+fuego-col1@2017-partial}")
     private String mapbiomasDataVersion;
 
     // Judgment-day finding #2 (WARNING, fixed): design D5 requires a `citation` field on the

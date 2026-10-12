@@ -33,7 +33,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 @ExtendWith(MockitoExtension.class)
 class MapbiomasSusceptibilityServiceImplTest {
 
-    private static final String DATA_VERSION = "fuego-col1@2017-partial";
+    private static final String DATA_VERSION = "lulc-col2+fuego-col1@2017-partial";
     private static final String COMUNA_ID = "CHL.8.1.1_1";
 
     @Mock

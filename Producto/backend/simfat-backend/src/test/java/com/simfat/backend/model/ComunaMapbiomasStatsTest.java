@@ -14,14 +14,14 @@ class ComunaMapbiomasStatsTest {
 
     @Test
     void buildId_concatenatesComunaIdAndDataVersionWithPipe() {
-        String id = ComunaMapbiomasStats.buildId("CHL.6.1.1_1", "fuego-col1@2017-partial");
+        String id = ComunaMapbiomasStats.buildId("CHL.6.1.1_1", "lulc-col2+fuego-col1@2017-partial");
 
-        assertThat(id).isEqualTo("CHL.6.1.1_1|fuego-col1@2017-partial");
+        assertThat(id).isEqualTo("CHL.6.1.1_1|lulc-col2+fuego-col1@2017-partial");
     }
 
     @Test
     void buildId_differentDataVersionsForTheSameComunaProduceDifferentIds() {
-        String v1 = ComunaMapbiomasStats.buildId("CHL.6.1.1_1", "fuego-col1@2017-partial");
+        String v1 = ComunaMapbiomasStats.buildId("CHL.6.1.1_1", "lulc-col2+fuego-col1@2017-partial");
         String v2 = ComunaMapbiomasStats.buildId("CHL.6.1.1_1", "lulc-col2+fuego-col1@2026-09-21");
 
         assertThat(v1).isNotEqualTo(v2);

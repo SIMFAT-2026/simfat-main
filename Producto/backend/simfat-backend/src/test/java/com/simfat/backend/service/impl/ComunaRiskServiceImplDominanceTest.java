@@ -175,7 +175,7 @@ class ComunaRiskServiceImplDominanceTest {
 
     private void stubMapbiomasFullSusceptibility(ComunaInfo comuna) {
         when(mapbiomasService.forComuna(comuna.getId())).thenReturn(Optional.of(
-            new MapbiomasSusceptibility(1.0, 0.9, 0.9, "fuego-col1@2017-partial", null, 0.0)
+            new MapbiomasSusceptibility(1.0, 0.9, 0.9, "lulc-col2+fuego-col1@2017-partial", null, 0.0)
         ));
     }
 

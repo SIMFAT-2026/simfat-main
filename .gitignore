@@ -22,3 +22,8 @@ Producto/frontend/simfat-web/*.log
 .env.local
 .env.*.local
 .vercel/
+
+# MapBiomas raw source files (xlsx/GeoTIFF): reproducible via
+# Producto/analytics/mapbiomas/src/mb_pipeline/download.py + data/manifest.json,
+# never committed (design D2).
+Producto/analytics/mapbiomas/data/raw/

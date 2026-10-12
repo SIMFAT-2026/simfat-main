@@ -46,11 +46,11 @@ class MapbiomasSeedLoaderMappingTest {
         JsonNode node = objectMapper.readTree(raw);
         ComunaInfo info = comunaInfo("CHL.6.1.1_1", "Arauco", "biobio");
 
-        ComunaMapbiomasStats result = MapbiomasSeedLoader.mapRawRecord(node, info, "fuego-col1@2017-partial", objectMapper);
+        ComunaMapbiomasStats result = MapbiomasSeedLoader.mapRawRecord(node, info, "lulc-col2+fuego-col1@2017-partial", objectMapper);
 
-        assertThat(result.getId()).isEqualTo("CHL.6.1.1_1|fuego-col1@2017-partial");
+        assertThat(result.getId()).isEqualTo("CHL.6.1.1_1|lulc-col2+fuego-col1@2017-partial");
         assertThat(result.getComunaId()).isEqualTo("CHL.6.1.1_1");
-        assertThat(result.getDataVersion()).isEqualTo("fuego-col1@2017-partial");
+        assertThat(result.getDataVersion()).isEqualTo("lulc-col2+fuego-col1@2017-partial");
         assertThat(result.getRegionId()).isEqualTo("biobio");
         assertThat(result.getNombreComuna()).isEqualTo("Arauco");
         assertThat(result.getLandCover()).isNull();
@@ -67,7 +67,7 @@ class MapbiomasSeedLoaderMappingTest {
     @Test
     void mapRawRecord_realSeedLineWithFireReasonField_doesNotThrowUnrecognizedProperty() throws Exception {
         // Exact line 1 of the real committed seed
-        // (src/main/resources/seed/mapbiomas/comuna-mapbiomas-stats.fuego-col1-2017-partial.jsonl).
+        // (src/main/resources/seed/mapbiomas/comuna-mapbiomas-stats.lulc-col2+fuego-col1-2017-partial.jsonl).
         // Every one of the 86 lines carries "fire.reason" (nullable string explaining why
         // fire.available is false; null when available=true), which the Fire model was
         // missing entirely -- with a plain, unconfigured ObjectMapper this made
@@ -87,7 +87,7 @@ class MapbiomasSeedLoaderMappingTest {
         JsonNode node = objectMapper.readTree(raw);
         ComunaInfo info = comunaInfo("CHL.6.1.1_1", "Arauco", "biobio");
 
-        ComunaMapbiomasStats result = MapbiomasSeedLoader.mapRawRecord(node, info, "fuego-col1@2017-partial", objectMapper);
+        ComunaMapbiomasStats result = MapbiomasSeedLoader.mapRawRecord(node, info, "lulc-col2+fuego-col1@2017-partial", objectMapper);
 
         assertThat(result.getFire()).isNotNull();
         assertThat(result.getFire().getReason()).isNull();
@@ -109,7 +109,7 @@ class MapbiomasSeedLoaderMappingTest {
         JsonNode node = objectMapper.readTree(raw);
         ComunaInfo info = comunaInfo("CHL.6.9.9_1", "Ejemplo", "biobio");
 
-        ComunaMapbiomasStats result = MapbiomasSeedLoader.mapRawRecord(node, info, "fuego-col1@2017-partial", objectMapper);
+        ComunaMapbiomasStats result = MapbiomasSeedLoader.mapRawRecord(node, info, "lulc-col2+fuego-col1@2017-partial", objectMapper);
 
         assertThat(result.getFire().getAvailable()).isFalse();
         assertThat(result.getFire().getReason()).isEqualTo("coverageFraction 0.4200 below threshold 0.8");
@@ -131,7 +131,7 @@ class MapbiomasSeedLoaderMappingTest {
         JsonNode node = objectMapper.readTree(raw);
         ComunaInfo info = comunaInfo("CHL.6.1.1_1", "Arauco", "biobio");
 
-        ComunaMapbiomasStats result = MapbiomasSeedLoader.mapRawRecord(node, info, "fuego-col1@2017-partial", objectMapper);
+        ComunaMapbiomasStats result = MapbiomasSeedLoader.mapRawRecord(node, info, "lulc-col2+fuego-col1@2017-partial", objectMapper);
 
         assertThat(result.getFire().getBurnedFractionPct()).isEqualTo(0.0);
     }
@@ -150,7 +150,7 @@ class MapbiomasSeedLoaderMappingTest {
         JsonNode node = objectMapper.readTree(raw);
         ComunaInfo info = comunaInfo("CHL.6.9.9_1", "Ejemplo", "biobio");
 
-        ComunaMapbiomasStats result = MapbiomasSeedLoader.mapRawRecord(node, info, "fuego-col1@2017-partial", objectMapper);
+        ComunaMapbiomasStats result = MapbiomasSeedLoader.mapRawRecord(node, info, "lulc-col2+fuego-col1@2017-partial", objectMapper);
 
         assertThat(result.getFire().getBurnedFractionPct()).isNull();
     }
@@ -171,12 +171,97 @@ class MapbiomasSeedLoaderMappingTest {
         JsonNode node = objectMapper.readTree(raw);
         ComunaInfo info = comunaInfo("CHL.6.1.2_1", "Canete", "biobio");
 
-        ComunaMapbiomasStats result = MapbiomasSeedLoader.mapRawRecord(node, info, "fuego-col1@2017-partial", objectMapper);
+        ComunaMapbiomasStats result = MapbiomasSeedLoader.mapRawRecord(node, info, "lulc-col2+fuego-col1@2017-partial", objectMapper);
 
-        assertThat(result.getId()).isEqualTo("CHL.6.1.2_1|fuego-col1@2017-partial")
-            .isNotEqualTo("CHL.6.1.1_1|fuego-col1@2017-partial");
+        assertThat(result.getId()).isEqualTo("CHL.6.1.2_1|lulc-col2+fuego-col1@2017-partial")
+            .isNotEqualTo("CHL.6.1.1_1|lulc-col2+fuego-col1@2017-partial");
         assertThat(result.getFire().getYearLastFire()).isEqualTo(2017);
         assertThat(result.getFire().getBurnedHaByYear()).containsEntry("2017", 33.5);
+    }
+
+    @Test
+    void mapRawRecord_realLandCoverWithSharesByYear_mapsAllThreeLandCoverFields() throws Exception {
+        // S1b4: the real merged seed has a non-null landCover with sharesByClass,
+        // sharesByClassMean5y and the new per-year bp series (26 years, 1999-2024).
+        String raw = "{\"comunaId\":\"CHL.6.1.1_1\","
+            + "\"landCover\":{\"referenceYear\":2024,"
+            + "\"sharesByClass\":{\"59\":0.4,\"60\":0.6},"
+            + "\"sharesByClassMean5y\":{\"59\":0.5,\"60\":0.5},"
+            + "\"sharesByYear\":{\"firstYear\":1999,\"lastYear\":2024,\"unit\":\"bp\","
+            + "\"classes\":{\"59\":[" + zeros(25) + ",4000],\"60\":[" + zeros(25) + ",6000]}}},"
+            + "\"fire\":{\"available\":false},"
+            + "\"provenance\":{\"sources\":[],\"scope\":\"s\",\"downloadDate\":\"2026-09-28\"},"
+            + "\"computedAt\":\"2026-09-28T00:00:00Z\",\"partial\":true}";
+        JsonNode node = objectMapper.readTree(raw);
+        ComunaInfo info = comunaInfo("CHL.6.1.1_1", "Arauco", "biobio");
+
+        ComunaMapbiomasStats result =
+            MapbiomasSeedLoader.mapRawRecord(node, info, "lulc-col2+fuego-col1@2017-partial", objectMapper);
+
+        assertThat(result.getLandCover()).isNotNull();
+        assertThat(result.getLandCover().getReferenceYear()).isEqualTo(2024);
+        assertThat(result.getLandCover().getSharesByClass()).containsEntry("59", 0.4);
+        assertThat(result.getLandCover().getSharesByClassMean5y()).containsEntry("59", 0.5);
+        assertThat(result.getLandCover().getSharesByYear()).isNotNull();
+        assertThat(result.getLandCover().getSharesByYear().getFirstYear()).isEqualTo(1999);
+        assertThat(result.getLandCover().getSharesByYear().getLastYear()).isEqualTo(2024);
+        assertThat(result.getLandCover().getSharesByYear().getUnit()).isEqualTo("bp");
+        assertThat(result.getLandCover().getSharesByYear().getClasses().get("59")).hasSize(26);
+        assertThat(result.getLandCover().getSharesByYear().getClasses().get("59")[25]).isEqualTo(4000);
+    }
+
+    @Test
+    void mapRawRecord_sharesByYearArrayLengthMismatchesFirstLastYear_throws() throws Exception {
+        // Design D1: "classes.*.length == lastYear - firstYear + 1" is a HARD gate -- a
+        // malformed seed (25 years instead of the declared 26) must be rejected loudly,
+        // not silently loaded with an inconsistent series.
+        String raw = "{\"comunaId\":\"CHL.6.1.1_1\","
+            + "\"landCover\":{\"referenceYear\":2024,\"sharesByClass\":{\"59\":1.0},"
+            + "\"sharesByClassMean5y\":{\"59\":1.0},"
+            + "\"sharesByYear\":{\"firstYear\":1999,\"lastYear\":2024,\"unit\":\"bp\","
+            + "\"classes\":{\"59\":[" + zeros(24) + "]}}},"
+            + "\"fire\":{\"available\":false},"
+            + "\"provenance\":{\"sources\":[],\"scope\":\"s\",\"downloadDate\":\"2026-09-28\"},"
+            + "\"computedAt\":\"2026-09-28T00:00:00Z\",\"partial\":true}";
+        JsonNode node = objectMapper.readTree(raw);
+        ComunaInfo info = comunaInfo("CHL.6.1.1_1", "Arauco", "biobio");
+
+        org.junit.jupiter.api.Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> MapbiomasSeedLoader.mapRawRecord(node, info, "lulc-col2+fuego-col1@2017-partial", objectMapper)
+        );
+    }
+
+    @Test
+    void mapRawRecord_sharesByClassDriftsFromSharesByYearReferenceYear_throws() throws Exception {
+        // Design MCS-1d: sharesByClass must equal sharesByYear[referenceYear]/10000 within
+        // 1e-4 -- the two representations of the reference year must never drift apart.
+        // Here sharesByClass says 0.9 but the 2024 (last) bp slot says 4000 (0.4): a real
+        // drift, not a rounding artifact, must be rejected.
+        String raw = "{\"comunaId\":\"CHL.6.1.1_1\","
+            + "\"landCover\":{\"referenceYear\":2024,\"sharesByClass\":{\"59\":0.9},"
+            + "\"sharesByClassMean5y\":{\"59\":0.9},"
+            + "\"sharesByYear\":{\"firstYear\":1999,\"lastYear\":2024,\"unit\":\"bp\","
+            + "\"classes\":{\"59\":[" + zeros(25) + ",4000]}}},"
+            + "\"fire\":{\"available\":false},"
+            + "\"provenance\":{\"sources\":[],\"scope\":\"s\",\"downloadDate\":\"2026-09-28\"},"
+            + "\"computedAt\":\"2026-09-28T00:00:00Z\",\"partial\":true}";
+        JsonNode node = objectMapper.readTree(raw);
+        ComunaInfo info = comunaInfo("CHL.6.1.1_1", "Arauco", "biobio");
+
+        org.junit.jupiter.api.Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> MapbiomasSeedLoader.mapRawRecord(node, info, "lulc-col2+fuego-col1@2017-partial", objectMapper)
+        );
+    }
+
+    private static String zeros(int count) {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < count; i++) {
+            if (i > 0) sb.append(',');
+            sb.append('0');
+        }
+        return sb.toString();
     }
 
     // computeStatus() is the pure decision function behind loadSeed()'s final summary

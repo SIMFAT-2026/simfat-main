@@ -133,6 +133,45 @@ def test_download_file_removes_partial_file_after_exhausting_retries(tmp_path):
     assert not dest.exists()
 
 
+def test_download_file_preserves_existing_valid_file_when_retries_exhausted(tmp_path):
+    """A failed re-download must never destroy a good, already-verified copy
+    at ``dest`` -- the download must land in a temp file first and only
+    replace ``dest`` once it has fully and successfully completed."""
+    dest = tmp_path / "cached.xlsx"
+    dest.write_bytes(b"already-verified-content")
+
+    def always_fails(url, timeout):
+        raise ConnectionError("simulated permanent failure")
+
+    with pytest.raises(download.DownloadError):
+        download.download_file(
+            "https://example.invalid/file.bin",
+            dest,
+            opener=always_fails,
+            retries=2,
+            sleep=lambda _s: None,
+        )
+
+    assert dest.read_bytes() == b"already-verified-content"
+    # No leftover temp file either.
+    leftovers = [p for p in tmp_path.iterdir() if p != dest]
+    assert leftovers == []
+
+
+def test_download_file_replaces_existing_file_only_on_full_success(tmp_path):
+    """A successful download must overwrite a stale ``dest``, but only after
+    the transfer completes -- never truncate it up front."""
+    dest = tmp_path / "cached.xlsx"
+    dest.write_bytes(b"stale-content")
+    source = tmp_path / "source.bin"
+    source.write_bytes(b"fresh-content")
+
+    result = download.download_file(_file_url(source), dest)
+
+    assert dest.read_bytes() == b"fresh-content"
+    assert result.bytes == len(b"fresh-content")
+
+
 def test_manifest_entry_has_expected_shape(tmp_path):
     dest = tmp_path / "file.xlsx"
     dest.write_bytes(b"x")
