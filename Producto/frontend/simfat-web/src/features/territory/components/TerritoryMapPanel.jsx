@@ -29,6 +29,7 @@ import RegionalSummary from './RegionalSummary';
 import { regionalSummary } from '../utils/regionalSummary';
 import { alertTrigger } from '../utils/alertTrigger';
 import { compassLabelFrom } from '../utils/compass';
+import { modeLabel } from '../../../utils/labels';
 import MapbiomasYearControl from './MapbiomasYearControl';
 import { chipLabel, controlVisible } from '../utils/yearControl';
 import { LandcoverChoropleth, LandcoverLegend } from './LandcoverLayer';
@@ -802,7 +803,7 @@ function ComunaTooltip({ comunaId, nombre, score, pos, burnedLine = '', landcove
         <span className="comuna-tooltip-nombre">{displayNombre}</span>
         {mode && (
           <span className={`comuna-mode-badge ${mode === 'ENHANCED' ? 'enhanced' : 'standard'}`}>
-            {mode}
+            {modeLabel(mode)}
           </span>
         )}
       </div>

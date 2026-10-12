@@ -7,6 +7,7 @@ import { RISK_LEVELS } from '../features/alerts/utils/alertsLogic';
 import { useFeedback } from '../hooks';
 import { createAlert, deleteAlert, updateAlert } from '../services';
 import { asNumberOrNull } from '../utils/data';
+import { levelLabel } from '../utils/labels';
 import { mapValidationErrors } from '../utils/errors';
 
 const initialForm = {
@@ -190,7 +191,7 @@ function AuthenticatedAlerts() {
             <select name="nivelRiesgo" value={form.nivelRiesgo} onChange={onInputChange} required>
               {RISK_LEVELS.map((level) => (
                 <option key={level} value={level}>
-                  {level}
+                  {levelLabel(level)}
                 </option>
               ))}
             </select>

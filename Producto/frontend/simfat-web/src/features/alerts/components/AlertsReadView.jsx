@@ -8,6 +8,7 @@ import FilterBar from '../../../components/FilterBar';
 import LoadingSpinner from '../../../components/LoadingSpinner';
 import SectionTitle from '../../../components/SectionTitle';
 import { useCloseDetailsOnOutsideClick } from '../../../hooks';
+import { levelLabel } from '../../../utils/labels';
 import {
   PUBLIC_ALERTS_CAP,
   PUBLIC_MAX_SPAN_DAYS,
@@ -196,7 +197,7 @@ function AlertsReadView({ data, rowActions, onExportCsv, feedback, children }) {
             <option value="">Todos</option>
             {RISK_LEVELS.map((level) => (
               <option key={level} value={level}>
-                {level}
+                {levelLabel(level)}
               </option>
             ))}
           </select>

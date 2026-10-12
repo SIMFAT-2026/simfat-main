@@ -8,6 +8,7 @@ import SectionTitle from '../components/SectionTitle';
 import CommunityChatPanel from '../features/community/chat/CommunityChatPanel';
 import { useAuth } from '../auth/AuthContext';
 import { useFeedback } from '../hooks';
+import { priorityLabel, resourceCategoryLabel } from '../utils/labels';
 import { useCommunityData } from '../features/community/hooks/useCommunityData';
 import { getComunasByRegion, getLabelForComuna, getLabelForRegion } from '../data/territorioChile';
 
@@ -616,7 +617,7 @@ function CommunityPage() {
                     <strong>{post.title}</strong>
                     <small>{regionMap[post.regionId] || post.regionId || 'Sin región'} · {formatDate(post.publishedAt)}</small>
                     <p>{post.message}</p>
-                    <span className={priorityBadge(post.priority)}>{post.priority}</span>
+                    <span className={priorityBadge(post.priority)}>{priorityLabel(post.priority)}</span>
                     {attachment ? <span className="community-note-attachment">📎 {attachment.kind === 'image' ? 'Imagen' : 'Archivo'}</span> : null}
                   </button>
                 );
@@ -639,7 +640,7 @@ function CommunityPage() {
                   <select name="priority" value={boardForm.priority} onChange={handleBoardInput}>
                     {BOARD_PRIORITIES.map((priority) => (
                       <option key={priority} value={priority}>
-                        {priority}
+                        {priorityLabel(priority)}
                       </option>
                     ))}
                   </select>
@@ -707,7 +708,7 @@ function CommunityPage() {
                   <select name="category" value={resourceForm.category} onChange={handleResourceInput}>
                     {RESOURCE_CATEGORIES.map((category) => (
                       <option key={category} value={category}>
-                        {category}
+                        {resourceCategoryLabel(category)}
                       </option>
                     ))}
                   </select>
@@ -855,7 +856,7 @@ function CommunityPage() {
                               >
                                 <span>{isPdfResource(resource) ? 'PDF' : isDocxResource(resource) ? 'DOCX' : 'DOC'}</span>
                                 <strong>{resource.title}</strong>
-                                <small>{resource.category}</small>
+                                <small>{resourceCategoryLabel(resource.category)}</small>
                               </button>
                             ))}
                           </div>
@@ -872,7 +873,7 @@ function CommunityPage() {
                 <>
                   <header className="community-resource-reader-header">
                     <div>
-                      <p>{selectedResource.category}</p>
+                      <p>{resourceCategoryLabel(selectedResource.category)}</p>
                       <h4>{selectedResource.title}</h4>
                       <small>
                         {regionMap[selectedResource.regionId] || selectedResource.regionId || 'Sin región'} - {getLabelForComuna(selectedResource.comunaId) || 'Sin comuna'}
@@ -1087,7 +1088,7 @@ function CommunityPage() {
         <div className="community-post-modal-backdrop" role="presentation" onClick={() => setSelectedPost(null)}>
           <article className="community-post-modal" role="dialog" aria-modal="true" aria-label="Publicación comunitaria" onClick={(event) => event.stopPropagation()}>
             <button type="button" className="panel-close" onClick={() => setSelectedPost(null)} aria-label="Cerrar">×</button>
-            <span className={priorityBadge(selectedPost.priority)}>{selectedPost.priority}</span>
+            <span className={priorityBadge(selectedPost.priority)}>{priorityLabel(selectedPost.priority)}</span>
             <h3>{selectedPost.title}</h3>
             <p className="community-post-meta">
               {regionMap[selectedPost.regionId] || selectedPost.regionId || 'Sin región'} · {formatDate(selectedPost.publishedAt)} · {selectedPost.author}

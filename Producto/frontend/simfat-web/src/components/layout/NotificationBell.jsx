@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getUnreadNotifications, markNotificationRead } from '../../services';
+import { levelLabel } from '../../utils/labels';
 
 const POLL_INTERVAL_MS = 30_000;
 
@@ -88,7 +89,7 @@ function NotificationBell() {
                     onClick={() => handleClick(n)}
                   >
                     <span className={`notification-level notification-level-${(n.alertLevel || '').toLowerCase()}`}>
-                      {n.alertLevel}
+                      {levelLabel(n.alertLevel)}
                     </span>
                     <span className="notification-title">{n.title}</span>
                     <span className="notification-msg">{n.message}</span>

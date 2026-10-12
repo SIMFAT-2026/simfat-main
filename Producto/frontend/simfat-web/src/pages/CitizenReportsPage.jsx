@@ -9,6 +9,7 @@ import SectionTitle from '../components/SectionTitle';
 import { useFeedback } from '../hooks';
 import { useCitizenReportsData } from '../features/reports/hooks/useCitizenReportsData';
 import { getComunasByRegion, getLabelForComuna } from '../data/territorioChile';
+import { reportCategoryLabel, reportStatusLabel } from '../utils/labels';
 
 const REPORT_CATEGORIES = [
   'HUMO',
@@ -91,13 +92,10 @@ function statusBadgeClass(status) {
 }
 
 function statusLabel(row) {
-  if (row.status === 'DESCARTADO' && row.discardReason === 'VENCIDO') {
-    return 'DESCARTADO (vencido)';
-  }
-  if (row.status === 'RECIBIDO' && row.staleCount > 0) {
-    return 'RECIBIDO (vencido)';
-  }
-  return row.status;
+  const stale =
+    (row.status === 'DESCARTADO' && row.discardReason === 'VENCIDO') ||
+    (row.status === 'RECIBIDO' && row.staleCount > 0);
+  return reportStatusLabel(row.status, { stale });
 }
 
 function CitizenReportsPage() {
@@ -146,7 +144,7 @@ function CitizenReportsPage() {
       {
         key: 'category',
         header: 'Categoría',
-        render: (row) => (row.subCategory ? `${row.category} — ${row.subCategory}` : row.category)
+        render: (row) => (row.subCategory ? `${reportCategoryLabel(row.category)} — ${row.subCategory}` : reportCategoryLabel(row.category))
       },
       {
         key: 'status',
@@ -292,9 +290,9 @@ function CitizenReportsPage() {
     try {
       await setReportStatus(reportId, status);
       if (filters.status && filters.status !== status) {
-        feedback.showSuccess(`Estado actualizado a ${status}. El reporte puede ocultarse por filtro actual.`);
+        feedback.showSuccess(`Estado actualizado a ${reportStatusLabel(status)}. El reporte puede ocultarse por filtro actual.`);
       } else {
-        feedback.showSuccess(`Estado actualizado a ${status}.`);
+        feedback.showSuccess(`Estado actualizado a ${reportStatusLabel(status)}.`);
       }
     } catch (err) {
       feedback.showError(err.message || 'No se pudo actualizar el estado.');
@@ -348,7 +346,7 @@ function CitizenReportsPage() {
             <option value="">Todos</option>
             {REPORT_STATUSES.map((status) => (
               <option key={status} value={status}>
-                {status}
+                {reportStatusLabel(status)}
               </option>
             ))}
           </select>
@@ -360,7 +358,7 @@ function CitizenReportsPage() {
             <option value="">Todas</option>
             {REPORT_CATEGORIES.map((category) => (
               <option key={category} value={category}>
-                {category}
+                {reportCategoryLabel(category)}
               </option>
             ))}
           </select>
@@ -405,7 +403,7 @@ function CitizenReportsPage() {
             <select name="category" value={form.category} onChange={onInputChange}>
               {REPORT_CATEGORIES.map((category) => (
                 <option key={category} value={category}>
-                  {category}
+                  {reportCategoryLabel(category)}
                 </option>
               ))}
             </select>

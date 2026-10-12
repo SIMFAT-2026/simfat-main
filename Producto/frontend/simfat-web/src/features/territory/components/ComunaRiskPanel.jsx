@@ -7,6 +7,7 @@ import { generateComunalReport } from '../utils/reportPrint';
 import { REGIONES } from '../../../data/territorioChile';
 import { panelMode } from '../utils/comunaMapbiomas';
 import { alertTrigger } from '../utils/alertTrigger';
+import { modeLabel } from '../../../utils/labels';
 
 
 const COMPONENT_META = {
@@ -315,7 +316,7 @@ export default function ComunaRiskPanel({ comunaId, comunaName = null, score, re
           <span className="panel-pct" style={{ color: level.color }}>{pct}<small>/100</small></span>
         </div>
         <div className="panel-badges">
-          <span className={`panel-mode-badge ${mode === 'ENHANCED' ? 'enhanced' : 'standard'}`}>{mode}</span>
+          <span className={`panel-mode-badge ${mode === 'ENHANCED' ? 'enhanced' : 'standard'}`}>{modeLabel(mode)}</span>
           {displayScore.qualityFlag && (
             <span className="panel-quality-flag" title={displayScore.qualityFlag}>⚠ Datos parciales</span>
           )}
@@ -361,7 +362,7 @@ export default function ComunaRiskPanel({ comunaId, comunaName = null, score, re
         <p className="panel-chart-legend">
           <span style={{ borderBottom: '2px dashed #ca8a04' }}>&nbsp;&nbsp;</span> Preventivo &nbsp;
           <span style={{ borderBottom: '2px dashed #ea580c' }}>&nbsp;&nbsp;</span> Alto &nbsp;
-          ✦ ENHANCED
+          ✦ Con Copernicus
         </p>
       </section>
 
