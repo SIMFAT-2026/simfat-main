@@ -7,6 +7,7 @@ import java.io.InputStream;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Component;
 
@@ -51,6 +52,8 @@ public class FuelWeightTable {
     private final Map<String, Double> classWeights;
     private final List<String> excludedClasses;
 
+    // Two constructors: Spring needs @Autowired to pick this one (see ComunaFwiStateService).
+    @Autowired
     public FuelWeightTable(ObjectMapper objectMapper) {
         this(objectMapper, DEFAULT_RESOURCE_PATH);
     }

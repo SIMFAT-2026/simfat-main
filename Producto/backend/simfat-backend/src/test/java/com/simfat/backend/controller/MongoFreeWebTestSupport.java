@@ -2,6 +2,7 @@ package com.simfat.backend.controller;
 
 import com.simfat.backend.repository.CitizenReportRepository;
 import com.simfat.backend.repository.ComunaInfoRepository;
+import com.simfat.backend.repository.ComunaMapbiomasStatsRepository;
 import com.simfat.backend.repository.ForestLossRecordRepository;
 import com.simfat.backend.repository.HeatAlertEventRepository;
 import com.simfat.backend.repository.OpenEoIndicatorObservationRepository;
@@ -43,6 +44,8 @@ abstract class MongoFreeWebTestSupport {
     protected ComunaInfoRepository comunaInfoRepository;
     @MockBean
     protected TerritoryWeatherObservationRepository territoryWeatherObservationRepository;
+    @MockBean
+    protected ComunaMapbiomasStatsRepository comunaMapbiomasStatsRepository;
     @MockBean
     protected TerritoryRiskService territoryRiskService;
     @MockBean

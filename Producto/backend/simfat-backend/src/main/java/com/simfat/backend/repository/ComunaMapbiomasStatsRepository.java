@@ -24,4 +24,10 @@ public interface ComunaMapbiomasStatsRepository extends MongoRepository<ComunaMa
     // cache" — S2a reads all comunas of the pinned dataVersion once instead of N single
     // lookups).
     List<ComunaMapbiomasStats> findByDataVersion(String dataVersion);
+
+    // Narrows the S2a bulk read to a single region (judgment-day finding #1, TerritoryController
+    // BURNED layer): {@code comuna_mapbiomas_stats} already has a compound index on
+    // {regionId, dataVersion} (see ComunaMapbiomasStats), so this reuses an existing index
+    // instead of scanning every region's stats per cache miss.
+    List<ComunaMapbiomasStats> findByRegionIdAndDataVersion(String regionId, String dataVersion);
 }
