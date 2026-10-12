@@ -264,7 +264,8 @@ export default function ComunaRiskPanel({ comunaId, comunaName = null, score, re
     score: displayScore.scoreComposite,
     fwiRaw: displayScore.fwiRaw,
     firmsCount: displayScore.firmsCount,
-    firmsFrpMean: displayScore.firmsFrpMean
+    firmsFrpMean: displayScore.firmsFrpMean,
+    alertDriver: displayScore.alertDriver
   });
   const mode = displayScore.mode || 'STANDARD';
   const components = displayScore.components || {};

@@ -6,7 +6,6 @@ import {
   LAYER_TOGGLE_GROUPS,
   MAPBIOMAS_INDICATORS,
   SECONDARY_INDICATORS,
-  hasVisibleLayer,
   activeLayerSummary,
   layerGroupInfoLines
 } from './indicators';
@@ -81,13 +80,6 @@ describe('layerGroupInfoLines', () => {
       'MapBiomas: historia anual (elige el año junto a cada capa).',
       'Más capas: última observación satelital y climática.'
     ]);
-  });
-});
-
-describe('hasVisibleLayer', () => {
-  it('is true only when one of the group layers is visible', () => {
-    expect(hasVisibleLayer(LAYER_TOGGLE_GROUPS[2], ['RISK_SCORE'])).toBe(false);
-    expect(hasVisibleLayer(LAYER_TOGGLE_GROUPS[2], ['RISK_SCORE', 'WIND'])).toBe(true);
   });
 });
 

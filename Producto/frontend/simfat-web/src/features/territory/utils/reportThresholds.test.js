@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { FWI_CLASS_NOTE, FWI_REFERENCE_CLASSES, fwiClassLabel, levelRuleRows } from './reportThresholds';
+import { FWI_CLASS_NOTE, FWI_REFERENCE_CLASSES, fwiClassLabel, fwiClassText, levelRuleRows } from './reportThresholds';
 
 describe('levelRuleRows', () => {
   it('lists the four comuna levels with the thresholds the system uses', () => {
@@ -33,5 +33,17 @@ describe('FWI reference classes', () => {
     expect(fwiClassLabel(40)).toBe('Muy alto');
     expect(fwiClassLabel(60)).toBe('Extremo');
     expect(fwiClassLabel(null)).toBe('—');
+  });
+});
+
+describe('fwiClassText', () => {
+  it('names the Canadian FWI class so it is not read as the system alert level', () => {
+    expect(fwiClassText(20.6)).toBe('Clase FWI canadiense: Moderado');
+    expect(fwiClassText(40)).toBe('Clase FWI canadiense: Muy alto');
+  });
+
+  it('is empty when the value is not usable', () => {
+    expect(fwiClassText(null)).toBe('');
+    expect(fwiClassText(NaN)).toBe('');
   });
 });

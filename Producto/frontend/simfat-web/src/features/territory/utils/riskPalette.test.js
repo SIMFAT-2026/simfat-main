@@ -110,8 +110,13 @@ describe('comunaRiskStyle', () => {
     expect(style.dashArray).toBe(ALERT_LEVEL_CONFIG.ALTO.dashArray);
   });
 
-  it('falls back to Normal for a score without a known level', () => {
-    expect(comunaRiskStyle({}).fillColor).toBe(ALERT_LEVEL_CONFIG.NORMAL.fill);
+  it('paints a score without a known level as "sin datos", never as Normal', () => {
+    for (const score of [{}, { alertLevel: null }, { alertLevel: 'XYZ' }]) {
+      const style = comunaRiskStyle(score);
+      expect(style.fillColor).toBe(RISK_NO_DATA.fill);
+      expect(style.dashArray).toBe(RISK_NO_DATA.dashArray);
+      expect(style.fillColor).not.toBe(ALERT_LEVEL_CONFIG.NORMAL.fill);
+    }
   });
 
   it('draws "sin datos" with its own grey fill and a dotted outline', () => {

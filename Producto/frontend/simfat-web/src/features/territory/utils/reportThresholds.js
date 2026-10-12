@@ -44,3 +44,10 @@ export function fwiClassLabel(value) {
   if (value == null || !Number.isFinite(value)) return '—';
   return FWI_REFERENCE_CLASSES.find((c) => value < c.max).label;
 }
+
+// "Clase FWI canadiense: Moderado": says which scale the class belongs to, so it is
+// not confused with the system alert level (Normal / Preventivo / Alto / Crítico).
+export function fwiClassText(value) {
+  if (value == null || !Number.isFinite(value)) return '';
+  return `Clase FWI canadiense: ${fwiClassLabel(value)}`;
+}

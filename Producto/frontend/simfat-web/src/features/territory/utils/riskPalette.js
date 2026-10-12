@@ -157,8 +157,11 @@ export function blendedLevelFills() {
 }
 
 // Leaflet path style for a comuna polygon in the risk layer.
+// A missing score, or a score whose alert level is unknown, is painted as "sin datos":
+// never as Normal, which would claim a safe level the backend did not report.
 export function comunaRiskStyle(score) {
-  if (!score) {
+  const cfg = score && LEVEL_ORDER.includes(score.alertLevel) ? ALERT_LEVEL_CONFIG[score.alertLevel] : null;
+  if (!cfg) {
     return {
       fillColor: RISK_NO_DATA.fill,
       fillOpacity: RISK_NO_DATA.fillOpacity,
@@ -168,7 +171,6 @@ export function comunaRiskStyle(score) {
       opacity: 0.8
     };
   }
-  const cfg = ALERT_LEVEL_CONFIG[score.alertLevel] || ALERT_LEVEL_CONFIG.NORMAL;
   return {
     fillColor: cfg.fill,
     fillOpacity: RISK_FILL_OPACITY,

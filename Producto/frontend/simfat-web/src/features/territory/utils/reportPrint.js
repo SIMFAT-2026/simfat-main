@@ -1,5 +1,5 @@
 import { ALERT_LEVEL_CONFIG, VEGETATION_SCALES } from '../constants/colorScales';
-import { FWI_CLASS_NOTE, FWI_REFERENCE_CLASSES, fwiClassLabel, levelRuleRows } from './reportThresholds';
+import { FWI_CLASS_NOTE, FWI_REFERENCE_CLASSES, fwiClassText, levelRuleRows } from './reportThresholds';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -300,7 +300,7 @@ export function generateComunalReport({ score, comunaId, regionLabel, generatedA
     let observedValue = '—';
     if (r.key === 'ndvi' && ndvi != null) observedValue = fmt(ndvi, 3);
     else if (r.key === 'ndmi' && ndmi != null) observedValue = fmt(ndmi, 3);
-    else if (r.key === 'fwi' && fwiRaw != null) observedValue = `${fmt(fwiRaw, 1)} (clase ${fwiClassLabel(fwiRaw)})`;
+    else if (r.key === 'fwi' && fwiRaw != null) observedValue = `${fmt(fwiRaw, 1)} (${fwiClassText(fwiRaw)})`;
     else if (r.key === 'firms' && firmsCount != null) {
       observedValue = `${firmsCount} foco${firmsCount === 1 ? '' : 's'}`;
       if (firmsFrpMean) observedValue += ` (FRP ${fmt(firmsFrpMean, 1)} MW)`;

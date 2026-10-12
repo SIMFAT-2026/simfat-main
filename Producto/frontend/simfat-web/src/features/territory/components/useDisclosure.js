@@ -8,15 +8,15 @@ export function useDisclosure() {
   const buttonRef = useRef(null);
   const panelRef = useRef(null);
 
+  // Mirror of `open` readable from document listeners without re-subscribing.
+  const openRef = useRef(open);
+  openRef.current = open;
+
   const dispatch = useCallback((event) => {
     const next = nextDisclosureState(openRef.current, event);
     if (next.restoreFocus) buttonRef.current?.focus();
     setOpen(next.open);
   }, []);
-
-  // Mirror of `open` readable from document listeners without re-subscribing.
-  const openRef = useRef(open);
-  openRef.current = open;
 
   useEffect(() => {
     if (!open) return undefined;

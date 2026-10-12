@@ -165,7 +165,9 @@
     position: relative;
   }
 
-  .territory-disclosure {
+  /* Only the toggle rows are positioned (above); the regional summary anchors to
+     its own line, so its disclosure is made static separately below. */
+  .territory-toggle-row .territory-disclosure {
     position: static;
   }
 
@@ -342,6 +344,10 @@
 
 .territory-year-select {
   min-height: 28px;
+}
+
+/* Higher specificity than `.territory-controls select { width: 100% }`. */
+.territory-controls .territory-year-select {
   width: auto;
   min-width: 4.5rem;
 }
@@ -533,11 +539,29 @@
 }
 
 .regional-summary-line {
+  position: relative;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 2px 8px;
   min-width: 0;
+}
+
+/* The info popover anchors to the summary line (not to the small button) and
+   aligns to its right edge so it cannot overflow the panel. */
+.regional-summary-line .territory-disclosure {
+  position: static;
+}
+
+.regional-summary-line .territory-popover {
+  left: auto;
+  right: 0;
+}
+
+@media (max-width: 640px) {
+  .regional-summary-line .territory-popover {
+    left: 0;
+  }
 }
 
 .regional-summary-title {

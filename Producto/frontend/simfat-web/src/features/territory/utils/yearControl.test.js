@@ -5,6 +5,7 @@ import {
   controlYear,
   latestYearLabel,
   latestYearTarget,
+  parseYearSelection,
   yearAnnouncement,
   yearControlState,
   yearOptions
@@ -137,5 +138,39 @@ describe('chipLabel', () => {
     expect(
       chipLabel({ plain: 'Cobertura (MapBiomas)', withYear: 'Cobertura (MapBiomas) · 2024', controlVisible: false })
     ).toBe('Cobertura (MapBiomas) · 2024');
+  });
+});
+
+describe('parseYearSelection', () => {
+  const range = { minYear: 2000, maxYear: 2023 };
+
+  it('returns the integer year for a valid option value', () => {
+    expect(parseYearSelection('2019', range)).toBe(2019);
+    expect(parseYearSelection('2000', range)).toBe(2000);
+    expect(parseYearSelection('2023', range)).toBe(2023);
+  });
+
+  it('ignores the blank placeholder, which Number() would turn into 0', () => {
+    expect(parseYearSelection('', range)).toBeNull();
+    expect(parseYearSelection('  ', range)).toBeNull();
+    expect(parseYearSelection(undefined, range)).toBeNull();
+    expect(parseYearSelection(null, range)).toBeNull();
+  });
+
+  it('ignores non-integer values', () => {
+    expect(parseYearSelection('abc', range)).toBeNull();
+    expect(parseYearSelection('2019.5', range)).toBeNull();
+    expect(parseYearSelection('NaN', range)).toBeNull();
+  });
+
+  it('ignores years outside the range', () => {
+    expect(parseYearSelection('1999', range)).toBeNull();
+    expect(parseYearSelection('2024', range)).toBeNull();
+    expect(parseYearSelection('0', range)).toBeNull();
+  });
+
+  it('accepts any integer year when the range is unknown', () => {
+    expect(parseYearSelection('2019', null)).toBe(2019);
+    expect(parseYearSelection('', null)).toBeNull();
   });
 });

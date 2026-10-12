@@ -61,7 +61,7 @@ export const ALERT_LEVEL_CONFIG = {
     bg: '#fee2e2',
     label: 'Crítico',
     range: '85-100',
-    legendText: 'Crítico (puntaje ≥ 85 o focos FIRMS)',
+    legendText: 'Crítico (puntaje ≥ 85, FWI ≥ 45 o focos FIRMS)',
     note: 'también se activa con un foco FIRMS detectado hoy, o con FWI ≥ 45, sin importar el puntaje',
     fill: '#7f0016',
     dashArray: '2 3',
@@ -69,17 +69,6 @@ export const ALERT_LEVEL_CONFIG = {
     patternLabel: 'dense dash'
   }
 };
-
-export const RISK_SCORE_LEGEND = Object.values(ALERT_LEVEL_CONFIG).map((item) => ({
-  color: item.fill,
-  label: item.label,
-  range: item.range,
-  text: item.legendText,
-  note: item.note,
-  dashArray: item.dashArray,
-  borderColor: item.color,
-  patternLabel: item.patternLabel
-}));
 
 // Per-variable color scales: each climate indicator gets its own bins/ramp tuned for fire-risk relevance.
 // `bins` are ascending upper-bounds; the last entry's `max` is Infinity.

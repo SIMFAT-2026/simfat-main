@@ -815,7 +815,8 @@ function ComunaTooltip({ comunaId, nombre, score, pos, burnedLine = '', landcove
     score: score?.scoreComposite,
     fwiRaw: score?.fwiRaw,
     firmsCount: score?.firmsCount,
-    firmsFrpMean: score?.firmsFrpMean
+    firmsFrpMean: score?.firmsFrpMean,
+    alertDriver: score?.alertDriver
   });
 
   const componentEntries = tooltipComponentEntries(score?.components);
@@ -1037,6 +1038,7 @@ function TerritoryMapPanel({
     return regionalSummary({
       comunaScores: effectiveComunalScores,
       comunaNames,
+      comunaTotal: comunalGeoJson?.features?.length,
       firmsCount48h: regionData?.riskScore?.components?.firms?.focosCount,
       reports7d: regionData?.riskScore?.components?.reports?.count
     });
