@@ -263,3 +263,138 @@ Persistencia:
 - En PostgreSQL, `spring.jpa.hibernate.ddl-auto=validate`: la estructura productiva depende de migraciones Flyway.
 - En MongoDB hay indices explicitos para los flujos openEO y snapshots; para colecciones funcionales (`forest_loss_records`, `heat_alert_events`, `regions`, `alert_rules`) solo existe indice por `_id`.
 - Este diccionario representa el estado del repositorio a fecha 2026-04-21.
+
+---
+
+## Actualización 2026-10-12: integración MapBiomas
+
+- Fecha de actualización: 2026-10-12
+- Alcance: colecciones y campos MongoDB agregados o modificados por la integración MapBiomas (commit de merge `767caa6`).
+- Fuente técnica: `model/ComunaMapbiomasStats.java`, `model/ComunaFwiState.java`, `model/ComunaRiskSnapshot.java`, `model/TerritoryWeatherObservation.java` y `application.properties`.
+- Detalle ampliado, diagrama ER y reglas de cálculo: `Documentacion/MER/2026-10-12_mer_integracion_mapbiomas_v1.md`.
+- **PostgreSQL:** sin cambios. La última migración Flyway sigue siendo `V6__notifications.sql`.
+- Las secciones 3 a 6 anteriores describen el estado al 2026-04-21 y no se modifican. Los nombres de colección de esta actualización son los reales del código (`@Document`).
+
+### 3.8 Colección `comuna_mapbiomas_stats` (nueva)
+
+Descripción: estadísticas MapBiomas por comuna (cobertura del suelo Colección 2, 1999-2024, y Fuego Colección 1, 2013-2025). Un documento por `(comunaId, dataVersion)`, cargado desde una semilla JSONL por `MapbiomasSeedLoader`. Con la semilla vigente hay 86 documentos (`dataVersion = lulc-col2+fuego-col1@2013-2025`).
+
+| Campo | Tipo (BSON esperado) | Requerido en app | Restricciones de dominio | Descripción |
+|---|---|---|---|---|
+| id | String | Sí | PK natural Mongo (`_id`) con formato `{comunaId}\|{dataVersion}` | Llave determinística de upsert; evita duplicados al recargar. |
+| comunaId | String | Sí | GADM GID_3 (ejemplo `CHL.13.1.1_1`) | Comuna a la que pertenecen las estadísticas. |
+| regionId | String | Sí | `biobio`, `nuble` o `araucania` | Región, copiada desde `comunas.regionId` al cargar. |
+| nombreComuna | String | Sí | | Nombre legible, copiado desde `comunas.nombre`. |
+| dataVersion | String | Sí | | Versión de los datos (propiedad `mapbiomas.seed.data-version`). |
+| landCover | Objeto | No | `null` si no hay cobertura | Cobertura del suelo (ver 3.8.1). |
+| landCoverReason | String | No | | Motivo por el que `landCover` es `null`; no viene en la semilla vigente. |
+| fire | Objeto | No | | Historial de fuego (ver 3.8.2). |
+| fireReason | String | No | | Motivo por el que falta `fire`; no viene en la semilla vigente. |
+| partial | Boolean | Sí | Por defecto `false` | `true` si alguna fuente es parcial; `false` en las 86 comunas vigentes. |
+| provenance | Objeto | No | | Procedencia: `sources` (lista de archivos), `scope` (texto) y `downloadDate` (texto `AAAA-MM-DD`). |
+| computedAt | Date (Instant UTC) | No | | Momento en que el pipeline generó el registro. |
+
+Subdocumento `landCover` (3.8.1):
+
+| Campo | Tipo (BSON esperado) | Descripción |
+|---|---|---|
+| referenceYear | Int32 | Año de referencia (2024 en la semilla vigente). |
+| sharesByClass | Documento (clase a Double) | Fracción (0 a 1) de cada clase de cobertura en el año de referencia; suma aproximadamente 1,0. |
+| sharesByClassMean5y | Documento (clase a Double) | Fracción promedio de 5 años. |
+| sharesByYear.firstYear / lastYear | Int32 | Rango de la serie anual (1999 a 2024). |
+| sharesByYear.unit | String | `bp` (puntos base, 0 a 10000). |
+| sharesByYear.classes | Documento (clase a arreglo de Int32) | Serie por clase; el índice `i` es el año `firstYear + i`. Solo en puntos base; las demás proporciones son fracciones. |
+
+Subdocumento `fire` (3.8.2):
+
+| Campo | Tipo (BSON esperado) | Descripción |
+|---|---|---|
+| available | Boolean | `true` si hay datos de fuego utilizables. |
+| coverageFraction | Double | Fracción de la comuna cubierta por la extensión del raster de Fuego. |
+| burnedHaByYear | Documento (año a Double) | Hectáreas quemadas por año, 2013 a 2025. |
+| burnedFractionByYear | Documento (año a Double) | Fracción de la superficie comunal quemada por año. |
+| burnedFraction | Double | Fracción quemada acumulada (unión a nivel de píxel; no es la suma de las anuales). |
+| burnedFractionPct | Double | Rango percentil empírico de `burnedFraction` entre las comunas; es el `burnedNorm` del score. |
+| burnedFractionLog | Double | Variante `log1p` con recorte en p95. |
+| frequencyMean | Double | Frecuencia media de quemas por píxel (2013-2025). |
+| frequencyMax | Int32 | Frecuencia máxima en la comuna. |
+| yearLastFire | Int32 | Último año con fuego. |
+| yearsSinceLastFire | Int32 | Años desde el último fuego respecto de 2025. |
+| reason | String | Solo no nulo cuando `available = false`. |
+
+Indices definidos:
+- Compuesto `idx_region_dataversion`: `{ regionId: 1, dataVersion: 1 }`.
+- Compuesto `idx_comuna_dataversion_desc`: `{ comunaId: 1, dataVersion: -1 }`.
+
+### 3.9 Colección `comuna_fwi_state` (nueva)
+
+Descripción: estado vigente de la cadena FWI Van Wagner por comuna (un documento por comuna, sin historial). Solo se usa cuando `territory.fwi.method = VAN_WAGNER`.
+
+| Campo | Tipo (BSON esperado) | Requerido en app | Restricciones de dominio | Descripción |
+|---|---|---|---|---|
+| id | String | Sí | PK natural Mongo (`_id`) = `comunaId` | Identificador de la comuna. |
+| stateDate | Date (LocalDate) | Sí | | Día calendario hasta el cual se avanzó la cadena. |
+| ffmc | Double | Sí | | Fine Fuel Moisture Code al cierre de `stateDate`. |
+| dmc | Double | Sí | | Duff Moisture Code al cierre de `stateDate`. |
+| dc | Double | Sí | | Drought Code al cierre de `stateDate`. |
+| baseDate | Date (LocalDate) | Sí | Un día antes de `stateDate` | Fecha de la base desde la que se avanza. |
+| baseFfmc / baseDmc / baseDc | Double | Sí | | Códigos al cierre de `baseDate`; permiten recalcular el mismo día sin acumular dos veces. |
+| method | String | Sí | `VAN_WAGNER` | Método que produjo el estado. |
+| qualityFlag | String | No | `null`, `FWI_WARMUP` o `FWI_RESTARTED` | `FWI_WARMUP`: arranque en frío; `FWI_RESTARTED`: reinicio por un hueco mayor que 3 días. |
+| updatedAt | Date (LocalDateTime) | No | | Solo observabilidad. |
+
+Indices definidos: ninguno adicional al de `_id`.
+
+### 3.10 Colección `comuna_risk_snapshots` (campos nuevos)
+
+Descripción: snapshot de riesgo por comuna y ciclo. Se listan solo los campos agregados por la integración; los campos previos (`comunaId`, `regionId`, `scoreComposite`, `alertLevel`, `mode`, `qualityFlag`, `component*`, `fwiRaw`, `firmsCount`, etc.) no cambian de significado. Los documentos anteriores leen `null` en estos campos.
+
+| Campo | Tipo (BSON esperado) | Requerido en app | Restricciones de dominio | Descripción |
+|---|---|---|---|---|
+| alertDriver | String | No | `SCORE`, `FWI`, `FIRMS_TODAY`, `FIRMS_CLUSTER` o `FIRMS_FRP` | Regla que determinó `alertLevel`. |
+| componentMapbiomas | Double | No | | `wEff × S_mapbiomas` redondeado a 4 decimales. |
+| mapbiomasFuelIndex | Double | No | 0 a 1 | Índice de combustible; `null` si no hay cobertura. |
+| mapbiomasHistoryIndex | Double | No | 0 a 1 | Índice de historial de fuego; `null` si no hay datos de fuego. |
+| mapbiomasWeight | Double | No | 0 a 0,50 | Peso efectivo `wEff` de este snapshot (0 si faltan datos). |
+| mapbiomasDataVersion | String | No | | `dataVersion` de la que salió el resultado. |
+| mapbiomasQualityFlag | String | No | Lista separada por comas | `MAPBIOMAS_FUEL_UNAVAILABLE`, `MAPBIOMAS_FIRE_UNAVAILABLE`, `MAPBIOMAS_UNAVAILABLE`, `MAPBIOMAS_BURNED_NORM_RAW_FALLBACK`. |
+
+Efecto sobre campos existentes: con `wEff > 0`, `scoreComposite = clamp((1 - wEff) × S_dyn + wEff × S_mapbiomas)` y los componentes `componentFwi`, `componentFirms`, `componentReports`, `componentNdmi` y `componentNdvi` se multiplican por `(1 - wEff)`. Con el valor por defecto (`wEff = 0`) los valores no cambian.
+
+Indices definidos (sin cambios):
+- Compuesto `idx_comuna_risk_computed_desc`: `{ comunaId: 1, computedAt: -1 }`.
+- Compuesto `idx_region_computed_desc`: `{ regionId: 1, computedAt: -1 }`.
+
+### 3.11 Colección `territory_weather_observations` (campo nuevo)
+
+| Campo | Tipo (BSON esperado) | Requerido en app | Restricciones de dominio | Descripción |
+|---|---|---|---|---|
+| fwiMethod | String | No | `PROXY_V1` o `VAN_WAGNER` | Método que produjo `fwi`, `ffmc`, `dmc`, `dc`, `isi`, `bui` y `dsr`. Los documentos anteriores a 2026-09-22 no tienen el campo y se interpretan como `PROXY_V1`. |
+
+### 3.12 Colecciones sin cambios
+
+`territory_risk_snapshots` (su campo `alertDriver` es anterior a la integración) y `comunas` (solo se lee desde el cargador de semilla) no se modifican.
+
+### Relaciones de datos nuevas (lógicas)
+
+| Origen | Campo | Destino | Cardinalidad | Tipo |
+|---|---|---|---|---|
+| comuna_mapbiomas_stats | comunaId | comunas.id | N:1 (una fila por versión de datos) | FK lógica |
+| comuna_mapbiomas_stats | regionId | regions.id | N:1 | FK lógica |
+| comuna_fwi_state | id | comunas.id | 1:1 | FK lógica |
+| comuna_risk_snapshots | mapbiomasDataVersion | comuna_mapbiomas_stats.dataVersion | N:1 (auditoría) | Referencia lógica |
+| territory_weather_observations | regionId (= comunaId) | comunas.id | N:1 | FK lógica |
+
+### Catálogo de valores nuevos
+
+- `fwiMethod`: `PROXY_V1`, `VAN_WAGNER`.
+- `comuna_fwi_state.qualityFlag`: `FWI_WARMUP`, `FWI_RESTARTED`.
+- `comuna_risk_snapshots.alertDriver`: `SCORE`, `FWI`, `FIRMS_TODAY`, `FIRMS_CLUSTER`, `FIRMS_FRP`.
+- `comuna_risk_snapshots.alertLevel`: `NORMAL`, `PREVENTIVO`, `ALTO`, `CRITICO`.
+- `comuna_risk_snapshots.mapbiomasQualityFlag`: ver 3.10.
+
+### Observaciones técnicas
+
+- Los índices se crean automáticamente al arrancar (`spring.data.mongodb.auto-index-creation=true`).
+- `comuna_mapbiomas_stats` está separada de `comunas` porque `ComunaInfo` se reescribe completa en cada arranque.
+- La integración no agrega llaves foráneas físicas; todas las relaciones son lógicas.
