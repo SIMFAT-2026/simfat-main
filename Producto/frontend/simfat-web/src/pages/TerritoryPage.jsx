@@ -68,7 +68,7 @@ function TerritoryContent({ isAuthenticated }) {
       {/* The analytics dashboard calls authenticated endpoints: signed-in users only. */}
       {isAuthenticated && (
         <div className="territory-dashboard-block">
-          <Suspense fallback={<div className="loading-state">Cargando panel analitico...</div>}>
+          <Suspense fallback={<div className="loading-state">Cargando panel analítico…</div>}>
             <DashboardPage selectedRegionId={territory.selectedRegionId} />
           </Suspense>
         </div>

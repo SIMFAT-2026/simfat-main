@@ -146,7 +146,8 @@ class TerritoryControllerClimateIntegrationTest {
         snapshot.setComunaId("comuna-with-data");
         snapshot.setRegionId("biobio");
         snapshot.setNombreComuna("Con Datos");
-        snapshot.setAlertLevel("NORMAL");
+        snapshot.setAlertLevel("CRITICO");
+        snapshot.setAlertDriver("FWI");
         snapshot.setScoreComposite(0.1);
         snapshot.setMode("STANDARD");
 
@@ -166,6 +167,8 @@ class TerritoryControllerClimateIntegrationTest {
         mockMvc.perform(get("/api/territory/risk-score/comunas/biobio"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.success", is(true)))
+            .andExpect(jsonPath("$.data.['comuna-with-data'].alertDriver", is("FWI")))
+            .andExpect(jsonPath("$.data.['comuna-without-data'].alertDriver").value(org.hamcrest.Matchers.nullValue()))
             .andExpect(jsonPath("$.data.['comuna-with-data'].fwiInputs.tempMax", is(28.5)))
             .andExpect(jsonPath("$.data.['comuna-with-data'].fwiInputs.humidityMin", is(35.0)))
             .andExpect(jsonPath("$.data.['comuna-with-data'].fwiInputs.windMax", is(20.0)))

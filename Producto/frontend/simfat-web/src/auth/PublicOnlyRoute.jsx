@@ -5,7 +5,7 @@ function PublicOnlyRoute({ children }) {
   const { isAuthenticated, isBootstrapping } = useAuth();
 
   if (isBootstrapping) {
-    return <div className="loading-state">Validando sesion...</div>;
+    return <div className="loading-state">Validando sesión…</div>;
   }
 
   if (isAuthenticated) {

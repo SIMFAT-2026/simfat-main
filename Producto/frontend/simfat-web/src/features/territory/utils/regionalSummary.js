@@ -23,32 +23,44 @@ function triggerBreakdown(entries, level) {
   return parts.length ? ` (${parts.join(', ')})` : '';
 }
 
+function plural(count) {
+  return `${count} ${count === 1 ? 'comuna' : 'comunas'}`;
+}
+
 // Regional summary derived from the per-comuna scores the map paints, so it
 // can never contradict the choropleth. Scores are 0-1; percentages use the
-// same `(score * 100).toFixed(0)` rounding as the rest of the territory UI.
-export function regionalSummary({ comunaScores, comunaNames, firmsCount48h, reports7d } = {}) {
+// same `(score * 100).toFixed(0)` rounding as the rest of the territory UI, and
+// ordering/ties compare that displayed value. `comunaTotal` is the number of
+// comunas in the region (GeoJSON features); comunas without a score, or with an
+// unknown alert level, count as "without data" and never as Normal.
+export function regionalSummary({ comunaScores, comunaNames, comunaTotal, firmsCount48h, reports7d } = {}) {
   const names = comunaNames || {};
-  const entries = Object.entries(comunaScores || {})
-    .filter(([, score]) => score && typeof score.scoreComposite === 'number')
+  const scored = Object.entries(comunaScores || {}).filter(
+    ([, score]) => score && typeof score.scoreComposite === 'number'
+  );
+  const entries = scored
+    .filter(([, score]) => LEVEL_ORDER.includes(score.alertLevel))
     .map(([comunaId, score]) => {
-      const level = LEVEL_ORDER.includes(score.alertLevel) ? score.alertLevel : 'NORMAL';
+      const level = score.alertLevel;
+      const pct = (score.scoreComposite * 100).toFixed(0);
       return {
         trigger: alertTrigger({
           alertLevel: level,
           score: score.scoreComposite,
           fwiRaw: score.fwiRaw,
           firmsCount: score.firmsCount,
-          firmsFrpMean: score.firmsFrpMean
+          firmsFrpMean: score.firmsFrpMean,
+          alertDriver: score.alertDriver
         }).kind,
         comunaId,
         name: names[comunaId] || score.nombreComuna || comunaId,
-        raw: score.scoreComposite,
-        pct: (score.scoreComposite * 100).toFixed(0),
+        rounded: Number(pct),
+        pct,
         level,
         label: ALERT_LEVEL_CONFIG[level].label
       };
     })
-    .sort((a, b) => b.raw - a.raw || a.name.localeCompare(b.name, 'es'));
+    .sort((a, b) => b.rounded - a.rounded || a.name.localeCompare(b.name, 'es'));
 
   const toItem = ({ comunaId, name, pct, level, label }) => ({ comunaId, name, pct, level, label });
 
@@ -60,20 +72,39 @@ export function regionalSummary({ comunaScores, comunaNames, firmsCount48h, repo
     }))
     .filter((item) => item.count > 0);
 
+  const total = Number.isFinite(comunaTotal) && comunaTotal > 0 ? comunaTotal : null;
+  const withoutDataCount = total !== null
+    ? Math.max(0, total - entries.length)
+    : scored.length - entries.length;
+
+  let comunasText = '';
+  if (entries.length > 0) {
+    comunasText = withoutDataCount > 0 && total !== null
+      ? `${entries.length} de ${total} comunas con puntaje`
+      : plural(entries.length);
+  }
+
   const highestAlert = distribution.find((item) => item.level !== 'NORMAL');
   let alertText = 'Sin datos por comuna';
   if (entries.length > 0) {
-    alertText = highestAlert
-      ? `${highestAlert.count} en nivel ${highestAlert.label.toLowerCase()}${triggerBreakdown(entries, highestAlert.level)}`
-      : 'Sin comunas en alerta';
+    if (highestAlert) {
+      alertText = `${highestAlert.count} en nivel ${highestAlert.label.toLowerCase()}${triggerBreakdown(entries, highestAlert.level)}`;
+    } else {
+      alertText = withoutDataCount > 0
+        ? 'Sin comunas en alerta entre las que tienen puntaje'
+        : 'Sin comunas en alerta';
+    }
   }
 
   return {
     comunaCount: entries.length,
+    comunaTotal: total,
+    withoutDataCount,
+    comunasText,
     alertText,
     distribution,
     max: entries.length ? toItem(entries[0]) : null,
-    maxTies: entries.filter((entry) => entry.raw === entries[0]?.raw).length - (entries.length ? 1 : 0),
+    maxTies: entries.length ? entries.filter((entry) => entry.rounded === entries[0].rounded).length - 1 : 0,
     top: entries.slice(0, TOP_LIMIT).map(toItem),
     firmsCount48h: validCount(firmsCount48h),
     reports7d: validCount(reports7d)

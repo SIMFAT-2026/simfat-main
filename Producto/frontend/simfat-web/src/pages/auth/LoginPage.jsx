@@ -41,7 +41,7 @@ function LoginPage() {
     event.preventDefault();
 
     if (TURNSTILE_ENABLED && !captchaToken) {
-      showError('Completa la verificacion de Cloudflare para continuar.');
+      showError('Completa la verificación de Cloudflare para continuar.');
       return;
     }
 
@@ -57,7 +57,7 @@ function LoginPage() {
 
       navigate(fromPath, { replace: true });
     } catch (error) {
-      showError(error.message || 'No fue posible iniciar sesion.');
+      showError(error.message || 'No fue posible iniciar sesión.');
     } finally {
       setSubmitting(false);
     }
@@ -79,7 +79,7 @@ function LoginPage() {
 
   return (
     <AuthCard
-      title="Iniciar sesion"
+      title="Iniciar sesión"
       subtitle="Accede al panel operativo de NoFires"
       footer={
         <>

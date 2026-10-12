@@ -273,10 +273,10 @@ function RulesPage() {
         <div className="card-title-row">
           <h3>{editingId ? `Editando: ${form.nombre}` : 'Nueva regla'}</h3>
           <details className="access-help">
-            <summary>&#9432; Como funcionan</summary>
+            <summary>&#9432; Cómo funcionan</summary>
             <ul>
               <li><strong>Qué son:</strong> definen los umbrales que determinan cuándo una región escala su nivel de alerta.</li>
-              <li><strong>Logica OR:</strong> si cualquiera de los umbrales configurados se supera, la regla se activa.</li>
+              <li><strong>Lógica OR:</strong> si cualquiera de los umbrales configurados se supera, la regla se activa.</li>
               <li><strong>Alcance:</strong> una regla puede aplicar a una región específica o a todas (Global).</li>
               <li><strong>Activa / Inactiva:</strong> las reglas inactivas no generan alertas aunque se cumplan los umbrales.</li>
               <li><strong>Umbrales opcionales:</strong> deja en blanco los que no quieras usar. Solo se evalúan los que tienen valor.</li>

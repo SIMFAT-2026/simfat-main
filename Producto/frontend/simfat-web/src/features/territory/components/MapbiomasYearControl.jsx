@@ -3,6 +3,7 @@ import {
   controlYear,
   latestYearLabel,
   latestYearTarget,
+  parseYearSelection,
   yearAnnouncement,
   yearControlState,
   yearOptions
@@ -61,9 +62,12 @@ function MapbiomasYearControl({ label, state }) {
             className="territory-year-select"
             aria-label={`Año de ${label}`}
             value={hasYear ? year : ''}
-            onChange={(event) => setYear(Number(event.target.value))}
+            onChange={(event) => {
+              const next = parseYearSelection(event.target.value, range);
+              if (next !== null) setYear(next);
+            }}
           >
-            {!hasYear ? <option value="" /> : null}
+            {!hasYear ? <option value="" disabled hidden /> : null}
             {yearOptions(range.minYear, range.maxYear).map((option) => (
               <option key={option} value={option}>
                 {option}

@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import L from 'leaflet';
 import { CircleMarker, MapContainer, Popup, TileLayer, useMap } from 'react-leaflet';
+import { levelLabel, reportCategoryLabel } from '../../../utils/labels';
 import marker2x from 'leaflet/dist/images/marker-icon-2x.png';
 import markerIcon from 'leaflet/dist/images/marker-icon.png';
 import markerShadow from 'leaflet/dist/images/marker-shadow.png';
@@ -114,7 +115,7 @@ function AlertsOperationalMap({ alerts, reports, selectedAlertId, center = [-37.
               }}
             >
               <Popup>
-                <strong>{alert.nivelRiesgo}</strong> | {alert.descripcion || 'Alerta territorial'}
+                <strong>{levelLabel(alert.nivelRiesgo)}</strong> | {alert.descripcion || 'Alerta territorial'}
               </Popup>
             </CircleMarker>
           );
@@ -133,7 +134,7 @@ function AlertsOperationalMap({ alerts, reports, selectedAlertId, center = [-37.
             }}
           >
             <Popup>
-              <strong>{report.category}</strong> | {report.description || 'Reporte ciudadano'}
+              <strong>{reportCategoryLabel(report.category)}</strong> | {report.description || 'Reporte ciudadano'}
             </Popup>
           </CircleMarker>
         ))}

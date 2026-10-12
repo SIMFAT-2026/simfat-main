@@ -189,7 +189,7 @@ function AccessControlPage() {
       const updatedUser = await updateAccessUserRoles(userId, nextRoles);
       await updateVerificationStatus(userId, {
         newStatus: isVerified ? 'IDENTITY_VERIFIED' : 'UNVERIFIED',
-        notes: isVerified ? 'Verificado via panel de control de accesos' : 'Verificacion removida via panel de control de accesos'
+        notes: isVerified ? 'Verificado vía panel de control de accesos' : 'Verificación removida vía panel de control de accesos'
       });
       setUsers((prev) => prev.map((row) => (row.id === userId ? updatedUser : row)));
       feedback.showSuccess(`Roles actualizados para ${updatedUser.email}`);
@@ -263,9 +263,9 @@ function AccessControlPage() {
       const updatedUser = await updateCommunityModuleAccess(userId, { regionIds: nextRegionIds });
       if (updatedUser) {
         setUsers((prev) => prev.map((row) => (row.id === userId ? updatedUser : row)));
-        feedback.showSuccess(`Acceso modulo comunidad actualizado para ${updatedUser.email}`);
+        feedback.showSuccess(`Acceso al módulo de comunidad actualizado para ${updatedUser.email}`);
       } else {
-        feedback.showSuccess('Configuracion guardada (pendiente de sincronizacion con backend).');
+        feedback.showSuccess('Configuración guardada (pendiente de sincronización con el servidor).');
       }
     } catch (err) {
       feedback.showError(err.message);
@@ -307,7 +307,7 @@ function AccessControlPage() {
       setPendingReview((prev) => prev.filter((row) => row.id !== userId));
       setEventsByUser((prev) => ({ ...prev, [userId]: undefined }));
       setExpandedVerifUser('');
-      feedback.showSuccess(`Estado de verificacion actualizado para ${updatedUser.email}`);
+      feedback.showSuccess(`Estado de verificación actualizado para ${updatedUser.email}`);
     } catch (err) {
       feedback.showError(err.message);
     } finally {
@@ -372,7 +372,7 @@ function AccessControlPage() {
 
   return (
     <section className="page-container">
-      <SectionTitle title="Control de Accesos" subtitle="Gestion de roles y permisos de usuarios" />
+      <SectionTitle title="Control de Accesos" subtitle="Gestión de roles y permisos de usuarios" />
       {feedback.message ? <p className={`feedback feedback-${feedback.type}`}>{feedback.message}</p> : null}
       {loading ? <LoadingSpinner label="Cargando panel de accesos..." /> : null}
       {!loading && error ? <ErrorMessage error={error} /> : null}
@@ -466,7 +466,7 @@ function AccessControlPage() {
                       value={draftChatAccessByUser[target.id]?.primaryRegionId || ''}
                       onChange={(event) => updatePrimaryChatRegion(target.id, event.target.value)}
                     >
-                      <option value="">Sin region asignada</option>
+                      <option value="">Sin región asignada</option>
                       {dedupedRegions.map((region) => (
                         <option key={region.id} value={region.id}>
                           {region.nombre || region.name || region.id}
@@ -476,7 +476,7 @@ function AccessControlPage() {
                   </label>
 
                   <p className="community-source-note">
-                    Por defecto accede a la sala general y a su region principal. Marca regiones extra solo cuando
+                    Por defecto accede a la sala general y a su región principal. Marca regiones extra solo cuando
                     necesite coordinar con otras subsalas.
                   </p>
 
@@ -513,7 +513,7 @@ function AccessControlPage() {
                 <details className="access-advanced">
                   <summary>Acceso a recursos comunitarios</summary>
                   <p className="community-source-note">
-                    Los administradores ven todas las regiones sin restriccion.
+                    Los administradores ven todas las regiones sin restricción.
                   </p>
                   <div className="access-role-list">
                     {dedupedRegions.map((region) => (
@@ -558,10 +558,10 @@ function AccessControlPage() {
           </h3>
           <DataTable columns={columns} rows={users} rowKey="id" />
 
-          <h3 style={{ marginTop: '2rem' }}>Verificaciones pendientes de revision</h3>
+          <h3 style={{ marginTop: '2rem' }}>Verificaciones pendientes de revisión</h3>
           {pendingReview.length === 0 ? (
             <p style={{ color: 'var(--color-text-muted, #888)', fontSize: '0.9rem' }}>
-              Sin usuarios pendientes de revision de identidad.
+              Sin usuarios pendientes de revisión de identidad.
             </p>
           ) : (
             <div className="access-grid">
@@ -591,7 +591,7 @@ function AccessControlPage() {
                       else setExpandedVerifUser('');
                     }}
                   >
-                    <summary>Historial de verificacion</summary>
+                    <summary>Historial de verificación</summary>
                     {eventsByUser[row.id] === undefined ? (
                       <p>Cargando...</p>
                     ) : eventsByUser[row.id].length === 0 ? (
@@ -640,7 +640,7 @@ function AccessControlPage() {
                     </label>
 
                     <label style={{ display: 'block', marginBottom: '0.75rem' }}>
-                      <span>Notas de revision (obligatorio)</span>
+                      <span>Notas de revisión (obligatorio)</span>
                       <textarea
                         rows={2}
                         value={expandedVerifUser === row.id ? verifDraft.notes : ''}

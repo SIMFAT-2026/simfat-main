@@ -364,7 +364,8 @@ public class ComunaRiskServiceImpl implements ComunaRiskService {
         String mapbiomasDataVersion = mapbiomasResult.map(MapbiomasSusceptibility::dataVersion).orElse(null);
         String mapbiomasQualityFlag = mapbiomasResult.map(MapbiomasSusceptibility::qualityFlag).orElse(null);
 
-        String alertLevel = resolveAlertLevel(scoreComposite, fwiRaw, firmsCount, firmsFrpMean, hasTodayFoco);
+        AlertResolution alert = resolveAlert(scoreComposite, fwiRaw, firmsCount, firmsFrpMean, hasTodayFoco);
+        String alertLevel = alert.level();
 
         // Nivel anterior para deduplicacion de notificaciones (antes de guardar el nuevo snapshot)
         String previousAlertLevel = snapshotRepository.findTopByComunaIdOrderByComputedAtDesc(comunaId)
@@ -378,6 +379,7 @@ public class ComunaRiskServiceImpl implements ComunaRiskService {
         snapshot.setComputedAt(now);
         snapshot.setScoreComposite(round4(scoreComposite));
         snapshot.setAlertLevel(alertLevel);
+        snapshot.setAlertDriver(alert.driver());
         snapshot.setMode(mode);
         snapshot.setQualityFlag(qualityFlag);
         snapshot.setComponentFwi(round4(cFwi));
@@ -474,24 +476,42 @@ public class ComunaRiskServiceImpl implements ComunaRiskService {
         return recomputeByComuna(comunaId);
     }
 
-    private String resolveAlertLevel(double score, Double fwiRaw, int firmsCount, double firmsFrpMean, boolean hasTodayFirms) {
-        // A FIRMS detection from TODAY is an active fire happening right now — always CRITICO.
-        if (hasTodayFirms || (fwiRaw != null && fwiRaw >= FWI_CRITICO) || score >= scoreCritico) {
-            return "CRITICO";
+    // Level plus the single rule that raised it. Rules are evaluated in this exact order and the
+    // first match wins, so the driver is never a guess: FIRMS today, FWI >= FWI_CRITICO, score
+    // >= scoreCritico, FIRMS cluster, FIRMS FRP (CRITICO); FWI >= FWI_ALTO, score >= scoreAlto
+    // (ALTO); score (PREVENTIVO / NORMAL). Drivers: FIRMS_TODAY, FWI, SCORE, FIRMS_CLUSTER, FIRMS_FRP.
+    record AlertResolution(String level, String driver) {}
+
+    AlertResolution resolveAlert(double score, Double fwiRaw, int firmsCount, double firmsFrpMean, boolean hasTodayFirms) {
+        // A FIRMS detection from TODAY is an active fire happening right now: always CRITICO.
+        if (hasTodayFirms) {
+            return new AlertResolution("CRITICO", "FIRMS_TODAY");
+        }
+        if (fwiRaw != null && fwiRaw >= FWI_CRITICO) {
+            return new AlertResolution("CRITICO", "FWI");
+        }
+        if (score >= scoreCritico) {
+            return new AlertResolution("CRITICO", "SCORE");
         }
         // Detections that are only "recent" (not today) still escalate to CRITICO if they
-        // cluster (FIRMS_COUNT_CRITICO) or are individually intense (FIRMS_FRP_CRITICO) —
+        // cluster (FIRMS_COUNT_CRITICO) or are individually intense (FIRMS_FRP_CRITICO),
         // otherwise they just feed the weighted score via firmsNorm.
-        if (firmsCount >= FirmsScoringConstants.FIRMS_COUNT_CRITICO || firmsFrpMean >= FirmsScoringConstants.FIRMS_FRP_CRITICO) {
-            return "CRITICO";
+        if (firmsCount >= FirmsScoringConstants.FIRMS_COUNT_CRITICO) {
+            return new AlertResolution("CRITICO", "FIRMS_CLUSTER");
         }
-        if ((fwiRaw != null && fwiRaw >= FWI_ALTO) || score >= scoreAlto) {
-            return "ALTO";
+        if (firmsFrpMean >= FirmsScoringConstants.FIRMS_FRP_CRITICO) {
+            return new AlertResolution("CRITICO", "FIRMS_FRP");
+        }
+        if (fwiRaw != null && fwiRaw >= FWI_ALTO) {
+            return new AlertResolution("ALTO", "FWI");
+        }
+        if (score >= scoreAlto) {
+            return new AlertResolution("ALTO", "SCORE");
         }
         if (score >= scorePreventivo) {
-            return "PREVENTIVO";
+            return new AlertResolution("PREVENTIVO", "SCORE");
         }
-        return "NORMAL";
+        return new AlertResolution("NORMAL", "SCORE");
     }
 
     private boolean isToday(LocalDateTime fechaEventoUtc) {

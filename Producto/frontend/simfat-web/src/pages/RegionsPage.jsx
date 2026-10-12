@@ -50,7 +50,7 @@ function RegionsPage() {
   const columns = useMemo(
     () => [
       { key: 'nombre', header: 'Nombre' },
-      { key: 'codigo', header: 'Codigo' },
+      { key: 'codigo', header: 'Código' },
       { key: 'zona', header: 'Zona' },
       {
         key: 'hectareasBosqueReferencia',
@@ -111,10 +111,10 @@ function RegionsPage() {
     try {
       if (editingId) {
         await updateRegion(editingId, payload);
-        feedback.showSuccess('Region actualizada correctamente.');
+        feedback.showSuccess('Región actualizada correctamente.');
       } else {
         await createRegion(payload);
-        feedback.showSuccess('Region creada correctamente.');
+        feedback.showSuccess('Región creada correctamente.');
       }
 
       resetForm();
@@ -134,7 +134,7 @@ function RegionsPage() {
 
     try {
       await deleteRegion(deleteId);
-      feedback.showSuccess('Region eliminada correctamente.');
+      feedback.showSuccess('Región eliminada correctamente.');
       setDeleteId('');
       await loadRegions();
     } catch (err) {
@@ -145,7 +145,7 @@ function RegionsPage() {
 
   return (
     <section className="page-container">
-      <SectionTitle title="Regiones" subtitle="Gestion de regiones del sistema NoFires" />
+      <SectionTitle title="Regiones" subtitle="Gestión de regiones del sistema NoFires" />
 
       {feedback.message ? <p className={`feedback feedback-${feedback.type}`}>{feedback.message}</p> : null}
 
@@ -157,7 +157,7 @@ function RegionsPage() {
         </label>
 
         <label>
-          Codigo
+          Código
           <input name="codigo" value={form.codigo} onChange={onInputChange} required />
           {validationErrors.codigo ? <small className="field-error">{validationErrors.codigo}</small> : null}
         </label>
@@ -169,7 +169,7 @@ function RegionsPage() {
         </label>
 
         <label>
-          Hectareas de referencia
+          Hectáreas de referencia
           <input
             name="hectareasBosqueReferencia"
             type="number"
@@ -228,8 +228,8 @@ function RegionsPage() {
 
       <ConfirmModal
         isOpen={Boolean(deleteId)}
-        title="Eliminar region"
-        message="Esta accion no se puede deshacer."
+        title="Eliminar región"
+        message="Esta acción no se puede deshacer."
         confirmLabel="Eliminar"
         onConfirm={confirmDelete}
         onCancel={() => setDeleteId('')}

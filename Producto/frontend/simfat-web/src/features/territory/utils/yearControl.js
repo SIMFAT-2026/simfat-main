@@ -57,3 +57,17 @@ export function controlVisible({ active, state }) {
 export function chipLabel({ plain, withYear, controlVisible: visible }) {
   return visible ? plain : withYear;
 }
+
+// Year chosen in the <select>, or null when the value is not usable (blank
+// placeholder, non-integer, or outside the range): callers must ignore null
+// instead of committing a bogus year such as Number('') === 0.
+export function parseYearSelection(value, range) {
+  if (typeof value !== 'string' || !/^\d+$/.test(value.trim())) {
+    return null;
+  }
+  const year = Number(value);
+  if (range && (year < range.minYear || year > range.maxYear)) {
+    return null;
+  }
+  return year;
+}

@@ -61,10 +61,6 @@ export function layerGroupInfoLines() {
   return LAYER_TOGGLE_GROUPS.map((group) => group.info);
 }
 
-export function hasVisibleLayer(group, visibleIndicators = []) {
-  return Boolean(group?.indicators.some((indicator) => visibleIndicators.includes(indicator)));
-}
-
 // "(2 activas)" for the group's visible layers, else ''.
 export function activeLayerSummary({ group, visibleIndicators = [] }) {
   const count = group.indicators.filter((indicator) => visibleIndicators.includes(indicator)).length;

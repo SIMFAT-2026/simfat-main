@@ -22,13 +22,13 @@ function DashboardKpiCards({ summary, loading, error, onRetry }: DashboardKpiCar
         error={error}
         isEmpty={!summary}
         emptyTitle="Sin datos de resumen"
-        emptyDescription="Todavia no hay informacion consolidada para mostrar."
+        emptyDescription="Todavía no hay información consolidada para mostrar."
         onRetry={onRetry}
       >
         <div className="metrics-grid">
           <MetricCard label="Total ha perdidas" value={formatNumber(summary?.totalHectaresLost || 0)} />
           <MetricCard label="Total alertas" value={formatNumber(summary?.totalAlerts || 0)} />
-          <MetricCard label="Periodo mas critico" value={summary?.worstPeriodLabel || '-'} />
+          <MetricCard label="Periodo más crítico" value={summary?.worstPeriodLabel || '-'} />
           <MetricCard label="Tendencia" value={summary?.trendLabel || '-'} />
           <MetricCard label="Regiones monitoreadas" value={formatNumber(summary?.monitoredRegions || 0)} />
         </div>

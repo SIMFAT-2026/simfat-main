@@ -1,12 +1,12 @@
 function ErrorMessage({ error, onRetry }) {
-  const message = error?.message || 'An unexpected error occurred.';
+  const message = error?.message || 'Ocurrió un error inesperado.';
 
   return (
     <div className="error-state" role="alert">
       <p>{message}</p>
       {onRetry ? (
         <button type="button" className="btn btn-secondary" onClick={onRetry}>
-          Retry
+          Reintentar
         </button>
       ) : null}
     </div>

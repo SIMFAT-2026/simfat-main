@@ -16,7 +16,6 @@ import {
   BURNED_SCALE,
   CLIMATE_SCALES,
   NEUTRAL_FILL,
-  RISK_SCORE_LEGEND,
   VEGETATION_SCALES,
   burnedColorFor
 } from '../constants/colorScales';
@@ -28,6 +27,18 @@ import LayerToggleGroups from './LayerToggleGroups';
 import RegionalSummary from './RegionalSummary';
 import { regionalSummary } from '../utils/regionalSummary';
 import { alertTrigger } from '../utils/alertTrigger';
+import { compassLabelFrom } from '../utils/compass';
+import { REPORT_CARD_COLORS, isLongDescription } from '../utils/reportCard';
+import { comunaRiskStyle, riskLegendItems } from '../utils/riskPalette';
+import {
+  WIND_ARROW,
+  WIND_ARROW_HALO_WIDTH,
+  WIND_ARROW_LEGEND,
+  WIND_ARROW_PATH,
+  windArrowHtml,
+  windArrowSize
+} from '../utils/windArrow';
+import { modeLabel } from '../../../utils/labels';
 import MapbiomasYearControl from './MapbiomasYearControl';
 import { chipLabel, controlVisible } from '../utils/yearControl';
 import { LandcoverChoropleth, LandcoverLegend } from './LandcoverLayer';
@@ -113,19 +124,6 @@ function climateColorForValue(indicator, value) {
 
 
 
-function comunaBaseStyle(score) {
-  const level = score?.alertLevel || 'NORMAL';
-  const cfg = ALERT_LEVEL_CONFIG[level] || ALERT_LEVEL_CONFIG.NORMAL;
-  return {
-    fillColor: cfg.fill,
-    fillOpacity: score ? 0.34 : 0.10,
-    color: cfg.color,
-    weight: score ? cfg.weight : 0.8,
-    dashArray: score ? cfg.dashArray : null,
-    opacity: score ? 0.9 : 0.7
-  };
-}
-
 const ComunaChoropleth = memo(function ComunaChoropleth({ geoJson, comunalScores, onComunaHover, onComunaHoverEnd, onComunaClick }) {
   // react-leaflet only rebuilds the underlying L.geoJSON layer when `data` (the
   // polygons) changes — onEachFeature's handlers are bound once at that point
@@ -144,7 +142,7 @@ const ComunaChoropleth = memo(function ComunaChoropleth({ geoJson, comunalScores
       data={geoJson}
       style={(feature) => {
         const score = scoresRef.current?.[feature?.properties?.comunaId];
-        return comunaBaseStyle(score);
+        return comunaRiskStyle(score);
       }}
       onEachFeature={(feature, layer) => {
         const comunaId = feature?.properties?.comunaId;
@@ -152,13 +150,13 @@ const ComunaChoropleth = memo(function ComunaChoropleth({ geoJson, comunalScores
 
         layer.on('mouseover', (e) => {
           const score = scoresRef.current?.[comunaId];
-          layer.setStyle({ fillOpacity: 0.68, weight: 1.4, color: '#475569' });
+          layer.setStyle({ fillOpacity: 0.75, weight: 1.6, color: '#0f172a' });
           onComunaHover?.(comunaId, nombre, score, e.containerPoint);
         });
 
         layer.on('mouseout', () => {
           const score = scoresRef.current?.[comunaId];
-          layer.setStyle(comunaBaseStyle(score));
+          layer.setStyle(comunaRiskStyle(score));
           onComunaHoverEnd?.();
         });
 
@@ -386,16 +384,6 @@ function formatHourLabel(str, includeDate) {
   });
 }
 
-const COMPASS_LABELS = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
-
-// Open-Meteo's winddirection is the bearing the wind comes FROM (meteorological
-// convention). For an arrow that visually shows where the wind is heading, we
-// rotate by +180°; the compass label below still describes the source bearing.
-function compassLabelFrom(directionFromDeg) {
-  const index = Math.round(directionFromDeg / 45) % 8;
-  return COMPASS_LABELS[index];
-}
-
 function featureCentroid(feature) {
   try {
     return L.geoJSON(feature).getBounds().getCenter();
@@ -405,14 +393,28 @@ function featureCentroid(feature) {
 }
 
 function windArrowIcon(speed, bearingTo) {
-  const color = climateColorForValue('WIND', speed);
-  const html = `<div class="wind-arrow" style="transform: rotate(${bearingTo}deg); border-bottom-color: ${color};"></div>`;
+  const size = windArrowSize(speed);
   return L.divIcon({
     className: 'wind-arrow-icon',
-    html,
-    iconSize: [20, 20],
-    iconAnchor: [10, 10]
+    html: windArrowHtml(speed, bearingTo),
+    iconSize: [size, size],
+    iconAnchor: [size / 2, size / 2]
   });
+}
+
+function WindArrowSample({ size }) {
+  return (
+    <svg className="territory-wind-legend-arrow" width={size} height={size} viewBox="0 0 24 24" aria-hidden="true">
+      <path
+        d={WIND_ARROW_PATH}
+        fill={WIND_ARROW.fill}
+        stroke={WIND_ARROW.halo}
+        strokeWidth={WIND_ARROW_HALO_WIDTH}
+        strokeLinejoin="round"
+        paintOrder="stroke"
+      />
+    </svg>
+  );
 }
 
 // Renders one rotated arrow per comuna centroid showing wind direction
@@ -484,7 +486,7 @@ function featureMeta(feature) {
     return `Valor: ${Number(props.value).toFixed(3)}`;
   }
   if (props.hectares !== undefined && props.hectares !== null) {
-    return `Hectareas: ${props.hectares}`;
+    return `Hectáreas: ${props.hectares}`;
   }
   if (props.level) {
     return `Nivel: ${props.level}`;
@@ -633,12 +635,6 @@ const REPORT_CATEGORY_LABELS = {
   INCENDIO: 'Incendio activo',
   OTRO: 'Otro'
 };
-const REPORT_CATEGORY_COLORS = {
-  HUMO: '#94a3b8',
-  FOCO: '#f97316',
-  INCENDIO: '#dc2626',
-  OTRO: '#64748b'
-};
 const REPORT_STATUS_LABELS = {
   RECIBIDO: 'Recibido',
   VALIDADO: 'Validado',
@@ -647,10 +643,17 @@ const REPORT_STATUS_LABELS = {
 };
 
 function ReportCard({ report, pos, onClose }) {
+  const [expanded, setExpanded] = useState(false);
+  const description = report?.properties?.description;
+  useEffect(() => {
+    setExpanded(false);
+  }, [description]);
+
   if (!report || !pos) return null;
   const props = report.properties || {};
   const category = props.category || 'OTRO';
-  const color = REPORT_CATEGORY_COLORS[category] || '#64748b';
+  const color = REPORT_CARD_COLORS.category[category] || REPORT_CARD_COLORS.category.OTRO;
+  const longDescription = isLongDescription(props.description);
   const photoUrl = props.photoUrl || (Array.isArray(props.photoUrls) && props.photoUrls[0]) || null;
   return (
     <div className="report-card" style={{ left: pos.x + 14, top: pos.y - 10 }}>
@@ -666,7 +669,24 @@ function ReportCard({ report, pos, onClose }) {
           style={{ width: '100%', maxHeight: '140px', objectFit: 'cover', borderRadius: '4px', marginBottom: '6px' }}
         />
       )}
-      {props.description && <p className="report-card-desc">{props.description}</p>}
+      {props.description && (
+        <p
+          className={`report-card-desc${expanded ? ' report-card-desc--expanded' : ''}`}
+          title={longDescription && !expanded ? props.description : undefined}
+        >
+          {props.description}
+        </p>
+      )}
+      {longDescription && (
+        <button
+          type="button"
+          className="report-card-more"
+          aria-expanded={expanded}
+          onClick={() => setExpanded((prev) => !prev)}
+        >
+          {expanded ? 'Ver menos' : 'Ver más'}
+        </button>
+      )}
       <div className="report-card-meta">
         {props.status && (
           <span className="report-card-status">{REPORT_STATUS_LABELS[props.status] || props.status}</span>
@@ -795,7 +815,8 @@ function ComunaTooltip({ comunaId, nombre, score, pos, burnedLine = '', landcove
     score: score?.scoreComposite,
     fwiRaw: score?.fwiRaw,
     firmsCount: score?.firmsCount,
-    firmsFrpMean: score?.firmsFrpMean
+    firmsFrpMean: score?.firmsFrpMean,
+    alertDriver: score?.alertDriver
   });
 
   const componentEntries = tooltipComponentEntries(score?.components);
@@ -811,7 +832,7 @@ function ComunaTooltip({ comunaId, nombre, score, pos, burnedLine = '', landcove
         <span className="comuna-tooltip-nombre">{displayNombre}</span>
         {mode && (
           <span className={`comuna-mode-badge ${mode === 'ENHANCED' ? 'enhanced' : 'standard'}`}>
-            {mode}
+            {modeLabel(mode)}
           </span>
         )}
       </div>
@@ -1017,6 +1038,7 @@ function TerritoryMapPanel({
     return regionalSummary({
       comunaScores: effectiveComunalScores,
       comunaNames,
+      comunaTotal: comunalGeoJson?.features?.length,
       firmsCount48h: regionData?.riskScore?.components?.firms?.focosCount,
       reports7d: regionData?.riskScore?.components?.reports?.count
     });
@@ -1102,7 +1124,7 @@ function TerritoryMapPanel({
           {!readOnly && (
             <>
               <WeatherSyncButton regionId={selectedRegionId} />
-              <small style={{ color: '#94a3b8', fontSize: '0.68rem', marginTop: 2 }}>
+              <small style={{ color: '#475569', fontSize: '0.8rem', marginTop: 2 }}>
                 ⓘ La sincronización puede tardar aprox. 2–3 min
               </small>
             </>
@@ -1364,11 +1386,11 @@ function TerritoryMapPanel({
                 <div className="territory-legend-section">
                   <h5>Riesgo comunal</h5>
                   <ul>
-                    {RISK_SCORE_LEGEND.map((item) => (
-                      <li key={item.label} title={item.note}>
+                    {riskLegendItems().map((item) => (
+                      <li key={item.key} title={item.note}>
                         <span
-                          className="territory-color-dot territory-risk-swatch"
-                          style={{ backgroundColor: item.color, borderColor: item.borderColor, color: item.borderColor }}
+                          className="territory-risk-swatch"
+                          style={{ backgroundColor: item.swatchFill, borderColor: item.borderColor, borderStyle: item.borderStyle }}
                           aria-hidden="true"
                         />
                         <span>{item.text}</span>
@@ -1385,10 +1407,11 @@ function TerritoryMapPanel({
                   <div key={indicator} className="territory-legend-section">
                     <h5>{scale.label}</h5>
                     <ul>
-                      {scale.bins.map((bin) => (
+                      {scale.bins.map((bin, index) => (
                         <li key={bin.label}>
                           <span className="territory-color-dot" style={{ backgroundColor: bin.color }} />
                           <span>{bin.label}</span>
+                          {indicator === 'WIND' ? <WindArrowSample size={WIND_ARROW_LEGEND[index].size} /> : null}
                         </li>
                       ))}
                       <li>
@@ -1396,6 +1419,9 @@ function TerritoryMapPanel({
                         <span>Sin datos</span>
                       </li>
                     </ul>
+                    {indicator === 'WIND' ? (
+                      <p className="territory-legend-note">Las flechas apuntan hacia donde sopla el viento; su tamaño indica la velocidad.</p>
+                    ) : null}
                   </div>
                 );
               })}
@@ -1407,10 +1433,11 @@ function TerritoryMapPanel({
                   <div key={indicator} className="territory-legend-section">
                     <h5>{scale.label} ({scale.unit})</h5>
                     <ul>
-                      {scale.bins.map((bin) => (
+                      {scale.bins.map((bin, index) => (
                         <li key={bin.label}>
                           <span className="territory-color-dot" style={{ backgroundColor: bin.color }} />
                           <span>{bin.label}</span>
+                          {indicator === 'WIND' ? <WindArrowSample size={WIND_ARROW_LEGEND[index].size} /> : null}
                         </li>
                       ))}
                       <li>
@@ -1418,6 +1445,9 @@ function TerritoryMapPanel({
                         <span>Sin datos</span>
                       </li>
                     </ul>
+                    {indicator === 'WIND' ? (
+                      <p className="territory-legend-note">Las flechas apuntan hacia donde sopla el viento; su tamaño indica la velocidad.</p>
+                    ) : null}
                   </div>
                 );
               })}
@@ -1431,7 +1461,7 @@ function TerritoryMapPanel({
               )}
 
               <p className="territory-meta">
-                Fuente: {regionData.source === 'backend' ? 'Backend' : 'Mock local'} | Última actualización:{' '}
+                Fuente: {regionData.source === 'backend' ? 'servidor' : 'datos de demostración'} | Última actualización:{' '}
                 {parseUtcDate(regionData.generatedAt)}
               </p>
             </div>

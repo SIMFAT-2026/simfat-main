@@ -175,7 +175,7 @@ export function clampPublicRange(from, to, todayIso) {
   const notices = [];
 
   if ((from && fromMs === null) || (to && toMs === null)) {
-    notices.push('Fecha invalida; se ignoro.');
+    notices.push('Fecha inválida; se ignoró.');
   }
 
   if (toMs !== null && todayMs !== null && toMs > todayMs) {
@@ -189,7 +189,7 @@ export function clampPublicRange(from, to, todayIso) {
   if ((fromMs !== null && fromMs < minMs) || (toMs !== null && toMs < minMs)) {
     if (fromMs !== null && fromMs < minMs) fromMs = minMs;
     if (toMs !== null && toMs < minMs) toMs = minMs;
-    notices.push('La fecha minima es 01-01-2000; se ajusto el rango.');
+    notices.push('La fecha mínima es 01-01-2000; se ajustó el rango.');
   }
 
   if (fromMs === null && toMs === null) {
@@ -201,11 +201,11 @@ export function clampPublicRange(from, to, todayIso) {
 
   if (fromMs > toMs) {
     fromMs = toMs;
-    notices.push('"Desde" no puede ser posterior a "hasta"; se ajusto el rango.');
+    notices.push('"Desde" no puede ser posterior a "hasta"; se ajustó el rango.');
   }
   if ((toMs - fromMs) / DAY_MS > PUBLIC_CLIENT_SPAN_DAYS) {
     fromMs = toMs - PUBLIC_CLIENT_SPAN_DAYS * DAY_MS;
-    notices.push(`El periodo publico maximo es de ${PUBLIC_MAX_SPAN_DAYS} dias; se ajusto el inicio.`);
+    notices.push(`El periodo público máximo es de ${PUBLIC_MAX_SPAN_DAYS} días; se ajustó el inicio.`);
   }
 
   return { from: utcMsToIso(fromMs), to: utcMsToIso(toMs), notice: notices.join(' ') };

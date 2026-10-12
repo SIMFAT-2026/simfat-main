@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getUnreadNotifications, markNotificationRead } from '../../services';
+import { levelLabel } from '../../utils/labels';
 
 const POLL_INTERVAL_MS = 30_000;
 
@@ -58,7 +59,7 @@ function NotificationBell() {
       <button
         type="button"
         className="notification-bell-btn"
-        aria-label={`Notificaciones${count > 0 ? `, ${count} no leidas` : ''}`}
+        aria-label={`Notificaciones${count > 0 ? `, ${count} no leídas` : ''}`}
         onClick={() => setOpen((prev) => !prev)}
       >
         <span className="notification-bell-icon" aria-hidden="true">&#128276;</span>
@@ -73,7 +74,7 @@ function NotificationBell() {
         <div className="notification-dropdown" role="menu">
           <div className="notification-dropdown-header">
             <span>Notificaciones</span>
-            {count > 0 && <span className="notification-dropdown-count">{count} no leidas</span>}
+            {count > 0 && <span className="notification-dropdown-count">{count} no leídas</span>}
           </div>
 
           {data.notifications.length === 0 ? (
@@ -88,7 +89,7 @@ function NotificationBell() {
                     onClick={() => handleClick(n)}
                   >
                     <span className={`notification-level notification-level-${(n.alertLevel || '').toLowerCase()}`}>
-                      {n.alertLevel}
+                      {levelLabel(n.alertLevel)}
                     </span>
                     <span className="notification-title">{n.title}</span>
                     <span className="notification-msg">{n.message}</span>

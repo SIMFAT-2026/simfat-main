@@ -42,7 +42,7 @@ function formatAge(ageSeconds: number): string {
 
 function DataFreshnessChip({ data, loading, error, hasRegion, onRetry }: DataFreshnessChipProps) {
   if (!hasRegion) {
-    return <span className="freshness-chip freshness-chip-unknown">Frescura: selecciona region</span>;
+    return <span className="freshness-chip freshness-chip-unknown">Frescura: selecciona región</span>;
   }
 
   if (loading) {

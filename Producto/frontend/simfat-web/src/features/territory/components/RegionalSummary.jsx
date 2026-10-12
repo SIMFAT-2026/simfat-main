@@ -10,7 +10,7 @@ function RegionalSummary({ regionLabel, summary, onComunaClick }) {
   const detailId = useId();
   const infoId = useId();
   const info = useDisclosure();
-  const { comunaCount, alertText, max, maxTies, top, distribution, firmsCount48h, reports7d } = summary;
+  const { comunaCount, comunasText, alertText, max, maxTies, top, distribution, firmsCount48h, reports7d } = summary;
 
   return (
     <section className="regional-summary-panel" aria-labelledby={`${detailId}-title`}>
@@ -18,7 +18,7 @@ function RegionalSummary({ regionLabel, summary, onComunaClick }) {
         <h4 id={`${detailId}-title`} className="regional-summary-title">Resumen regional</h4>
         <span className="regional-summary-text">
           <strong>{regionLabel}</strong>
-          {comunaCount > 0 ? ` · ${comunaCount} comunas` : ''}
+          {comunasText ? ` · ${comunasText}` : ''}
           {` · ${alertText}`}
           {max ? ` · Puntaje máx.: ${max.name} ${max.pct}/100${maxTies > 0 ? ` (+${maxTies} con igual puntaje)` : ''}` : ''}
           {firmsCount48h !== null ? ` · Focos FIRMS 48 h: ${firmsCount48h}` : ''}

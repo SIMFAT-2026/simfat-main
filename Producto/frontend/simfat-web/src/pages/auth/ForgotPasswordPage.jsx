@@ -19,7 +19,7 @@ function ForgotPasswordPage() {
     event.preventDefault();
 
     if (TURNSTILE_ENABLED && !captchaToken) {
-      showError('Completa la verificacion de Cloudflare para continuar.');
+      showError('Completa la verificación de Cloudflare para continuar.');
       return;
     }
 

@@ -23,6 +23,9 @@ public class ComunaRiskSnapshot {
 
     private Double scoreComposite;
     private String alertLevel;
+    // Why alertLevel was raised: SCORE | FWI | FIRMS_TODAY | FIRMS_CLUSTER | FIRMS_FRP.
+    // Null for snapshots computed before this field was added.
+    private String alertDriver;
     private String mode;         // STANDARD | ENHANCED
     private String qualityFlag;  // null | PARTIAL | COPERNICUS_UNAVAILABLE
 
@@ -76,6 +79,9 @@ public class ComunaRiskSnapshot {
 
     public Double getScoreComposite() { return scoreComposite; }
     public void setScoreComposite(Double scoreComposite) { this.scoreComposite = scoreComposite; }
+
+    public String getAlertDriver() { return alertDriver; }
+    public void setAlertDriver(String alertDriver) { this.alertDriver = alertDriver; }
 
     public String getAlertLevel() { return alertLevel; }
     public void setAlertLevel(String alertLevel) { this.alertLevel = alertLevel; }

@@ -13,13 +13,13 @@ function AlertsBar({ data, loading, error, onRetry }: AlertsBarProps) {
   const rows = data || [];
   return (
     <article className="dashboard-card">
-      <h3>Alertas por categoria (barras)</h3>
+      <h3>Alertas por categoría (barras)</h3>
       <DashboardPanelState
         loading={loading}
         error={error}
         isEmpty={rows.length === 0}
         emptyTitle="Sin alertas para visualizar"
-        emptyDescription="No hay informacion para construir el grafico de barras."
+        emptyDescription="No hay información para construir el gráfico de barras."
         onRetry={onRetry}
       >
         <ResponsiveContainer width="100%" height={280}>

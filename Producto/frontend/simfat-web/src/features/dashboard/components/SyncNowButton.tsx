@@ -18,7 +18,7 @@ function SyncNowButton({ onSync, onSyncSuccess }: SyncNowButtonProps) {
       await onSyncSuccess();
       setFeedback({
         type: 'success',
-        message: result.message || 'Sincronizacion ejecutada correctamente.'
+        message: result.message || 'Sincronización ejecutada correctamente.'
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'No fue posible sincronizar ahora.';

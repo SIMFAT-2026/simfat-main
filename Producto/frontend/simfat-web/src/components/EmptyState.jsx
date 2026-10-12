@@ -1,4 +1,4 @@
-function EmptyState({ title = 'No data found', description = 'Try adjusting filters or creating a new record.' }) {
+function EmptyState({ title = 'Sin datos', description = 'Prueba ajustando los filtros o creando un nuevo registro.' }) {
   return (
     <div className="empty-state">
       <h3>{title}</h3>

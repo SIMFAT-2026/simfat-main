@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BURNED_SCALE, NEUTRAL_FILL, RISK_SCORE_LEGEND, burnedColorFor } from './colorScales';
+import { ALERT_LEVEL_CONFIG, BURNED_SCALE, NEUTRAL_FILL, burnedColorFor } from './colorScales';
 
 const available = (burnedFraction) => ({ available: true, burnedFraction, burnedHa: 1 });
 const colorOfBin = (index) => BURNED_SCALE.bins[index].color;
@@ -64,13 +64,13 @@ describe('BURNED_SCALE', () => {
   });
 });
 
-describe('RISK_SCORE_LEGEND', () => {
+describe('ALERT_LEVEL_CONFIG legend text', () => {
   it('states the score range and the trigger for each level in visible text', () => {
-    expect(RISK_SCORE_LEGEND.map((item) => item.text)).toEqual([
+    expect(Object.values(ALERT_LEVEL_CONFIG).map((item) => item.legendText)).toEqual([
       'Normal (puntaje 0–49)',
       'Preventivo (puntaje 50–69)',
       'Alto (puntaje 70–84 o FWI ≥ 20)',
-      'Crítico (puntaje ≥ 85 o focos FIRMS)'
+      'Crítico (puntaje ≥ 85, FWI ≥ 45 o focos FIRMS)'
     ]);
   });
 });

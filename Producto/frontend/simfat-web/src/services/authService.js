@@ -16,7 +16,7 @@ function normalizeAuthPayload(payload) {
   const expiresAt = data.expiresAt || null;
 
   if (!user || !accessToken) {
-    throw new Error('Respuesta de autenticacion incompleta desde backend.');
+    throw new Error('Respuesta de autenticación incompleta desde el servidor.');
   }
 
   return { user, accessToken, refreshToken, expiresAt };

@@ -28,7 +28,7 @@ function WeatherSyncButton({ regionId }: WeatherSyncButtonProps) {
 
   const handleClick = async () => {
     if (!regionId) {
-      setFeedback({ type: 'error', message: 'Selecciona una region antes de sincronizar.' });
+      setFeedback({ type: 'error', message: 'Selecciona una región antes de sincronizar.' });
       return;
     }
 
@@ -38,7 +38,7 @@ function WeatherSyncButton({ regionId }: WeatherSyncButtonProps) {
       const result = await triggerWeatherSync(regionId);
       setFeedback({
         type: 'success',
-        message: result.message || 'Sincronizacion de clima y viento iniciada.'
+        message: result.message || 'Sincronización de clima y viento iniciada.'
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'No fue posible sincronizar el clima.';
@@ -51,7 +51,7 @@ function WeatherSyncButton({ regionId }: WeatherSyncButtonProps) {
   return (
     <div className="sync-button-block">
       <button type="button" className="btn btn-secondary" onClick={handleClick} disabled={loading || !regionId}>
-        {loading ? 'Sincronizando clima...' : 'Sincronizar clima y viento'}
+        {loading ? 'Sincronizando clima…' : 'Sincronizar clima y viento'}
       </button>
       {feedback ? <p className={`sync-feedback sync-feedback-${feedback.type}`}>{feedback.message}</p> : null}
     </div>

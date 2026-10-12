@@ -8,24 +8,24 @@ import {
 } from '../../router/navigationConfig';
 
 const sidebarSections = [
-  { title: 'Operacion', links: primaryNavigationLinks },
-  { title: 'Administracion', links: adminNavigationLinks }
+  { title: 'Operación', links: primaryNavigationLinks },
+  { title: 'Administración', links: adminNavigationLinks }
 ];
 
 function Sidebar({ collapsed = false, onToggle }) {
   const { isAuthenticated, isBootstrapping } = useAuth();
 
   return (
-    <aside className="sidebar" aria-label="Menu lateral" data-collapsed={collapsed}>
+    <aside className="sidebar" aria-label="Menú lateral" data-collapsed={collapsed}>
       <div className="sidebar-header">
-        {!collapsed && <h2>Modulos</h2>}
+        {!collapsed && <h2>Módulos</h2>}
         <button
           type="button"
           className="sidebar-toggle"
           onClick={onToggle}
-          aria-label={collapsed ? 'Expandir menu lateral' : 'Contraer menu lateral'}
+          aria-label={collapsed ? 'Expandir menú lateral' : 'Contraer menú lateral'}
           aria-expanded={!collapsed}
-          title={collapsed ? 'Expandir menu' : 'Contraer menu'}
+          title={collapsed ? 'Expandir menú' : 'Contraer menú'}
         >
           <span aria-hidden="true">{collapsed ? '>' : '<'}</span>
         </button>

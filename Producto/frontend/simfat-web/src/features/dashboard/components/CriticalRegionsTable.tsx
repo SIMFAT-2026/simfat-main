@@ -49,7 +49,7 @@ function CriticalRegionsTable({ data, loading, error, onRetry }: CriticalRegions
         loading={loading}
         error={error}
         isEmpty={rows.length === 0}
-        emptyTitle="Sin regiones criticas"
+        emptyTitle="Sin regiones críticas"
         emptyDescription="No hay regiones con criticidad reportada en este momento."
         onRetry={onRetry}
       >

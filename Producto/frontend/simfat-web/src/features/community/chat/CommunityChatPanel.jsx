@@ -103,7 +103,7 @@ function CommunityChatPanel() {
 
   async function handleModerate(messageId) {
     try {
-      await moderateMessage(messageId, moderationReason.trim() || 'Moderacion operativa');
+      await moderateMessage(messageId, moderationReason.trim() || 'Moderación operativa');
       setModerationReason('');
     } catch (err) {
       setLocalError(err.message || 'No se pudo moderar el mensaje.');
@@ -122,7 +122,7 @@ function CommunityChatPanel() {
           <div className="community-chat-header">
             <div>
               <h3>{roomLabel(activeRoom)}</h3>
-              <p>Coordinacion territorial para prevencion de incendios.</p>
+              <p>Coordinación territorial para prevención de incendios.</p>
             </div>
 
             <label>
@@ -172,7 +172,7 @@ function CommunityChatPanel() {
               <div className="community-chat-messages">
                 {loadingMessages && messages.length === 0 ? <LoadingSpinner label="Cargando mensajes..." /> : null}
                 {!loadingMessages && messages.length === 0 ? (
-                  <EmptyState title="Sin mensajes" description="Inicia la coordinacion en esta sala." />
+                  <EmptyState title="Sin mensajes" description="Inicia la coordinación en esta sala." />
                 ) : null}
 
                 {messages.map((message) => (
@@ -193,7 +193,7 @@ function CommunityChatPanel() {
 
               {canModerate ? (
                 <label className="community-chat-moderation-reason">
-                  Motivo de moderacion
+                  Motivo de moderación
                   <input
                     value={moderationReason}
                     onChange={(event) => setModerationReason(event.target.value)}
@@ -212,7 +212,7 @@ function CommunityChatPanel() {
                   maxLength={800}
                   value={draft}
                   onChange={(event) => setDraft(event.target.value)}
-                  placeholder="Escribe una actualizacion operativa..."
+                  placeholder="Escribe una actualización operativa…"
                   disabled={!activeRoomId || sending}
                 />
                 <button type="submit" className="btn" disabled={!activeRoomId || sending || !draft.trim()}>
