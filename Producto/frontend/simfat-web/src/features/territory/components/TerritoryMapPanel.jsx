@@ -28,6 +28,7 @@ import RegionalSummary from './RegionalSummary';
 import { regionalSummary } from '../utils/regionalSummary';
 import { alertTrigger } from '../utils/alertTrigger';
 import { compassLabelFrom } from '../utils/compass';
+import { REPORT_CARD_COLORS, isLongDescription } from '../utils/reportCard';
 import { comunaRiskStyle, riskLegendItems } from '../utils/riskPalette';
 import {
   WIND_ARROW,
@@ -634,12 +635,6 @@ const REPORT_CATEGORY_LABELS = {
   INCENDIO: 'Incendio activo',
   OTRO: 'Otro'
 };
-const REPORT_CATEGORY_COLORS = {
-  HUMO: '#94a3b8',
-  FOCO: '#f97316',
-  INCENDIO: '#dc2626',
-  OTRO: '#64748b'
-};
 const REPORT_STATUS_LABELS = {
   RECIBIDO: 'Recibido',
   VALIDADO: 'Validado',
@@ -648,10 +643,17 @@ const REPORT_STATUS_LABELS = {
 };
 
 function ReportCard({ report, pos, onClose }) {
+  const [expanded, setExpanded] = useState(false);
+  const description = report?.properties?.description;
+  useEffect(() => {
+    setExpanded(false);
+  }, [description]);
+
   if (!report || !pos) return null;
   const props = report.properties || {};
   const category = props.category || 'OTRO';
-  const color = REPORT_CATEGORY_COLORS[category] || '#64748b';
+  const color = REPORT_CARD_COLORS.category[category] || REPORT_CARD_COLORS.category.OTRO;
+  const longDescription = isLongDescription(props.description);
   const photoUrl = props.photoUrl || (Array.isArray(props.photoUrls) && props.photoUrls[0]) || null;
   return (
     <div className="report-card" style={{ left: pos.x + 14, top: pos.y - 10 }}>
@@ -667,7 +669,24 @@ function ReportCard({ report, pos, onClose }) {
           style={{ width: '100%', maxHeight: '140px', objectFit: 'cover', borderRadius: '4px', marginBottom: '6px' }}
         />
       )}
-      {props.description && <p className="report-card-desc">{props.description}</p>}
+      {props.description && (
+        <p
+          className={`report-card-desc${expanded ? ' report-card-desc--expanded' : ''}`}
+          title={longDescription && !expanded ? props.description : undefined}
+        >
+          {props.description}
+        </p>
+      )}
+      {longDescription && (
+        <button
+          type="button"
+          className="report-card-more"
+          aria-expanded={expanded}
+          onClick={() => setExpanded((prev) => !prev)}
+        >
+          {expanded ? 'Ver menos' : 'Ver más'}
+        </button>
+      )}
       <div className="report-card-meta">
         {props.status && (
           <span className="report-card-status">{REPORT_STATUS_LABELS[props.status] || props.status}</span>

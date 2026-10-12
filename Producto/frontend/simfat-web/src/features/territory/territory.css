@@ -834,9 +834,9 @@
 }
 
 .report-card-desc {
-  margin: 0 0 6px;
-  color: #cbd5e1;
-  font-size: 0.8rem;
+  margin: 0 0 4px;
+  color: #e2e8f0;
+  font-size: 0.86rem;
   overflow: hidden;
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -851,19 +851,46 @@
 }
 
 .report-card-status {
-  font-size: 0.7rem;
+  font-size: 0.8rem;
   background: rgba(255,255,255,0.1);
   border-radius: 4px;
   padding: 2px 6px;
-  color: #94a3b8;
+  color: #cbd5e1;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
 
 .report-card-time {
-  font-size: 0.72rem;
-  color: #64748b;
+  font-size: 0.8rem;
+  color: #cbd5e1;
+}
+
+.report-card-desc--expanded {
+  display: block;
+  max-height: 160px;
+  overflow-y: auto;
+}
+
+.report-card-more {
+  background: none;
+  border: none;
+  padding: 2px 0 6px;
+  color: #7dd3fc;
+  font-size: 0.86rem;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.report-card-more:focus-visible {
+  outline: 2px solid #7dd3fc;
+  outline-offset: 2px;
+}
+
+@media (pointer: coarse) {
+  .report-card-more {
+    min-height: 44px;
+  }
 }
 
 /* ── Panel lateral comunal ── */
