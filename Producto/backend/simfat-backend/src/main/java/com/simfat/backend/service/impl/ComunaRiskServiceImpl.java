@@ -27,6 +27,7 @@ import java.time.ZoneOffset;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -423,15 +424,19 @@ public class ComunaRiskServiceImpl implements ComunaRiskService {
         // and must not leak. Names projection keeps the heavy geometry out of the read.
         Set<String> currentComunaIds = comunaRepository.findNamesByRegionId(regionId).stream()
             .map(ComunaInfo::getId)
+            .filter(Objects::nonNull)
             .collect(Collectors.toSet());
         boolean filterByCurrentComunas = !currentComunaIds.isEmpty();
-        if (!filterByCurrentComunas) {
-            // Missing/empty comuna catalog must not blank the region: fall back to unfiltered snapshots.
-            LOGGER.warn("No ComunaInfo found for regionId={}; returning unfiltered snapshots", regionId);
-        }
         // Single query sorted desc; first occurrence of each comunaId is the latest snapshot.
+        List<ComunaRiskSnapshot> snapshots = snapshotRepository.findByRegionIdOrderByComputedAtDesc(regionId);
+        if (!filterByCurrentComunas && !snapshots.isEmpty()) {
+            // Missing/empty comuna catalog must not blank the region: fall back to unfiltered snapshots.
+            // Warn only when snapshots exist (unknown public ids carry no signal); strip CR/LF from the id.
+            LOGGER.warn("No ComunaInfo found for regionId={}; returning unfiltered snapshots",
+                regionId == null ? null : regionId.replaceAll("[\\r\\n]", "_"));
+        }
         Map<String, ComunaRiskSnapshot> result = new LinkedHashMap<>();
-        for (ComunaRiskSnapshot snap : snapshotRepository.findByRegionIdOrderByComputedAtDesc(regionId)) {
+        for (ComunaRiskSnapshot snap : snapshots) {
             if (!filterByCurrentComunas || currentComunaIds.contains(snap.getComunaId())) {
                 result.putIfAbsent(snap.getComunaId(), snap);
             }

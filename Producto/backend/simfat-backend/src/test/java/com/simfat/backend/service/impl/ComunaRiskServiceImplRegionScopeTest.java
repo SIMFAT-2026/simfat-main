@@ -3,6 +3,7 @@ package com.simfat.backend.service.impl;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.when;
 
 import com.simfat.backend.integration.openeo.OpenEoServiceClient;
@@ -121,6 +122,44 @@ class ComunaRiskServiceImplRegionScopeTest {
 
         assertEquals(1, result.size());
         assertEquals("CHL.8.1_1", result.get(0).getComunaId());
+    }
+
+    @Test
+    void getLatestSnapshotsByRegion_unknownRegion_returnsEmptyWithoutException() {
+        String id = "nope\r\nfake";
+        when(comunaRepository.findNamesByRegionId(id)).thenReturn(List.of());
+        when(snapshotRepository.findByRegionIdOrderByComputedAtDesc(id)).thenReturn(List.of());
+
+        Map<String, ComunaRiskSnapshot> result = service.getLatestSnapshotsByRegion(id);
+
+        assertTrue(result.isEmpty());
+    }
+
+    @Test
+    void getLatestSnapshotsByRegion_nullIdComunaInfoEntry_isIgnoredAndValidComunaStillScopes() {
+        LocalDateTime at = LocalDateTime.of(2026, 10, 13, 1, 30);
+        when(comunaRepository.findNamesByRegionId("biobio")).thenReturn(List.of(comuna(null), comuna("CHL.8.1_1")));
+        when(snapshotRepository.findByRegionIdOrderByComputedAtDesc("biobio")).thenReturn(List.of(
+            snapshot("CHL.8.1_1", "biobio", at),
+            snapshot("CHL.16.1_1", "biobio", at)
+        ));
+
+        Map<String, ComunaRiskSnapshot> result = service.getLatestSnapshotsByRegion("biobio");
+
+        assertEquals(List.of("CHL.8.1_1"), List.copyOf(result.keySet()));
+    }
+
+    @Test
+    void getLatestSnapshotsByRegion_onlyNullIdComunaInfo_doesNotBlankRegion() {
+        LocalDateTime at = LocalDateTime.of(2026, 10, 13, 1, 30);
+        when(comunaRepository.findNamesByRegionId("biobio")).thenReturn(List.of(comuna(null)));
+        when(snapshotRepository.findByRegionIdOrderByComputedAtDesc("biobio")).thenReturn(List.of(
+            snapshot("CHL.8.1_1", "biobio", at)
+        ));
+
+        Map<String, ComunaRiskSnapshot> result = service.getLatestSnapshotsByRegion("biobio");
+
+        assertEquals(List.of("CHL.8.1_1"), List.copyOf(result.keySet()));
     }
 
     @Test
