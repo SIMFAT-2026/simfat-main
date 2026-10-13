@@ -786,18 +786,20 @@
   margin-left: 1px;
 }
 
-.comuna-tooltip-components {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
+.comuna-tooltip-raw {
+  font-size: 0.8rem;
+  color: #cbd5e1;
 }
 
-.comuna-tooltip-comp-chip {
+.comuna-tooltip-composition {
   font-size: 0.8rem;
-  background: rgba(255,255,255,0.1);
-  border-radius: 4px;
-  padding: 2px 6px;
+  line-height: 1.35;
   color: #cbd5e1;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  background: rgba(255,255,255,0.08);
+  border-radius: 4px;
+  padding: 3px 6px;
 }
 
 .comuna-tooltip-context-line {

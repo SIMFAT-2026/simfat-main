@@ -43,6 +43,8 @@ import { modeLabel } from '../../../utils/labels';
 import MapbiomasYearControl from './MapbiomasYearControl';
 import { chipLabel, controlVisible } from '../utils/yearControl';
 import { LandcoverChoropleth, LandcoverLegend } from './LandcoverLayer';
+import { ScoreCompositionLine, ScoreRawLine } from './ScoreExplanationLines';
+import { hasWeatherRow } from '../utils/scoreExplanation';
 
 // LocalDateTime de Java llega sin 'Z' — JS lo interpreta como hora local del browser.
 // Esta utilidad fuerza UTC antes de convertir a Santiago para evitar doble conversión.
@@ -582,14 +584,6 @@ function toPointStyle(indicator, feature) {
   };
 }
 
-const COMPONENT_LABELS = {
-  fwi:     'FWI meteorológico',
-  ndmi:    'Humedad vegetación (NDMI)',
-  firms:   'Detecciones FIRMS',
-  ndvi:    'Índice vegetación (NDVI)',
-  reports: 'Reportes'
-};
-
 const INDICATOR_LABELS = {
   RISK_SCORE: 'Riesgo',
   FIRMS: 'Focos activos',
@@ -620,15 +614,12 @@ const INDICATOR_FULL_LABELS = {
   LANDCOVER: 'Cobertura del suelo (MapBiomas)'
 };
 
-const VISIBLE_RISK_COMPONENTS = new Set(['fwi', 'ndmi', 'firms', 'ndvi', 'reports']);
 const POINT_LAYER_INDICATORS = ['FIRMS', 'ALERTS', 'REPORTS'];
 // MapBiomas layers that get a year control while visible (Q31).
 const MAPBIOMAS_YEAR_CONTROLS = [
   { indicator: 'BURNED', label: 'Área quemada' },
   { indicator: 'LANDCOVER', label: 'Cobertura' }
 ];
-
-const ALERT_TOOLTIP_COMPONENTS = ['firms', 'fwi', 'ndmi', 'ndvi'];
 
 const REPORT_CATEGORY_LABELS = {
   HUMO: 'Humo',
@@ -708,31 +699,6 @@ function firmsRecencyCount(regionData, bucket) {
   return (regionData?.layers?.FIRMS?.features || [])
     .filter((feature) => firmsRecencyBucket(feature) === bucket)
     .length;
-}
-
-function tooltipComponentEntries(components) {
-  const allEntries = Object.entries(components || {})
-    .filter(([key, v]) => VISIBLE_RISK_COMPONENTS.has(key) && v != null);
-  const entries = allEntries.filter(([, v]) => v > 0);
-
-  if (!allEntries.length) {
-    return [];
-  }
-
-  const hasActiveFirms = Number(components?.firms || 0) > 0;
-  if (!hasActiveFirms) {
-    return entries.sort(([, a], [, b]) => b - a).slice(0, 2);
-  }
-
-  const byKey = new Map(allEntries);
-  const prioritized = ALERT_TOOLTIP_COMPONENTS
-    .filter((key) => byKey.has(key))
-    .map((key) => [key, byKey.get(key)]);
-  const fallback = entries
-    .filter(([key]) => !ALERT_TOOLTIP_COMPONENTS.includes(key))
-    .sort(([, a], [, b]) => b - a);
-
-  return [...prioritized, ...fallback].slice(0, 4);
 }
 
 function vegetationColorForValue(indicator, value) {
@@ -820,9 +786,9 @@ function ComunaTooltip({ comunaId, nombre, score, pos, burnedLine = '', landcove
     alertDriver: score?.alertDriver
   });
 
-  const componentEntries = tooltipComponentEntries(score?.components);
   const fwiInputs = score?.fwiInputs;
   const weatherCategory = weatherCategoryFromCode(fwiInputs?.weatherCode);
+  const hasWeatherNumbers = hasWeatherRow(fwiInputs);
 
   return (
     <div
@@ -837,9 +803,9 @@ function ComunaTooltip({ comunaId, nombre, score, pos, burnedLine = '', landcove
           </span>
         )}
       </div>
-      {fwiInputs && weatherCategory && (
+      {hasWeatherNumbers && (
         <div className="comuna-tooltip-weather">
-          <WeatherIllustration category={weatherCategory} size={28} />
+          {weatherCategory && <WeatherIllustration category={weatherCategory} size={28} />}
           <span className="comuna-tooltip-weather-text">
             {typeof fwiInputs.tempMin === 'number' && typeof fwiInputs.tempMax === 'number'
               ? `${fwiInputs.tempMin.toFixed(0)}°/${fwiInputs.tempMax.toFixed(0)}°`
@@ -852,6 +818,7 @@ function ComunaTooltip({ comunaId, nombre, score, pos, burnedLine = '', landcove
           </span>
         </div>
       )}
+      <ScoreRawLine score={score} />
       {score ? (
         <>
           <div className="comuna-tooltip-level" style={{ color: level.darkUiColor }}>
@@ -873,15 +840,7 @@ function ComunaTooltip({ comunaId, nombre, score, pos, burnedLine = '', landcove
       ) : (
         <div className="comuna-tooltip-level" style={{ color: '#64748b' }}>Sin datos de riesgo aún</div>
       )}
-      {componentEntries.length > 0 && (
-        <div className="comuna-tooltip-components">
-          {componentEntries.map(([key, val]) => (
-            <span key={key} className="comuna-tooltip-comp-chip">
-              {COMPONENT_LABELS[key] || key}: {(val * 100).toFixed(0)}
-            </span>
-          ))}
-        </div>
-      )}
+      <ScoreCompositionLine score={score} />
       {burnedLine && <div className="comuna-tooltip-context-line">{burnedLine}</div>}
       {landcoverLine && <div className="comuna-tooltip-context-line">{landcoverLine}</div>}
     </div>

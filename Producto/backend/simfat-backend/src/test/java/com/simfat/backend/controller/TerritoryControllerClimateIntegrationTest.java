@@ -176,4 +176,43 @@ class TerritoryControllerClimateIntegrationTest {
             .andExpect(jsonPath("$.data.['comuna-without-data'].fwiInputs", is(notNullValue())))
             .andExpect(jsonPath("$.data.['comuna-without-data'].fwiInputs.tempMax").doesNotExist());
     }
+
+    @Test
+    @WithMockUser(authorities = "ROLE_VERIFIED_USER")
+    void getComunalRiskScores_exposesMapbiomasComponentAndWeightWhenPresent() throws Exception {
+        ComunaRiskSnapshot withMapbiomas = new ComunaRiskSnapshot();
+        withMapbiomas.setComunaId("comuna-new");
+        withMapbiomas.setRegionId("biobio");
+        withMapbiomas.setNombreComuna("Nueva");
+        withMapbiomas.setAlertLevel("NORMAL");
+        withMapbiomas.setScoreComposite(0.38);
+        withMapbiomas.setMode("STANDARD");
+        withMapbiomas.setComponentFwi(0.07);
+        withMapbiomas.setComponentMapbiomas(0.31);
+        withMapbiomas.setMapbiomasWeight(0.5);
+
+        ComunaRiskSnapshot legacy = new ComunaRiskSnapshot();
+        legacy.setComunaId("comuna-legacy");
+        legacy.setRegionId("biobio");
+        legacy.setNombreComuna("Antigua");
+        legacy.setAlertLevel("NORMAL");
+        legacy.setScoreComposite(0.2);
+        legacy.setMode("STANDARD");
+        legacy.setComponentFwi(0.2);
+
+        when(comunaRiskService.getLatestSnapshotsByRegion(any())).thenReturn(Map.of(
+            "comuna-new", withMapbiomas,
+            "comuna-legacy", legacy
+        ));
+
+        mockMvc.perform(get("/api/territory/risk-score/comunas/biobio"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.['comuna-new'].components.mapbiomas", is(0.31)))
+            .andExpect(jsonPath("$.data.['comuna-new'].mapbiomasWeight", is(0.5)))
+            .andExpect(jsonPath("$.data.['comuna-new'].components.fwi", is(0.07)))
+            .andExpect(jsonPath("$.data.['comuna-legacy'].components.mapbiomas").doesNotExist())
+            .andExpect(jsonPath("$.data.['comuna-legacy'].mapbiomasWeight").doesNotExist())
+            .andExpect(jsonPath("$.data.['comuna-legacy'].components.fwi", is(0.2)))
+            .andExpect(jsonPath("$.data.['comuna-legacy'].scoreComposite", is(0.2)));
+    }
 }
