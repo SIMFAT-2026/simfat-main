@@ -27,7 +27,10 @@ import java.time.ZoneOffset;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -415,10 +418,28 @@ public class ComunaRiskServiceImpl implements ComunaRiskService {
 
     @Override
     public Map<String, ComunaRiskSnapshot> getLatestSnapshotsByRegion(String regionId) {
+        // The comuna collection (same source the recompute job iterates) defines which comunas
+        // currently belong to the region. Snapshots persisted under this regionId for comunas
+        // that have since moved elsewhere (e.g. Nuble once stored as biobio) are stale leftovers
+        // and must not leak. Names projection keeps the heavy geometry out of the read.
+        Set<String> currentComunaIds = comunaRepository.findNamesByRegionId(regionId).stream()
+            .map(ComunaInfo::getId)
+            .filter(Objects::nonNull)
+            .collect(Collectors.toSet());
+        boolean filterByCurrentComunas = !currentComunaIds.isEmpty();
         // Single query sorted desc; first occurrence of each comunaId is the latest snapshot.
+        List<ComunaRiskSnapshot> snapshots = snapshotRepository.findByRegionIdOrderByComputedAtDesc(regionId);
+        if (!filterByCurrentComunas && !snapshots.isEmpty()) {
+            // Missing/empty comuna catalog must not blank the region: fall back to unfiltered snapshots.
+            // Warn only when snapshots exist (unknown public ids carry no signal); strip CR/LF from the id.
+            LOGGER.warn("No ComunaInfo found for regionId={}; returning unfiltered snapshots",
+                regionId == null ? null : regionId.replaceAll("[\\r\\n]", "_"));
+        }
         Map<String, ComunaRiskSnapshot> result = new LinkedHashMap<>();
-        for (ComunaRiskSnapshot snap : snapshotRepository.findByRegionIdOrderByComputedAtDesc(regionId)) {
-            result.putIfAbsent(snap.getComunaId(), snap);
+        for (ComunaRiskSnapshot snap : snapshots) {
+            if (!filterByCurrentComunas || currentComunaIds.contains(snap.getComunaId())) {
+                result.putIfAbsent(snap.getComunaId(), snap);
+            }
         }
         return result;
     }
