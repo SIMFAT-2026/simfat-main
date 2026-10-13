@@ -577,7 +577,9 @@ public class TerritoryController {
             components.put("reports", s.getComponentReports());
             components.put("ndmi", s.getComponentNdmi());
             components.put("ndvi", s.getComponentNdvi());
+            components.put("mapbiomas", s.getComponentMapbiomas());
             data.put("components", components);
+            data.put("mapbiomasWeight", s.getMapbiomasWeight());
             data.put("fwiInputs", buildFwiInputs(weatherByComuna.get(comunaId)));
             result.put(comunaId, data);
         });
