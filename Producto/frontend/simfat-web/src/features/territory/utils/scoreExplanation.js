@@ -24,7 +24,8 @@ function format(value, decimals) {
       maximumFractionDigits: decimals
     });
   }
-  return formatters[decimals].format(value);
+  // Normalize only negative zero (e.g. Math.round(-0.4)) so "-0" never renders.
+  return formatters[decimals].format(Object.is(value, -0) ? 0 : value);
 }
 
 function isPresent(key, score) {
@@ -90,4 +91,20 @@ const WEATHER_ROW_KEYS = ['tempMin', 'tempMax', 'humidityMin', 'windMax'];
 // precipitation alone would render only placeholders.
 export function hasWeatherRow(fwiInputs) {
   return WEATHER_ROW_KEYS.some((key) => isNum(fwiInputs?.[key]));
+}
+
+// Tooltip weather row, e.g. "8°/20° · 46% · 11 km/h · 3,7 mm" (es-CL decimals,
+// a space before multi-letter units). Placeholders keep the columns stable.
+export function formatWeatherRow(fwiInputs) {
+  const { tempMin, tempMax, humidityMin, windMax, precip } = fwiInputs ?? {};
+  let temp = '—';
+  if (isNum(tempMin) && isNum(tempMax)) temp = `${format(Math.round(tempMin), 0)}°/${format(Math.round(tempMax), 0)}°`;
+  else if (isNum(tempMax)) temp = `${format(Math.round(tempMax), 0)}°`;
+  const parts = [
+    temp,
+    isNum(humidityMin) ? `${format(Math.round(humidityMin), 0)}%` : '—',
+    isNum(windMax) ? `${format(Math.round(windMax), 0)} km/h` : '—'
+  ];
+  if (isNum(precip) && precip > 0) parts.push(`${format(precip, 1)} mm`);
+  return parts.join(' · ');
 }

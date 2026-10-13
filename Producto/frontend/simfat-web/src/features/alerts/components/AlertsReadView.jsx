@@ -8,6 +8,7 @@ import FilterBar from '../../../components/FilterBar';
 import LoadingSpinner from '../../../components/LoadingSpinner';
 import SectionTitle from '../../../components/SectionTitle';
 import { useCloseDetailsOnOutsideClick } from '../../../hooks';
+import { comunaDisplayName } from '../../../data/territorioChile';
 import { levelLabel } from '../../../utils/labels';
 import {
   PUBLIC_ALERTS_CAP,
@@ -35,7 +36,7 @@ function OperationalItem({ item, position }) {
   return (
     <li className="alerts-operational-item">
       <span className="alerts-operational-num">{position}</span>
-      <strong>{item.nombreComuna || item.comunaId}</strong>
+      <strong>{comunaDisplayName(item.comunaId, item.nombreComuna)}</strong>
       <AlertBadge level={item.alertLevel} />
       <span className="alerts-priority-score">{item.scoreComposite != null ? `${Math.round(item.scoreComposite * 100)}/100` : '-'}</span>
     </li>

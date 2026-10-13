@@ -4,7 +4,7 @@ import { LineChart, Line, XAxis, YAxis, Tooltip as ChartTooltip, ResponsiveConta
 import { fetchComunaHistory, fetchComunalRiskScores, syncComunaCopernicus } from '../services/territoryApiService';
 import { ALERT_LEVEL_CONFIG } from '../constants/colorScales';
 import { generateComunalReport } from '../utils/reportPrint';
-import { REGIONES } from '../../../data/territorioChile';
+import { REGIONES, comunaDisplayName } from '../../../data/territorioChile';
 import { panelMode } from '../utils/comunaMapbiomas';
 import { alertTrigger } from '../utils/alertTrigger';
 import { modeLabel } from '../../../utils/labels';
@@ -245,7 +245,7 @@ export default function ComunaRiskPanel({ comunaId, comunaName = null, score, re
       <aside className="comuna-risk-panel">
         <div className="panel-header">
           <div>
-            <h4 className="panel-nombre">{comunaName || comunaId}</h4>
+            <h4 className="panel-nombre">{comunaDisplayName(comunaId, comunaName)}</h4>
           </div>
           <button type="button" className="panel-close" onClick={onClose} aria-label="Cerrar">×</button>
         </div>
@@ -303,7 +303,7 @@ export default function ComunaRiskPanel({ comunaId, comunaName = null, score, re
       <div className="panel-header">
         <div>
           <p className="panel-region">{displayScore.regionId}</p>
-          <h4 className="panel-nombre">{displayScore.nombreComuna || comunaId}</h4>
+          <h4 className="panel-nombre">{comunaDisplayName(comunaId, displayScore.nombreComuna)}</h4>
         </div>
         <button type="button" className="panel-close" onClick={onClose} aria-label="Cerrar">×</button>
       </div>

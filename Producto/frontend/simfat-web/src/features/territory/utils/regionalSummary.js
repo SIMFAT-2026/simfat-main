@@ -1,3 +1,4 @@
+import { comunaDisplayName } from '../../../data/territorioChile';
 import { ALERT_LEVEL_CONFIG } from '../constants/colorScales';
 import { FWI_ALTO, FWI_CRITICO, alertTrigger } from './alertTrigger';
 
@@ -53,7 +54,7 @@ export function regionalSummary({ comunaScores, comunaNames, comunaTotal, firmsC
           alertDriver: score.alertDriver
         }).kind,
         comunaId,
-        name: names[comunaId] || score.nombreComuna || comunaId,
+        name: names[comunaId] || comunaDisplayName(comunaId, score.nombreComuna),
         rounded: Number(pct),
         pct,
         level,

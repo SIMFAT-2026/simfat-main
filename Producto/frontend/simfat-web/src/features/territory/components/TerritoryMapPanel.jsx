@@ -40,11 +40,12 @@ import {
   windArrowSize
 } from '../utils/windArrow';
 import { modeLabel } from '../../../utils/labels';
+import { comunaDisplayName } from '../../../data/territorioChile';
 import MapbiomasYearControl from './MapbiomasYearControl';
 import { chipLabel, controlVisible } from '../utils/yearControl';
 import { LandcoverChoropleth, LandcoverLegend } from './LandcoverLayer';
 import { ScoreCompositionLine, ScoreRawLine } from './ScoreExplanationLines';
-import { hasWeatherRow } from '../utils/scoreExplanation';
+import { formatWeatherRow, hasWeatherRow } from '../utils/scoreExplanation';
 
 // LocalDateTime de Java llega sin 'Z' — JS lo interpreta como hora local del browser.
 // Esta utilidad fuerza UTC antes de convertir a Santiago para evitar doble conversión.
@@ -149,7 +150,7 @@ const ComunaChoropleth = memo(function ComunaChoropleth({ geoJson, comunalScores
       }}
       onEachFeature={(feature, layer) => {
         const comunaId = feature?.properties?.comunaId;
-        const nombre = feature?.properties?.nombre || comunaId;
+        const nombre = comunaDisplayName(comunaId, feature?.properties?.nombre);
 
         layer.on('mouseover', (e) => {
           const score = scoresRef.current?.[comunaId];
@@ -205,7 +206,7 @@ const ClimateChoropleth = memo(function ClimateChoropleth({ geoJson, indicator, 
       }}
       onEachFeature={(feature, layer) => {
         const comunaId = feature?.properties?.comunaId;
-        const nombre = feature?.properties?.nombre || comunaId;
+        const nombre = comunaDisplayName(comunaId, feature?.properties?.nombre);
         layer.bindTooltip('', { sticky: true });
         layer.on('mouseover', () => {
           const entry = valueMapRef.current?.values?.[comunaId];
@@ -269,7 +270,7 @@ const BurnedChoropleth = memo(function BurnedChoropleth({
       onEachFeature={(feature, layerGeo) => {
         if (!interactive) return;
         const comunaId = feature?.properties?.comunaId;
-        const nombre = feature?.properties?.nombre || comunaId;
+        const nombre = comunaDisplayName(comunaId, feature?.properties?.nombre);
         layerGeo.bindTooltip('', { sticky: true });
         layerGeo.on('mouseover', () => {
           const current = layerRef.current;
@@ -334,7 +335,7 @@ const VegetationChoropleth = memo(function VegetationChoropleth({ geoJson, indic
       }}
       onEachFeature={(feature, layer) => {
         const comunaId = feature?.properties?.comunaId;
-        const nombre = feature?.properties?.nombre || comunaId;
+        const nombre = comunaDisplayName(comunaId, feature?.properties?.nombre);
         layer.bindTooltip('', { sticky: true });
         layer.on('mouseover', () => {
           const value = scoresRef.current?.[comunaId]?.[scale.valueKey];
@@ -442,7 +443,7 @@ const WindArrowLayer = memo(function WindArrowLayer({ geoJson, valueMap, hourInd
     if (!center) return null;
 
     const bearingTo = (directionFrom + 180) % 360;
-    const nombre = feature?.properties?.nombre || comunaId;
+    const nombre = comunaDisplayName(comunaId, feature?.properties?.nombre);
 
     return (
       <Marker key={comunaId} position={center} pane="wind-arrow-pane" icon={windArrowIcon(speed, bearingTo)}>
@@ -775,7 +776,7 @@ function ComunaTooltip({ comunaId, nombre, score, pos, burnedLine = '', landcove
   if (!comunaId || !pos) return null;
   const level = ALERT_LEVEL_CONFIG[score?.alertLevel] || ALERT_LEVEL_CONFIG.NORMAL;
   const pct = typeof score?.scoreComposite === 'number' ? (score.scoreComposite * 100).toFixed(0) : null;
-  const displayNombre = nombre || score?.nombreComuna || comunaId;
+  const displayNombre = comunaDisplayName(comunaId, nombre || score?.nombreComuna);
   const mode = score?.mode;
   const trigger = alertTrigger({
     alertLevel: score?.alertLevel,
@@ -807,14 +808,7 @@ function ComunaTooltip({ comunaId, nombre, score, pos, burnedLine = '', landcove
         <div className="comuna-tooltip-weather">
           {weatherCategory && <WeatherIllustration category={weatherCategory} size={28} />}
           <span className="comuna-tooltip-weather-text">
-            {typeof fwiInputs.tempMin === 'number' && typeof fwiInputs.tempMax === 'number'
-              ? `${fwiInputs.tempMin.toFixed(0)}°/${fwiInputs.tempMax.toFixed(0)}°`
-              : typeof fwiInputs.tempMax === 'number' ? `${fwiInputs.tempMax.toFixed(0)}°` : '—'}
-            {' · '}
-            {typeof fwiInputs.humidityMin === 'number' ? `${fwiInputs.humidityMin.toFixed(0)}%` : '—'}
-            {' · '}
-            {typeof fwiInputs.windMax === 'number' ? `${fwiInputs.windMax.toFixed(0)}km/h` : '—'}
-            {typeof fwiInputs.precip === 'number' && fwiInputs.precip > 0 ? ` · ${fwiInputs.precip.toFixed(1)}mm` : ''}
+            {formatWeatherRow(fwiInputs)}
           </span>
         </div>
       )}
@@ -993,7 +987,7 @@ function TerritoryMapPanel({
     const comunaNames = {};
     for (const feature of comunalGeoJson?.features || []) {
       const props = feature?.properties;
-      if (props?.comunaId && props?.nombre) comunaNames[props.comunaId] = props.nombre;
+      if (props?.comunaId && props?.nombre) comunaNames[props.comunaId] = comunaDisplayName(props.comunaId, props.nombre);
     }
     return regionalSummary({
       comunaScores: effectiveComunalScores,

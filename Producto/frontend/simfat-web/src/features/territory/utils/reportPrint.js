@@ -1,3 +1,4 @@
+import { comunaDisplayName } from '../../../data/territorioChile';
 import { ALERT_LEVEL_CONFIG, VEGETATION_SCALES } from '../constants/colorScales';
 import { FWI_CLASS_NOTE, FWI_REFERENCE_CLASSES, fwiClassText, levelRuleRows } from './reportThresholds';
 
@@ -276,7 +277,7 @@ export function generateComunalReport({ score, comunaId, regionLabel, generatedA
   const compositeScore = typeof score.scoreComposite === 'number'
     ? Math.round(score.scoreComposite * 100) : null;
 
-  const nombreComuna = score.nombreComuna || comunaId || score.comunaId || 'Comuna';
+  const nombreComuna = comunaDisplayName(comunaId || score.comunaId, score.nombreComuna) || 'Comuna';
   const comps = score.components || {};
   const mode = score.mode || 'STANDARD';
   const modeLabel = mode === 'ENHANCED' ? 'ENHANCED (Copernicus)' : 'STANDARD';
