@@ -29,6 +29,7 @@ import com.simfat.backend.service.TerritoryRiskService;
 import com.simfat.backend.web.CoordinateRounding;
 import com.simfat.backend.web.MapbiomasBurnedDefaultYearResolver;
 import com.simfat.backend.web.MapbiomasBurnedLayerBuilder;
+import com.simfat.backend.web.MapbiomasCitations;
 import com.simfat.backend.web.MapbiomasLandCoverDefaultYearResolver;
 import com.simfat.backend.web.MapbiomasLandCoverLayerBuilder;
 import com.simfat.backend.web.MapbiomasLayerCache;
@@ -137,13 +138,12 @@ public class TerritoryController {
     @Value("${mapbiomas.stats.data-version:lulc-col2+fuego-col1@2013-2025}")
     private String mapbiomasDataVersion;
 
-    // Judgment-day finding #2 (WARNING, fixed): design D5 requires a `citation` field on the
-    // BURNED payload; MapbiomasBurnedLayerBuilder omitted it. Config-driven (not a code literal)
-    // so it can be corrected without a redeploy. The default text below is PROVISIONAL: design D6
-    // marks this attribution as UNVERIFIED/ADAPTED pending confirmation from MapBiomas Chile's own
-    // citation template -- do not treat this string as final/legally reviewed.
-    @Value("${mapbiomas.citation:MapBiomas Chile - Colección 2 de Cobertura y Uso del Suelo (1999-2024) y Colección 1 de Fuego (2013-2025). Licencia CC BY 4.0.}")
-    private String mapbiomasCitation;
+    // Attribution texts required by the MapBiomas terms of use; defaults live in MapbiomasCitations.
+    @Value("${mapbiomas.citation.fire:" + MapbiomasCitations.FIRE + "}")
+    private String mapbiomasFireCitation;
+
+    @Value("${mapbiomas.citation.landcover:" + MapbiomasCitations.LANDCOVER + "}")
+    private String mapbiomasLandCoverCitation;
 
     public TerritoryController(
         HeatAlertEventRepository heatAlertRepository,
@@ -774,7 +774,7 @@ public class TerritoryController {
             }
             return MapbiomasBurnedLayerBuilder.build(
                 comunas, statsByComunaId, resolvedYear.year(),
-                resolvedYear.minYear(), resolvedYear.maxYear(), mapbiomasDataVersion, mapbiomasCitation);
+                resolvedYear.minYear(), resolvedYear.maxYear(), mapbiomasDataVersion, mapbiomasFireCitation);
         });
     }
 
@@ -816,7 +816,7 @@ public class TerritoryController {
             }
             return MapbiomasLandCoverLayerBuilder.build(
                 comunas, statsByComunaId, resolvedYear.year(),
-                resolvedYear.minYear(), resolvedYear.maxYear(), mapbiomasDataVersion, mapbiomasCitation);
+                resolvedYear.minYear(), resolvedYear.maxYear(), mapbiomasDataVersion, mapbiomasLandCoverCitation);
         });
     }
 

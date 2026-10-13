@@ -32,6 +32,11 @@ import org.springframework.security.test.context.support.WithMockUser;
  * bounds by {@code MapbiomasYearTest}.
  */
 class TerritoryControllerMapbiomasYearTest extends MongoFreeWebTestSupport {
+    private static final String LANDCOVER_CITATION =
+        "MapBiomas – Colección 2 de la Serie Anual de Mapas de Cobertura y Uso del Suelo de Chile, consultada el 21 de septiembre de 2026 a través del enlace: https://chile.mapbiomas.org/wp-content/uploads/sites/7/2026/08/statistics_lulc_chile_col2_political_level_234.xlsx";
+    private static final String FIRE_CITATION =
+        "MapBiomas – Colección 1 de la Serie Anual de Mapas de Área Quemada de Chile (Fuego, 2013–2025), consultada el 30 de septiembre de 2026 a través del enlace: https://storage.googleapis.com/mapbiomas-public/initiatives/chile/fire/collection1/";
+
 
     @Autowired
     private TerritoryController territoryController;
@@ -189,7 +194,7 @@ class TerritoryControllerMapbiomasYearTest extends MongoFreeWebTestSupport {
                 .param("indicators", "BURNED")
                 .param("year", "2020"))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.data.layers.BURNED.citation").exists());
+            .andExpect(jsonPath("$.data.layers.BURNED.citation", is(FIRE_CITATION)));
     }
 
     @Test
@@ -265,7 +270,7 @@ class TerritoryControllerMapbiomasYearTest extends MongoFreeWebTestSupport {
             .andExpect(jsonPath("$.data.layers.LANDCOVER.year", is(2010)))
             .andExpect(jsonPath("$.data.layers.LANDCOVER.minYear", is(1999)))
             .andExpect(jsonPath("$.data.layers.LANDCOVER.maxYear", is(2024)))
-            .andExpect(jsonPath("$.data.layers.LANDCOVER.citation").exists())
+            .andExpect(jsonPath("$.data.layers.LANDCOVER.citation", is(LANDCOVER_CITATION)))
             .andExpect(jsonPath("$.data.layers.LANDCOVER.values.c1.available", is(true)))
             .andExpect(jsonPath("$.data.layers.LANDCOVER.values.c1.dominantClass", is(59)))
             .andExpect(jsonPath("$.data.layers.LANDCOVER.values.c1.dominantLabel", is("Bosque Primario")))
