@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildScoreExplanation, hasWeatherRow } from './scoreExplanation';
+import { buildScoreExplanation, formatWeatherRow, hasWeatherRow } from './scoreExplanation';
 
 const MB = 'MapBiomas';
 const P = 'Aporte al puntaje: ';
@@ -144,5 +144,18 @@ describe('hasWeatherRow', () => {
     for (const key of ['tempMin', 'tempMax', 'humidityMin', 'windMax']) {
       expect(hasWeatherRow({ [key]: 10 })).toBe(true);
     }
+  });
+});
+
+describe('formatWeatherRow', () => {
+  it('uses es-CL decimals and a space before units', () => {
+    expect(formatWeatherRow({ tempMin: 8.2, tempMax: 20.4, humidityMin: 46, windMax: 11.3, precip: 3.7 })).toBe(
+      '8°/20° · 46% · 11 km/h · 3,7 mm'
+    );
+  });
+
+  it('omits precipitation when zero or missing and keeps placeholders', () => {
+    expect(formatWeatherRow({ tempMax: 20, precip: 0 })).toBe('20° · — · —');
+    expect(formatWeatherRow({ tempMin: 1, tempMax: 9, humidityMin: 80, windMax: 5 })).toBe('1°/9° · 80% · 5 km/h');
   });
 });

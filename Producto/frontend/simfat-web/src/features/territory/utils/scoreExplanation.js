@@ -91,3 +91,19 @@ const WEATHER_ROW_KEYS = ['tempMin', 'tempMax', 'humidityMin', 'windMax'];
 export function hasWeatherRow(fwiInputs) {
   return WEATHER_ROW_KEYS.some((key) => isNum(fwiInputs?.[key]));
 }
+
+// Tooltip weather row, e.g. "8°/20° · 46% · 11 km/h · 3,7 mm" (es-CL decimals,
+// a space before multi-letter units). Placeholders keep the columns stable.
+export function formatWeatherRow(fwiInputs) {
+  const { tempMin, tempMax, humidityMin, windMax, precip } = fwiInputs ?? {};
+  let temp = '—';
+  if (isNum(tempMin) && isNum(tempMax)) temp = `${format(Math.round(tempMin), 0)}°/${format(Math.round(tempMax), 0)}°`;
+  else if (isNum(tempMax)) temp = `${format(Math.round(tempMax), 0)}°`;
+  const parts = [
+    temp,
+    isNum(humidityMin) ? `${format(Math.round(humidityMin), 0)}%` : '—',
+    isNum(windMax) ? `${format(Math.round(windMax), 0)} km/h` : '—'
+  ];
+  if (isNum(precip) && precip > 0) parts.push(`${format(precip, 1)} mm`);
+  return parts.join(' · ');
+}

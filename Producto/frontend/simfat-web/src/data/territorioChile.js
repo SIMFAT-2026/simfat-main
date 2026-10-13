@@ -149,6 +149,12 @@ export function getLabelForComuna(comunaId) {
   return NOMBRE_POR_ID[comunaId] ?? comunaId;
 }
 
+// Display name for map UI. Boundary GeoJSON (GADM NAME_3) drops spaces
+// ("LosAngeles"), so prefer the curated label keyed by the stable comunaId.
+export function comunaDisplayName(comunaId, rawName) {
+  return NOMBRE_POR_ID[comunaId] ?? rawName ?? comunaId;
+}
+
 export function getLabelForRegion(regionCode) {
   return REGIONES.find((r) => r.value === regionCode)?.label ?? regionCode;
 }
