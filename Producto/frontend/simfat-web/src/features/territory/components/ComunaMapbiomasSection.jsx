@@ -69,19 +69,22 @@ function FireBlock({ data, highlightYear }) {
 
 function Attribution({ attribution }) {
   if (!attribution?.text) return null;
-  const license =
-    attribution.license && !attribution.text.includes(attribution.license) ? ` (${attribution.license})` : '';
+  const showLicense = attribution.license && !attribution.text.includes(attribution.license);
+  const hasMeta = showLicense || attribution.sourceUrl;
+  // The citation is rendered verbatim and alone; license and link go below it.
   return (
-    <p className="mb-source" style={{ whiteSpace: 'pre-line' }}>
-      {attribution.text}
-      {license}
-      {attribution.sourceUrl && (
-        <>
-          {' '}
-          <a href={attribution.sourceUrl} target="_blank" rel="noopener noreferrer">Fuente</a>
-        </>
+    <>
+      <p className="mb-source mb-citation">{attribution.text}</p>
+      {hasMeta && (
+        <p className="mb-source mb-license">
+          {showLicense && `Licencia: ${attribution.license}`}
+          {showLicense && attribution.sourceUrl && ' · '}
+          {attribution.sourceUrl && (
+            <a href={attribution.sourceUrl} target="_blank" rel="noopener noreferrer">Fuente</a>
+          )}
+        </p>
       )}
-    </p>
+    </>
   );
 }
 

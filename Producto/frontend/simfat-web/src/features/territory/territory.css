@@ -518,6 +518,7 @@
 
 .territory-meta {
   margin: 8px 0 0;
+  overflow-wrap: anywhere;
   color: #64748b;
   font-size: 0.8rem;
 }
@@ -1203,7 +1204,8 @@
 @media (prefers-reduced-motion: reduce) { .mb-content { transition: none; } }
 .mb-subtitle { margin: 6px 0 4px; font-size: 0.86rem; font-weight: 600; color: #334155; }
 .mb-note { margin: 2px 0; font-size: 0.86rem; color: #475569; }
-.mb-source { margin: 4px 0 0; font-size: 0.8rem; color: #64748b; }
+.mb-source { margin: 4px 0 0; font-size: 0.8rem; color: #64748b; overflow-wrap: anywhere; }
+.mb-citation { white-space: pre-line; }
 .mb-bars { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
 .mb-bar-row { display: grid; grid-template-columns: minmax(80px, 120px) minmax(40px, 1fr) minmax(40px, auto); align-items: center; gap: 6px; font-size: 0.86rem; min-width: 0; }
 .mb-bar-label { color: #334155; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
