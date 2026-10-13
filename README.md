@@ -14,9 +14,9 @@ SIMFAT es una plataforma web para el monitoreo territorial, análisis de riesgo 
 
 | Servicio | URL |
 |---|---|
-| Frontend | https://simfat-web-stg.vercel.app/ |
-| Backend API | https://simfat-backend-production.up.railway.app |
-| Swagger UI | https://simfat-backend-production.up.railway.app/swagger-ui/index.html |
+| Frontend | https://nofires-latam.vercel.app/ |
+| Backend API | https://nofires-backend-production.up.railway.app |
+| Swagger UI | https://nofires-backend-production.up.railway.app/swagger-ui/index.html |
 | Servicio OpenEO | https://openeo-service-production-production.up.railway.app |
 
 ---
