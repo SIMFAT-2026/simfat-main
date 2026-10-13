@@ -424,10 +424,15 @@ public class ComunaRiskServiceImpl implements ComunaRiskService {
         Set<String> currentComunaIds = comunaRepository.findNamesByRegionId(regionId).stream()
             .map(ComunaInfo::getId)
             .collect(Collectors.toSet());
+        boolean filterByCurrentComunas = !currentComunaIds.isEmpty();
+        if (!filterByCurrentComunas) {
+            // Missing/empty comuna catalog must not blank the region: fall back to unfiltered snapshots.
+            LOGGER.warn("No ComunaInfo found for regionId={}; returning unfiltered snapshots", regionId);
+        }
         // Single query sorted desc; first occurrence of each comunaId is the latest snapshot.
         Map<String, ComunaRiskSnapshot> result = new LinkedHashMap<>();
         for (ComunaRiskSnapshot snap : snapshotRepository.findByRegionIdOrderByComputedAtDesc(regionId)) {
-            if (currentComunaIds.contains(snap.getComunaId())) {
+            if (!filterByCurrentComunas || currentComunaIds.contains(snap.getComunaId())) {
                 result.putIfAbsent(snap.getComunaId(), snap);
             }
         }

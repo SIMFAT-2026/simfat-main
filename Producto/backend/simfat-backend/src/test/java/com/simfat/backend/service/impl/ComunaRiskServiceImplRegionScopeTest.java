@@ -1,7 +1,8 @@
 package com.simfat.backend.service.impl;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.mockito.Mockito.when;
 
 import com.simfat.backend.integration.openeo.OpenEoServiceClient;
@@ -77,6 +78,62 @@ class ComunaRiskServiceImplRegionScopeTest {
         Map<String, ComunaRiskSnapshot> result = service.getLatestSnapshotsByRegion("biobio");
 
         assertEquals(List.of("CHL.8.1_1"), List.copyOf(result.keySet()));
-        assertTrue(!result.containsKey("CHL.16.1_1"));
+        assertFalse(result.containsKey("CHL.16.1_1"));
+    }
+
+    @Test
+    void getLatestSnapshotsByRegion_emptyComunaInfo_returnsUnfilteredSnapshots() {
+        LocalDateTime at = LocalDateTime.of(2026, 10, 13, 1, 30);
+        when(comunaRepository.findNamesByRegionId("biobio")).thenReturn(List.of());
+        when(snapshotRepository.findByRegionIdOrderByComputedAtDesc("biobio")).thenReturn(List.of(
+            snapshot("CHL.8.1_1", "biobio", at),
+            snapshot("CHL.16.1_1", "biobio", at)
+        ));
+
+        Map<String, ComunaRiskSnapshot> result = service.getLatestSnapshotsByRegion("biobio");
+
+        assertEquals(List.of("CHL.8.1_1", "CHL.16.1_1"), List.copyOf(result.keySet()));
+    }
+
+    @Test
+    void getLatestSnapshotsByRegion_duplicateInRegionComuna_newestWins() {
+        ComunaRiskSnapshot fresh = snapshot("CHL.8.1_1", "biobio", LocalDateTime.of(2026, 10, 13, 1, 30));
+        ComunaRiskSnapshot stale = snapshot("CHL.8.1_1", "biobio", LocalDateTime.of(2026, 6, 5, 1, 30));
+        when(comunaRepository.findNamesByRegionId("biobio")).thenReturn(List.of(comuna("CHL.8.1_1")));
+        when(snapshotRepository.findByRegionIdOrderByComputedAtDesc("biobio")).thenReturn(List.of(fresh, stale));
+
+        Map<String, ComunaRiskSnapshot> result = service.getLatestSnapshotsByRegion("biobio");
+
+        assertEquals(1, result.size());
+        assertSame(fresh, result.get("CHL.8.1_1"));
+    }
+
+    @Test
+    void getLatestSnapshotsListByRegion_appliesSameScoping() {
+        LocalDateTime at = LocalDateTime.of(2026, 10, 13, 1, 30);
+        when(comunaRepository.findNamesByRegionId("biobio")).thenReturn(List.of(comuna("CHL.8.1_1")));
+        when(snapshotRepository.findByRegionIdOrderByComputedAtDesc("biobio")).thenReturn(List.of(
+            snapshot("CHL.8.1_1", "biobio", at),
+            snapshot("CHL.16.1_1", "biobio", at)
+        ));
+
+        List<ComunaRiskSnapshot> result = service.getLatestSnapshotsListByRegion("biobio");
+
+        assertEquals(1, result.size());
+        assertEquals("CHL.8.1_1", result.get(0).getComunaId());
+    }
+
+    @Test
+    void getLatestSnapshotsByRegion_nullComunaId_isDroppedWhenFilterActive() {
+        LocalDateTime at = LocalDateTime.of(2026, 10, 13, 1, 30);
+        when(comunaRepository.findNamesByRegionId("biobio")).thenReturn(List.of(comuna("CHL.8.1_1")));
+        when(snapshotRepository.findByRegionIdOrderByComputedAtDesc("biobio")).thenReturn(List.of(
+            snapshot(null, "biobio", at),
+            snapshot("CHL.8.1_1", "biobio", at)
+        ));
+
+        Map<String, ComunaRiskSnapshot> result = service.getLatestSnapshotsByRegion("biobio");
+
+        assertEquals(List.of("CHL.8.1_1"), List.copyOf(result.keySet()));
     }
 }
