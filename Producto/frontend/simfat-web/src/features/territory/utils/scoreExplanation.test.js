@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildScoreExplanation } from './scoreExplanation';
+import { buildScoreExplanation, hasWeatherRow } from './scoreExplanation';
 
 const MB = 'MapBiomas';
 const STRUCT = '(susceptibilidad estructural)';
@@ -36,7 +36,7 @@ describe('buildScoreExplanation - presence and order', () => {
   it('puts MapBiomas first with the structural label and keeps zeros with data', () => {
     const out = buildScoreExplanation(standardScore());
     expect(out.compositionLine).toBe(
-      `Puntaje 38: ${MB} 31 ${STRUCT} · FWI 7 · Focos FIRMS 0 · Reportes 0`
+      `${MB} 31 ${STRUCT} · FWI 7 · Focos FIRMS 0 · Reportes 0`
     );
   });
 
@@ -48,7 +48,7 @@ describe('buildScoreExplanation - presence and order', () => {
       components: { reports: 0.04, firms: 0.1, ndvi: 0.02, ndmi: 0.08, fwi: 0.2, mapbiomas: 0.06 }
     });
     expect(out.compositionLine).toBe(
-      `Puntaje 50: ${MB} 6 ${STRUCT} · FWI 20 · NDMI 8 · NDVI 2 · Focos FIRMS 10 · Reportes 4`
+      `${MB} 6 ${STRUCT} · FWI 20 · NDMI 8 · NDVI 2 · Focos FIRMS 10 · Reportes 4`
     );
   });
 
@@ -75,12 +75,23 @@ describe('buildScoreExplanation - presence and order', () => {
       fwiRaw: 3,
       components: { fwi: 0.07, firms: 0, reports: 0 }
     });
-    expect(out.compositionLine).toBe('Puntaje 7: FWI 7 · Focos FIRMS 0 · Reportes 0');
+    expect(out.compositionLine).toBe('FWI 7 · Focos FIRMS 0 · Reportes 0');
+  });
+
+  it('hides FWI when fwiRaw is missing even if components.fwi is a number', () => {
+    // The service writes components.fwi = 0 when there is no weather data.
+    const out = buildScoreExplanation({
+      scoreComposite: 0.31,
+      mapbiomasWeight: 0.5,
+      components: { mapbiomas: 0.31, fwi: 0, firms: 0 }
+    });
+    expect(out.compositionLine).not.toContain('FWI');
+    expect(out.compositionLine).toBe(`${MB} 31 ${STRUCT} · Focos FIRMS 0`);
   });
 
   it('never renders "sin datos" or placeholders', () => {
     const out = buildScoreExplanation({ scoreComposite: 0.2, components: { firms: null, reports: 0.2 } });
-    expect(out.compositionLine).toBe('Puntaje 20: Reportes 20');
+    expect(out.compositionLine).toBe('Reportes 20');
     expect(JSON.stringify(out)).not.toMatch(/sin datos/i);
   });
 });
@@ -95,7 +106,7 @@ describe('buildScoreExplanation - rounding', () => {
       components: { mapbiomas: 0.125, fwi: 0.125, firms: 0.125 }
     });
     expect(out.compositionLine).toBe(
-      `Puntaje 38: ${MB} 13 ${STRUCT} · FWI 13 · Focos FIRMS 12`
+      `${MB} 13 ${STRUCT} · FWI 13 · Focos FIRMS 12`
     );
   });
 
@@ -120,5 +131,20 @@ describe('buildScoreExplanation - raw line', () => {
   it('omits missing raw values and returns null when none exist', () => {
     expect(buildScoreExplanation(standardScore({ fwiRaw: 5 })).rawLine).toBe('FWI 5');
     expect(buildScoreExplanation(standardScore({ fwiRaw: null })).rawLine).toBeNull();
+  });
+});
+
+describe('hasWeatherRow', () => {
+  it('is false for missing inputs and for precip alone', () => {
+    expect(hasWeatherRow(undefined)).toBe(false);
+    expect(hasWeatherRow({})).toBe(false);
+    expect(hasWeatherRow({ precip: 1.2 })).toBe(false);
+    expect(hasWeatherRow({ precip: 1.2, tempMin: null })).toBe(false);
+  });
+
+  it('is true when any of temperature, humidity or wind is numeric', () => {
+    for (const key of ['tempMin', 'tempMax', 'humidityMin', 'windMax']) {
+      expect(hasWeatherRow({ [key]: 10 })).toBe(true);
+    }
   });
 });

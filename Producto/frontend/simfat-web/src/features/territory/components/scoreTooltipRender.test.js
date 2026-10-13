@@ -14,10 +14,16 @@ describe('score tooltip lines render', () => {
   it('renders the composition line and no legacy chips or placeholders', () => {
     const html = renderToStaticMarkup(createElement(ScoreCompositionLine, { score }));
     expect(html).toContain('comuna-tooltip-composition');
-    expect(html).toContain('Puntaje 38: MapBiomas 31');
+    expect(html).toContain('MapBiomas 31');
     expect(html).toContain('susceptibilidad estructural');
     expect(html).not.toContain('comuna-tooltip-comp-chip');
     expect(html).not.toMatch(/sin datos/i);
+  });
+
+  it('renders the approximate fallback with its accent intact', () => {
+    const inconsistent = { scoreComposite: 0.8, fwiRaw: 10, components: { fwi: 0.2, firms: 0.1 } };
+    const html = renderToStaticMarkup(createElement(ScoreCompositionLine, { score: inconsistent }));
+    expect(html).toContain('Composición aprox.: FWI 20 · Focos FIRMS 10');
   });
 
   it('renders the raw line with es-CL formatting', () => {

@@ -44,6 +44,7 @@ import MapbiomasYearControl from './MapbiomasYearControl';
 import { chipLabel, controlVisible } from '../utils/yearControl';
 import { LandcoverChoropleth, LandcoverLegend } from './LandcoverLayer';
 import { ScoreCompositionLine, ScoreRawLine } from './ScoreExplanationLines';
+import { hasWeatherRow } from '../utils/scoreExplanation';
 
 // LocalDateTime de Java llega sin 'Z' — JS lo interpreta como hora local del browser.
 // Esta utilidad fuerza UTC antes de convertir a Santiago para evitar doble conversión.
@@ -787,8 +788,7 @@ function ComunaTooltip({ comunaId, nombre, score, pos, burnedLine = '', landcove
 
   const fwiInputs = score?.fwiInputs;
   const weatherCategory = weatherCategoryFromCode(fwiInputs?.weatherCode);
-  const hasWeatherNumbers = ['tempMin', 'tempMax', 'humidityMin', 'windMax', 'precip']
-    .some((key) => typeof fwiInputs?.[key] === 'number');
+  const hasWeatherNumbers = hasWeatherRow(fwiInputs);
 
   return (
     <div

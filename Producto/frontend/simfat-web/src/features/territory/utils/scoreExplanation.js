@@ -31,6 +31,8 @@ function isPresent(key, score) {
   const value = score.components?.[key];
   if (!isNum(value)) return false;
   if (key === 'mapbiomas') return isNum(score.mapbiomasWeight) && score.mapbiomasWeight > 0;
+  // Deliberate: the service writes components.fwi = 0 when there is no weather
+  // data, so a numeric component alone must not show a misleading "FWI 0".
   if (key === 'fwi') return isNum(score.fwiRaw);
   return true;
 }
@@ -66,7 +68,7 @@ function buildCompositionLine(score) {
     .map(({ label, suffix = '' }, i) => `${label} ${points[i]}${suffix}`)
     .join(' · ');
 
-  return apportioned ? `Puntaje ${target}: ${body}` : `Composición aprox.: ${body}`;
+  return apportioned ? body : `Composición aprox.: ${body}`;
 }
 
 function buildRawLine(score) {
@@ -80,4 +82,12 @@ function buildRawLine(score) {
 export function buildScoreExplanation(score) {
   if (!score) return { rawLine: null, compositionLine: null };
   return { rawLine: buildRawLine(score), compositionLine: buildCompositionLine(score) };
+}
+
+const WEATHER_ROW_KEYS = ['tempMin', 'tempMax', 'humidityMin', 'windMax'];
+
+// The tooltip weather row needs at least one of temperature, humidity or wind;
+// precipitation alone would render only placeholders.
+export function hasWeatherRow(fwiInputs) {
+  return WEATHER_ROW_KEYS.some((key) => isNum(fwiInputs?.[key]));
 }
