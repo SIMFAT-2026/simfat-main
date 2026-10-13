@@ -156,3 +156,17 @@ docker compose up --build -d
 | BD documental | MongoDB Atlas (M0) |
 | Despliegue frontend | Vercel |
 | Despliegue backend | Railway |
+
+---
+
+## Licencia
+
+El código fuente de este repositorio se distribuye bajo la [licencia MIT](LICENSE), © 2026 David Vásquez y Andrés Ibáñez.
+
+Los datos de MapBiomas Chile incluidos en el repositorio (por ejemplo, `Producto/analytics/mapbiomas/data/`, `Producto/analytics/study/data/features/season_mapbiomas.csv` y `Producto/backend/simfat-backend/src/main/resources/seed/mapbiomas/`) **no** están cubiertos por la licencia MIT. Conservan su licencia original, [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/), y deben citarse según los [términos de uso de MapBiomas Chile](https://chile.mapbiomas.org/terminos-de-uso/):
+
+> MapBiomas – Colección 2 de la Serie Anual de Mapas de Cobertura y Uso del Suelo de Chile, consultada el 21 de septiembre de 2026 a través del enlace: https://chile.mapbiomas.org/wp-content/uploads/sites/7/2026/08/statistics_lulc_chile_col2_political_level_234.xlsx
+>
+> MapBiomas – Colección 1 de la Serie Anual de Mapas de Área Quemada de Chile (Fuego, 2013–2025), consultada el 30 de septiembre de 2026 a través del enlace: https://storage.googleapis.com/mapbiomas-public/initiatives/chile/fire/collection1/
+
+Las fechas y enlaces de cada archivo descargado están registrados en `Producto/analytics/mapbiomas/data/manifest.json`.
