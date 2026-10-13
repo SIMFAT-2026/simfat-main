@@ -1199,6 +1199,20 @@
   }
 }
 
+/* Compact phone layout: keep 44px touch targets but stop controls from
+   filling the screen so the map shows near the top. */
+@media (max-width: 640px) {
+  .territory-toggle-row { gap: 2px 4px; }
+  .territory-chips { gap: 4px; }
+  .territory-toggle,
+  .territory-more-button,
+  .territory-info-button { padding-inline: 8px; }
+  .territory-toggle span { white-space: nowrap; overflow-wrap: normal; }
+  .territory-chip-pair { flex-basis: auto; }
+  .territory-control-actions { min-width: 0; width: 100%; }
+  .territory-map { height: min(430px, 60vh); min-height: 280px; }
+}
+
 /* ── MapBiomas section of the comuna panel ── */
 .mb-content { display: flex; flex-direction: column; gap: 6px; transition: opacity 150ms ease; }
 /* Dim only if the refresh takes a while, so quick loads never blink. */
