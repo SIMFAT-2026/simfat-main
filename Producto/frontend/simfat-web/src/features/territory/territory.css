@@ -360,8 +360,8 @@
 }
 
 @media (max-width: 640px) {
-  /* Each chip + control pair takes its own line; the control may wrap under
-     the chip on very narrow screens instead of overflowing. */
+  /* The control may wrap under its chip on very narrow screens instead of
+     overflowing; the compact phone block below lets pairs share a line. */
   .territory-chip-pair {
     flex-wrap: wrap;
     flex-basis: 100%;
