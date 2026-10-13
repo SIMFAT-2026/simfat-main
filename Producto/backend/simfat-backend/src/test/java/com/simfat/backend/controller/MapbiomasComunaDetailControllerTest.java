@@ -15,6 +15,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.simfat.backend.model.ComunaMapbiomasStats;
+import com.simfat.backend.web.MapbiomasCitations;
 import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -97,8 +98,8 @@ class MapbiomasComunaDetailControllerTest extends MongoFreeWebTestSupport {
             .andExpect(jsonPath("$.data.landCover.series.classes.59", hasSize(26)))
             .andExpect(jsonPath("$.data.attribution.license", is("CC BY 4.0")))
             .andExpect(jsonPath("$.data.attribution.text", not("")))
-            .andExpect(jsonPath("$.data.attribution.text", containsString("MapBiomas – Colección 2 de la Serie Anual de Mapas de Cobertura y Uso del Suelo de Chile, consultada el 21 de septiembre de 2026 a través del enlace: https://chile.mapbiomas.org/wp-content/uploads/sites/7/2026/08/statistics_lulc_chile_col2_political_level_234.xlsx")))
-            .andExpect(jsonPath("$.data.attribution.text", containsString("MapBiomas – Colección 1 de la Serie Anual de Mapas de Área Quemada de Chile (Fuego, 2013–2025), consultada el 30 de septiembre de 2026 a través del enlace: https://storage.googleapis.com/mapbiomas-public/initiatives/chile/fire/collection1/")))
+            .andExpect(jsonPath("$.data.attribution.text",
+                is(MapbiomasCitations.LANDCOVER + "\n" + MapbiomasCitations.FIRE)))
             .andExpect(jsonPath("$.data.fire.burnedHaByYear.2017", is(10.0)))
             .andExpect(jsonPath("$.data.fireHistoryAvailable", is(true)))
             .andExpect(jsonPath("$.data.indices.weight", is(0.0)))
