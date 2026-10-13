@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useCallback, useMemo, memo } from 'react';
 import L from 'leaflet';
 import ComunaRiskPanel from './ComunaRiskPanel';
 import ComunaMapbiomasSection from './ComunaMapbiomasSection';
+import { MAPBIOMAS_FIRE_CITATION } from '../utils/mapbiomasCitations';
 import { comunaPanelOrigin, panelYear } from '../utils/comunaMapbiomas';
 import { GeoJSON, MapContainer, Marker, Pane, TileLayer, Tooltip, useMap } from 'react-leaflet';
 import marker2x from 'leaflet/dist/images/marker-icon-2x.png';
@@ -935,7 +936,7 @@ function BurnedLegend({ state }) {
           </ul>
           {note && <p className="territory-meta">{note}</p>}
           <p className="territory-meta">
-            Fuente: {layer.citation || 'MapBiomas Fuego Chile (provisional)'}. Colores: rampa oficial de MapBiomas
+            Fuente: {layer.citation || MAPBIOMAS_FIRE_CITATION} Colores: rampa oficial de MapBiomas
             Fuego (tamaño de cicatriz), reutilizada porque no existe una rampa para fracción anual quemada.
           </p>
         </>

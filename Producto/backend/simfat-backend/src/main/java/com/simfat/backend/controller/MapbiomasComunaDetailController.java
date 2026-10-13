@@ -10,6 +10,7 @@ import com.simfat.backend.repository.ComunaMapbiomasStatsRepository;
 import com.simfat.backend.repository.ComunaRiskSnapshotRepository;
 import com.simfat.backend.service.mapbiomas.MapbiomasSusceptibility;
 import com.simfat.backend.service.mapbiomas.MapbiomasSusceptibilityService;
+import com.simfat.backend.web.MapbiomasCitations;
 import com.simfat.backend.web.MapbiomasComunaDetailBuilder;
 import com.simfat.backend.web.MapbiomasComunaId;
 import com.simfat.backend.web.MapbiomasLandCoverDefaultYearResolver;
@@ -50,8 +51,12 @@ public class MapbiomasComunaDetailController {
     @Value("${mapbiomas.stats.data-version:lulc-col2+fuego-col1@2013-2025}")
     private String dataVersion;
 
-    @Value("${mapbiomas.citation:MapBiomas Chile - Colección 2 de Cobertura y Uso del Suelo (1999-2024) y Colección 1 de Fuego (2013-2025). Licencia CC BY 4.0.}")
-    private String citation;
+    // Attribution texts required by the MapBiomas terms of use; defaults live in MapbiomasCitations.
+    @Value("${mapbiomas.citation.landcover:" + MapbiomasCitations.LANDCOVER + "}")
+    private String landCoverCitation;
+
+    @Value("${mapbiomas.citation.fire:" + MapbiomasCitations.FIRE + "}")
+    private String fireCitation;
 
     // Configured wM, same property ComunaRiskServiceImpl reads. Only the fallback: the weight the
     // user sees is the one persisted in the comuna's latest risk snapshot.
@@ -105,7 +110,8 @@ public class MapbiomasComunaDetailController {
         }
 
         MapbiomasComunaDetailDTO detail = MapbiomasComunaDetailBuilder.build(
-            stats, resolved.year(), susceptibility, effectiveWeight(comunaId), citation, indicesInvalid);
+            stats, resolved.year(), susceptibility, effectiveWeight(comunaId),
+            landCoverCitation + "\n" + fireCitation, indicesInvalid);
 
         return ResponseEntity.ok()
             .header("Cache-Control", "public, max-age=300")

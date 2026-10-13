@@ -15,6 +15,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.simfat.backend.model.ComunaMapbiomasStats;
+import com.simfat.backend.web.MapbiomasCitations;
 import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -97,8 +98,8 @@ class MapbiomasComunaDetailControllerTest extends MongoFreeWebTestSupport {
             .andExpect(jsonPath("$.data.landCover.series.classes.59", hasSize(26)))
             .andExpect(jsonPath("$.data.attribution.license", is("CC BY 4.0")))
             .andExpect(jsonPath("$.data.attribution.text", not("")))
-            .andExpect(jsonPath("$.data.attribution.text", containsString("Colección 2")))
-            .andExpect(jsonPath("$.data.attribution.text", containsString("Colección 1")))
+            .andExpect(jsonPath("$.data.attribution.text",
+                is(MapbiomasCitations.LANDCOVER + "\n" + MapbiomasCitations.FIRE)))
             .andExpect(jsonPath("$.data.fire.burnedHaByYear.2017", is(10.0)))
             .andExpect(jsonPath("$.data.fireHistoryAvailable", is(true)))
             .andExpect(jsonPath("$.data.indices.weight", is(0.0)))

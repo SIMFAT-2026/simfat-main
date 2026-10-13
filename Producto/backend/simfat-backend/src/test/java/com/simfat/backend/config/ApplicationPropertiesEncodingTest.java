@@ -16,15 +16,14 @@ import org.junit.jupiter.api.Test;
 class ApplicationPropertiesEncodingTest {
 
     @Test
-    void mapbiomasCitationKeepsItsAccentWhenLoadedAsIso88591() throws Exception {
+    void noPropertyValueIsMojibakeWhenLoadedAsIso88591() throws Exception {
         Properties properties = new Properties();
         try (InputStream in = Files.newInputStream(Path.of("src/main/resources/application.properties"))) {
             properties.load(in);
         }
 
-        assertThat(properties.getProperty("mapbiomas.citation"))
-                .contains("Colección 2 de Cobertura")
-                .contains("Colección 1 de Fuego")
-                .doesNotContain("Ã");
+        // Citation texts live in MapbiomasCitations (Java), so no accented literal belongs here.
+        assertThat(properties.getProperty("mapbiomas.citation")).isNull();
+        properties.forEach((key, value) -> assertThat(value.toString()).as(key.toString()).doesNotContain("Ã"));
     }
 }
