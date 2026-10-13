@@ -1,5 +1,6 @@
 import { memo, useRef } from 'react';
 import { GeoJSON } from 'react-leaflet';
+import { comunaDisplayName } from '../../../data/territorioChile';
 import { NEUTRAL_FILL } from '../constants/colorScales';
 import { landcoverColorFor } from '../constants/landcoverClasses';
 import {
@@ -69,7 +70,7 @@ export const LandcoverChoropleth = memo(function LandcoverChoropleth({
       onEachFeature={(feature, layerGeo) => {
         if (!interactive) return;
         const comunaId = feature?.properties?.comunaId;
-        const nombre = feature?.properties?.nombre || comunaId;
+        const nombre = comunaDisplayName(comunaId, feature?.properties?.nombre);
         layerGeo.bindTooltip('', { sticky: true });
         layerGeo.on('mouseover', () => {
           const current = layerRef.current;

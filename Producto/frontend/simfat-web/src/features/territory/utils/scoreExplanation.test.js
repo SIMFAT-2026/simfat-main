@@ -154,6 +154,12 @@ describe('formatWeatherRow', () => {
     );
   });
 
+  it('never renders negative zero', () => {
+    expect(formatWeatherRow({ tempMin: -0.4, tempMax: 5, humidityMin: 50, windMax: 3 })).toBe('0°/5° · 50% · 3 km/h');
+    expect(formatWeatherRow({ tempMax: -0.2 })).toBe('0° · — · —');
+    expect(formatWeatherRow({ tempMin: -3.2, tempMax: 4 })).toBe('-3°/4° · — · —');
+  });
+
   it('omits precipitation when zero or missing and keeps placeholders', () => {
     expect(formatWeatherRow({ tempMax: 20, precip: 0 })).toBe('20° · — · —');
     expect(formatWeatherRow({ tempMin: 1, tempMax: 9, humidityMin: 80, windMax: 5 })).toBe('1°/9° · 80% · 5 km/h');

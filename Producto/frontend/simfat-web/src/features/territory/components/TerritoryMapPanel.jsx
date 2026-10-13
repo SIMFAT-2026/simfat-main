@@ -776,7 +776,7 @@ function ComunaTooltip({ comunaId, nombre, score, pos, burnedLine = '', landcove
   if (!comunaId || !pos) return null;
   const level = ALERT_LEVEL_CONFIG[score?.alertLevel] || ALERT_LEVEL_CONFIG.NORMAL;
   const pct = typeof score?.scoreComposite === 'number' ? (score.scoreComposite * 100).toFixed(0) : null;
-  const displayNombre = nombre || score?.nombreComuna || comunaId;
+  const displayNombre = comunaDisplayName(comunaId, nombre || score?.nombreComuna);
   const mode = score?.mode;
   const trigger = alertTrigger({
     alertLevel: score?.alertLevel,
@@ -987,7 +987,7 @@ function TerritoryMapPanel({
     const comunaNames = {};
     for (const feature of comunalGeoJson?.features || []) {
       const props = feature?.properties;
-      if (props?.comunaId && props?.nombre) comunaNames[props.comunaId] = props.nombre;
+      if (props?.comunaId && props?.nombre) comunaNames[props.comunaId] = comunaDisplayName(props.comunaId, props.nombre);
     }
     return regionalSummary({
       comunaScores: effectiveComunalScores,

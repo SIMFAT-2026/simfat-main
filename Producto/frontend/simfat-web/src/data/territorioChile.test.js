@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { comunaDisplayName } from './territorioChile';
+import { comunaDisplayName, hasCuratedName } from './territorioChile';
 
 const GEOJSON_DIR = new URL(
   '../../../../backend/simfat-backend/src/main/resources/static/geojson/',
@@ -30,6 +30,7 @@ describe('comunaDisplayName', () => {
       const geo = JSON.parse(readFileSync(new URL(`${file}.geojson`, GEOJSON_DIR), 'utf8'));
       for (const f of geo.features) {
         total += 1;
+        expect(hasCuratedName(f.properties.comunaId), `${f.properties.comunaId} missing curated name`).toBe(true);
         const { comunaId, nombre } = f.properties;
         const label = comunaDisplayName(comunaId, nombre);
         expect(fold(label), comunaId).toBe(fold(nombre));

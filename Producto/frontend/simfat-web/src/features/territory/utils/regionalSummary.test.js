@@ -220,4 +220,11 @@ describe('regionalSummary', () => {
     expect(bad.firmsCount48h).toBeNull();
     expect(bad.reports7d).toBeNull();
   });
+
+  it('restores curated names when the score only carries the GADM joined name', () => {
+    const summary = regionalSummary({
+      comunaScores: { 'CHL.6.2.5_1': score(0.9, 'ALTO', 'LosAngeles') }
+    });
+    expect(summary.top[0].name).toBe('Los Ángeles');
+  });
 });
