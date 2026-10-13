@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { buildScoreExplanation, hasWeatherRow } from './scoreExplanation';
 
 const MB = 'MapBiomas';
+const P = 'Aporte al puntaje: ';
 const STRUCT = '(susceptibilidad estructural)';
 
 function standardScore(overrides = {}) {
@@ -35,8 +36,7 @@ describe('buildScoreExplanation - empty inputs', () => {
 describe('buildScoreExplanation - presence and order', () => {
   it('puts MapBiomas first with the structural label and keeps zeros with data', () => {
     const out = buildScoreExplanation(standardScore());
-    expect(out.compositionLine).toBe(
-      `${MB} 31 ${STRUCT} · FWI 7 · Focos FIRMS 0 · Reportes 0`
+    expect(out.compositionLine).toBe(`${P}${MB} 31 ${STRUCT} · FWI 7 · Focos FIRMS 0 · Reportes 0`
     );
   });
 
@@ -47,8 +47,7 @@ describe('buildScoreExplanation - presence and order', () => {
       mapbiomasWeight: 0.5,
       components: { reports: 0.04, firms: 0.1, ndvi: 0.02, ndmi: 0.08, fwi: 0.2, mapbiomas: 0.06 }
     });
-    expect(out.compositionLine).toBe(
-      `${MB} 6 ${STRUCT} · FWI 20 · NDMI 8 · NDVI 2 · Focos FIRMS 10 · Reportes 4`
+    expect(out.compositionLine).toBe(`${P}${MB} 6 ${STRUCT} · FWI 20 · NDMI 8 · NDVI 2 · Focos FIRMS 10 · Reportes 4`
     );
   });
 
@@ -75,7 +74,7 @@ describe('buildScoreExplanation - presence and order', () => {
       fwiRaw: 3,
       components: { fwi: 0.07, firms: 0, reports: 0 }
     });
-    expect(out.compositionLine).toBe('FWI 7 · Focos FIRMS 0 · Reportes 0');
+    expect(out.compositionLine).toBe('Aporte al puntaje: FWI 7 · Focos FIRMS 0 · Reportes 0');
   });
 
   it('hides FWI when fwiRaw is missing even if components.fwi is a number', () => {
@@ -86,12 +85,12 @@ describe('buildScoreExplanation - presence and order', () => {
       components: { mapbiomas: 0.31, fwi: 0, firms: 0 }
     });
     expect(out.compositionLine).not.toContain('FWI');
-    expect(out.compositionLine).toBe(`${MB} 31 ${STRUCT} · Focos FIRMS 0`);
+    expect(out.compositionLine).toBe(`${P}${MB} 31 ${STRUCT} · Focos FIRMS 0`);
   });
 
   it('never renders "sin datos" or placeholders', () => {
     const out = buildScoreExplanation({ scoreComposite: 0.2, components: { firms: null, reports: 0.2 } });
-    expect(out.compositionLine).toBe('Reportes 20');
+    expect(out.compositionLine).toBe('Aporte al puntaje: Reportes 20');
     expect(JSON.stringify(out)).not.toMatch(/sin datos/i);
   });
 });
@@ -105,8 +104,7 @@ describe('buildScoreExplanation - rounding', () => {
       mapbiomasWeight: 0.5,
       components: { mapbiomas: 0.125, fwi: 0.125, firms: 0.125 }
     });
-    expect(out.compositionLine).toBe(
-      `${MB} 13 ${STRUCT} · FWI 13 · Focos FIRMS 12`
+    expect(out.compositionLine).toBe(`${P}${MB} 13 ${STRUCT} · FWI 13 · Focos FIRMS 12`
     );
   });
 
@@ -116,7 +114,7 @@ describe('buildScoreExplanation - rounding', () => {
       fwiRaw: 10,
       components: { fwi: 0.2, firms: 0.1 }
     });
-    expect(out.compositionLine).toBe('Composición aprox.: FWI 20 · Focos FIRMS 10');
+    expect(out.compositionLine).toBe('Aporte al puntaje (aprox.): FWI 20 · Focos FIRMS 10');
   });
 });
 

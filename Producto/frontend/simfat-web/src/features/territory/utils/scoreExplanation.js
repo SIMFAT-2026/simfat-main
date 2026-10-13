@@ -68,7 +68,7 @@ function buildCompositionLine(score) {
     .map(({ label, suffix = '' }, i) => `${label} ${points[i]}${suffix}`)
     .join(' · ');
 
-  return apportioned ? body : `Composición aprox.: ${body}`;
+  return apportioned ? `Aporte al puntaje: ${body}` : `Aporte al puntaje (aprox.): ${body}`;
 }
 
 function buildRawLine(score) {

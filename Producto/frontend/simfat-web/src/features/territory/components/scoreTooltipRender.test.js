@@ -23,7 +23,13 @@ describe('score tooltip lines render', () => {
   it('renders the approximate fallback with its accent intact', () => {
     const inconsistent = { scoreComposite: 0.8, fwiRaw: 10, components: { fwi: 0.2, firms: 0.1 } };
     const html = renderToStaticMarkup(createElement(ScoreCompositionLine, { score: inconsistent }));
-    expect(html).toContain('Composición aprox.: FWI 20 · Focos FIRMS 10');
+    expect(html).toBe(
+      '<div class="comuna-tooltip-composition">Aporte al puntaje (aprox.): FWI 20 · Focos FIRMS 10</div>'
+    );
+    expect(html).toContain('Aporte al puntaje');
+    expect(html).toContain('(aprox.)');
+    expect(html).not.toContain('Composición aprox.');
+    expect(html).not.toMatch(/>Puntaje /);
   });
 
   it('renders the raw line with es-CL formatting', () => {
