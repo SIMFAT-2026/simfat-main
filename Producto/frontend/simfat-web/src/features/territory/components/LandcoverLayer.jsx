@@ -8,6 +8,7 @@ import {
   landcoverLegendNote,
   landcoverTooltipLines
 } from '../utils/landcoverLayer';
+import { MAPBIOMAS_LANDCOVER_CITATION } from '../utils/mapbiomasCitations';
 import { landcoverFillOpacity } from '../utils/mapbiomasStyle';
 
 // Leaflet renders string tooltips as HTML, so build a DOM node with textContent:
@@ -137,7 +138,7 @@ export function LandcoverLegend({ state }) {
           <p className="territory-meta">Cada comuna se colorea según su clase de cobertura dominante.</p>
           {note && <p className="territory-meta">{note}</p>}
           <p className="territory-meta">
-            Fuente: {layer.citation || 'MapBiomas Chile, Colección 2 (CC BY 4.0)'}. Colores: leyenda oficial de
+            Fuente: {layer.citation || MAPBIOMAS_LANDCOVER_CITATION} Colores: leyenda oficial de
             MapBiomas Chile.
           </p>
         </>

@@ -72,7 +72,7 @@ function Attribution({ attribution }) {
   const license =
     attribution.license && !attribution.text.includes(attribution.license) ? ` (${attribution.license})` : '';
   return (
-    <p className="mb-source">
+    <p className="mb-source" style={{ whiteSpace: 'pre-line' }}>
       {attribution.text}
       {license}
       {attribution.sourceUrl && (
