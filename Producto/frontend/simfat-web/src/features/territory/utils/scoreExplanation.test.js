@@ -158,6 +158,7 @@ describe('formatWeatherRow', () => {
     expect(formatWeatherRow({ tempMin: -0.4, tempMax: 5, humidityMin: 50, windMax: 3 })).toBe('0°/5° · 50% · 3 km/h');
     expect(formatWeatherRow({ tempMax: -0.2 })).toBe('0° · — · —');
     expect(formatWeatherRow({ tempMin: -3.2, tempMax: 4 })).toBe('-3°/4° · — · —');
+    expect(formatWeatherRow({ tempMax: 7, precip: 0.5 })).toBe('7° · — · — · 0,5 mm');
   });
 
   it('omits precipitation when zero or missing and keeps placeholders', () => {

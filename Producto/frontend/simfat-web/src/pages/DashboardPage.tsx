@@ -10,6 +10,7 @@ import {
 } from '../features/territory/constants/colorScales';
 import { generateRegionalReport } from '../features/territory/utils/reportPrint';
 import { reportCategoryLabel } from '../utils/labels';
+import { comunaDisplayName } from '../data/territorioChile';
 import '../features/territory/territory.css';
 import '../features/dashboard/dashboard.css';
 
@@ -268,7 +269,12 @@ function AlertsPanel({ features }: { features: GeoFeature[] }) {
     (f) => (f.properties as { type?: string })?.type === 'FIRMS_HOY'
   );
   const total = comunas.length;
-  const names = comunas.map((f) => (f.properties as { label?: string })?.label).filter(Boolean);
+  const names = comunas
+    .filter((f) => (f.properties as { label?: string })?.label)
+    .map((f) => ({
+      id: String(f.id),
+      name: comunaDisplayName(String(f.id), (f.properties as { label?: string }).label),
+    }));
 
   return (
     <div style={panel}>
@@ -290,8 +296,8 @@ function AlertsPanel({ features }: { features: GeoFeature[] }) {
           {total === 0 ? (
             <span style={{ fontSize: '0.76rem', color: '#94a3b8' }}>Sin detecciones hoy</span>
           ) : (
-            names.slice(0, 5).map((name) => (
-              <div key={name} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            names.slice(0, 5).map(({ id, name }) => (
+              <div key={id} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#ef4444', flexShrink: 0 }} />
                 <span style={{ fontSize: '0.74rem', color: '#334155' }}>{name}</span>
               </div>

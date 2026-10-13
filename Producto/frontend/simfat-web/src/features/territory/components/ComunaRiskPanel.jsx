@@ -245,7 +245,7 @@ export default function ComunaRiskPanel({ comunaId, comunaName = null, score, re
       <aside className="comuna-risk-panel">
         <div className="panel-header">
           <div>
-            <h4 className="panel-nombre">{comunaName || comunaId}</h4>
+            <h4 className="panel-nombre">{comunaDisplayName(comunaId, comunaName)}</h4>
           </div>
           <button type="button" className="panel-close" onClick={onClose} aria-label="Cerrar">×</button>
         </div>

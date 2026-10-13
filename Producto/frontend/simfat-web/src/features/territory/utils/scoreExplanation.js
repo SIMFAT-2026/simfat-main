@@ -24,8 +24,8 @@ function format(value, decimals) {
       maximumFractionDigits: decimals
     });
   }
-  // `|| 0` turns -0 (e.g. Math.round(-0.4)) into 0 so "-0" never renders.
-  return formatters[decimals].format(value || 0);
+  // Normalize only negative zero (e.g. Math.round(-0.4)) so "-0" never renders.
+  return formatters[decimals].format(Object.is(value, -0) ? 0 : value);
 }
 
 function isPresent(key, score) {
