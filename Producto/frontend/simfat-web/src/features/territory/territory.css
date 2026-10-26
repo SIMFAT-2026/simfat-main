@@ -360,8 +360,8 @@
 }
 
 @media (max-width: 640px) {
-  /* Each chip + control pair takes its own line; the control may wrap under
-     the chip on very narrow screens instead of overflowing. */
+  /* The control may wrap under its chip on very narrow screens instead of
+     overflowing; the compact phone block below lets pairs share a line. */
   .territory-chip-pair {
     flex-wrap: wrap;
     flex-basis: 100%;
@@ -1194,9 +1194,26 @@
     text-align: left;
   }
 
-  .territory-map-wrapper {
+  /* Must match the specificity of `.sidebar-collapsed .territory-map-wrapper`, or its
+     two-column template wins and the map column collapses to ~0px on narrow screens. */
+  .territory-map-wrapper,
+  .sidebar-collapsed .territory-map-wrapper {
     grid-template-columns: 1fr;
   }
+}
+
+/* Compact phone layout: keep 44px touch targets but stop controls from
+   filling the screen so the map shows near the top. */
+@media (max-width: 640px) {
+  .territory-toggle-row { gap: 2px 4px; }
+  .territory-chips { gap: 4px; }
+  .territory-toggle,
+  .territory-more-button,
+  .territory-info-button { padding-inline: 8px; }
+  .territory-toggle span { white-space: nowrap; overflow-wrap: normal; }
+  .territory-chip-pair { flex-basis: auto; }
+  .territory-control-actions { min-width: 0; width: 100%; }
+  .territory-map { height: min(430px, 60vh); min-height: 280px; }
 }
 
 /* ── MapBiomas section of the comuna panel ── */
