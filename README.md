@@ -170,3 +170,12 @@ Los datos de MapBiomas Chile incluidos en el repositorio (por ejemplo, `Producto
 > MapBiomas – Colección 1 de la Serie Anual de Mapas de Área Quemada de Chile (Fuego, 2013–2025), consultada el 30 de septiembre de 2026 a través del enlace: https://storage.googleapis.com/mapbiomas-public/initiatives/chile/fire/collection1/
 
 Las fechas y enlaces de cada archivo descargado están registrados en `Producto/analytics/mapbiomas/data/manifest.json`.
+
+### Datos de la API
+
+Los datos que sirve la API pública de NoFires (puntajes de riesgo, susceptibilidad derivada de MapBiomas, capas y alertas) se publican bajo [CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/): uso libre no comercial, con atribución a NoFires. La licencia NC cubre los aportes propios de NoFires (puntajes calculados, índices y agregaciones), no los datos originales de MapBiomas, que siguen bajo CC BY 4.0.
+
+- Atribución sugerida: «Fuente: NoFires (https://nofires-latam.vercel.app), CC BY-NC 4.0».
+- Qué se considera uso no comercial: ver el [texto de la licencia](https://creativecommons.org/licenses/by-nc/4.0/).
+- Los campos derivados de MapBiomas también requieren la cita de MapBiomas indicada arriba.
+- Para uso comercial, escribir a David Vásquez – d.vasquez.ovalle@gmail.com.
