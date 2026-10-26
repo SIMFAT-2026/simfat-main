@@ -24,7 +24,7 @@ class OpenApiSwaggerIntegrationTest {
         mockMvc.perform(get("/v3/api-docs"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.openapi").exists())
-            .andExpect(jsonPath("$.info.title").value("SIMFAT Backend API"))
+            .andExpect(jsonPath("$.info.title").value("NoFires API"))
             .andExpect(jsonPath("$.info.version").value("v1"));
     }
 
@@ -36,7 +36,8 @@ class OpenApiSwaggerIntegrationTest {
             .andExpect(jsonPath("$.info.license.url").value("https://creativecommons.org/licenses/by-nc/4.0/"))
             .andExpect(jsonPath("$.info.contact.name").value("David Vásquez"))
             .andExpect(jsonPath("$.info.contact.email").value("d.vasquez.ovalle@gmail.com"))
-            .andExpect(jsonPath("$.info.description").value(containsString("MapBiomas")));
+            .andExpect(jsonPath("$.info.description").value(containsString("MapBiomas")))
+            .andExpect(jsonPath("$.info.description").value(containsString("atribución")));
     }
 
     @Test

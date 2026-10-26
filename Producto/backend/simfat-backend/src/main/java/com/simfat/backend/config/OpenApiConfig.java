@@ -12,12 +12,12 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 @OpenAPIDefinition(
     info = @Info(
-        title = "SIMFAT Backend API",
+        title = "NoFires API",
         version = "v1",
-        description = "Documentacion interactiva para pruebas de endpoints en entorno local/dev. "
-            + "Los datos de la API se publican bajo CC BY-NC 4.0: atribucion a NoFires requerida, "
-            + "uso comercial solo con acuerdo previo. Los campos derivados de MapBiomas Chile "
-            + "(CC BY 4.0) tambien requieren la cita de MapBiomas.",
+        description = "API de NoFires (ex SIMFAT), plataforma de monitoreo y alerta temprana de "
+            + "incendios forestales. Los datos de la API se publican bajo CC BY-NC 4.0: se requiere "
+            + "atribución a NoFires y el uso comercial necesita un acuerdo previo. Los campos "
+            + "derivados de MapBiomas Chile (CC BY 4.0) también requieren la cita de MapBiomas.",
         contact = @Contact(name = "David Vásquez", email = "d.vasquez.ovalle@gmail.com"),
         license = @License(
             name = "CC BY-NC 4.0 (datos de la API) · código MIT",
